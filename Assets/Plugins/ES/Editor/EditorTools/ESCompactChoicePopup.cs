@@ -19,6 +19,11 @@ namespace ES
     {
         private const string StylePath = "Assets/Plugins/ES/Editor/EditorTools/ESCompactChoicePopup.uss";
         private const int RecommendedMaximumOptions = 12;
+        private const int MaximumSupportedOptions = 256;
+        private const float MinimumPopupWidth = 280f;
+        private const float MaximumPopupWidth = 1000f;
+        private const float MinimumPopupHeight = 190f;
+        private const float MaximumPopupHeight = 700f;
         private static ESCompactChoicePopup activePopup;
         private static bool openingPopup;
 
@@ -49,7 +54,11 @@ namespace ES
         private readonly List<Button> optionButtons = new List<Button>();
         private int keyboardIndex;
         private IDisposable hostInteractionHold;
+        private EditorWindow hostWindow;
+        private VisualElement hostRoot;
+        private IVisualElementScheduledItem focusSchedule;
         private bool configured;
+        private bool selectionInProgress;
 
         public static bool Open(VisualElement anchor, EditorWindow hostWindow, string title,
             IReadOnlyList<Option> choices, string hint = null, Vector2? windowSize = null)
@@ -64,14 +73,43 @@ namespace ES
                 Debug.LogWarning("[ESCompactChoicePopup] 没有可显示的选项。");
                 return false;
             }
+            if (choices.Count > MaximumSupportedOptions)
+            {
+                Debug.LogWarning("[ESCompactChoicePopup] 选项数量超过安全上限 "
+                    + MaximumSupportedOptions + "，请改用 ESSearchDropdown。");
+                return false;
+            }
             if (choices.Count > RecommendedMaximumOptions)
                 Debug.LogWarning("[ESCompactChoicePopup] 当前有 " + choices.Count
                     + " 个选项；超过 12 项时建议使用 ESSearchDropdown。");
 
             Vector2 size = windowSize ?? new Vector2(400f,
-                Mathf.Clamp(62f + choices.Count * 43f, 190f, 460f));
+                Mathf.Clamp(62f + choices.Count * 43f, MinimumPopupHeight, 460f));
+            size = NormalizePopupSize(size, choices.Count);
+            // Popup creation and CreateGUI are separated by Unity's window lifecycle.
+            // Snapshot the bounded choices so a mutable caller list cannot change the
+            // button/index contract while the popup is being created or displayed.
+            Option[] choiceSnapshot = new Option[choices.Count];
+            for (int index = 0; index < choices.Count; index++)
+                choiceSnapshot[index] = choices[index];
             if (activePopup != null)
-                activePopup.Close();
+            {
+                try
+                {
+                    activePopup.Close();
+                }
+                catch (Exception closeException)
+                {
+                    // Do not open a second instance while the previous native
+                    // popup could not be closed; preserve the single-instance contract.
+                    Debug.LogException(new InvalidOperationException(
+                        "[ESCompactChoicePopup] 现有弹窗关闭失败，已拒绝创建第二个实例。",
+                        closeException));
+                    return false;
+                }
+                if (activePopup != null)
+                    return false;
+            }
             openingPopup = true;
             ESCompactChoicePopup popup = null;
             try
@@ -81,7 +119,9 @@ namespace ES
                 popup.hideFlags = HideFlags.DontSave;
                 popup.popupTitle = string.IsNullOrWhiteSpace(title) ? "选择" : title.Trim();
                 popup.popupHint = string.IsNullOrWhiteSpace(hint) ? "少量固定选项" : hint.Trim();
-                popup.options = choices;
+                popup.options = choiceSnapshot;
+                popup.hostWindow = hostWindow;
+                popup.hostRoot = hostWindow != null ? hostWindow.rootVisualElement : null;
                 popup.configured = true;
                 popup.titleContent = new GUIContent(popup.popupTitle);
                 popup.minSize = size;
@@ -89,21 +129,50 @@ namespace ES
                 popup.hostInteractionHold = ESWindowFoundation.HoldInteraction(
                     hostWindow,
                     "ESCompactChoicePopup");
+                popup.hostRoot?.RegisterCallback<DetachFromPanelEvent>(popup.OnHostDetached);
                 popup.ShowAsDropDown(anchorRect, size);
                 popup.Focus();
+                EditorApplication.delayCall -= popup.CloseIfContextWasLost;
+                EditorApplication.delayCall += popup.CloseIfContextWasLost;
                 return true;
             }
             catch
             {
-                popup.ReleaseHostInteractionHold();
                 if (popup != null)
-                    popup.Close();
+                {
+                    popup.ReleaseHostInteractionHold();
+                    try { popup.Close(); }
+                    catch (Exception closeException)
+                    {
+                        Debug.LogException(closeException);
+                    }
+                    if (ReferenceEquals(activePopup, popup))
+                        activePopup = null;
+                }
                 throw;
             }
             finally
             {
                 openingPopup = false;
             }
+        }
+
+        private static Vector2 NormalizePopupSize(Vector2 requested, int optionCount)
+        {
+            float fallbackHeight = Mathf.Clamp(
+                62f + Mathf.Max(0, optionCount) * 43f,
+                MinimumPopupHeight,
+                460f);
+            float width = IsFinite(requested.x) && requested.x > 0f ? requested.x : 400f;
+            float height = IsFinite(requested.y) && requested.y > 0f ? requested.y : fallbackHeight;
+            return new Vector2(
+                Mathf.Clamp(width, MinimumPopupWidth, MaximumPopupWidth),
+                Mathf.Clamp(height, MinimumPopupHeight, MaximumPopupHeight));
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private void OnEnable()
@@ -117,6 +186,13 @@ namespace ES
         public void CreateGUI()
         {
             ESWindowFoundation.BindTransient(this);
+            focusSchedule?.Pause();
+            focusSchedule = null;
+            // Unity may rebuild an EditorWindow visual tree without recreating the
+            // managed window. Make CreateGUI idempotent so options and callbacks
+            // cannot accumulate across a panel rebuild.
+            rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+            rootVisualElement.Clear();
             StyleSheet style = AssetDatabase.LoadAssetAtPath<StyleSheet>(StylePath);
             if (style != null && !rootVisualElement.styleSheets.Contains(style))
                 rootVisualElement.styleSheets.Add(style);
@@ -174,16 +250,22 @@ namespace ES
                     keyboardIndex = index;
             }
             rootVisualElement.Add(list);
-            rootVisualElement.schedule.Execute(FocusCurrent).ExecuteLater(25);
+            focusSchedule = rootVisualElement.schedule.Execute(FocusCurrent).ExecuteLater(25);
         }
 
         private void OnDisable()
         {
             EditorApplication.delayCall -= CloseIfContextWasLost;
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+            focusSchedule?.Pause();
+            focusSchedule = null;
+            hostRoot?.UnregisterCallback<DetachFromPanelEvent>(OnHostDetached);
+            hostRoot = null;
             ReleaseHostInteractionHold();
+            hostWindow = null;
             ESWindowFoundation.Suspend(this);
             configured = false;
+            selectionInProgress = false;
             options = Array.Empty<Option>();
             optionButtons.Clear();
             if (ReferenceEquals(activePopup, this))
@@ -198,14 +280,37 @@ namespace ES
         private void CloseIfContextWasLost()
         {
             EditorApplication.delayCall -= CloseIfContextWasLost;
-            if (this != null && !configured)
+            bool hostContextLost = hostWindow == null
+                || hostWindow.rootVisualElement == null
+                || hostWindow.rootVisualElement.panel == null
+                || (rootVisualElement != null
+                    && rootVisualElement.panel != null
+                    && !ReferenceEquals(rootVisualElement.panel, hostWindow.rootVisualElement.panel));
+            if (this != null && (!configured || hostContextLost))
+                Close();
+        }
+
+        private void OnHostDetached(DetachFromPanelEvent evt)
+        {
+            if (this != null)
                 Close();
         }
 
         private void ReleaseHostInteractionHold()
         {
-            hostInteractionHold?.Dispose();
+            IDisposable hold = hostInteractionHold;
             hostInteractionHold = null;
+            if (hold == null)
+                return;
+            try
+            {
+                hold.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCompactChoicePopup] 宿主交互保持释放失败。", exception));
+            }
         }
 
         private void OnKeyDown(KeyDownEvent evt)
@@ -235,14 +340,17 @@ namespace ES
 
         private void FocusCurrent()
         {
+            if (!configured || rootVisualElement == null || rootVisualElement.panel == null)
+                return;
             if (keyboardIndex >= 0 && keyboardIndex < optionButtons.Count)
                 optionButtons[keyboardIndex]?.Focus();
         }
 
         private void Select(int index)
         {
-            if (index < 0 || index >= options.Count)
+            if (selectionInProgress || index < 0 || index >= options.Count)
                 return;
+            selectionInProgress = true;
             Option option = options[index];
             try { option.OnSelected?.Invoke(); }
             catch (Exception exception)
@@ -273,9 +381,5 @@ namespace ES
             return true;
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
     }
 }

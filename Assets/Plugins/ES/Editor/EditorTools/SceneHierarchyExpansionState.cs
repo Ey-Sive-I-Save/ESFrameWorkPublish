@@ -338,6 +338,10 @@ public static class SceneHierarchyExpansionState
     {
         if (state == PlayModeStateChange.ExitingEditMode)
         {
+            // SceneView 基线只允许由编辑模式下场景切换后的首帧建立。
+            // 若此时尚未绘制就进入 PlayMode，必须撤销待捕获回调，
+            // 避免把运行中的 SceneView 相机误保存为编辑器基线。
+            CancelSceneViewCameraBaseline();
             RememberActiveSceneViewCameraState();
             SaveLoadedScenesExpansionState();
             return;
@@ -876,7 +880,7 @@ public static class SceneHierarchyExpansionState
             return;
 
         EditorUtility.SetDirty(globalData);
-        AssetDatabase.SaveAssets();
+        AssetDatabase.SaveAssetIfDirty(globalData);
     }
 
     private static string GetProjectHash()
@@ -1099,8 +1103,17 @@ public static class SceneHierarchyExpansionState
         if (EditorApplication.timeSinceStartup - sceneViewCameraBaselineStartedAt < SceneViewCameraBaselineTimeoutSeconds)
             return;
 
+        bool hasSceneView = SceneView.sceneViews != null && SceneView.sceneViews.Count > 0;
         CancelSceneViewCameraBaseline();
-        Debug.LogWarning("[SceneHierarchyExpansionState] 未等到 SceneView 绘制帧，已取消本次场景相机基线。");
+        if (hasSceneView)
+        {
+            // A SceneView can exist without receiving a draw callback while Unity is
+            // restoring layouts, entering PlayMode, or the view is hidden behind a
+            // different dock. This is an expected, retryable condition rather than
+            // a user-facing warning; keep the cancellation observable without
+            // making the Console look like the scene or camera state is corrupted.
+            Debug.Log("[SceneHierarchyExpansionState] 当前未收到 SceneView 绘制帧，已取消本次相机基线捕获；下次场景视图绘制时将重试。");
+        }
     }
 
     private static void RememberActiveSceneViewCameraState()
@@ -1280,8 +1293,17 @@ public static class SceneHierarchyExpansionState
 
             if (FindMethodOwner(hierarchyObject, "SetExpanded", ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out object owner, out MethodInfo method))
             {
-                method.Invoke(owner, new object[] { instanceId, expanded });
-                return true;
+                try
+                {
+                    method.Invoke(owner, new object[] { instanceId, expanded });
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "SceneHierarchy SetExpanded 反射调用失败，已安全跳过。", exception));
+                    return false;
+                }
             }
 
             return TrySetExpandedId(hierarchyObject, instanceId, expanded);
@@ -1299,8 +1321,17 @@ public static class SceneHierarchyExpansionState
             // Unity 2022 的 SceneHierarchyWindow 内部通常持有 m_SceneHierarchy。
             // 如果字段名变化，则回退到 window 自身继续搜索，降低版本差异导致的失败概率。
             object window = windows[0];
-            var field = HierarchyWindowType.GetField("m_SceneHierarchy", InstanceFlags);
-            return field != null ? field.GetValue(window) : window;
+            try
+            {
+                var field = HierarchyWindowType.GetField("m_SceneHierarchy", InstanceFlags);
+                return field != null ? field.GetValue(window) : window;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "SceneHierarchy 内部对象解析失败，已安全跳过。", exception));
+                return null;
+            }
         }
 
         private static bool TryFindExpandedIds(object source, int depth, HashSet<object> visited, out IList expandedIds)

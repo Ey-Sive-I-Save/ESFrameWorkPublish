@@ -1809,6 +1809,15 @@ namespace ES
             SimpleToolsWindow.UsingWindow?.Repaint();
         }
 
+        public override void OnPageDisable()
+        {
+            EditorApplication.delayCall -= ShowDeferredActionFeedback;
+            EditorApplication.delayCall -= ShowDeferredDiagnostics;
+            EditorApplication.delayCall -= DeferredRefresh;
+            lastActionFeedbackVisible = false;
+            base.OnPageDisable();
+        }
+
         private bool ConfirmMethodAction(WatchEntry entry)
         {
             if (!confirmMethodActions || entry == null || !(entry.MemberInfo is MethodInfo))
@@ -2491,12 +2500,14 @@ namespace ES
 
         private void RequestDeferredRefresh()
         {
-            EditorApplication.delayCall += () =>
-            {
-                CollectEntries(false, "操作后刷新");
-                if (SimpleToolsWindow.UsingWindow != null)
-                    SimpleToolsWindow.UsingWindow.Repaint();
-            };
+            EditorApplication.delayCall -= DeferredRefresh;
+            EditorApplication.delayCall += DeferredRefresh;
+        }
+
+        private void DeferredRefresh()
+        {
+            CollectEntries(false, "操作后刷新");
+            SimpleToolsWindow.UsingWindow?.Repaint();
         }
 
         private string GetOrCreateDraft(string key, string seed)

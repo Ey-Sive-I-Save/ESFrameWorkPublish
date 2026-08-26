@@ -155,7 +155,7 @@ namespace ES.EditorInternal
             Undo.RecordObject(theme, "恢复 ES 默认编辑器主题");
             theme.RestoreDefault();
             EditorUtility.SetDirty(theme);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(theme);
             ESEditorPresentation.InvalidateTheme();
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
         }
@@ -177,8 +177,17 @@ namespace ES.EditorInternal
             theme.name = "ESGlobalEditorTheme";
             theme.RestoreDefault();
             theme.HasConfirm = true;
-            AssetDatabase.CreateAsset(theme, ThemeAssetPath);
-            AssetDatabase.SaveAssets();
+            try
+            {
+                AssetDatabase.CreateAsset(theme, ThemeAssetPath);
+            }
+            catch
+            {
+                if (theme != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(theme)))
+                    UnityEngine.Object.DestroyImmediate(theme);
+                throw;
+            }
+            AssetDatabase.SaveAssetIfDirty(theme);
             AssetDatabase.Refresh();
             Debug.Log("[ES] 已创建默认编辑器主题：" + ThemeAssetPath, theme);
             return theme;

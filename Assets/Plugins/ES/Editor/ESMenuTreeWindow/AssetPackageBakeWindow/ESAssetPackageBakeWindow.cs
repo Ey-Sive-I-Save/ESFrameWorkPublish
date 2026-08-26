@@ -105,6 +105,8 @@ namespace ES
 
         protected override void ESWindow_OnHostDisable()
         {
+            EditorApplication.delayCall -= RepaintAssetPackageWindow;
+            ReleaseInstancePreviewResources();
             SaveSelectedBakeGuid(selectedBake);
             base.ESWindow_OnHostDisable();
         }
@@ -242,9 +244,10 @@ namespace ES
                             Page_AssetPackageBakeIndex state = context.GetPageState<Page_AssetPackageBakeIndex>();
                             if (state?.bake == null)
                                 return;
+                            Undo.RecordObject(state.bake, "修正资产包导出链路");
                             int removed = ESAssetPackageBakeUtility.RepairExportLinks(state.bake);
                             EditorUtility.SetDirty(state.bake);
-                            AssetDatabase.SaveAssets();
+                            AssetDatabase.SaveAssetIfDirty(state.bake);
                             EditorUtility.DisplayDialog("导出链路修正", $"已清理 {removed} 条无效或重复链路记录。目标资产未删除。", "确定");
                             ESAssetPackageBakeWindow.UsingWindow?.Repaint();
                         })
@@ -570,22 +573,37 @@ namespace ES
             string assetName = string.IsNullOrWhiteSpace(newBakeName) ? "资产包烘焙数据" : newBakeName.Trim();
             string path = AssetDatabase.GenerateUniqueAssetPath($"{parent}/{SanitizeFileName(assetName)}.asset");
             var bake = ScriptableObject.CreateInstance<ESAssetPackageBakeData>();
-            bake.displayName = assetName;
-            bake.exportConfigName = assetName;
-            bake.targetFolderPath = NormalizeAssetPath(newBakeTargetFolder);
-            bake.exportRootPath = "Assets/_ESAssetPackageExport/" + SanitizeFileName(assetName);
-            bake.EnsureCategoryFolderSettings();
-            AssetDatabase.CreateAsset(bake, path);
+            bool assetCommitted = false;
+            try
+            {
+                bake.displayName = assetName;
+                bake.exportConfigName = assetName;
+                bake.targetFolderPath = NormalizeAssetPath(newBakeTargetFolder);
+                bake.exportRootPath = "Assets/_ESAssetPackageExport/" + SanitizeFileName(assetName);
+                bake.EnsureCategoryFolderSettings();
+                AssetDatabase.CreateAsset(bake, path);
+                assetCommitted = true;
 
-            if (bakeImmediately)
-                ESAssetPackageBakeUtility.Bake(bake);
-            else
-                EditorUtility.SetDirty(bake);
+                if (bakeImmediately)
+                    ESAssetPackageBakeUtility.Bake(bake);
+                else
+                    EditorUtility.SetDirty(bake);
 
-            AssetDatabase.SaveAssets();
-            Selection.activeObject = bake;
-            EditorGUIUtility.PingObject(bake);
-            ESAssetPackageBakeWindow.SelectBake(bake, true);
+                AssetDatabase.SaveAssetIfDirty(bake);
+                Selection.activeObject = bake;
+                EditorGUIUtility.PingObject(bake);
+                ESAssetPackageBakeWindow.SelectBake(bake, true);
+            }
+            catch (Exception exception)
+            {
+                if (assetCommitted && AssetDatabase.LoadAssetAtPath<ESAssetPackageBakeData>(path) == bake)
+                    AssetDatabase.DeleteAsset(path);
+                else if (bake != null)
+                    DestroyImmediate(bake);
+
+                Debug.LogException(new InvalidOperationException(
+                    "[ESAssetPackageBakeWindow] 创建资产包烘焙数据失败，已清理本次生成的资产。", exception));
+            }
         }
 
         public void RefreshWindow()
@@ -1024,10 +1042,17 @@ namespace ES
                 if (bake.exportSessions != null && bake.exportSessions.Count > 0)
                 {
                     ESAssetPackageExportSession last = bake.exportSessions[bake.exportSessions.Count - 1];
-                    EditorGUILayout.LabelField("最近会话", $"{last.sessionId} | 新增 {last.createdCount} | 更新 {last.updatedCount} | 失败 {last.errorCount}");
-                    EditorGUILayout.LabelField("事务状态", last.transactionState.ToString());
-                    if (!string.IsNullOrWhiteSpace(last.transactionWarning))
-                        EditorGUILayout.HelpBox(last.transactionWarning, MessageType.Warning);
+                    if (last == null)
+                    {
+                        EditorGUILayout.HelpBox("最近导出会话记录为空或已损坏，请先执行链路诊断。", MessageType.Warning);
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField("最近会话", $"{last.sessionId} | 新增 {last.createdCount} | 更新 {last.updatedCount} | 失败 {last.errorCount}");
+                        EditorGUILayout.LabelField("事务状态", last.transactionState.ToString());
+                        if (!string.IsNullOrWhiteSpace(last.transactionWarning))
+                            EditorGUILayout.HelpBox(last.transactionWarning, MessageType.Warning);
+                    }
                 }
                 else
                 {
@@ -1104,11 +1129,14 @@ namespace ES
 
         public void SaveBake()
         {
+            if (bake == null)
+                return;
+            Undo.RecordObject(bake, "保存资产包索引");
             bake.EnsureIdentity();
             bake.EnsureCategoryFolderSettings();
             bake.RebuildStats();
             EditorUtility.SetDirty(bake);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(bake);
             ESAssetPackageBakeWindow.UsingWindow?.Repaint();
         }
 
@@ -1383,7 +1411,7 @@ namespace ES
 
             bake.RebuildStats();
             EditorUtility.SetDirty(bake);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(bake);
         }
 
         private void SetCategoryUse(bool value)
@@ -1391,6 +1419,7 @@ namespace ES
             if (bake == null || bake.records == null)
                 return;
 
+            Undo.RecordObject(bake, "设置资产包分类使用状态");
             foreach (var record in bake.records)
             {
                 if (record != null && record.category == category)
@@ -1721,6 +1750,8 @@ namespace ES
             EditorGUI.indentLevel = oldIndent;
             if (newUse != record.selectedForUse)
             {
+                if (bake != null)
+                    Undo.RecordObject(bake, "标记资产包记录使用状态");
                 record.selectedForUse = newUse;
                 SetSelectedRecord(record);
                 int recordCount = bake.records != null ? bake.records.Count : 0;
@@ -2394,6 +2425,7 @@ namespace ES
             window.SaveWindowState();
             window.titleContent = new GUIContent("预览: " + record.assetName);
             window.minSize = new Vector2(520f, 640f);
+            window.maxSize = new Vector2(1600f, 1400f);
             UnityEngine.Object asset = record.LoadAsset();
             if (asset != null)
                 Selection.activeObject = asset;
@@ -2462,6 +2494,7 @@ namespace ES
 
         protected override void ESWindow_OnHostEnable()
         {
+            maxSize = new Vector2(1600f, 1400f);
             EnsurePreviewPlayers();
             RestoreWindowState();
         }
@@ -2554,7 +2587,7 @@ namespace ES
 
             bake.RebuildStats();
             EditorUtility.SetDirty(bake);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(bake);
         }
 
         private void DrawExportLinkInfo()
@@ -2724,10 +2757,11 @@ namespace ES
                         StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
                         if (stateMachineConfig != null)
                         {
+                            Undo.RecordObject(stateMachineConfig, "保存状态机预览模型");
                             stateMachineConfig.previewModel = animationPreviewModel;
                             EditorUtility.SetDirty(stateMachineConfig);
+                            AssetDatabase.SaveAssetIfDirty(stateMachineConfig);
                         }
-                        AssetDatabase.SaveAssets();
                     }
                 }
             }
@@ -3053,27 +3087,51 @@ namespace ES
             if (sourceMaterial == material && previewObject != null && previewPrimitive == primitive)
                 return;
             DisposeInstance();
-            sourceMaterial = material;
-            previewPrimitive = primitive;
-            previewMaterial = new Material(material) { hideFlags = HideFlags.HideAndDontSave };
-            previewObject = GameObject.CreatePrimitive(primitive);
-            previewObject.name = "ESAssetPackageMaterialPreview";
-            Collider collider = previewObject.GetComponent<Collider>();
-            if (collider != null)
-                UnityEngine.Object.DestroyImmediate(collider);
-            previewContext.PreparePreviewObject(previewObject);
-            previewObject.transform.position = previewContext.GroupOrigin;
-            Renderer renderer = previewObject.GetComponent<Renderer>();
-            if (renderer != null)
-                renderer.sharedMaterial = previewMaterial;
+            Material nextMaterial = null;
+            GameObject nextObject = null;
+            try
+            {
+                nextMaterial = new Material(material) { hideFlags = HideFlags.HideAndDontSave };
+                nextObject = GameObject.CreatePrimitive(primitive);
+                nextObject.name = "ESAssetPackageMaterialPreview";
+                nextObject.hideFlags = ESEditorPreviewUtility.SamplingSafeHideFlags;
+                Collider collider = nextObject.GetComponent<Collider>();
+                if (collider != null)
+                    UnityEngine.Object.DestroyImmediate(collider);
+                if (!previewContext.PreparePreviewObject(nextObject))
+                    throw new InvalidOperationException("材质预览对象未能进入受管预览场景。");
+                nextObject.transform.position = previewContext.GroupOrigin;
+                Renderer renderer = nextObject.GetComponent<Renderer>();
+                if (renderer != null)
+                    renderer.sharedMaterial = nextMaterial;
+
+                sourceMaterial = material;
+                previewPrimitive = primitive;
+                previewMaterial = nextMaterial;
+                previewObject = nextObject;
+            }
+            catch
+            {
+                if (nextObject != null)
+                    UnityEngine.Object.DestroyImmediate(nextObject);
+                if (nextMaterial != null)
+                    UnityEngine.Object.DestroyImmediate(nextMaterial);
+                throw;
+            }
         }
 
         private void DisposeInstance()
         {
             if (previewObject != null)
-                UnityEngine.Object.DestroyImmediate(previewObject);
+            {
+                try { UnityEngine.Object.DestroyImmediate(previewObject); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
             if (previewMaterial != null)
-                UnityEngine.Object.DestroyImmediate(previewMaterial);
+            {
+                try { UnityEngine.Object.DestroyImmediate(previewMaterial); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
             previewObject = null;
             previewMaterial = null;
             sourceMaterial = null;
@@ -3422,12 +3480,28 @@ namespace ES
             previewListener = previewContext.EnsurePreviewAudioListener();
             if (previewAudioObject == null)
             {
-                previewAudioObject = new GameObject("ES Asset Package Audio Preview Source");
-                previewAudioObject.hideFlags = HideFlags.HideAndDontSave;
-                previewSource = previewAudioObject.AddComponent<AudioSource>();
-                previewSource.playOnAwake = false;
-                previewSource.loop = false;
-                previewContext.PreparePreviewAudioObject(previewAudioObject);
+                GameObject nextObject = null;
+                AudioSource nextSource = null;
+                try
+                {
+                    nextObject = new GameObject("ES Asset Package Audio Preview Source");
+                    nextObject.hideFlags = HideFlags.HideAndDontSave;
+                    nextSource = nextObject.AddComponent<AudioSource>();
+                    nextSource.playOnAwake = false;
+                    nextSource.loop = false;
+                    previewContext.PreparePreviewAudioObject(nextObject);
+                    previewAudioObject = nextObject;
+                    previewSource = nextSource;
+                }
+                catch
+                {
+                    if (nextObject != null)
+                    {
+                        try { UnityEngine.Object.DestroyImmediate(nextObject); }
+                        catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                    }
+                    throw;
+                }
             }
         }
 
@@ -3539,15 +3613,20 @@ namespace ES
 
         public void Dispose()
         {
-            Stop();
+            try { Stop(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             if (previewAudioObject != null)
-                UnityEngine.Object.DestroyImmediate(previewAudioObject);
+            {
+                try { UnityEngine.Object.DestroyImmediate(previewAudioObject); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
             previewAudioObject = null;
             previewSource = null;
             previewListener = null;
             currentClip = null;
             repaint = null;
-            previewContext.Dispose();
+            try { previewContext.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
         }
     }
 
@@ -3724,6 +3803,8 @@ namespace ES
             if (source == null)
                 return null;
 
+            size = Mathf.Clamp(size, 16, 2048);
+
             PreviewRenderUtility utility = null;
             GameObject instance = null;
             try
@@ -3743,11 +3824,18 @@ namespace ES
                 Bounds bounds = ESEditorPreviewUtility.CalculateBounds(instance);
                 Vector3 center = bounds.center;
                 float radius = Mathf.Max(0.5f, bounds.extents.magnitude);
+                if (float.IsNaN(center.x) || float.IsInfinity(center.x)
+                    || float.IsNaN(center.y) || float.IsInfinity(center.y)
+                    || float.IsNaN(center.z) || float.IsInfinity(center.z)
+                    || float.IsNaN(radius) || float.IsInfinity(radius)
+                    || Mathf.Abs(center.x) > 1000000f || Mathf.Abs(center.y) > 1000000f
+                    || Mathf.Abs(center.z) > 1000000f)
+                    return null;
                 utility.camera.aspect = 1f;
                 utility.camera.transform.position = center + new Vector3(0f, radius * 0.25f, -radius * 2.8f);
                 utility.camera.transform.LookAt(center);
                 utility.camera.nearClipPlane = 0.01f;
-                utility.camera.farClipPlane = radius * 10f;
+                utility.camera.farClipPlane = Mathf.Clamp(radius * 10f, 1f, 10000f);
                 utility.camera.clearFlags = CameraClearFlags.Color;
                 utility.camera.backgroundColor = new Color(0.18f, 0.18f, 0.18f, 1f);
                 utility.lights[0].intensity = 1.25f;
@@ -3767,8 +3855,25 @@ namespace ES
             finally
             {
                 if (instance != null)
-                    UnityEngine.Object.DestroyImmediate(instance);
-                utility?.Cleanup();
+                {
+                    try
+                    {
+                        UnityEngine.Object.DestroyImmediate(instance);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                }
+
+                try
+                {
+                    utility?.Cleanup();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
         }
 
@@ -4212,6 +4317,8 @@ namespace ES
             AssemblyReloadEvents.beforeAssemblyReload += ReleaseForAssemblyReload;
             EditorApplication.quitting -= ReleaseForEditorQuit;
             EditorApplication.quitting += ReleaseForEditorQuit;
+            EditorApplication.projectChanged -= ClearPreviewCacheAfterProjectChange;
+            EditorApplication.projectChanged += ClearPreviewCacheAfterProjectChange;
             ESAssetPackageGridAnimationFrameCache.BlockPersistentFrameLoading(ReloadDomainPersistentFrameBlockSeconds);
         }
 
@@ -4316,13 +4423,22 @@ namespace ES
 
         private static void ReleaseForAssemblyReload()
         {
+            EditorApplication.projectChanged -= ClearPreviewCacheAfterProjectChange;
             ESAssetPackageGridAnimationFrameCache.BlockPersistentFrameLoading(ReloadDomainPersistentFrameBlockSeconds);
             ReleaseAllPreviewResources("AssemblyReload");
         }
 
         private static void ReleaseForEditorQuit()
         {
+            EditorApplication.projectChanged -= ClearPreviewCacheAfterProjectChange;
             ReleaseAllPreviewResources("EditorQuit");
+        }
+
+        private static void ClearPreviewCacheAfterProjectChange()
+        {
+            // Asset reimport can replace the source object behind a cached model
+            // preview. Drop owned snapshots and stale keys before the next repaint.
+            ESAssetPackagePreviewUtility.ClearPreviewCache();
         }
 
         private static void ReleaseAllPreviewResources(string reason)
@@ -4352,6 +4468,7 @@ namespace ES
 
     internal sealed class ESAssetPackagePreviewSceneContext : IDisposable
     {
+        private const int MaxRenderTextureSize = 4096;
         public const int PreviewRenderLayer = 31;
         private const string Owner = "AssetPackagePreview";
         private const float PreviewGroupSpacing = 100f;
@@ -4379,6 +4496,7 @@ namespace ES
         private ESAssetPackagePreviewBaselinePlatform renderTexturePlatform;
         private double lastRenderTime;
         private bool disposed;
+        private bool cellReleased;
         private AudioListener previewAudioListener;
         private bool ownsPreviewAudioListener;
         private bool previewAudioListenerPlaying;
@@ -4416,28 +4534,50 @@ namespace ES
 
         public void Ensure()
         {
+            if (disposed)
+            {
+                LastStatus = "Preview context already disposed.";
+                return;
+            }
             if (Camera != null && (!usePreviewScene || previewScene.IsValid()))
                 return;
 
-            EnsurePreviewScene();
-            CreateCamera();
-            CreateLights();
-            LastStatus = usePreviewScene
-                ? "Preview context ready. Scene isolated, layer locked."
-                : "Preview context ready. Normal editor scene hidden objects, layer locked.";
+            try
+            {
+                // A preview scene can be invalidated by an external editor scene
+                // change while the context object is still alive. Do not keep a
+                // camera/lights from the dead scene and report the new scene as
+                // ready; tear down only those scene-bound objects and rebuild them.
+                if (usePreviewScene && Camera != null && !previewScene.IsValid())
+                    ResetSceneBoundPreviewObjects();
+                EnsurePreviewScene();
+                CreateCamera();
+                CreateLights();
+                LastStatus = usePreviewScene
+                    ? "Preview context ready. Scene isolated, layer locked."
+                    : "Preview context ready. Normal editor scene hidden objects, layer locked.";
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview context initialization failed: " + exception.Message;
+                Dispose();
+                throw;
+            }
         }
 
-        public void PreparePreviewObject(GameObject obj)
+        public bool PreparePreviewObject(GameObject obj)
         {
-            if (obj == null)
-                return;
+            if (disposed || obj == null)
+                return false;
 
             Ensure();
-            ApplyPreviewObjectLifecycle(obj, "Asset package preview model.", samplingTarget: true);
+            return ApplyPreviewObjectLifecycle(obj, "Asset package preview model.", samplingTarget: true);
         }
 
         public AudioListener EnsurePreviewAudioListener()
         {
+            if (disposed)
+                return null;
             Ensure();
             if (Camera == null)
                 return null;
@@ -4483,9 +4623,21 @@ namespace ES
             {
                 if (sharedPreviewAudioListener == null)
                 {
-                    GameObject listenerObject = new GameObject("ES Asset Package Preview Shared Audio Listener");
-                    listenerObject.hideFlags = HideFlags.HideAndDontSave;
-                    sharedPreviewAudioListener = listenerObject.AddComponent<AudioListener>();
+                    GameObject listenerObject = null;
+                    try
+                    {
+                        listenerObject = new GameObject("ES Asset Package Preview Shared Audio Listener");
+                        listenerObject.hideFlags = HideFlags.HideAndDontSave;
+                        sharedPreviewAudioListener = listenerObject.AddComponent<AudioListener>();
+                        if (sharedPreviewAudioListener == null)
+                            throw new InvalidOperationException("无法创建共享 AudioListener 组件。");
+                    }
+                    catch
+                    {
+                        DestroyObject(listenerObject);
+                        sharedPreviewAudioListener = null;
+                        throw;
+                    }
                 }
 
                 previewAudioListener = sharedPreviewAudioListener;
@@ -4536,29 +4688,52 @@ namespace ES
 
         public bool PreparePreviewAudioObject(GameObject obj)
         {
-            if (obj == null)
+            if (disposed || obj == null)
                 return false;
 
-            PreparePreviewObject(obj);
+            if (!PreparePreviewObject(obj))
+                return false;
             obj.transform.position = groupOrigin;
-            return obj.scene.IsValid();
+            return usePreviewScene ? obj.scene == previewScene : obj.scene.IsValid();
         }
 
         public bool MoveToPreviewScene(GameObject obj)
         {
-            if (obj == null)
+            if (disposed || obj == null)
                 return false;
 
             if (!usePreviewScene)
                 return MoveToActiveScene(obj);
 
-            EnsurePreviewScene();
-            SceneManager.MoveGameObjectToScene(obj, previewScene);
+            try
+            {
+                EnsurePreviewScene();
+                SceneManager.MoveGameObjectToScene(obj, previewScene);
+            }
+            catch (Exception exception)
+            {
+                LastObjectFlowStatus = "Preview object scene move failed: " + exception.Message;
+                return false;
+            }
+
             return obj.scene == previewScene;
         }
 
         public bool Render(Rect rect, Vector3 center, float radius, float renderScale, float yaw, float pitch, float zoom, ESAssetPackagePreviewBaselinePlatform baselinePlatform, double minRenderInterval = 0d)
         {
+            if (disposed || !IsFinite(rect.x) || !IsFinite(rect.y)
+                || !IsFinite(rect.width) || !IsFinite(rect.height)
+                || rect.width <= 0f || rect.height <= 0f
+                || !IsFinite(center.x) || !IsFinite(center.y) || !IsFinite(center.z)
+                || Mathf.Abs(center.x) > 1000000f || Mathf.Abs(center.y) > 1000000f
+                || Mathf.Abs(center.z) > 1000000f
+                || !IsFinite(radius) || !IsFinite(renderScale) || !IsFinite(yaw)
+                || !IsFinite(pitch) || !IsFinite(zoom))
+                return false;
+
+            radius = Mathf.Clamp(radius, 0.01f, 10000f);
+            renderScale = Mathf.Clamp(renderScale, 1f, 4f);
+            zoom = Mathf.Clamp(zoom, 0.01f, 100f);
             Ensure();
             if (Camera == null)
                 return false;
@@ -4578,8 +4753,8 @@ namespace ES
                 return true;
 
             float scale = Mathf.Clamp(EditorGUIUtility.pixelsPerPoint * renderScale, 1f, 4f);
-            int width = Mathf.Max(1, Mathf.CeilToInt(rect.width * scale));
-            int height = Mathf.Max(1, Mathf.CeilToInt(rect.height * scale));
+            int width = Mathf.Clamp(Mathf.CeilToInt(rect.width * scale), 1, MaxRenderTextureSize);
+            int height = Mathf.Clamp(Mathf.CeilToInt(rect.height * scale), 1, MaxRenderTextureSize);
             EnsureRenderTexture(width, height, baselinePlatform);
             if (renderTexture == null)
                 return false;
@@ -4600,6 +4775,11 @@ namespace ES
                 lastRenderTime = now;
                 GUI.DrawTexture(rect, renderTexture, ScaleMode.StretchToFill, false);
             }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview render failed: " + exception.Message;
+                return false;
+            }
             finally
             {
                 Camera.targetTexture = oldTarget;
@@ -4611,6 +4791,15 @@ namespace ES
 
         public Texture2D RenderSnapshot(int width, int height, Vector3 center, float radius, float yaw, float pitch, float zoom, ESAssetPackagePreviewBaselinePlatform baselinePlatform)
         {
+            if (disposed
+                || !IsFinite(center.x) || !IsFinite(center.y) || !IsFinite(center.z)
+                || Mathf.Abs(center.x) > 1000000f || Mathf.Abs(center.y) > 1000000f
+                || Mathf.Abs(center.z) > 1000000f
+                || !IsFinite(radius) || !IsFinite(yaw) || !IsFinite(pitch) || !IsFinite(zoom))
+                return null;
+
+            radius = Mathf.Clamp(radius, 0.01f, 10000f);
+            zoom = Mathf.Clamp(zoom, 0.01f, 100f);
             Ensure();
             if (Camera == null)
                 return null;
@@ -4644,7 +4833,6 @@ namespace ES
             if (disposed)
                 return;
 
-            disposed = true;
             ReleaseRenderTexture();
             DestroyObject(cameraObject);
             DestroyObject(keyLightObject);
@@ -4655,7 +4843,8 @@ namespace ES
                 sharedPreviewAudioUsers = Mathf.Max(0, sharedPreviewAudioUsers - 1);
                 if (sharedPreviewAudioUsers == 0)
                 {
-                    DestroyObject(sharedPreviewAudioListener.gameObject);
+                    if (sharedPreviewAudioListener != null)
+                        DestroyObject(sharedPreviewAudioListener.gameObject);
                     sharedPreviewAudioListener = null;
                     sharedPreviewAudioPlaying = 0;
                 }
@@ -4664,13 +4853,28 @@ namespace ES
             ownsPreviewAudioListener = false;
             previewAudioListenerPlaying = false;
             Camera = null;
-            ReleaseCell(allocatedCell);
 
             if (previewScene.IsValid())
             {
-                EditorSceneManager.ClosePreviewScene(previewScene);
+                try
+                {
+                    EditorSceneManager.ClosePreviewScene(previewScene);
+                }
+                catch (Exception exception)
+                {
+                    LastStatus = "PreviewScene 关闭失败，保留句柄等待重试：" + exception.Message;
+                    Debug.LogException(exception);
+                    return;
+                }
                 previewScene = default;
             }
+
+            if (!cellReleased)
+            {
+                ReleaseCell(allocatedCell);
+                cellReleased = true;
+            }
+            disposed = true;
         }
 
         private void EnsurePreviewScene()
@@ -4689,21 +4893,52 @@ namespace ES
             if (Camera != null)
                 return;
 
-            cameraObject = usePreviewScene
-                ? EditorUtility.CreateGameObjectWithHideFlags("ES Asset Package Preview Camera", HideFlags.HideAndDontSave, typeof(Camera))
-                : new GameObject("ES Asset Package Preview Camera", typeof(Camera));
-            ApplyPreviewObjectLifecycle(cameraObject, "Asset package preview camera.", samplingTarget: false);
-            Camera = cameraObject.GetComponent<Camera>();
-            Camera.enabled = false;
-            Camera.fieldOfView = 30f;
-            Camera.clearFlags = CameraClearFlags.Color;
-            Camera.backgroundColor = ESAssetPackagePresentation.Canvas;
-            Camera.cullingMask = 1 << PreviewRenderLayer;
-            Camera.allowHDR = true;
-            Camera.allowMSAA = true;
-            Camera.renderingPath = RenderingPath.Forward;
-            CameraSceneBound = usePreviewScene && TrySetCameraScene(Camera, previewScene);
-            AddAndConfigureUniversalCameraData(Camera);
+            try
+            {
+                cameraObject = usePreviewScene
+                    ? EditorUtility.CreateGameObjectWithHideFlags("ES Asset Package Preview Camera", HideFlags.HideAndDontSave, typeof(Camera))
+                    : new GameObject("ES Asset Package Preview Camera", typeof(Camera));
+                cameraObject.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                if (!ApplyPreviewObjectLifecycle(cameraObject, "Asset package preview camera.", samplingTarget: false))
+                    throw new InvalidOperationException("预览相机未能进入受管预览场景。");
+                Camera = cameraObject.GetComponent<Camera>();
+                Camera.enabled = false;
+                Camera.fieldOfView = 30f;
+                Camera.clearFlags = CameraClearFlags.Color;
+                Camera.backgroundColor = ESAssetPackagePresentation.Canvas;
+                Camera.cullingMask = 1 << PreviewRenderLayer;
+                Camera.allowHDR = true;
+                Camera.allowMSAA = true;
+                Camera.renderingPath = RenderingPath.Forward;
+                CameraSceneBound = usePreviewScene && TrySetCameraScene(Camera, previewScene);
+                AddAndConfigureUniversalCameraData(Camera);
+            }
+            catch
+            {
+                if (cameraObject != null)
+                    DestroyObject(cameraObject);
+                cameraObject = null;
+                Camera = null;
+                CameraSceneBound = false;
+                throw;
+            }
+        }
+
+        private void ResetSceneBoundPreviewObjects()
+        {
+            if (cameraObject != null)
+                DestroyObject(cameraObject);
+            cameraObject = null;
+            Camera = null;
+            CameraSceneBound = false;
+
+            if (keyLightObject != null)
+                DestroyObject(keyLightObject);
+            keyLightObject = null;
+
+            if (fillLightObject != null)
+                DestroyObject(fillLightObject);
+            fillLightObject = null;
         }
 
         private void CreateLights()
@@ -4719,25 +4954,38 @@ namespace ES
             GameObject go = usePreviewScene
                 ? EditorUtility.CreateGameObjectWithHideFlags(name, HideFlags.HideAndDontSave, typeof(Light))
                 : new GameObject(name, typeof(Light));
-            ApplyPreviewObjectLifecycle(go, "Asset package preview light.", samplingTarget: false);
-            Light light = go.GetComponent<Light>();
-            if (usePreviewScene)
+            try
             {
-                light.type = LightType.Directional;
-                light.intensity = intensity;
+                go.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                if (!ApplyPreviewObjectLifecycle(go, "Asset package preview light.", samplingTarget: false))
+                    throw new InvalidOperationException("预览灯光未能进入受管预览场景：" + name);
+                Light light = go.GetComponent<Light>();
+                if (light == null)
+                    throw new InvalidOperationException("预览灯光组件创建失败：" + name);
+                if (usePreviewScene)
+                {
+                    light.type = LightType.Directional;
+                    light.intensity = intensity;
+                }
+                else
+                {
+                    light.type = LightType.Spot;
+                    light.intensity = intensity * 5f;
+                    light.range = 60f;
+                    light.spotAngle = 75f;
+                }
+                light.cullingMask = 1 << PreviewRenderLayer;
+                light.transform.rotation = rotation;
+                if (!usePreviewScene)
+                    light.transform.position = groupOrigin - light.transform.forward * 18f + Vector3.up * 8f;
+                return go;
             }
-            else
+            catch
             {
-                light.type = LightType.Spot;
-                light.intensity = intensity * 5f;
-                light.range = 60f;
-                light.spotAngle = 75f;
+                if (go != null)
+                    DestroyObject(go);
+                throw;
             }
-            light.cullingMask = 1 << PreviewRenderLayer;
-            light.transform.rotation = rotation;
-            if (!usePreviewScene)
-                light.transform.position = groupOrigin - light.transform.forward * 18f + Vector3.up * 8f;
-            return go;
         }
 
         private void EnsureRenderTexture(int width, int height, ESAssetPackagePreviewBaselinePlatform baselinePlatform)
@@ -4745,16 +4993,22 @@ namespace ES
             if (renderTexture != null && renderTextureWidth == width && renderTextureHeight == height && renderTexturePlatform == baselinePlatform)
                 return;
 
-            ReleaseRenderTexture();
-            renderTextureWidth = width;
-            renderTextureHeight = height;
-            renderTexturePlatform = baselinePlatform;
-            renderTexture = ESEditorPreviewUtility.CreateRenderTexture(
+            RenderTexture created = ESEditorPreviewUtility.CreateRenderTexture(
                 width,
                 height,
                 24,
                 GetAntiAliasing(baselinePlatform),
                 "ES Asset Package Preview RT");
+            if (created == null)
+                return;
+
+            RenderTexture previous = renderTexture;
+            renderTexture = created;
+            renderTextureWidth = width;
+            renderTextureHeight = height;
+            renderTexturePlatform = baselinePlatform;
+            if (previous != null)
+                ESEditorPreviewUtility.ReleaseRenderTexture(ref previous);
         }
 
         private static int GetAntiAliasing(ESAssetPackagePreviewBaselinePlatform baselinePlatform)
@@ -4804,6 +5058,11 @@ namespace ES
         private static void DestroyObject(UnityEngine.Object obj)
         {
             ESEditorPreviewUtility.DestroyObject(obj);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static Vector2Int AllocateCell(int allocationId, out string report)
@@ -4898,12 +5157,22 @@ namespace ES
             }
         }
 
-        private void ApplyPreviewObjectLifecycle(GameObject obj, string note, bool samplingTarget)
+        private bool ApplyPreviewObjectLifecycle(GameObject obj, string note, bool samplingTarget)
         {
             if (obj == null)
-                return;
+                return false;
+            if (EditorUtility.IsPersistent(obj) || !ESEditorPreviewUtility.HasPreviewOwnershipFlags(obj))
+            {
+                LastObjectFlowStatus = "Preview object rejected: object is not an owned temporary preview object.";
+                return false;
+            }
 
             bool movedBeforeHide = usePreviewScene ? MoveToPreviewScene(obj) : MoveToActiveScene(obj);
+            if (!movedBeforeHide)
+            {
+                LastObjectFlowStatus = "Preview object rejected: scene move did not reach the required destination.";
+                return false;
+            }
             Scene sceneBeforeHide = obj.scene;
             HideFlags hideFlags = GetPreviewObjectHideFlags(samplingTarget);
             ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, hideFlags);
@@ -4921,6 +5190,7 @@ namespace ES
                 + ", MoveBeforeHide=" + movedBeforeHide
                 + ", MoveAfterHide=" + movedAfterHide
                 + ", Layer=" + PreviewRenderLayer;
+            return movedAfterHide;
         }
 
         private HideFlags GetPreviewObjectHideFlags(bool samplingTarget)
@@ -4938,7 +5208,7 @@ namespace ES
 
             Scene activeScene = SceneManager.GetActiveScene();
             if (!activeScene.IsValid())
-                return obj.scene.IsValid();
+                return false;
 
             if (obj.scene != activeScene)
             {
@@ -4951,7 +5221,7 @@ namespace ES
                 }
             }
 
-            return obj.scene.IsValid();
+            return obj.scene == activeScene;
         }
 
         private static string FormatScene(Scene scene)
@@ -5693,13 +5963,14 @@ namespace ES
                 if (!File.Exists(manifestPath))
                     return;
 
+                Texture2D[] loaded = null;
                 try
                 {
                     string existingManifest = File.ReadAllText(manifestPath, Encoding.UTF8);
                     if (!string.Equals(existingManifest, manifestContent, StringComparison.Ordinal))
                         return;
 
-                    var loaded = new Texture2D[FrameCount];
+                    loaded = new Texture2D[FrameCount];
                     for (int i = 0; i < FrameCount; i++)
                     {
                         string framePath = GetFramePath(persistentDirectory, i);
@@ -5710,17 +5981,27 @@ namespace ES
                         }
 
                         byte[] bytes = File.ReadAllBytes(framePath);
-                        var texture = new Texture2D(2, 2)
+                        Texture2D texture = null;
+                        try
                         {
-                            name = "ES Persistent Grid Frame " + (i + 1).ToString("000"),
-                            hideFlags = HideFlags.HideAndDontSave,
-                            filterMode = FilterMode.Bilinear
-                        };
-                        if (!texture.LoadImage(bytes, true))
+                            texture = new Texture2D(2, 2)
+                            {
+                                name = "ES Persistent Grid Frame " + (i + 1).ToString("000"),
+                                hideFlags = HideFlags.HideAndDontSave,
+                                filterMode = FilterMode.Bilinear
+                            };
+                            if (!texture.LoadImage(bytes, true))
+                            {
+                                UnityEngine.Object.DestroyImmediate(texture);
+                                DisposeLoadedFrames(loaded);
+                                return;
+                            }
+                        }
+                        catch
                         {
-                            UnityEngine.Object.DestroyImmediate(texture);
-                            DisposeLoadedFrames(loaded);
-                            return;
+                            if (texture != null)
+                                UnityEngine.Object.DestroyImmediate(texture);
+                            throw;
                         }
 
                         loaded[i] = texture;
@@ -5733,6 +6014,7 @@ namespace ES
                 }
                 catch (Exception ex)
                 {
+                    DisposeLoadedFrames(loaded);
                     error = "读取磁盘帧失败 " + ex.GetType().Name;
                 }
             }

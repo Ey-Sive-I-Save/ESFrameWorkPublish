@@ -47,6 +47,12 @@ namespace ES
 
         protected override string ESWindow_Subtitle => "仅验证导航与生命周期，不连接业务数据";
 
+        protected override void ESWindow_OnHostEnable()
+        {
+            base.ESWindow_OnHostEnable();
+            maxSize = new Vector2(1400f, 1000f);
+        }
+
         protected override void ESWindow_BuildGlobalActions(
             ICollection<ESMenuTreeGlobalAction> actions)
         {
@@ -1149,6 +1155,11 @@ namespace ES
         protected override string ESWindow_Subtitle => "无菜单树的统一 ES 功能面板宿主";
         protected override Vector2 ESWindow_MinSize => new Vector2(560f, 420f);
         protected override Vector2 ESWindow_DefaultSize => new Vector2(820f, 620f);
+        protected override void ESWindow_OnHostEnable()
+        {
+            base.ESWindow_OnHostEnable();
+            maxSize = new Vector2(1400f, 1000f);
+        }
         protected override ESMenuTreePageLayout ESWindow_PageLayout => ESMenuTreePageLayout.Compact;
         protected override float ESWindow_PageMaxContentWidth => 780f;
         protected override float ESWindow_PageContentPadding => 18f;
@@ -1709,6 +1720,7 @@ namespace ES
                 + " | edgeLayout=Left,Right,Top,Bottom"
                 + " | narrowHosts="
                 + ((OpenedWindows.Count + 3) / 4));
+            EditorApplication.delayCall -= RequestAllWindowsSleep;
             EditorApplication.delayCall += RequestAllWindowsSleep;
         }
 
@@ -1869,6 +1881,7 @@ namespace ES
 
         private static void StopOpeningQueue()
         {
+            EditorApplication.delayCall -= RequestAllWindowsSleep;
             bool closeBenchmarkProbes = benchmarkWindowCount > 0;
             EditorApplication.update -= OpenNextWindow;
             EditorApplication.update -= UpdatePerformanceBenchmark;

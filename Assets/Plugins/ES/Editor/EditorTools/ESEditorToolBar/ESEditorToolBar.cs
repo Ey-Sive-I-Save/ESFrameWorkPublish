@@ -111,10 +111,11 @@ namespace ES
 
                 foreach (string recentPath in GetRecentScenePaths())
                 {
-                    if (string.IsNullOrWhiteSpace(recentPath) || !File.Exists(recentPath))
+                    string canonicalRecentPath = ResolveCanonicalScenePath(recentPath);
+                    if (string.IsNullOrEmpty(canonicalRecentPath))
                         continue;
 
-                    entries.Add(CreateSceneEntry(recentPath, "最近打开", activeScenePath));
+                    entries.Add(CreateSceneEntry(canonicalRecentPath, "最近打开", activeScenePath));
                 }
 
                 if (cachedBuildScenes.Count == 0)
@@ -678,10 +679,12 @@ namespace ES
                 for (int i = 0; i < paths.Length; i++)
                 {
                     string path = paths[i];
-                    if (!File.Exists(path))
+                    if (string.IsNullOrWhiteSpace(path)
+                        || !path.Replace('\\', '/').StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                    string normalizedPath = path.Replace('\\', '/');
+                    UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(normalizedPath);
                     if (asset == null)
                         continue;
 
@@ -690,7 +693,7 @@ namespace ES
                         () => PingAsset(asset),
                         group,
                         GetAssetTypeIcon(asset),
-                        subtitle: path,
+                        subtitle: normalizedPath,
                         badge: "常用"));
                 }
             }
@@ -711,9 +714,6 @@ namespace ES
                 for (int i = 0; i < guids.Length && added < maximum; i++)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                    if (!File.Exists(path))
-                        continue;
-
                     UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
                     if (asset == null)
                         continue;
@@ -823,12 +823,15 @@ namespace ES
                     return;
                 }
 
-                if (!System.IO.File.Exists(scenePath))
+                string canonicalScenePath = ResolveCanonicalScenePath(scenePath);
+                if (string.IsNullOrEmpty(canonicalScenePath))
                 {
                     ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
-                    Debug.LogError($"场景文件不存在: {scenePath}");
+                    Debug.LogError($"场景资产无效或路径已过期: {scenePath}");
                     return;
                 }
+
+                scenePath = canonicalScenePath;
 
                 UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
                 if (!additiveMode
@@ -901,6 +904,23 @@ namespace ES
                 }
             }
 
+            private static string ResolveCanonicalScenePath(string candidatePath)
+            {
+                string normalized = candidatePath.Replace('\\', '/').Trim();
+                if (!normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                    || !normalized.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                var sceneAsset = AssetDatabase.LoadAssetAtPath<SceneAsset>(normalized);
+                if (sceneAsset == null)
+                    return null;
+
+                string canonicalPath = AssetDatabase.GetAssetPath(sceneAsset);
+                return string.IsNullOrEmpty(canonicalPath)
+                    ? null
+                    : canonicalPath.Replace('\\', '/');
+            }
+
             private static void PingSceneAsset(string scenePath)
             {
                 var sceneAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(scenePath);
@@ -953,9 +973,10 @@ namespace ES
             {
                 if (ESSceneGlobalData.Instance != null)
                 {
+                    Undo.RecordObject(ESSceneGlobalData.Instance, "切换场景自动保存");
                     ESSceneGlobalData.Instance.AutoSaveBeforeSwitch = !ESSceneGlobalData.Instance.AutoSaveBeforeSwitch;
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                     Debug.Log($"自动保存: {(ESSceneGlobalData.Instance.AutoSaveBeforeSwitch ? "开启" : "关闭")}");
                 }
                 else
@@ -975,9 +996,10 @@ namespace ES
             {
                 if (ESSceneGlobalData.Instance != null)
                 {
+                    Undo.RecordObject(ESSceneGlobalData.Instance, "切换场景叠加模式");
                     ESSceneGlobalData.Instance.UseAdditiveMode = !ESSceneGlobalData.Instance.UseAdditiveMode;
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                     Debug.Log($"叠加模式: {(ESSceneGlobalData.Instance.UseAdditiveMode ? "开启" : "关闭")}");
                 }
                 else

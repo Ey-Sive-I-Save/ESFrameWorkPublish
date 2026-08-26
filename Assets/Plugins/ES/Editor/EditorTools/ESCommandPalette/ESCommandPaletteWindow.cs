@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using UnityEditor;
 using UnityEditor.ShortcutManagement;
@@ -39,8 +40,15 @@ namespace ES
 
         public static void RestoreDefaultBinding()
         {
-            ShortcutManager.instance.ClearShortcutOverride(ShortcutId);
             EditorPrefs.SetBool(EnabledKey, true);
+            try
+            {
+                ShortcutManager.instance.ClearShortcutOverride(ShortcutId);
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogWarning("[ES Command Palette] 默认快捷键恢复失败：" + exception.Message);
+            }
         }
 
         public static string FindConflictingShortcutId()
@@ -73,6 +81,7 @@ namespace ES
     {
         public const int MaximumResults = 50;
         public const long AllocationBudgetBytes = 64 * 1024;
+        public const int MaximumQueryCharacters = 1024;
 
         private static readonly Dictionary<string, string> SearchAliases =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -110,10 +119,19 @@ namespace ES
                 { "scene", "场景" }
             };
 
-        private readonly List<ScoredItem> scoredItems = new List<ScoredItem>(MaximumResults * 2);
+        // Keep only the top-K candidates while scanning. The registry can contain
+        // thousands of commands; retaining every match makes a simple query create
+        // an avoidable allocation spike before the final 50 results are selected.
+        private readonly List<ScoredItem> scoredItems = new List<ScoredItem>(MaximumResults);
         private readonly List<ESCommandPaletteItem> results = new List<ESCommandPaletteItem>(MaximumResults);
+        private readonly ReadOnlyCollection<ESCommandPaletteItem> resultsView;
 
-        public IReadOnlyList<ESCommandPaletteItem> Results => results;
+        public ESCommandPaletteSearchEngine()
+        {
+            resultsView = results.AsReadOnly();
+        }
+
+        public IReadOnlyList<ESCommandPaletteItem> Results => resultsView;
         public ESCommandPaletteSearchMetrics LastMetrics { get; private set; }
 
         public IReadOnlyList<ESCommandPaletteItem> Search(string query, IReadOnlyList<ESCommandPaletteItem> allItems)
@@ -124,8 +142,15 @@ namespace ES
             results.Clear();
 
             string text = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
+            if (text.Length > MaximumQueryCharacters)
+                text = text.Substring(0, MaximumQueryCharacters);
             char prefix = text.Length > 0 && IsPrefix(text[0]) ? text[0] : '\0';
             string term = prefix == '\0' ? text : text.Substring(1).Trim();
+            // Tokenize once per query. Splitting inside Score used to allocate a
+            // new array for every candidate in the command registry.
+            string[] tokens = term.Length > 0
+                ? term.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                : Array.Empty<string>();
             int candidateCount = 0;
 
             if (allItems != null)
@@ -133,24 +158,23 @@ namespace ES
                 for (int i = 0; i < allItems.Count; i++)
                 {
                     ESCommandPaletteItem item = allItems[i];
-                    if (item == null || !MatchesPrefix(item, prefix))
+                    if (item == null || string.IsNullOrEmpty(item.Title) || !MatchesPrefix(item, prefix))
                     {
                         continue;
                     }
 
                     candidateCount++;
-                    int score = Score(item, term);
+                    int score = Score(item, term, tokens);
                     if (term.Length > 0 && score <= 0)
                     {
                         continue;
                     }
 
-                    scoredItems.Add(new ScoredItem(item, score));
+                    AddTopScoredItem(new ScoredItem(item, score));
                 }
             }
 
-            scoredItems.Sort(ScoredItemComparer.Instance);
-            int resultCount = Math.Min(MaximumResults, scoredItems.Count);
+            int resultCount = scoredItems.Count;
             for (int i = 0; i < resultCount; i++)
             {
                 results.Add(scoredItems[i].Item);
@@ -164,7 +188,22 @@ namespace ES
                 candidateCount,
                 results.Count,
                 AllocationBudgetBytes);
-            return results;
+            return resultsView;
+        }
+
+        private void AddTopScoredItem(ScoredItem candidate)
+        {
+            IComparer<ScoredItem> comparer = ScoredItemComparer.Instance;
+            int insertionIndex = scoredItems.BinarySearch(candidate, comparer);
+            if (insertionIndex < 0)
+                insertionIndex = ~insertionIndex;
+
+            if (insertionIndex >= MaximumResults)
+                return;
+
+            scoredItems.Insert(insertionIndex, candidate);
+            if (scoredItems.Count > MaximumResults)
+                scoredItems.RemoveAt(scoredItems.Count - 1);
         }
 
         public void Clear()
@@ -212,14 +251,13 @@ namespace ES
             return item.Prefix != null && item.Prefix.Length == 1 && item.Prefix[0] == prefix;
         }
 
-        private static int Score(ESCommandPaletteItem item, string term)
+        private static int Score(ESCommandPaletteItem item, string term, string[] tokens)
         {
             if (term.Length == 0)
             {
                 return 1000 + ScorePopularity(item);
             }
 
-            string[] tokens = term.Split(' ');
             int total = 0;
             int count = 0;
             for (int i = 0; i < tokens.Length; i++)
@@ -251,6 +289,9 @@ namespace ES
 
         private static int ScoreToken(ESCommandPaletteItem item, string token)
         {
+            if (item == null || string.IsNullOrEmpty(item.Title) || string.IsNullOrEmpty(token))
+                return 0;
+
             if (item.Title.StartsWith(token, StringComparison.OrdinalIgnoreCase))
             {
                 return 1000;
@@ -261,7 +302,8 @@ namespace ES
                 return 800;
             }
 
-            if (item.SearchText.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+            if (!string.IsNullOrEmpty(item.SearchText)
+                && item.SearchText.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return 500;
             }
@@ -269,7 +311,8 @@ namespace ES
             string aliasTarget = TryResolveAlias(token);
             if (!string.IsNullOrEmpty(aliasTarget)
                 && (item.Title.IndexOf(aliasTarget, StringComparison.OrdinalIgnoreCase) >= 0
-                    || item.SearchText.IndexOf(aliasTarget, StringComparison.OrdinalIgnoreCase) >= 0))
+                    || !string.IsNullOrEmpty(item.SearchText)
+                    && item.SearchText.IndexOf(aliasTarget, StringComparison.OrdinalIgnoreCase) >= 0))
             {
                 return 400;
             }
@@ -324,9 +367,14 @@ namespace ES
             public int Compare(ScoredItem left, ScoredItem right)
             {
                 int score = right.Score.CompareTo(left.Score);
-                return score != 0
-                    ? score
-                    : string.Compare(left.Item.Title, right.Item.Title, StringComparison.Ordinal);
+                if (score != 0)
+                    return score;
+
+                int title = string.Compare(left.Item.Title, right.Item.Title, StringComparison.Ordinal);
+                if (title != 0)
+                    return title;
+
+                return string.Compare(left.Item.StableId, right.Item.StableId, StringComparison.Ordinal);
             }
         }
     }
@@ -365,6 +413,7 @@ namespace ES
         private bool searchTickRegistered;
         private bool shortcutCheckTickRegistered;
         private bool stylesAcquired;
+        private bool lifecycleActive;
         private ShortcutConflictState shortcutConflictState = ShortcutConflictState.NoConflict;
         private string shortcutConflictMessage = string.Empty;
         private double nextShortcutConflictCheck = double.MinValue;
@@ -479,23 +528,39 @@ namespace ES
             ShortcutConflictCheck check = RunShortcutConflictCheck();
             if (check.State == ShortcutConflictState.Failed)
             {
-                EditorUtility.DisplayDialog(
-                    "ES 命令面板快捷键",
+                ShowShortcutStatusDialog(
                     "冲突检测失败：" + check.Message,
-                    "确定");
+                    ESDialogTone.Warning);
                 return;
             }
 
             if (check.State == ShortcutConflictState.Conflict)
             {
-                EditorUtility.DisplayDialog(
-                    "ES 命令面板快捷键",
+                ShowShortcutStatusDialog(
                     "发现冲突：" + check.Message + Environment.NewLine + "可在“恢复默认快捷键”中重置。",
-                    "确定");
+                    ESDialogTone.Warning);
                 return;
             }
 
-            EditorUtility.DisplayDialog("ES 命令面板快捷键", "未发现冲突。", "确定");
+            ShowShortcutStatusDialog("未发现冲突。", ESDialogTone.Success);
+        }
+
+        private static void ShowShortcutStatusDialog(string message, ESDialogTone tone)
+        {
+            ESDialogService.ShowModal(new ESAdvancedDialogRequest
+            {
+                dialogId = "es.command-palette.shortcut-status",
+                title = "ES 命令面板快捷键",
+                message = message ?? string.Empty,
+                confirmText = "确定",
+                cancelText = string.Empty,
+                showCancel = false,
+                tone = tone,
+                minSize = new Vector2(420f, 220f),
+                preferredSize = new Vector2(560f, 300f),
+                allowMainWorkspaceFallback = true,
+                duplicatePolicy = ESDialogDuplicatePolicy.FocusExisting,
+            });
         }
 
         public static void OpenWindow()
@@ -570,6 +635,7 @@ namespace ES
 
         private void OnEnable()
         {
+            lifecycleActive = true;
             ESWindowFoundation.BindTransient(this);
             if (!stylesAcquired)
             {
@@ -583,6 +649,7 @@ namespace ES
 
         private void OnDisable()
         {
+            lifecycleActive = false;
             SessionState.SetString(LastTabKey, activeTab);
             ESWindowFoundation.Suspend(this);
             UnregisterSearchTick();
@@ -599,6 +666,7 @@ namespace ES
 
         private void OnDestroy()
         {
+            lifecycleActive = false;
             ESWindowFoundation.Close(this);
             UnregisterSearchTick();
             UnregisterShortcutCheckTick();
@@ -613,6 +681,11 @@ namespace ES
 
         private void OnGUI()
         {
+            // Unity can deliver one final repaint while a utility window is
+            // being disabled. Do not rebuild styles or process stale input in
+            // that frame after transient resources have been released.
+            if (!lifecycleActive)
+                return;
             EnsureStyles();
             if (EditorApplication.timeSinceStartup >= nextSearchAt)
             {
@@ -899,13 +972,19 @@ namespace ES
             menu.AddItem(
                 new GUIContent(isFavorite ? "取消收藏" : "收藏"),
                 false,
-                () =>
-                {
-                    ESCommandPaletteRegistry.ToggleFavorite(item.StableId);
-                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Confirm);
-                });
+                () => ToggleFavoriteFromContextMenu(item.StableId));
             menu.AddItem(new GUIContent("查看详情"), false, OpenDetailSelected);
             menu.ShowAsContext();
+        }
+
+        private void ToggleFavoriteFromContextMenu(string stableId)
+        {
+            if (this == null || !lifecycleActive || string.IsNullOrEmpty(stableId))
+                return;
+
+            ESCommandPaletteRegistry.ToggleFavorite(stableId);
+            ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Confirm);
+            Repaint();
         }
 
         private void DrawDetailPanel()
@@ -1039,6 +1118,11 @@ namespace ES
 
         private void OnShortcutCheckTick()
         {
+            if (!lifecycleActive)
+            {
+                UnregisterShortcutCheckTick();
+                return;
+            }
             if (EditorApplication.timeSinceStartup < nextShortcutConflictCheck)
             {
                 return;
@@ -1279,14 +1363,43 @@ namespace ES
 
         private void ExecuteItem(ESCommandPaletteItem item)
         {
-            if (item == null)
+            // GenericMenu callbacks can outlive this window when the host is
+            // closed while the context menu is open. Do not touch window state
+            // or dispatch a command from a stale callback.
+            if (this == null || !lifecycleActive || item == null)
             {
                 return;
             }
 
             RecordQuery(query);
             ESEditorFeedbackSound.SuppressSelectionSound();
-            ESCommandPaletteResult result = ESCommandPaletteExecutors.Execute(item);
+            ESCommandPaletteResult result;
+            try
+            {
+                result = ESCommandPaletteExecutors.Execute(item);
+            }
+            catch (Exception exception)
+            {
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
+                feedback = "命令执行异常：" + exception.Message + "（建议：刷新命令面板后重试）";
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 命令执行器未返回受管结果：" + item.Title,
+                    exception));
+                if (this != null && lifecycleActive)
+                    Repaint();
+                return;
+            }
+            if (result == null)
+            {
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
+                feedback = "命令执行器未返回结果（建议：刷新命令面板后重试）";
+                Debug.LogError("[ESCommandPalette] 命令执行器返回了 null：" + item.Title);
+                if (this != null && lifecycleActive)
+                    Repaint();
+                return;
+            }
+            if (this == null || !lifecycleActive)
+                return;
             if (result.Success)
             {
                 PlaySuccessKind(item.ActionKind);
@@ -1306,7 +1419,8 @@ namespace ES
                 }
             }
 
-            Repaint();
+            if (this != null && lifecycleActive)
+                Repaint();
         }
 
         private static void PlaySuccessKind(ESCommandPaletteActionKind kind)
@@ -1436,7 +1550,8 @@ namespace ES
 
         private void OpenDetailSelected()
         {
-            if (selected < 0 || selected >= results.Count)
+            if (this == null || !lifecycleActive
+                || selected < 0 || selected >= results.Count)
             {
                 return;
             }
@@ -1580,6 +1695,10 @@ namespace ES
 
         private void ScheduleSearch()
         {
+            if (!lifecycleActive)
+            {
+                return;
+            }
             nextSearchAt = EditorApplication.timeSinceStartup + SearchDebounceSeconds;
             if (!searchTickRegistered)
             {
@@ -1592,6 +1711,11 @@ namespace ES
 
         private void OnSearchDebounceTick()
         {
+            if (!lifecycleActive)
+            {
+                UnregisterSearchTick();
+                return;
+            }
             if (EditorApplication.timeSinceStartup < nextSearchAt)
             {
                 return;
@@ -1615,8 +1739,21 @@ namespace ES
         private void UpdateResultsNow()
         {
             UnregisterSearchTick();
-            UpdateResults();
-            Repaint();
+            try
+            {
+                UpdateResults();
+            }
+            catch (Exception exception)
+            {
+                searchEngine.Clear();
+                results = Array.Empty<ESCommandPaletteItem>();
+                selected = 0;
+                feedback = "搜索暂时失败：" + exception.Message + "（建议：重新输入或重开命令面板）";
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 搜索结果更新失败。", exception));
+            }
+            if (this != null && lifecycleActive)
+                Repaint();
         }
 
         private void UpdateResults()
@@ -1893,11 +2030,20 @@ namespace ES
         private static Texture2D SolidTexture(Color color)
         {
             var texture = new Texture2D(1, 1, UnityEngine.TextureFormat.RGBA32, false);
-            texture.SetPixel(0, 0, color);
-            texture.Apply();
-            texture.hideFlags = HideFlags.HideAndDontSave;
-            CreatedTextures.Add(texture);
-            return texture;
+            try
+            {
+                texture.SetPixel(0, 0, color);
+                texture.Apply();
+                texture.hideFlags = HideFlags.HideAndDontSave;
+                CreatedTextures.Add(texture);
+                return texture;
+            }
+            catch
+            {
+                if (texture != null)
+                    DestroyImmediate(texture);
+                throw;
+            }
         }
 
         private static void AcquireStyles()
@@ -1923,7 +2069,15 @@ namespace ES
             {
                 if (CreatedTextures[i] != null)
                 {
-                    DestroyImmediate(CreatedTextures[i]);
+                    try
+                    {
+                        DestroyImmediate(CreatedTextures[i]);
+                    }
+                    catch (Exception exception)
+                    {
+                        UnityEngine.Debug.LogException(new InvalidOperationException(
+                            "[ES Command Palette] 临时样式纹理释放失败。", exception));
+                    }
                 }
             }
 

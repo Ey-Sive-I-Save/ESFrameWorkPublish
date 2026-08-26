@@ -19,6 +19,14 @@ namespace ES
     {
         private const float DefaultMinimumWidth = 420f;
         private const float AbsoluteMinimumWidth = 280f;
+        private const float MaximumMinimumWidth = 2400f;
+        private const float MaximumMinimumHeight = 1600f;
+        // Provider 数据来自编辑器扫描或外部适配器时，必须有界，避免错误枚举导致 UI 长时间无响应。
+        private const int MaximumResolvedEntries = 10000;
+        internal const int MaximumToolbarActions = 32;
+        private const int MaximumGroupPathCharacters = 4096;
+        private const int MaximumGroupPathSegments = 64;
+        private const int MaximumGroupSegmentCharacters = 256;
         private static readonly PropertyInfo NativeTooltipProperty = FindNativeTooltipProperty();
         private static readonly Action<AdvancedDropdownItem, string> NativeTooltipSetter =
             CreateNativeTooltipSetter(NativeTooltipProperty);
@@ -30,6 +38,7 @@ namespace ES
             private readonly List<Entry> entries = new List<Entry>();
             private readonly List<ToolbarAction> toolbarActions = new List<ToolbarAction>();
             private Func<IEnumerable<Entry>> provider;
+            private bool entryLimitMarkerAdded;
 
             internal Builder(string title)
             {
@@ -49,24 +58,42 @@ namespace ES
                 string badge = null,
                 bool selected = false)
             {
-                entries.Add(Entry.Item(label, onSelected, groupPath, icon, id, subtitle, tooltip, keywords, badge, selected));
+                AddBounded(Entry.Item(label, onSelected, groupPath, icon, id, subtitle, tooltip, keywords, badge, selected));
                 return this;
             }
 
             public Builder AddDisabled(string label, string groupPath = null, string tooltip = null)
             {
-                entries.Add(Entry.Disabled(label, groupPath, tooltip));
+                AddBounded(Entry.Disabled(label, groupPath, tooltip));
                 return this;
             }
 
             public Builder AddSeparator(string groupPath = null)
             {
-                entries.Add(Entry.Separator(groupPath));
+                AddBounded(Entry.Separator(groupPath));
                 return this;
+            }
+
+            private void AddBounded(Entry entry)
+            {
+                if (entries.Count < MaximumResolvedEntries)
+                {
+                    entries.Add(entry);
+                    return;
+                }
+
+                if (entryLimitMarkerAdded)
+                    return;
+
+                entryLimitMarkerAdded = true;
+                entries.Add(Entry.Disabled(
+                    "候选项过多，已限制为 " + MaximumResolvedEntries + " 项"));
             }
 
             public Builder AddToolbarAction(string label, Action onClick, string tooltip = null)
             {
+                if (toolbarActions.Count >= MaximumToolbarActions)
+                    return this;
                 toolbarActions.Add(new ToolbarAction(label, onClick, tooltip));
                 return this;
             }
@@ -81,26 +108,36 @@ namespace ES
             {
                 if (values == null || getLabel == null || onSelected == null)
                     return this;
-
-                // 已知集合容量时只预留一次，避免 AddRange 构建较大候选集时
-                // 反复扩容和复制；不改变枚举顺序、回调捕获或 Provider 时机。
-                ICollection<T> collection = values as ICollection<T>;
-                if (collection != null)
+                if (values is ICollection<T> collection)
+                    entries.Capacity = Mathf.Min(
+                        MaximumResolvedEntries + 1,
+                        Mathf.Max(entries.Count, collection.Count));
+                int count = 0;
+                try
                 {
-                    int additionalCount = collection.Count;
-                    if (additionalCount > entries.Capacity - entries.Count
-                        && additionalCount <= int.MaxValue - entries.Count)
-                        entries.Capacity = entries.Count + additionalCount;
+                    foreach (T value in values)
+                    {
+                        if (count >= MaximumResolvedEntries)
+                        {
+                            AddDisabled(
+                                "候选项过多，已限制为 " + MaximumResolvedEntries + " 项");
+                            break;
+                        }
+
+                        T captured = value;
+                        Add(
+                            getLabel(value),
+                            () => onSelected(captured),
+                            getGroupPath?.Invoke(value),
+                            getIcon?.Invoke(value));
+                        count++;
+                    }
                 }
-
-                foreach (T value in values)
+                catch (Exception exception)
                 {
-                    T captured = value;
-                    Add(
-                        getLabel(value),
-                        () => onSelected(captured),
-                        getGroupPath?.Invoke(value),
-                        getIcon?.Invoke(value));
+                    AddDisabled("候选数据加载失败，请查看 Console");
+                    Debug.LogException(new InvalidOperationException(
+                        "[ESSearchDropdown] AddRange 数据构建失败。", exception));
                 }
                 return this;
             }
@@ -306,14 +343,18 @@ namespace ES
 
         private static PropertyInfo FindNativeTooltipProperty()
         {
-            for (Type type = typeof(AdvancedDropdownItem); type != null; type = type.BaseType)
+            try
             {
-                PropertyInfo property = type.GetProperty(
-                    "tooltip",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-                if (property?.GetSetMethod(true) != null)
-                    return property;
+                for (Type type = typeof(AdvancedDropdownItem); type != null; type = type.BaseType)
+                {
+                    PropertyInfo property = type.GetProperty(
+                        "tooltip",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+                    if (property?.GetSetMethod(true) != null)
+                        return property;
+                }
             }
+            catch (Exception) { }
             return null;
         }
 
@@ -337,6 +378,12 @@ namespace ES
             }
             catch (MemberAccessException)
             {
+                return null;
+            }
+            catch (Exception)
+            {
+                // Unity 版本差异可能抛出其他反射异常；Tooltip 只是增强能力，
+                // 不能让整个 SearchDropdown 类型初始化失败。
                 return null;
             }
         }
@@ -368,9 +415,19 @@ namespace ES
         {
             this.title = string.IsNullOrWhiteSpace(title) ? "选择" : title.Trim();
             this.provider = provider;
+            minimumWindowSize = NormalizeMinimumWindowSize(minimumWindowSize);
             minimumSize = new Vector2(
                 Mathf.Max(AbsoluteMinimumWidth, minimumWindowSize.x),
                 Mathf.Max(220f, minimumWindowSize.y));
+        }
+
+        private static Vector2 NormalizeMinimumWindowSize(Vector2 requested)
+        {
+            float width = IsFinite(requested.x) ? requested.x : DefaultMinimumWidth;
+            float height = IsFinite(requested.y) ? requested.y : 320f;
+            return new Vector2(
+                Mathf.Clamp(width, AbsoluteMinimumWidth, MaximumMinimumWidth),
+                Mathf.Clamp(height, 220f, MaximumMinimumHeight));
         }
 
         /// <summary>兼容旧 API：直接传入候选项。</summary>
@@ -438,7 +495,7 @@ namespace ES
             }
             catch
             {
-                interactionHold?.Dispose();
+                DisposeInteractionHold(interactionHold);
                 throw;
             }
 
@@ -562,17 +619,28 @@ namespace ES
         {
             Open(anchorRect, title, () =>
             {
-                var entries = new List<Entry>();
+                int capacity = values is ICollection<T> collection
+                    ? Mathf.Min(MaximumResolvedEntries + 1, collection.Count)
+                    : 0;
+                var entries = capacity > 0 ? new List<Entry>(capacity) : new List<Entry>();
                 if (values == null || getLabel == null || onSelected == null)
                     return entries;
+                int count = 0;
                 foreach (T value in values)
                 {
+                    if (count >= MaximumResolvedEntries)
+                    {
+                        entries.Add(Entry.Disabled(
+                            "候选项过多，已限制为 " + MaximumResolvedEntries + " 项"));
+                        break;
+                    }
                     T captured = value;
                     entries.Add(Entry.Item(
                         getLabel(value),
                         () => onSelected(captured),
                         getGroupPath?.Invoke(value),
                         getIcon?.Invoke(value)));
+                    count++;
                 }
                 return entries;
             }, state, minimumWindowSize, toolbarActions, hostWindow);
@@ -591,10 +659,34 @@ namespace ES
             for (int i = 0; i < entries.Count; i++)
             {
                 Entry entry = entries[i];
+                // Entry is a readonly struct, so a provider cannot yield null.
+                // Treat default(Entry) as invalid while preserving valid separators
+                // whose label is intentionally an empty string.
+                if (entry.Label == null)
+                {
+                    root.AddChild(new AdvancedDropdownItem("候选项无效，已跳过"));
+                    continue;
+                }
                 if (!entry.IsSeparator && !usedIds.Add(entry.Id))
                 {
                     int disambiguatedId = entry.Id;
-                    while (!usedIds.Add(disambiguatedId)) disambiguatedId++;
+                    bool assigned = false;
+                    for (int attempts = 0; attempts <= MaximumResolvedEntries; attempts++)
+                    {
+                        if (usedIds.Add(disambiguatedId))
+                        {
+                            assigned = true;
+                            break;
+                        }
+                        disambiguatedId = disambiguatedId == int.MaxValue
+                            ? int.MinValue
+                            : disambiguatedId + 1;
+                    }
+                    if (!assigned)
+                    {
+                        root.AddChild(new AdvancedDropdownItem("候选项 ID 冲突，已跳过"));
+                        continue;
+                    }
                     entry = entry.WithId(disambiguatedId);
                     Debug.LogWarning("[ESSearchDropdown] 检测到重复 Entry Id，已自动修正：" + entry.Label);
                 }
@@ -637,7 +729,28 @@ namespace ES
                 var result = provider();
                 if (result == null)
                     return Array.Empty<Entry>();
-                return new List<Entry>(result);
+
+                int capacity = result is ICollection<Entry> collection
+                    ? Mathf.Min(MaximumResolvedEntries + 1, collection.Count)
+                    : 0;
+                var resolved = capacity > 0 ? new List<Entry>(capacity) : new List<Entry>();
+                bool truncated = false;
+                foreach (Entry entry in result)
+                {
+                    if (resolved.Count >= MaximumResolvedEntries)
+                    {
+                        truncated = true;
+                        break;
+                    }
+                    resolved.Add(entry);
+                }
+
+                if (truncated)
+                {
+                    resolved.Add(Entry.Disabled(
+                        "候选项过多，已限制为 " + MaximumResolvedEntries + " 项"));
+                }
+                return resolved;
             }
             catch (Exception exception)
             {
@@ -654,13 +767,20 @@ namespace ES
         {
             if (string.IsNullOrWhiteSpace(groupPath))
                 return root;
+            if (groupPath.Length > MaximumGroupPathCharacters)
+                return root;
 
             AdvancedDropdownItem parent = root;
             string currentPath = string.Empty;
+            int segmentCount = 0;
             foreach (string rawSegment in groupPath.Split('/'))
             {
+                if (segmentCount++ >= MaximumGroupPathSegments)
+                    break;
                 string segment = rawSegment.Trim();
                 if (segment.Length == 0) continue;
+                if (segment.Length > MaximumGroupSegmentCharacters)
+                    segment = segment.Substring(0, MaximumGroupSegmentCharacters);
                 currentPath = currentPath.Length == 0 ? segment : currentPath + "/" + segment;
                 if (!groups.TryGetValue(currentPath, out AdvancedDropdownItem group))
                 {
@@ -685,10 +805,13 @@ namespace ES
             private readonly ESSearchDropdown.ToolbarAction[] actions;
             private readonly GUIContent[] contents;
             private readonly float[] widths;
+            private bool disposed;
 
             internal ToolbarOverlay(IReadOnlyList<ESSearchDropdown.ToolbarAction> source)
             {
-                int sourceCount = source?.Count ?? 0;
+                int sourceCount = Mathf.Min(
+                    source?.Count ?? 0,
+                    ESSearchDropdown.MaximumToolbarActions);
                 actions = new ESSearchDropdown.ToolbarAction[sourceCount];
                 contents = new GUIContent[sourceCount];
                 widths = new float[sourceCount];
@@ -726,8 +849,15 @@ namespace ES
             internal float Width { get; }
             internal IMGUIContainer Element { get; }
 
+            internal void Dispose()
+            {
+                disposed = true;
+            }
+
             private void Draw()
             {
+                if (disposed)
+                    return;
                 float x = 2f;
                 for (int i = 0; i < Count; i++)
                 {
@@ -782,9 +912,11 @@ namespace ES
 
             internal void Attach()
             {
+                root.RegisterCallback<DetachFromPanelEvent>(OnDetachedFromPanel);
                 if (toolbar != null && toolbar.Count > 0)
                     root.Add(toolbar.Element);
-                root.RegisterCallback<DetachFromPanelEvent>(OnDetachedFromPanel);
+                if (disposed)
+                    throw new InvalidOperationException("AdvancedDropdown 原生窗口在桥接期间已关闭。");
             }
 
             public void Dispose()
@@ -793,11 +925,47 @@ namespace ES
                     return;
 
                 disposed = true;
-                root?.UnregisterCallback<DetachFromPanelEvent>(OnDetachedFromPanel);
-                toolbar?.Element.RemoveFromHierarchy();
-                interactionHold?.Dispose();
-                if (window != null)
-                    WindowStates.Remove(window);
+                try
+                {
+                    root?.UnregisterCallback<DetachFromPanelEvent>(OnDetachedFromPanel);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "AdvancedDropdown 原生窗口回调注销失败。", exception));
+                }
+                try
+                {
+                    toolbar?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "AdvancedDropdown 工具栏回调失效处理失败。", exception));
+                }
+                try
+                {
+                    toolbar?.Element.RemoveFromHierarchy();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "AdvancedDropdown 工具栏移除失败。", exception));
+                }
+                try
+                {
+                    interactionHold?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "AdvancedDropdown 宿主交互保持释放失败。", exception));
+                }
+                finally
+                {
+                    if (window != null)
+                        WindowStates.Remove(window);
+                }
             }
 
             private void OnDetachedFromPanel(DetachFromPanelEvent evt)
@@ -824,7 +992,7 @@ namespace ES
                 VisualElement root = window != null ? window.rootVisualElement : null;
                 if (window == null || root == null)
                 {
-                    interactionHold?.Dispose();
+                    DisposeInteractionHold(interactionHold);
                     LogFailureOnce("找不到原生 AdvancedDropdownWindow，宿主交互保持已安全释放。");
                     return false;
                 }
@@ -845,22 +1013,43 @@ namespace ES
                 if (attachedState != null)
                     attachedState.Dispose();
                 else
-                    interactionHold?.Dispose();
+                    DisposeInteractionHold(interactionHold);
                 LogFailureOnce("原生窗口桥接失败，已保留下拉选择流程：" + exception.Message);
                 return false;
             }
         }
 
+        private static void DisposeInteractionHold(IDisposable interactionHold)
+        {
+            if (interactionHold == null)
+                return;
+            try
+            {
+                interactionHold.Dispose();
+            }
+            catch (Exception exception)
+            {
+                // Cleanup is best-effort and must never replace the original
+                // dropdown/bridge failure or escape an editor callback.
+                Debug.LogException(new InvalidOperationException(
+                    "[ESSearchDropdown] 宿主交互保持释放失败。", exception));
+            }
+        }
+
         private static FieldInfo FindField(Type declaringType, string name)
         {
-            for (Type type = declaringType; type != null; type = type.BaseType)
+            try
             {
-                FieldInfo field = type.GetField(
-                    name,
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
-                if (field != null)
-                    return field;
+                for (Type type = declaringType; type != null; type = type.BaseType)
+                {
+                    FieldInfo field = type.GetField(
+                        name,
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+                    if (field != null)
+                        return field;
+                }
             }
+            catch (Exception) { }
             return null;
         }
 

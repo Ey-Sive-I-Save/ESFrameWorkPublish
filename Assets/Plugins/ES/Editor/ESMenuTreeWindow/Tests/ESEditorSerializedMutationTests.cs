@@ -114,6 +114,35 @@ namespace ES.Tests
             Assert.That(refreshCount, Is.EqualTo(2));
         }
 
+        [Test]
+        public void TryApply_RejectsSerializedObjectBoundToAnotherTarget()
+        {
+            ESEditorSerializedMutationTarget foreignTarget =
+                ScriptableObject.CreateInstance<ESEditorSerializedMutationTarget>();
+            SerializedObject foreignSerializedObject = new SerializedObject(foreignTarget);
+            try
+            {
+                bool changed = ESEditorSerializedMutation.TryApply(
+                    new[] { entries[0] },
+                    "测试拒绝错误序列化目标",
+                    entry => entry.Target,
+                    entry => foreignSerializedObject,
+                    (entry, index) => foreignSerializedObject.FindProperty(nameof(ESEditorSerializedMutationTarget.Value)).intValue = 99,
+                    null,
+                    out string error);
+
+                Assert.That(changed, Is.False);
+                Assert.That(error, Does.Contain("未绑定对应目标"));
+                Assert.That(entries[0].Target.Value, Is.EqualTo(3));
+                Assert.That(foreignTarget.Value, Is.EqualTo(0));
+            }
+            finally
+            {
+                foreignSerializedObject.Dispose();
+                UnityEngine.Object.DestroyImmediate(foreignTarget);
+            }
+        }
+
         private static MutationEntry CreateEntry(int value)
         {
             ESEditorSerializedMutationTarget target =

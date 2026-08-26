@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -122,7 +123,14 @@ namespace ES.EditorInternal
         protected override void ESWindow_OnHostDisable()
         {
             EditorApplication.delayCall -= CompleteDeepSkinAction;
-            serializedTheme = null;
+            ReleaseSerializedTheme();
+        }
+
+        private void ReleaseSerializedTheme()
+        {
+            try { serializedTheme?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            finally { serializedTheme = null; }
         }
 
         private void OnFocus()
@@ -238,10 +246,11 @@ namespace ES.EditorInternal
 
         private void DrawConfiguration()
         {
-            if (serializedTheme == null || serializedTheme.targetObject != theme)
-                serializedTheme = new SerializedObject(theme);
-
-            serializedTheme.Update();
+            if (!TryPrepareSerializedTheme())
+            {
+                EditorGUILayout.HelpBox("主题资产在重载或外部修改后已失效，已取消本次编辑。请重新加载主题。", MessageType.Warning);
+                return;
+            }
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
             try
@@ -295,8 +304,17 @@ namespace ES.EditorInternal
 
             if (EditorGUI.EndChangeCheck())
             {
-                serializedTheme.ApplyModifiedProperties();
-                EditorUtility.SetDirty(theme);
+                try
+                {
+                    serializedTheme.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(theme);
+                }
+                catch (Exception exception)
+                {
+                    ReleaseSerializedTheme();
+                    Debug.LogWarning("[ESEditorThemeWindow] 主题序列化对象已失效，取消本次写回：" + exception.Message);
+                    return;
+                }
                 previewFeedbackStartedAt = EditorApplication.timeSinceStartup;
                 ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
                 ESEditorPresentation.InvalidateTheme();
@@ -307,6 +325,7 @@ namespace ES.EditorInternal
 
         private void DrawProperty(string propertyName)
         {
+            if (serializedTheme == null) return;
             SerializedProperty property = serializedTheme.FindProperty(propertyName);
             if (property != null)
             {
@@ -430,19 +449,47 @@ namespace ES.EditorInternal
 
         private void SetDeepSkinEnabled(bool enabled)
         {
-            if (theme == null)
-                return;
-            if (serializedTheme == null || serializedTheme.targetObject != theme)
-                serializedTheme = new SerializedObject(theme);
-            serializedTheme.Update();
+            if (!TryPrepareSerializedTheme()) return;
             SerializedProperty property = serializedTheme.FindProperty("enableDeepEditorSkin");
             if (property == null || property.boolValue == enabled)
                 return;
-            Undo.RecordObject(theme, enabled ? "启用 ES 全局深度皮肤" : "停用 ES 全局深度皮肤");
-            property.boolValue = enabled;
-            serializedTheme.ApplyModifiedProperties();
-            EditorUtility.SetDirty(theme);
+            try
+            {
+                Undo.RecordObject(theme, enabled ? "启用 ES 全局深度皮肤" : "停用 ES 全局深度皮肤");
+                property.boolValue = enabled;
+                serializedTheme.ApplyModifiedProperties();
+                EditorUtility.SetDirty(theme);
+            }
+            catch (Exception exception)
+            {
+                ReleaseSerializedTheme();
+                Debug.LogWarning("[ESEditorThemeWindow] 深度皮肤开关写回失败，已取消本次修改：" + exception.Message);
+                return;
+            }
             ESEditorPresentation.InvalidateTheme();
+        }
+
+        private bool TryPrepareSerializedTheme()
+        {
+            if (theme == null)
+            {
+                ReleaseSerializedTheme();
+                return false;
+            }
+
+            try
+            {
+                if (serializedTheme == null || serializedTheme.targetObject != theme)
+                    serializedTheme = new SerializedObject(theme);
+                serializedTheme.UpdateIfRequiredOrScript();
+                return serializedTheme.targetObject != null;
+            }
+            catch (Exception exception)
+            {
+                ReleaseSerializedTheme();
+                Debug.LogWarning("[ESEditorThemeWindow] 主题序列化对象不可用，取消本次编辑：" + exception.Message);
+                return false;
+            }
         }
 
         private void RefreshDeepSkinStatus()
@@ -469,7 +516,8 @@ namespace ES.EditorInternal
         private void RefreshTheme()
         {
             theme = ESGlobalEditorThemeMenu.LoadTheme();
-            serializedTheme = theme == null ? null : new SerializedObject(theme);
+            ReleaseSerializedTheme();
+            TryPrepareSerializedTheme();
             ESWindow_CurrentPageContext?.RefreshPageActions();
         }
 

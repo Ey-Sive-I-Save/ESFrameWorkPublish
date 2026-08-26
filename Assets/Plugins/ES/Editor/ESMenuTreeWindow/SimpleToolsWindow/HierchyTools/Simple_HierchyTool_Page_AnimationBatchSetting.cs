@@ -684,12 +684,21 @@ namespace ES
 
             string path = SimpleToolsSafetyUtility.GetUniqueAssetPath($"{folder}/{SanitizeAssetName(baseName)}.controller");
             var controller = new AnimatorController();
-            AssetDatabase.CreateAsset(controller, path);
-            controller.name = Path.GetFileNameWithoutExtension(path);
-            EnsureControllerHasBaseLayer(controller);
-            AssetDatabase.SaveAssets();
-            RecordCreatedAsset("AnimatorController", path, source);
-            return controller;
+            try
+            {
+                AssetDatabase.CreateAsset(controller, path);
+                controller.name = Path.GetFileNameWithoutExtension(path);
+                EnsureControllerHasBaseLayer(controller);
+                AssetDatabase.SaveAssetIfDirty(controller);
+                RecordCreatedAsset("AnimatorController", path, source);
+                return controller;
+            }
+            catch
+            {
+                if (controller != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(controller)))
+                    UnityEngine.Object.DestroyImmediate(controller);
+                throw;
+            }
         }
 
         private AnimationClip CreateAnimationClipAsset(string baseName, string source)
@@ -703,11 +712,20 @@ namespace ES
 
             string path = SimpleToolsSafetyUtility.GetUniqueAssetPath($"{folder}/{SanitizeAssetName(baseName)}.anim");
             var clip = new AnimationClip();
-            AssetDatabase.CreateAsset(clip, path);
-            clip.name = Path.GetFileNameWithoutExtension(path);
-            AssetDatabase.SaveAssets();
-            RecordCreatedAsset("AnimationClip", path, source);
-            return clip;
+            try
+            {
+                AssetDatabase.CreateAsset(clip, path);
+                clip.name = Path.GetFileNameWithoutExtension(path);
+                AssetDatabase.SaveAssetIfDirty(clip);
+                RecordCreatedAsset("AnimationClip", path, source);
+                return clip;
+            }
+            catch
+            {
+                if (clip != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(clip)))
+                    UnityEngine.Object.DestroyImmediate(clip);
+                throw;
+            }
         }
 
         private void EnsureControllerHasBaseLayer(AnimatorController controller)
@@ -831,7 +849,7 @@ namespace ES
                     var rootStateMachine = (sharedController as AnimatorController).layers[0].stateMachine;
                     var defaultState = rootStateMachine.AddState(sharedClip.name);
                     defaultState.motion = sharedClip;
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(sharedController);
                 }
                 else if (clipNullAction == ClipNullAction.Ignore)
                 {
@@ -934,14 +952,14 @@ namespace ES
                                         var rootStateMachine = (controllerToUse as AnimatorController).layers[0].stateMachine;
                                         var defaultState = rootStateMachine.AddState(clipToAdd.name);
                                         defaultState.motion = clipToAdd;
-                                        AssetDatabase.SaveAssets();
+                                        AssetDatabase.SaveAssetIfDirty(controllerToUse);
                                     }
                                     else if (clipNullAction == ClipNullAction.CreateShared && sharedClip != null)
                                     {
                                         var rootStateMachine = (controllerToUse as AnimatorController).layers[0].stateMachine;
                                         var defaultState = rootStateMachine.AddState(sharedClip.name);
                                         defaultState.motion = sharedClip;
-                                        AssetDatabase.SaveAssets();
+                                        AssetDatabase.SaveAssetIfDirty(controllerToUse);
                                     }
                                     else if (clipNullAction == ClipNullAction.Ignore)
                                     {
@@ -1355,7 +1373,7 @@ namespace ES
                         state.motion = clip;
                     }
                 }
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(animatorController);
             }
 
             AnimationClip clipToUse = defaultAnimationClip;
@@ -1390,7 +1408,7 @@ namespace ES
                     var rootStateMachine = controller.layers[0].stateMachine;
                     var state = rootStateMachine.AddState(clipToUse.name);
                     state.motion = clipToUse;
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(controller);
                 }
             }
 

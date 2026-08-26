@@ -155,7 +155,7 @@ namespace ES
                     record = data.GetOrCreateGuide(ob);
                     hasRecord = record != null;
                     EditorUtility.SetDirty(data);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(data);
                 }
             }
 
@@ -195,12 +195,15 @@ namespace ES
             }
 
             EditorGUI.BeginChangeCheck();
+            string nextOwnerSystem = record.ownerSystem;
+            string nextRoleTitle = record.roleTitle;
+            string nextResponsibilityHint = record.responsibilityHint;
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(34);
             GUILayout.Label("所属系统", ESEditorPresentation.MetaStyle, GUILayout.Width(64));
-            record.ownerSystem = EditorGUILayout.TextField(
-                record.ownerSystem,
+            nextOwnerSystem = EditorGUILayout.TextField(
+                nextOwnerSystem,
                 ESEditorInspectorControls.TextField,
                 GUILayout.ExpandWidth(true));
             EditorGUILayout.EndHorizontal();
@@ -208,8 +211,8 @@ namespace ES
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(34);
             GUILayout.Label("职责标题", ESEditorPresentation.MetaStyle, GUILayout.Width(64));
-            record.roleTitle = EditorGUILayout.TextField(
-                record.roleTitle,
+            nextRoleTitle = EditorGUILayout.TextField(
+                nextRoleTitle,
                 ESEditorInspectorControls.TextField,
                 GUILayout.ExpandWidth(true));
             EditorGUILayout.EndHorizontal();
@@ -218,14 +221,18 @@ namespace ES
             GUILayout.Space(34);
             EditorGUILayout.BeginVertical();
             GUILayout.Label("职责提示", ESEditorPresentation.MetaStyle);
-            record.responsibilityHint = EditorGUILayout.TextArea(
-                record.responsibilityHint,
+            nextResponsibilityHint = EditorGUILayout.TextArea(
+                nextResponsibilityHint,
                 ESEditorInspectorControls.TextArea,
                 GUILayout.MinHeight(46));
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
             if (EditorGUI.EndChangeCheck())
             {
+                Undo.RecordObject(data, "编辑资产职责提示");
+                record.ownerSystem = nextOwnerSystem;
+                record.roleTitle = nextRoleTitle;
+                record.responsibilityHint = nextResponsibilityHint;
                 record.MarkManuallyEdited();
                 EditorUtility.SetDirty(data);
             }
@@ -609,11 +616,12 @@ namespace ES
         private static bool CanDeleteAsset(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
-            if (!path.StartsWith("Assets/")) return false;
-            if (path == "Assets") return false;
-            if (!File.Exists(path) && !Directory.Exists(path)) return false;
+            string normalized = path.Replace('\\', '/').Trim();
+            if (!normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.Equals(normalized, "Assets", StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(normalized))) return false;
 
-            return !AssetDatabase.IsValidFolder(path);
+            return !AssetDatabase.IsValidFolder(normalized);
         }
 
         private static string ReadTextWithFallback(string path)

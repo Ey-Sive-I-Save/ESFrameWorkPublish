@@ -194,7 +194,7 @@ namespace ES
                             }
 
                             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                            AssetDatabase.SaveAssets();
+                            AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                             lastResultSummary = $"拖拽添加场景完成: 新增 {scenePaths.Count} 个";
                             lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(scenePaths, 12);
                         }
@@ -331,7 +331,7 @@ namespace ES
                     Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "移除快捷场景");
                     ESSceneGlobalData.Instance.RemoveScene(scene.ScenePath);
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                     lastResultSummary = $"移除快捷场景完成: {displayName}";
                     lastResultDetail = scene.ScenePath;
                 }
@@ -441,7 +441,7 @@ namespace ES
                     Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "移除快捷资产");
                     ESSceneGlobalData.Instance.RemoveAsset(asset.Asset);
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                     lastResultSummary = $"移除快捷资产完成: {asset.DisplayName}";
                     lastResultDetail = AssetDatabase.GetAssetPath(asset.Asset);
                 }
@@ -500,9 +500,12 @@ namespace ES
 
             try
             {
-                if (string.IsNullOrEmpty(scene.ScenePath) || !scene.ScenePath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+                string sceneAssetPath = AssetDatabase.GetAssetPath(scene.SceneAsset);
+                if (string.IsNullOrEmpty(sceneAssetPath)
+                    || !sceneAssetPath.StartsWith("Assets/", StringComparison.Ordinal)
+                    || !sceneAssetPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
                 {
-                    EditorUtility.DisplayDialog("场景路径无效", $"场景路径无效：\n{scene.ScenePath}", "知道了");
+                    EditorUtility.DisplayDialog("场景路径无效", $"场景资产路径无效：\n{sceneAssetPath}", "知道了");
                     return;
                 }
 
@@ -525,9 +528,9 @@ namespace ES
                 }
 
                 // 打开场景
-                EditorSceneManager.OpenScene(scene.ScenePath, mode);
+                EditorSceneManager.OpenScene(sceneAssetPath, mode);
                 lastResultSummary = $"打开场景完成: {scene.DisplayName}";
-                lastResultDetail = $"路径: {scene.ScenePath}\n模式: {mode}";
+                lastResultDetail = $"路径: {sceneAssetPath}\n模式: {mode}";
                 Debug.Log($"已打开场景: {scene.DisplayName}");
             }
             catch (Exception ex)
@@ -595,7 +598,7 @@ namespace ES
             Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "添加当前场景");
             ESSceneGlobalData.Instance.AddScene(activeScene.path);
             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
             lastResultSummary = $"添加当前场景完成: {activeScene.name}";
             lastResultDetail = activeScene.path;
         }
@@ -640,7 +643,7 @@ namespace ES
             }
 
             if (scenesToAdd.Count > 0)
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
 
             lastResultSummary = $"Build Settings 同步完成: 新增 {scenesToAdd.Count} 个场景";
             lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(scenesToAdd, 12);
@@ -693,7 +696,7 @@ namespace ES
             Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "添加快捷资产");
             ESSceneGlobalData.Instance.AddAsset(name, Selection.activeObject, group);
             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
             lastResultSummary = $"添加快捷资产完成: {name}";
             lastResultDetail = $"分组: {group}\n路径: {assetPath}";
         }
@@ -726,7 +729,7 @@ namespace ES
             Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "添加快捷文件夹");
             ESSceneGlobalData.Instance.AddAsset($"📁 {name}", Selection.activeObject, group);
             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
             lastResultSummary = $"添加快捷文件夹完成: {name}";
             lastResultDetail = assetPath;
         }
@@ -766,7 +769,7 @@ namespace ES
 
                     scene.DisplayName = newDisplayName;
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                     lastResultSummary = $"重命名快捷场景完成: {newDisplayName}";
                     lastResultDetail = scene.ScenePath;
                 }
@@ -787,7 +790,7 @@ namespace ES
 
                             scene.Group = group;
                             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                            AssetDatabase.SaveAssets();
+                            AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                             lastResultSummary = $"修改场景分组完成: {scene.DisplayName}";
                             lastResultDetail = $"分组: {group}\n路径: {scene.ScenePath}";
                         });
@@ -831,7 +834,7 @@ namespace ES
 
                     asset.DisplayName = newDisplayName;
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                     lastResultSummary = $"重命名快捷资产完成: {newDisplayName}";
                     lastResultDetail = AssetDatabase.GetAssetPath(asset.Asset);
                 }
@@ -852,7 +855,7 @@ namespace ES
 
                             asset.Group = group;
                             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
-                            AssetDatabase.SaveAssets();
+                            AssetDatabase.SaveAssetIfDirty(ESSceneGlobalData.Instance);
                             lastResultSummary = $"修改资产分组完成: {asset.DisplayName}";
                             lastResultDetail = $"分组: {group}\n路径: {AssetDatabase.GetAssetPath(asset.Asset)}";
                         });

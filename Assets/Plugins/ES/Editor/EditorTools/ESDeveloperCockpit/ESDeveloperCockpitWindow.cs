@@ -97,6 +97,7 @@ namespace ES
 
         protected override void ESWindow_OnHostEnable()
         {
+            maxSize = new Vector2(1400f, 1000f);
             traceProvider ??= new ESDeveloperTraceProvider();
             ESDeveloperTraceHost.SetProvider(traceProvider);
             EditorApplication.update -= OnEditorUpdate;

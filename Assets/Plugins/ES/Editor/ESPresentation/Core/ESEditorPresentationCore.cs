@@ -3308,6 +3308,13 @@ namespace ES.EditorInternal
             binding.lifecycleSuspended = false;
             if (binding.semiSleepOverlay != null)
                 binding.semiSleepOverlay.pickingMode = PickingMode.Position;
+            // A duplicate ungoverned instance may have been suspended while it
+            // was still asleep. RefreshSingleInstanceSafetyForType cannot wake
+            // it during lifecycle suspension; enforce the violation only after
+            // the panel is live again, so it cannot remain a hidden competing
+            // sleep owner after PlayMode/domain-reload recovery.
+            if (binding.singleInstanceViolation && IsSleepingOrTargetingSleep(binding))
+                RestoreSemiSleep(binding, true);
             resumeBindingsRetryExhaustedWindowIds.Remove(id);
         }
 
@@ -6248,7 +6255,13 @@ namespace ES.EditorInternal
                 return null;
             string key = resourceName.Trim();
             if (esBrandIconCache.TryGetValue(key, out Texture cached))
-                return cached;
+            {
+                if (cached != null)
+                    return cached;
+                // Asset reimport may invalidate the native Texture behind the
+                // managed reference. Drop the stale entry and resolve again.
+                esBrandIconCache.Remove(key);
+            }
             Texture icon = AssetDatabase.LoadAssetAtPath<Texture2D>(
                 "Assets/Plugins/ES/Editor/Resources/ESBrandIcons/"
                 + key + ".png");
@@ -9853,32 +9866,40 @@ namespace ES.EditorInternal
                 wrapMode = TextureWrapMode.Clamp
             };
 
-            var pixels = new Color[size * size];
-            float half = size * 0.5f;
-            for (int y = 0; y < size; y++)
+            try
             {
-                float py = y + 0.5f - half;
-                for (int x = 0; x < size; x++)
+                var pixels = new Color[size * size];
+                float half = size * 0.5f;
+                for (int y = 0; y < size; y++)
                 {
-                    float px = x + 0.5f - half;
-                    float qx = Mathf.Abs(px) - (half - radius);
-                    float qy = Mathf.Abs(py) - (half - radius);
-                    float outsideX = Mathf.Max(qx, 0f);
-                    float outsideY = Mathf.Max(qy, 0f);
-                    float signedDistance = Mathf.Sqrt(outsideX * outsideX + outsideY * outsideY)
-                                           + Mathf.Min(Mathf.Max(qx, qy), 0f)
-                                           - radius;
-                    float outerCoverage = Mathf.Clamp01(0.5f - signedDistance);
-                    float innerCoverage = Mathf.Clamp01(0.5f - (signedDistance + borderWidth));
-                    Color pixel = Color.Lerp(borderColor, fillColor, innerCoverage);
-                    pixel.a *= outerCoverage;
-                    pixels[y * size + x] = pixel;
+                    float py = y + 0.5f - half;
+                    for (int x = 0; x < size; x++)
+                    {
+                        float px = x + 0.5f - half;
+                        float qx = Mathf.Abs(px) - (half - radius);
+                        float qy = Mathf.Abs(py) - (half - radius);
+                        float outsideX = Mathf.Max(qx, 0f);
+                        float outsideY = Mathf.Max(qy, 0f);
+                        float signedDistance = Mathf.Sqrt(outsideX * outsideX + outsideY * outsideY)
+                                               + Mathf.Min(Mathf.Max(qx, qy), 0f)
+                                               - radius;
+                        float outerCoverage = Mathf.Clamp01(0.5f - signedDistance);
+                        float innerCoverage = Mathf.Clamp01(0.5f - (signedDistance + borderWidth));
+                        Color pixel = Color.Lerp(borderColor, fillColor, innerCoverage);
+                        pixel.a *= outerCoverage;
+                        pixels[y * size + x] = pixel;
+                    }
                 }
-            }
 
-            texture.SetPixels(pixels);
-            texture.Apply(false, true);
-            return texture;
+                texture.SetPixels(pixels);
+                texture.Apply(false, true);
+                return texture;
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+                throw;
+            }
         }
 
         private static void ApplyButtonState(

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -23,6 +24,10 @@ namespace ES
         private static readonly HashSet<string> FavoriteSet = new HashSet<string>(StringComparer.Ordinal);
         private static readonly List<string> RecentIds = new List<string>();
         private static readonly Dictionary<string, int> RecentRanks = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static readonly ReadOnlyCollection<ESCommandPaletteItem> OrderedItemsView = OrderedItems.AsReadOnly();
+        private static readonly ReadOnlyCollection<ESCommandPaletteRegistrationDiagnostic> DiagnosticsView = Diagnostics.AsReadOnly();
+        private static readonly ReadOnlyCollection<string> FavoriteIdsView = FavoriteIds.AsReadOnly();
+        private static readonly ReadOnlyCollection<string> RecentIdsView = RecentIds.AsReadOnly();
 
         private static bool initialized;
         private static bool initializing;
@@ -32,7 +37,7 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return OrderedItems;
+                return OrderedItemsView;
             }
         }
 
@@ -41,7 +46,7 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return Diagnostics;
+                return DiagnosticsView;
             }
         }
 
@@ -68,7 +73,7 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return FavoriteIds;
+                return FavoriteIdsView;
             }
         }
 
@@ -77,7 +82,7 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return RecentIds;
+                return RecentIdsView;
             }
         }
 
@@ -113,13 +118,41 @@ namespace ES
         public static void Refresh()
         {
             EnsureInitialized();
+            var previousItems = new Dictionary<string, ESCommandPaletteItem>(Items, StringComparer.Ordinal);
+            var previousOrderedItems = new List<ESCommandPaletteItem>(OrderedItems);
+            var previousDiagnostics = new List<ESCommandPaletteRegistrationDiagnostic>(Diagnostics);
             Items.Clear();
             OrderedItems.Clear();
             Diagnostics.Clear();
 
-            for (int i = 0; i < ProviderOrder.Count; i++)
+            bool refreshSucceeded = true;
+            try
             {
-                RebuildProviderItems(ProviderOrder[i], null);
+                for (int i = 0; i < ProviderOrder.Count; i++)
+                {
+                    if (!RebuildProviderItems(ProviderOrder[i], null))
+                        refreshSucceeded = false;
+                }
+            }
+            catch (Exception exception)
+            {
+                refreshSucceeded = false;
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 命令索引刷新失败，保留旧索引。", exception));
+            }
+
+            if (!refreshSucceeded)
+            {
+                Items.Clear();
+                foreach (KeyValuePair<string, ESCommandPaletteItem> pair in previousItems)
+                    Items.Add(pair.Key, pair.Value);
+                OrderedItems.Clear();
+                OrderedItems.AddRange(previousOrderedItems);
+                Diagnostics.Clear();
+                Diagnostics.AddRange(previousDiagnostics);
+                AddDiagnostic(null, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    string.Empty, string.Empty, "命令索引刷新失败，已保留上一次有效索引。");
+                return;
             }
 
             LoadAndCleanState();

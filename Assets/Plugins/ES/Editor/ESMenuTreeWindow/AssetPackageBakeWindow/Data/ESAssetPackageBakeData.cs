@@ -858,6 +858,7 @@ namespace ES
             if (analysisData == null)
                 return;
 
+            Undo.RecordObject(analysisData, "标记资产包分析过期");
             analysisState = ESAssetPackageAnalysisState.Stale;
             analysisData.state = ESAssetPackageAnalysisState.Stale;
             EditorUtility.SetDirty(analysisData);
@@ -1185,6 +1186,7 @@ namespace ES
             if (data == null || data.records == null)
                 return;
 
+            Undo.RecordObject(data, "分析 ES 资产包");
             ESAssetPackageAnalysisData analysis = data.analysisData;
             if (analysis == null)
             {
@@ -1199,6 +1201,7 @@ namespace ES
                 string path = AssetDatabase.GenerateUniqueAssetPath(folder + "/" + Path.GetFileNameWithoutExtension(bakePath) + "_Analysis.asset");
                 analysis = ScriptableObject.CreateInstance<ESAssetPackageAnalysisData>();
                 AssetDatabase.CreateAsset(analysis, path);
+                Undo.RegisterCreatedObjectUndo(analysis, "创建 ES 资产包分析数据");
                 data.analysisData = analysis;
             }
 
@@ -1234,7 +1237,8 @@ namespace ES
             analysis.packageHash = data.analysisPackageHash;
             EditorUtility.SetDirty(data);
             EditorUtility.SetDirty(analysis);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
+            AssetDatabase.SaveAssetIfDirty(analysis);
             Debug.Log($"[ES] 资产包分析完成: {data.name}, 记录 {data.analysisRecordCount}, ParticleSystem {analysis.summary.particleSystemCount}, 待确认 {analysis.summary.needsReviewCount}。");
         }
 
@@ -1451,6 +1455,7 @@ public static class ESAssetPackageBakeUtility
             public bool committed;
             public string expectedTargetGuid;
             public string expectedTargetFileHash;
+            public string expectedStagedFileHash;
             public string committedTargetGuid;
             public string committedTargetFileHash;
         }
@@ -1586,6 +1591,7 @@ public static class ESAssetPackageBakeUtility
             if (data == null)
                 return;
 
+            Undo.RecordObject(data, "烘焙资产包记录");
             data.EnsureIdentity();
             data.EnsureCategoryFolderSettings();
 
@@ -1654,7 +1660,7 @@ public static class ESAssetPackageBakeUtility
             data.RebuildStats();
             data.MarkAnalysisStale();
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
         }
 
         public static void ExportSelectedAssetsByCategory(ESAssetPackageBakeData data)
@@ -1662,6 +1668,7 @@ public static class ESAssetPackageBakeUtility
             if (data == null)
                 return;
 
+            Undo.RecordObject(data, "导出资产包分类内容");
             data.EnsureCategoryFolderSettings();
             data.EnsureIdentity();
             if (!data.HasValidIdentity(out string identityError))
@@ -1669,7 +1676,7 @@ public static class ESAssetPackageBakeUtility
                 data.lastExportAttemptState = ESAssetPackageExportAttemptState.Blocked;
                 data.lastExportAttemptMessage = identityError;
                 EditorUtility.SetDirty(data);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(data);
                 EditorUtility.DisplayDialog("资源包导出已阻止", identityError, "确定");
                 return;
             }
@@ -1688,6 +1695,17 @@ public static class ESAssetPackageBakeUtility
 
             if (!ValidateExportRootForUse(exportRoot))
             {
+                return;
+            }
+
+            if (HasUnresolvedExportTransactions(exportRoot, out string unresolvedTransactions))
+            {
+                data.lastExportAttemptState = ESAssetPackageExportAttemptState.Blocked;
+                data.lastExportAttemptTime = DateTime.UtcNow.ToString("O");
+                data.lastExportAttemptMessage = unresolvedTransactions;
+                EditorUtility.SetDirty(data);
+                AssetDatabase.SaveAssetIfDirty(data);
+                EditorUtility.DisplayDialog("资源包导出已阻止", unresolvedTransactions, "确定");
                 return;
             }
 
@@ -1830,7 +1848,7 @@ public static class ESAssetPackageBakeUtility
                 data.lastExportAttemptTime = exportTime;
                 data.lastExportAttemptMessage = string.Join("\n", errors.Take(20));
                 EditorUtility.SetDirty(data);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(data);
                 EditorUtility.DisplayDialog("资源包导出已阻止", string.Join("\n", errors.Take(20)), "确定");
                 return;
             }
@@ -1847,20 +1865,20 @@ public static class ESAssetPackageBakeUtility
             data.lastExportAttemptState = ESAssetPackageExportAttemptState.NeedsReview;
             data.lastExportAttemptMessage = "解析快照已生成，等待人工确认。";
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
 
             data.lastExportAttemptState = ESAssetPackageExportAttemptState.AwaitingConfirmation;
             data.lastExportAttemptSessionId = sessionId;
             data.lastExportAttemptTime = exportTime;
             data.lastExportAttemptMessage = "导出计划已生成，等待用户确认。";
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             if (!DisplayExportPreflight(data, exportRoot, plan, rootPaths, dependencyPaths, duplicateSkipped))
             {
                 data.lastExportAttemptState = ESAssetPackageExportAttemptState.Cancelled;
                 data.lastExportAttemptMessage = "用户取消了本次导出，未修改目标资产。";
                 EditorUtility.SetDirty(data);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(data);
                 return;
             }
 
@@ -1869,7 +1887,7 @@ public static class ESAssetPackageBakeUtility
                 data.lastExportAttemptState = ESAssetPackageExportAttemptState.Stale;
                 data.lastExportAttemptMessage = snapshotError;
                 EditorUtility.SetDirty(data);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(data);
                 EditorUtility.DisplayDialog("资产包导出已阻止", snapshotError, "确定");
                 return;
             }
@@ -1888,7 +1906,7 @@ public static class ESAssetPackageBakeUtility
                 data.lastExportAttemptTime = exportTime;
                 data.lastExportAttemptMessage = "事务目录已存在，拒绝复用以避免覆盖其他导出会话：" + transactionRoot;
                 EditorUtility.SetDirty(data);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(data);
                 EditorUtility.DisplayDialog("资源包导出已阻止", data.lastExportAttemptMessage, "确定");
                 return;
             }
@@ -1897,7 +1915,7 @@ public static class ESAssetPackageBakeUtility
             data.lastExportAttemptTime = exportTime;
             data.lastExportAttemptMessage = "事务正在准备暂存、备份和提交。若 Unity 中途重载，下次打开窗口时请优先检查事务状态。";
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             if (!TryCommitExportTransaction(
                     transactionRoot,
                     plan,
@@ -1937,7 +1955,7 @@ public static class ESAssetPackageBakeUtility
                 });
                 TrimExportSessions(data.exportSessions, 30);
                 EditorUtility.SetDirty(data);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(data);
                 EditorUtility.DisplayDialog(
                     "资源包导出失败",
                     (rollbackState == ESAssetPackageRollbackState.Partial
@@ -2003,7 +2021,7 @@ public static class ESAssetPackageBakeUtility
                 : transactionError;
             data.RebuildStats();
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
 
             string message = $"导出完成。\n新增: {created}\n更新: {updated}\n总导出: {copiedPathMap.Count}\n其中依赖: {session.dependencyAssetCount}\n重映射文件: {remapped}\n未选跳过: {skipped}\n重复/冲突跳过: {duplicateSkipped.Count}\n失败: {errors.Count}\n\n导出目录:\n{exportRoot}\n命名前缀:\n{data.exportFileNamePrefix}\n会话:\n{sessionId}";
             if (duplicateSkipped.Count > 0)
@@ -2078,11 +2096,14 @@ public static class ESAssetPackageBakeUtility
                         expectedTargetFileHash = existedBefore ? ComputeAssetFileHash(exportPlan.targetPath) : string.Empty
                     };
 
+                    // Register the item before either copy starts. If backup succeeds
+                    // but staging fails, the rollback state still knows this item and
+                    // can retain the transaction evidence for recovery.
+                    items.Add(item);
                     if (existedBefore && !AssetDatabase.CopyAsset(exportPlan.targetPath, item.backupPath))
                         throw new IOException("无法备份已有目标，事务已中止：" + exportPlan.targetPath);
                     if (!AssetDatabase.CopyAsset(exportPlan.sourcePath, item.stagedPath))
                         throw new IOException("无法生成暂存资产，事务已中止：" + exportPlan.sourcePath);
-                    items.Add(item);
                 }
 
                 AssetDatabase.StopAssetEditing();
@@ -2095,6 +2116,12 @@ public static class ESAssetPackageBakeUtility
                 for (int index = 0; index < items.Count; index++)
                 {
                     ExportTransactionItem item = items[index];
+                    if (string.IsNullOrEmpty(item.expectedStagedFileHash)
+                        || !string.Equals(
+                            ComputeAssetFileHash(item.stagedPath),
+                            item.expectedStagedFileHash,
+                            StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("提交阶段发现暂存资产已被外部修改，拒绝覆盖目标：" + item.plan.targetPath);
                     bool targetExistsNow = AssetDatabase.LoadMainAssetAtPath(item.plan.targetPath) != null;
                     if (targetExistsNow && !item.plan.overwrite)
                         throw new IOException("提交阶段发现新的目标冲突：" + item.plan.targetPath);
@@ -2157,6 +2184,9 @@ public static class ESAssetPackageBakeUtility
                     throw new IOException("暂存资产刷新后不可见：" + item.stagedPath);
                 if (item.hadExistingTarget && AssetDatabase.LoadMainAssetAtPath(item.backupPath) == null)
                     throw new IOException("已有目标备份刷新后不可见：" + item.backupPath);
+                item.expectedStagedFileHash = ComputeAssetFileHash(item.stagedPath);
+                if (string.IsNullOrEmpty(item.expectedStagedFileHash))
+                    throw new IOException("暂存资产没有可验证的文件 Hash：" + item.stagedPath);
             }
         }
 
@@ -2192,6 +2222,15 @@ public static class ESAssetPackageBakeUtility
 
                     if (item.hadExistingTarget && AssetDatabase.LoadMainAssetAtPath(item.backupPath) != null)
                     {
+                        if (!string.IsNullOrEmpty(item.expectedTargetFileHash)
+                            && !string.Equals(
+                                ComputeAssetFileHash(item.backupPath),
+                                item.expectedTargetFileHash,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            rollbackErrors.Add("已跳过被修改的原目标备份：" + item.backupPath);
+                            continue;
+                        }
                         string moveError = AssetDatabase.MoveAsset(item.backupPath, item.plan.targetPath);
                         if (!string.IsNullOrEmpty(moveError))
                             rollbackErrors.Add("无法恢复原目标：" + item.plan.targetPath + "，" + moveError);
@@ -2209,8 +2248,11 @@ public static class ESAssetPackageBakeUtility
                 AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
             }
 
-            if (rollbackErrors.Count == 0 && AssetDatabase.IsValidFolder(transactionRoot))
-                AssetDatabase.DeleteAsset(transactionRoot);
+            if (rollbackErrors.Count == 0 && AssetDatabase.IsValidFolder(transactionRoot)
+                && !AssetDatabase.DeleteAsset(transactionRoot))
+            {
+                rollbackErrors.Add("无法清理事务目录：" + transactionRoot);
+            }
             if (rollbackErrors.Count > 0)
                 rollbackState = ESAssetPackageRollbackState.Partial;
             return string.Join("；", rollbackErrors);
@@ -2254,11 +2296,18 @@ public static class ESAssetPackageBakeUtility
 
             if (!EditorUtility.DisplayDialog(
                     "资产包导出回退",
-                    $"将删除最近一次导出的 {session.targetAssetPaths.Count} 个目标资源。\n\n导出根目录:\n{exportRoot}\n会话:\n{session.sessionId}\n\n此操作只处理导出链路记录中的目标路径。",
+                    $"将删除最近一次导出的 {session.targetAssetPaths?.Count ?? 0} 个目标资源。\n\n导出根目录:\n{exportRoot}\n会话:\n{session.sessionId}\n\n此操作只处理导出链路记录中的目标路径。",
                     "确认回退",
                     "取消"))
                 return;
 
+            int sessionIndex = data.exportSessions.LastIndexOf(session);
+            if (sessionIndex < 0)
+            {
+                EditorUtility.DisplayDialog("资产包导出回退", "导出会话已发生变化，拒绝回退。", "确定");
+                return;
+            }
+            Undo.RecordObject(data, "回退资产包导出");
             int deleted = 0;
             int missing = 0;
             int changed = 0;
@@ -2286,7 +2335,10 @@ public static class ESAssetPackageBakeUtility
                 {
                     string targetPath = NormalizeAssetPath(rawPath);
                     if (!ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(targetPath, out targetPath))
+                    {
+                        changed++;
                         continue;
+                    }
 
                     if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) == null)
                     {
@@ -2312,6 +2364,8 @@ public static class ESAssetPackageBakeUtility
 
                     if (AssetDatabase.DeleteAsset(targetPath))
                         deleted++;
+                    else
+                        changed++;
                 }
             }
             finally
@@ -2341,17 +2395,26 @@ public static class ESAssetPackageBakeUtility
             SyncExportChainDictionary(data);
 
             if (!partialRollback)
-                data.exportSessions.RemoveAt(data.exportSessions.Count - 1);
+                data.exportSessions.RemoveAt(sessionIndex);
             else
                 session.transactionState = ESAssetPackageExportAttemptState.RollbackPartial;
-            data.lastExportTime = data.exportSessions.Count > 0 ? data.exportSessions[data.exportSessions.Count - 1].exportTime : string.Empty;
-            data.lastExportRootPath = data.exportSessions.Count > 0 ? data.exportSessions[data.exportSessions.Count - 1].exportRootPath : string.Empty;
-            data.lastExportAssetCount = data.exportSessions.Count > 0 ? data.exportSessions[data.exportSessions.Count - 1].totalAssetCount : 0;
-            data.lastExportDependencyCount = data.exportSessions.Count > 0 ? data.exportSessions[data.exportSessions.Count - 1].dependencyAssetCount : 0;
+            ESAssetPackageExportSession lastCommittedSession = data.exportSessions
+                .AsEnumerable()
+                .Reverse()
+                .FirstOrDefault(item => item != null &&
+                    (item.transactionState == ESAssetPackageExportAttemptState.Committed ||
+                     item.transactionState == ESAssetPackageExportAttemptState.CommittedWithWarning ||
+                     item.transactionState == ESAssetPackageExportAttemptState.RollbackPartial));
+            data.lastExportTime = lastCommittedSession != null ? lastCommittedSession.exportTime : string.Empty;
+            data.lastExportRootPath = lastCommittedSession != null ? lastCommittedSession.exportRootPath : string.Empty;
+            data.lastExportAssetCount = lastCommittedSession != null ? lastCommittedSession.totalAssetCount : 0;
+            data.lastExportDependencyCount = lastCommittedSession != null ? lastCommittedSession.dependencyAssetCount : 0;
 
-            RemoveEmptyFolders(exportRoot);
+            // Only prune the transaction namespace created by ES. Pruning the
+            // whole export root could delete unrelated user-created empty folders.
+            RemoveEmptyFolders(NormalizeAssetPath(exportRoot + "/.ESBakeTransactions"));
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             AssetDatabase.Refresh();
 
             EditorUtility.DisplayDialog("资产包导出回退", $"回退完成。\n删除: {deleted}\n已不存在: {missing}\n已被修改而跳过: {changed}\n状态: {(partialRollback ? "部分回退，保留会话与链路供人工处理" : "完整回退")}", "确定");
@@ -2404,6 +2467,33 @@ public static class ESAssetPackageBakeUtility
                     "取消");
             }
 
+            return true;
+        }
+
+        private static bool HasUnresolvedExportTransactions(string exportRoot, out string message)
+        {
+            message = string.Empty;
+            if (!ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(exportRoot, out string normalizedRoot))
+                return false;
+
+            string transactionRoot = NormalizeAssetPath(normalizedRoot + "/.ESBakeTransactions");
+            if (!AssetDatabase.IsValidFolder(transactionRoot))
+                return false;
+
+            string[] sessions = AssetDatabase.GetSubFolders(transactionRoot) ?? Array.Empty<string>();
+            sessions = sessions
+                .Select(NormalizeAssetPath)
+                .Where(path => !string.IsNullOrEmpty(path))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (sessions.Length == 0)
+                return false;
+
+            message = "发现尚未完成或未复核的资产包导出事务，已拒绝继续导出。\n\n" +
+                      "请先检查事务目录中的 Staged/Backup 与最近导出状态，确认恢复或人工清理后再重试。\n\n" +
+                      "事务目录:\n" + string.Join("\n", sessions.Take(8));
+            if (sessions.Length > 8)
+                message += "\n…其余 " + (sessions.Length - 8) + " 个事务目录未展开。";
             return true;
         }
 

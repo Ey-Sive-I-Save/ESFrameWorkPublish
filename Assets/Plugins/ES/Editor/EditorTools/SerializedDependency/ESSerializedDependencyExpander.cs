@@ -294,17 +294,18 @@ namespace ES.EditorInternal
                 PendingRoot current = pending[rootIndex];
                 if (current.Depth > maximumDepth)
                     maximumDepth = current.Depth;
-                var serialized = new SerializedObject(current.Root);
-                SerializedProperty iterator = serialized.GetIterator();
-                bool enterChildren = true;
-                while (iterator.Next(enterChildren))
+                using (var serialized = new SerializedObject(current.Root))
                 {
-                    visitedPropertyCount++;
-                    if ((visitedPropertyCount & 255) == 0)
-                        ThrowIfCancellationRequested(options);
-                    enterChildren = true;
-                    if (!TryGetRule(rulesBySerializedType, iterator, out ESSerializedDependencyRule<TContext, TDependency> rule))
-                        continue;
+                    SerializedProperty iterator = serialized.GetIterator();
+                    bool enterChildren = true;
+                    while (iterator.Next(enterChildren))
+                    {
+                        visitedPropertyCount++;
+                        if ((visitedPropertyCount & 255) == 0)
+                            ThrowIfCancellationRequested(options);
+                        enterChildren = true;
+                        if (!TryGetRule(rulesBySerializedType, iterator, out ESSerializedDependencyRule<TContext, TDependency> rule))
+                            continue;
 
                     matchedPropertyCount++;
                     // A matched rule owns the complete property. Its internal serialized fields
@@ -344,10 +345,11 @@ namespace ES.EditorInternal
 
                     visited.Add(identity);
                     traversalCount++;
-                    pending.Add(new PendingRoot(
-                        nextRoot,
-                        current.Depth + 1,
-                        BuildTraversalPath(current.TraversalPath, visit.EdgeDescription, nextRoot)));
+                        pending.Add(new PendingRoot(
+                            nextRoot,
+                            current.Depth + 1,
+                            BuildTraversalPath(current.TraversalPath, visit.EdgeDescription, nextRoot)));
+                    }
                 }
             }
 

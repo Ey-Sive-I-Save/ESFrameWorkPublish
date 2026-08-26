@@ -320,6 +320,23 @@ namespace ES.Editor
             catch (Exception e)
             {
                 Debug.LogException(e);
+                try
+                {
+                    lifecycle.OnPreviewDisable();
+                }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogException(cleanupException);
+                }
+                try
+                {
+                    lifecycle.DisposePreview();
+                }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogException(cleanupException);
+                }
+                activeProviders.Remove(provider);
             }
         }
 
@@ -327,18 +344,28 @@ namespace ES.Editor
         {
             if (provider != null)
             {
-                try
+                if (provider is IPreviewElementLifecycle lifecycle)
                 {
-                    if (provider is IPreviewElementLifecycle lifecycle)
+                    try
                     {
                         lifecycle.OnPreviewDisable();
-                        if (dispose)
-                            lifecycle.DisposePreview();
                     }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
+
+                    if (dispose)
+                    {
+                        try
+                        {
+                            lifecycle.DisposePreview();
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogException(e);
+                        }
+                    }
                 }
             }
 

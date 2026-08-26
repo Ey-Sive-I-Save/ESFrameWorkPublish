@@ -1000,12 +1000,18 @@ namespace ES
             public override Component Component => mono;
             public override string ComponentType => mono != null ? mono.GetType().Name : "MonoBehaviour";
             public override string Location => propertyPath;
-            public override bool CanWrite => mono != null && FindProperty() != null;
+            public override bool CanWrite => TryHasProperty();
 
             public override Material Read()
             {
-                var property = FindProperty();
-                return property != null ? property.objectReferenceValue as Material : null;
+                if (mono == null)
+                    return null;
+                using (var serializedObject = new SerializedObject(mono))
+                {
+                    serializedObject.Update();
+                    SerializedProperty property = serializedObject.FindProperty(propertyPath);
+                    return property != null ? property.objectReferenceValue as Material : null;
+                }
             }
 
             public override bool Write(Material material, out string error)
@@ -1017,31 +1023,35 @@ namespace ES
                     return false;
                 }
 
-                var serializedObject = new SerializedObject(mono);
-                serializedObject.Update();
-                var property = serializedObject.FindProperty(propertyPath);
-                if (property == null || property.propertyType != SerializedPropertyType.ObjectReference)
+                using (var serializedObject = new SerializedObject(mono))
                 {
-                    error = "The serialized field path is no longer valid.";
-                    return false;
-                }
+                    serializedObject.Update();
+                    var property = serializedObject.FindProperty(propertyPath);
+                    if (property == null || property.propertyType != SerializedPropertyType.ObjectReference)
+                    {
+                        error = "The serialized field path is no longer valid.";
+                        return false;
+                    }
 
-                Undo.RecordObject(mono, "批量替换脚本材质字段");
-                property.objectReferenceValue = material;
-                serializedObject.ApplyModifiedProperties();
-                EditorUtility.SetDirty(mono);
-                PrefabUtility.RecordPrefabInstancePropertyModifications(mono);
-                return true;
+                    Undo.RecordObject(mono, "批量替换脚本材质字段");
+                    property.objectReferenceValue = material;
+                    serializedObject.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(mono);
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(mono);
+                    return true;
+                }
             }
 
-            private SerializedProperty FindProperty()
+            private bool TryHasProperty()
             {
                 if (mono == null)
-                    return null;
+                    return false;
 
-                var serializedObject = new SerializedObject(mono);
-                serializedObject.Update();
-                return serializedObject.FindProperty(propertyPath);
+                using (var serializedObject = new SerializedObject(mono))
+                {
+                    serializedObject.Update();
+                    return serializedObject.FindProperty(propertyPath) != null;
+                }
             }
         }
 
@@ -1143,21 +1153,23 @@ namespace ES
 
                 try
                 {
-                    var serializedObject = new SerializedObject(mono);
-                    serializedObject.Update();
-                    var iterator = serializedObject.GetIterator();
-                    bool enterChildren = true;
-                    while (iterator.NextVisible(enterChildren))
+                    using (var serializedObject = new SerializedObject(mono))
                     {
-                        enterChildren = true;
-                        if (iterator.propertyType != SerializedPropertyType.ObjectReference)
-                            continue;
+                        serializedObject.Update();
+                        var iterator = serializedObject.GetIterator();
+                        bool enterChildren = true;
+                        while (iterator.NextVisible(enterChildren))
+                        {
+                            enterChildren = true;
+                            if (iterator.propertyType != SerializedPropertyType.ObjectReference)
+                                continue;
 
-                        if (!IsMaterialReferenceProperty(iterator))
-                            continue;
+                            if (!IsMaterialReferenceProperty(iterator))
+                                continue;
 
-                        var accessor = new SerializedMaterialAccessor(mono, iterator.propertyPath);
-                        records.Add(CreateRecord(obj, accessor, sourceLabel, assetPath));
+                            var accessor = new SerializedMaterialAccessor(mono, iterator.propertyPath);
+                            records.Add(CreateRecord(obj, accessor, sourceLabel, assetPath));
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -1394,7 +1406,12 @@ namespace ES
                 EditorUtility.ClearProgressBar();
             }
 
-            AssetDatabase.SaveAssets();
+            foreach (string changedAssetPath in changedAssetPaths.Distinct(StringComparer.Ordinal))
+            {
+                UnityEngine.Object changedAsset = AssetDatabase.LoadMainAssetAtPath(changedAssetPath);
+                if (changedAsset != null)
+                    AssetDatabase.SaveAssetIfDirty(changedAsset);
+            }
             AssetDatabase.Refresh();
 
             string completionState = cancelled ? "cancelled" : "completed";

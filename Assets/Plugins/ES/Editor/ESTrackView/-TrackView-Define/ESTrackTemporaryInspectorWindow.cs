@@ -165,8 +165,13 @@ namespace ES
                 return string.Empty;
 
             bool changed = false;
-            if (stableTrack.TrackSchema <= ESTrackIdentity.CurrentTrackSchema)
+            if (stableTrack.TrackSchema <= ESTrackIdentity.CurrentTrackSchema
+                && (!ESTrackIdentity.IsValidStableId(stableTrack.TrackId) || stableTrack.TrackSchema <= 0))
+            {
+                if (sourceAsset != null)
+                    Undo.RecordObject(sourceAsset, "迁移 Track 稳定身份");
                 changed = stableTrack.EnsureStableTrackIdentity();
+            }
             if (changed && sourceAsset != null)
                 EditorUtility.SetDirty(sourceAsset);
 
@@ -212,8 +217,13 @@ namespace ES
                 return string.Empty;
 
             bool changed = false;
-            if (stableClip.ClipSchema <= ESTrackIdentity.CurrentClipSchema)
+            if (stableClip.ClipSchema <= ESTrackIdentity.CurrentClipSchema
+                && (!ESTrackIdentity.IsValidStableId(stableClip.ClipId) || stableClip.ClipSchema <= 0))
+            {
+                if (sourceAsset != null)
+                    Undo.RecordObject(sourceAsset, "迁移 Clip 稳定身份");
                 changed = stableClip.EnsureStableClipIdentity();
+            }
             if (changed && sourceAsset != null)
                 EditorUtility.SetDirty(sourceAsset);
 
@@ -449,10 +459,19 @@ namespace ES
                     hideFlags = HideFlags.HideAndDontSave,
                     name = "ESTrackInspectorLocalSkin"
                 };
-                texture.SetPixel(0, 0, color);
-                texture.Apply(false, true);
-                cachedTextures.Add(texture);
-                return texture;
+                try
+                {
+                    texture.SetPixel(0, 0, color);
+                    texture.Apply(false, true);
+                    cachedTextures.Add(texture);
+                    return texture;
+                }
+                catch
+                {
+                    if (texture != null)
+                        UnityEngine.Object.DestroyImmediate(texture);
+                    throw;
+                }
             }
 
             private static void DestroyCachedGraphSkin()

@@ -125,16 +125,26 @@ namespace ES
             {
                 if (trackItem is IStableTrackItem stableTrack)
                 {
-                    if (stableTrack.TrackSchema <= ESTrackIdentity.CurrentTrackSchema)
+                    if (stableTrack.TrackSchema <= ESTrackIdentity.CurrentTrackSchema
+                        && (!ESTrackIdentity.IsValidStableId(stableTrack.TrackId) || stableTrack.TrackSchema <= 0))
+                    {
+                        UnityEngine.Object undoTarget = ESTrackViewWindow.TrackContainer as UnityEngine.Object;
+                        if (undoTarget != null)
+                            Undo.RecordObject(undoTarget, "迁移 Track 稳定身份");
                         stableTrack.EnsureStableTrackIdentity();
+                    }
                 }
                 else if (trackItem != null && trackItem.Clips != null)
                 {
                     foreach (ITrackClip clip in trackItem.Clips)
                     {
                         if (clip is IStableTrackClip stableClip
-                            && stableClip.ClipSchema <= ESTrackIdentity.CurrentClipSchema)
+                            && stableClip.ClipSchema <= ESTrackIdentity.CurrentClipSchema
+                            && (!ESTrackIdentity.IsValidStableId(stableClip.ClipId) || stableClip.ClipSchema <= 0))
                         {
+                            UnityEngine.Object undoTarget = ESTrackViewWindow.TrackContainer as UnityEngine.Object;
+                            if (undoTarget != null)
+                                Undo.RecordObject(undoTarget, "迁移 Clip 稳定身份");
                             stableClip.EnsureStableClipIdentity();
                         }
                     }

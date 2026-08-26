@@ -34,6 +34,7 @@ public sealed class ESCreateSkillWindow : EditorWindow
     {
         ESCreateSkillWindow window = GetWindow<ESCreateSkillWindow>(true, "新建技能");
         window.minSize = new Vector2(420f, 220f);
+        window.maxSize = new Vector2(900f, 600f);
         window.Show();
     }
 
@@ -95,6 +96,12 @@ public sealed class ESCreateSkillWindow : EditorWindow
             return;
         }
 
+        if (placeInGroup && targetGroup is not ScriptableObject)
+        {
+            EditorUtility.DisplayDialog("无法创建技能", "目标技能组不是有效资产。", "知道了");
+            return;
+        }
+
         if (placeInGroup && !targetGroup.NotContainsInfoKey(safeKey))
         {
             EditorUtility.DisplayDialog("无法创建技能", "目标技能组已包含键名：" + safeKey, "知道了");
@@ -102,8 +109,16 @@ public sealed class ESCreateSkillWindow : EditorWindow
         }
 
         string fileName = string.Join("_", safeKey.Split(Path.GetInvalidFileNameChars()));
+        string targetGroupPath = placeInGroup && targetGroup != null
+            ? AssetDatabase.GetAssetPath(targetGroup as ScriptableObject)
+            : string.Empty;
+        if (placeInGroup && string.IsNullOrEmpty(targetGroupPath))
+        {
+            EditorUtility.DisplayDialog("无法创建技能", "目标技能组尚未保存，无法创建同组技能资产。", "知道了");
+            return;
+        }
         string folder = placeInGroup && targetGroup != null
-            ? Path.GetDirectoryName(AssetDatabase.GetAssetPath(targetGroup)).Replace('\\', '/')
+            ? Path.GetDirectoryName(targetGroupPath).Replace('\\', '/')
             : DefaultSkillFolder;
         EnsureFolder(folder);
 
@@ -116,24 +131,60 @@ public sealed class ESCreateSkillWindow : EditorWindow
 
         SkillTrackProcessInfo skill = ScriptableObject.CreateInstance<SkillTrackProcessInfo>();
         skill.name = safeKey;
-        AssetDatabase.CreateAsset(skill, assetPath);
-
+        bool createdAsset = false;
         bool usesUnifiedGameCoreRegistration = placeInGroup
                                                && targetGroup != null
                                                && ESScriptableObjectClassification.GetClass(targetGroup) == ESScriptableObjectClass.GameCore;
-        if (placeInGroup && targetGroup != null && !usesUnifiedGameCoreRegistration)
-            targetGroup._TryAddInfoToDic(safeKey, skill);
+        bool groupLinked = false;
+        try
+        {
+            AssetDatabase.CreateAsset(skill, assetPath);
+            createdAsset = true;
 
-        EditorUtility.SetDirty(skill);
-        if (targetGroup != null)
-            EditorUtility.SetDirty(targetGroup);
+            if (placeInGroup && targetGroup != null && !usesUnifiedGameCoreRegistration)
+            {
+                targetGroup._TryAddInfoToDic(safeKey, skill);
+                if (!ReferenceEquals(targetGroup.GetInfoByKey(safeKey), skill))
+                    throw new InvalidOperationException("目标技能组未接受该技能，可能存在并发 Key 冲突。");
+                groupLinked = true;
+            }
 
-        AssetDatabase.SaveAssets();
-        if (usesUnifiedGameCoreRegistration)
-            ESResourceCollectionWorkflowWindow.OpenForGameCoreRegistration(skill, targetGroup, null, safeKey);
-        Selection.activeObject = skill;
-        ESTrackViewWindow.TryUpdateTrackSequence(skill);
-        Close();
+            EditorUtility.SetDirty(skill);
+            if (targetGroup != null)
+                EditorUtility.SetDirty(targetGroup);
+
+            AssetDatabase.SaveAssetIfDirty(skill);
+            if (targetGroup != null)
+                AssetDatabase.SaveAssetIfDirty(targetGroup);
+            if (usesUnifiedGameCoreRegistration)
+                ESResourceCollectionWorkflowWindow.OpenForGameCoreRegistration(skill, targetGroup, null, safeKey);
+            Selection.activeObject = skill;
+            ESTrackViewWindow.TryUpdateTrackSequence(skill);
+            Close();
+        }
+        catch (Exception exception)
+        {
+            if (groupLinked && targetGroup != null
+                && ReferenceEquals(targetGroup.GetInfoByKey(safeKey), skill))
+            {
+                targetGroup._RemoveInfoFromDic(safeKey);
+                EditorUtility.SetDirty(targetGroup);
+                try
+                {
+                    AssetDatabase.SaveAssetIfDirty(targetGroup);
+                }
+                catch (Exception rollbackException)
+                {
+                    Debug.LogException(new InvalidOperationException("技能 Group 回滚保存失败。", rollbackException));
+                }
+            }
+            if (createdAsset && AssetDatabase.LoadAssetAtPath<SkillTrackProcessInfo>(assetPath) == skill)
+                AssetDatabase.DeleteAsset(assetPath);
+            else if (skill != null && !EditorUtility.IsPersistent(skill))
+                UnityEngine.Object.DestroyImmediate(skill);
+            Debug.LogException(new InvalidOperationException("创建技能资产失败，已回滚本次创建。", exception));
+            EditorUtility.DisplayDialog("无法创建技能", exception.Message, "知道了");
+        }
     }
 
     private static void EnsureFolder(string folder)

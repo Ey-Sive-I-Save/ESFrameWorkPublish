@@ -118,6 +118,22 @@ namespace ES
             KindVolumeCache =
                 new Dictionary<ESEditorFeedbackSoundKind, float>();
 
+        [InitializeOnLoadMethod]
+        private static void RegisterPreviewLifecycleCleanup()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= CleanupPreviewLifecycle;
+            AssemblyReloadEvents.beforeAssemblyReload += CleanupPreviewLifecycle;
+            EditorApplication.quitting -= CleanupPreviewLifecycle;
+            EditorApplication.quitting += CleanupPreviewLifecycle;
+        }
+
+        private static void CleanupPreviewLifecycle()
+        {
+            StopSchemePreview();
+            DestroyPreviewHost();
+            StopNativePlayback();
+        }
+
         private static string SchemeRoot
         {
             get
@@ -591,7 +607,16 @@ namespace ES
                 return;
             }
 
-            Directory.CreateDirectory(Path.Combine(SchemeRoot, name));
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(SchemeRoot, name));
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[ES 编辑器音效] 创建音效方案目录失败：" + exception.Message);
+                return;
+            }
+
             ClearClipCache();
             Scheme = name;
             Play(ESEditorFeedbackSoundKind.Click);
@@ -1224,13 +1249,31 @@ namespace ES
 
                 if (previewHost == null || previewSource == null)
                 {
-                    previewHost = new GameObject(
-                        "ES Editor Feedback Sound Preview")
+                    DestroyPreviewHost();
+                    GameObject host = null;
+                    try
                     {
-                        hideFlags = HideFlags.HideAndDontSave
-                    };
-                    previewSource = previewHost.AddComponent<AudioSource>();
-                    previewSource.playOnAwake = false;
+                        host = new GameObject(
+                            "ES Editor Feedback Sound Preview")
+                        {
+                            hideFlags = HideFlags.HideAndDontSave
+                        };
+                        AudioSource source = host.AddComponent<AudioSource>();
+                        source.playOnAwake = false;
+                        previewHost = host;
+                        previewSource = source;
+                    }
+                    catch
+                    {
+                        if (host != null)
+                        {
+                            UnityEngine.Object.DestroyImmediate(host);
+                        }
+
+                        previewHost = null;
+                        previewSource = null;
+                        throw;
+                    }
                 }
 
                 previewSource.Stop();
@@ -1260,13 +1303,20 @@ namespace ES
 
         private static void DestroyPreviewHost()
         {
-            if (previewHost != null)
-            {
-                UnityEngine.Object.DestroyImmediate(previewHost);
-            }
-
+            GameObject host = previewHost;
             previewHost = null;
             previewSource = null;
+            if (host != null)
+            {
+                try
+                {
+                    UnityEngine.Object.DestroyImmediate(host);
+                }
+                catch (Exception)
+                {
+                    // Cleanup is best effort during domain reload/editor shutdown.
+                }
+            }
         }
 
         private static void StopNativePlayback()

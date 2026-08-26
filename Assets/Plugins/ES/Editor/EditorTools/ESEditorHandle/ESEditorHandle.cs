@@ -34,6 +34,38 @@ namespace ES
         private static int nextLongTaskId;
         private static bool registered;
 
+        [InitializeOnLoadMethod]
+        private static void RegisterLifecycleCleanup()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= CleanupForLifecycle;
+            AssemblyReloadEvents.beforeAssemblyReload += CleanupForLifecycle;
+            EditorApplication.quitting -= CleanupForLifecycle;
+            EditorApplication.quitting += CleanupForLifecycle;
+        }
+
+        private static void CleanupForLifecycle()
+        {
+            if (RunningTasks.Count == 0 && LongTasks.Count == 0)
+                return;
+
+            try
+            {
+                ForceClearAllTasks();
+            }
+            catch (Exception exception)
+            {
+                // 生命周期边界上的清理必须尽力完成，不能阻断域重载或编辑器退出。
+                Debug.LogWarning("[ES] ESEditorHandle 生命周期清理未完全完成："
+                    + exception.GetType().Name);
+                EditorApplication.update -= Update;
+                registered = false;
+                RunningTasks.Clear();
+                LongTasks.Clear();
+                LongTaskById.Clear();
+                singleKeys.Clear();
+            }
+        }
+
         private static void RegisterUpdate()
         {
             if (registered)

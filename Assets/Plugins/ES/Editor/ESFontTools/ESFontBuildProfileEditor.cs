@@ -354,9 +354,9 @@ namespace ES
                     string metaPath = absolutePath + ".meta";
                     if (File.Exists(absolutePath) != file.exists || File.Exists(metaPath) != file.metaExists)
                         throw new InvalidOperationException("恢复后文件存在性与原始快照不一致：" + file.assetPath);
-                    if (file.exists && !string.Equals(ComputeSha256(File.ReadAllBytes(absolutePath)), file.bytesHash, StringComparison.OrdinalIgnoreCase))
+                    if (file.exists && !string.Equals(ComputeSha256File(absolutePath), file.bytesHash, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("恢复后资产 SHA-256 与原始快照不一致：" + file.assetPath);
-                    if (file.metaExists && !string.Equals(ComputeSha256(File.ReadAllBytes(metaPath)), file.metaHash, StringComparison.OrdinalIgnoreCase))
+                    if (file.metaExists && !string.Equals(ComputeSha256File(metaPath), file.metaHash, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("恢复后 .meta SHA-256 与原始快照不一致：" + file.assetPath);
                 }
 
@@ -395,13 +395,27 @@ namespace ES
             if (!normalized.StartsWith("Assets/", StringComparison.Ordinal))
                 throw new InvalidOperationException("字体构建恢复路径必须位于 Assets/ 下：" + assetPath);
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            return Path.Combine(projectRoot, normalized.Replace('/', Path.DirectorySeparatorChar));
+            string assetsRoot = Path.GetFullPath(Application.dataPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string absolutePath = Path.GetFullPath(
+                Path.Combine(projectRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
+            string assetsPrefix = assetsRoot + Path.DirectorySeparatorChar;
+            if (!absolutePath.StartsWith(assetsPrefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("字体构建恢复路径越出项目 Assets/ 根目录：" + assetPath);
+            return absolutePath;
         }
 
         private static string ComputeSha256(byte[] bytes)
         {
             using (SHA256 hash = SHA256.Create())
                 return BitConverter.ToString(hash.ComputeHash(bytes ?? Array.Empty<byte>())).Replace("-", string.Empty);
+        }
+
+        private static string ComputeSha256File(string path)
+        {
+            using (FileStream stream = File.OpenRead(path))
+            using (SHA256 hash = SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", string.Empty);
         }
 
         public static int UpdateAllProfiles()
@@ -536,8 +550,7 @@ namespace ES
                 BuildFallbacks(profile, report);
                 BuildRuntimeCatalog(profile, entries, outputFolder, report);
                 profile.lastBuildReport = report.ToString();
-                EditorUtility.SetDirty(profile);
-                AssetDatabase.SaveAssets();
+                SaveBuildAssets(profile, entries);
             }
             catch (Exception buildException)
             {
@@ -560,8 +573,7 @@ namespace ES
             {
                 BuildFallbacks(profile, report);
                 profile.lastBuildReport = report.ToString();
-                EditorUtility.SetDirty(profile);
-                AssetDatabase.SaveAssets();
+                SaveBuildAssets(profile, entries);
             }
             catch (Exception buildException)
             {
@@ -585,7 +597,16 @@ namespace ES
             if (catalog == null)
             {
                 catalog = ScriptableObject.CreateInstance<ESRuntimeFontCatalog>();
-                AssetDatabase.CreateAsset(catalog, catalogPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(catalog, catalogPath);
+                }
+                catch
+                {
+                    if (catalog != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(catalog)))
+                        UnityEngine.Object.DestroyImmediate(catalog);
+                    throw;
+                }
             }
             else if (!string.Equals(AssetDatabase.GetAssetPath(catalog), catalogPath, StringComparison.OrdinalIgnoreCase))
             {
@@ -616,6 +637,19 @@ namespace ES
             profile.runtimeCatalog = catalog;
             EditorUtility.SetDirty(catalog);
             report.AppendLine("运行时字体目录：" + catalogPath + "（" + bindings.Count + " 个绑定）");
+        }
+
+        private static void SaveBuildAssets(
+            ESFontBuildProfile profile,
+            IReadOnlyCollection<ESFontLanguageBuildEntry> entries)
+        {
+            if (profile != null)
+                AssetDatabase.SaveAssetIfDirty(profile);
+            foreach (ESFontLanguageBuildEntry entry in entries ?? Array.Empty<ESFontLanguageBuildEntry>())
+                if (entry != null && entry.outputFont != null)
+                    AssetDatabase.SaveAssetIfDirty(entry.outputFont);
+            if (profile != null)
+                AssetDatabase.SaveAssetIfDirty(profile.runtimeCatalog);
         }
 
         private static ESRuntimeFontRole ConvertRole(ESFontUsage usage)
@@ -740,8 +774,10 @@ namespace ES
 
         private static string NormalizeFolder(string path)
         {
-            if (string.IsNullOrWhiteSpace(path) || !path.Replace('\\', '/').StartsWith("Assets/", StringComparison.Ordinal)) throw new InvalidOperationException("字体输出目录必须位于 Assets/ 下。");
-            return path.Replace('\\', '/').TrimEnd('/');
+            string candidate = string.IsNullOrWhiteSpace(path) ? string.Empty : path.Replace('\\', '/').TrimEnd('/');
+            if (!ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(candidate, out string normalized))
+                throw new InvalidOperationException("字体输出目录必须是 Assets/ 下的安全项目路径，不能包含绝对路径或 ..。");
+            return normalized;
         }
 
         private static void Validate(ESFontBuildProfile profile, IReadOnlyCollection<ESFontLanguageBuildEntry> entries)
@@ -891,14 +927,38 @@ namespace ES
             if (existing != null)
             {
                 // Keep the main .asset and its GUID stable. Runtime/theme references therefore remain valid
-                // across a rebuild; only the generated atlas and material sub-assets are replaced.
-                foreach (var subAsset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+                // across a rebuild. Existing sub-assets are retained until the new generated objects have
+                // been attached successfully, so a failed rebuild cannot destroy the last good atlas.
+                string existingSnapshot = EditorJsonUtility.ToJson(existing);
+                TMP_FontAsset generatedAsset = fontAsset;
+                bool generatedSubAssetsAttached = false;
+                try
                 {
-                    if (subAsset != null && subAsset != existing) UnityEngine.Object.DestroyImmediate(subAsset, true);
+                    EditorUtility.CopySerialized(generatedAsset, existing);
+                    existing.name = generatedAsset.name;
+                    storedAsset = existing;
+                    AttachGeneratedSubAssets(storedAsset);
+                    generatedSubAssetsAttached = true;
+
+                    foreach (var subAsset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+                    {
+                        if (subAsset != null && subAsset != storedAsset
+                            && !IsGeneratedSubAsset(storedAsset, subAsset))
+                            UnityEngine.Object.DestroyImmediate(subAsset, true);
+                    }
                 }
-                EditorUtility.CopySerialized(fontAsset, existing);
-                existing.name = fontAsset.name;
-                storedAsset = existing;
+                catch
+                {
+                    EditorJsonUtility.FromJsonOverwrite(existingSnapshot, existing);
+                    EditorUtility.SetDirty(existing);
+                    throw;
+                }
+                finally
+                {
+                    if (generatedAsset != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(generatedAsset)))
+                        UnityEngine.Object.DestroyImmediate(generatedAsset, !generatedSubAssetsAttached);
+                }
+                return;
             }
             else if (AssetDatabase.LoadMainAssetAtPath(assetPath) != null)
             {
@@ -906,20 +966,58 @@ namespace ES
             }
             else
             {
-                AssetDatabase.CreateAsset(fontAsset, assetPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(fontAsset, assetPath);
+                }
+                catch
+                {
+                    if (fontAsset != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(fontAsset)))
+                        UnityEngine.Object.DestroyImmediate(fontAsset, true);
+                    throw;
+                }
                 storedAsset = fontAsset;
             }
-            foreach (var texture in storedAsset.atlasTextures.Where(texture => texture != null))
+            AttachGeneratedSubAssets(storedAsset);
+        }
+
+        private static void AttachGeneratedSubAssets(TMP_FontAsset storedAsset)
+        {
+            var attached = new List<UnityEngine.Object>();
+            try
             {
-                texture.name = storedAsset.name + " Atlas";
-                AssetDatabase.AddObjectToAsset(texture, storedAsset);
+                foreach (var texture in storedAsset.atlasTextures.Where(texture => texture != null))
+                {
+                    texture.name = storedAsset.name + " Atlas";
+                    AssetDatabase.AddObjectToAsset(texture, storedAsset);
+                    attached.Add(texture);
+                }
+                if (storedAsset.material != null)
+                {
+                    storedAsset.material.name = storedAsset.name + " Material";
+                    AssetDatabase.AddObjectToAsset(storedAsset.material, storedAsset);
+                    attached.Add(storedAsset.material);
+                }
+                EditorUtility.SetDirty(storedAsset);
             }
-            if (storedAsset.material != null)
+            catch
             {
-                storedAsset.material.name = storedAsset.name + " Material";
-                AssetDatabase.AddObjectToAsset(storedAsset.material, storedAsset);
+                for (int index = attached.Count - 1; index >= 0; index--)
+                {
+                    UnityEngine.Object subAsset = attached[index];
+                    if (subAsset == null) continue;
+                    try { AssetDatabase.RemoveObjectFromAsset(subAsset); } catch { }
+                    try { UnityEngine.Object.DestroyImmediate(subAsset, true); } catch { }
+                }
+                throw;
             }
-            EditorUtility.SetDirty(storedAsset);
+        }
+
+        private static bool IsGeneratedSubAsset(TMP_FontAsset storedAsset, UnityEngine.Object candidate)
+        {
+            if (candidate == null || storedAsset == null) return false;
+            if (storedAsset.material == candidate) return true;
+            return storedAsset.atlasTextures != null && storedAsset.atlasTextures.Any(texture => texture == candidate);
         }
 
         private static void EnsureAssetFolder(string assetFolder)
@@ -1305,7 +1403,16 @@ namespace ES
             if (catalog == null)
             {
                 catalog = ScriptableObject.CreateInstance<ESLocalizationCatalog>();
-                AssetDatabase.CreateAsset(catalog, CatalogPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(catalog, CatalogPath);
+                }
+                catch
+                {
+                    if (catalog != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(catalog)))
+                        UnityEngine.Object.DestroyImmediate(catalog);
+                    throw;
+                }
             }
 
             Undo.RecordObject(catalog, "生成 ES 本地化目录");
@@ -1317,7 +1424,7 @@ namespace ES
             catalog.entries = candidate;
             catalog.InvalidateIndex();
             EditorUtility.SetDirty(catalog);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(catalog);
             Selection.activeObject = catalog;
             EditorUtility.DisplayDialog("ES 本地化目录", "已生成：" + CatalogPath + "\n条目数：" + candidate.Count, "确定");
         }

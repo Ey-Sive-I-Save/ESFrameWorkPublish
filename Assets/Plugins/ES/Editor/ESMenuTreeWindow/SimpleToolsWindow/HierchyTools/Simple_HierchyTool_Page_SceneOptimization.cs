@@ -789,7 +789,7 @@ namespace ES
             ShowAnalysisDialog();
         }
 
-        private void BackupScene()
+        private bool BackupScene()
         {
             var scene = SceneManager.GetActiveScene();
             if (!string.IsNullOrEmpty(scene.path))
@@ -799,11 +799,14 @@ namespace ES
                 if (!AssetDatabase.CopyAsset(scene.path, backupPath))
                 {
                     UnityEngine.Debug.LogError("场景备份失败，已中止优化：" + scene.path);
-                    return;
+                    return false;
                 }
                 if (verboseLogging)
                     UnityEngine.Debug.Log($"场景已备份到: {backupPath}");
+                return true;
             }
+            UnityEngine.Debug.LogError("当前场景尚未保存，无法创建回滚备份；已中止优化。");
+            return false;
         }
 
         private void ShowAnalysisDialog()
@@ -1776,7 +1779,8 @@ namespace ES
 
             if (shouldBackup)
             {
-                BackupScene();
+                if (!BackupScene())
+                    return;
             }
 
             int optimizationsApplied = 0;
@@ -1952,7 +1956,6 @@ namespace ES
             // 重新分析以查看效果。
             if (!previewOnly)
             {
-                AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 AnalyzeScene();
             }
@@ -2011,24 +2014,25 @@ namespace ES
                     if (components == null)
                         continue;
                         
-                    var serializedObject = new SerializedObject(obj);
-                    var prop = serializedObject.FindProperty("m_Component");
-
-                    int removed = 0;
-                    for (int i = components.Length - 1; i >= 0; i--)
+                    using (var serializedObject = new SerializedObject(obj))
                     {
-                        if (components[i] == null)
+                        var prop = serializedObject.FindProperty("m_Component");
+                        int removed = 0;
+                        for (int i = components.Length - 1; i >= 0; i--)
                         {
-                        prop.DeleteArrayElementAtIndex(i);
-                        removed++;
-                        cleanedCount++;
-                    }
-                }
+                            if (components[i] == null)
+                            {
+                                prop.DeleteArrayElementAtIndex(i);
+                                removed++;
+                                cleanedCount++;
+                            }
+                        }
 
-                    if (removed > 0)
-                    {
-                        serializedObject.ApplyModifiedProperties();
-                        EditorUtility.SetDirty(obj);
+                        if (removed > 0)
+                        {
+                            serializedObject.ApplyModifiedProperties();
+                            EditorUtility.SetDirty(obj);
+                        }
                     }
                 }
 

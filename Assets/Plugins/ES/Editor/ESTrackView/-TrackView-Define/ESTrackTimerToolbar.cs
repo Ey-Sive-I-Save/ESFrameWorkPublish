@@ -519,6 +519,10 @@ namespace ES
         private void ShowTimelineMenuDelayed()
         {
             EditorApplication.delayCall -= ShowTimelineMenuDelayed;
+            // The owning TrackView can be rebuilt before delayCall runs. Do not
+            // dereference a detached button or open a menu against a stale panel.
+            if (MoreButton == null || MoreButton.panel == null)
+                return;
             IEditorTrackSupport_GetSequence.ShowDynamicMenu(MoreButton.worldBound, OnTimelineSelected);
         }
 

@@ -53,9 +53,14 @@ namespace ES
                 return;
 
             OpenWindow();
-            EditorApplication.delayCall += () =>
+            ESResWindow expectedWindow = UsingWindow;
+            EditorApplication.CallbackFunction selectPageCallback = null;
+            selectPageCallback = () =>
             {
-                if (menuTree == null)
+                EditorApplication.delayCall -= selectPageCallback;
+                if (expectedWindow == null
+                    || !ReferenceEquals(UsingWindow, expectedWindow)
+                    || menuTree == null)
                     return;
                 foreach (OdinMenuItem item in menuTree.EnumerateTree())
                 {
@@ -73,6 +78,7 @@ namespace ES
                     return;
                 }
             };
+            EditorApplication.delayCall += selectPageCallback;
         }
 
         [MenuItem(MenuItemPathDefine.RESOURCE_WINDOW_PATH, false, 0)]
@@ -102,7 +108,6 @@ namespace ES
         public override void ES_SaveData()
         {
             base.ES_SaveData();
-            AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
 
@@ -352,15 +357,23 @@ namespace ES
                 ESGlobalResSetting settings = ESGlobalResSetting.Instance;
                 if (settings == null)
                 {
-                    resSettingSerializedObject = null;
+                    ReleaseResSettingSerializedObject();
                     return;
                 }
 
                 if (resSettingSerializedObject == null
                     || resSettingSerializedObject.targetObject != settings)
                 {
+                    ReleaseResSettingSerializedObject();
                     resSettingSerializedObject = new SerializedObject(settings);
                 }
+            }
+
+            private void ReleaseResSettingSerializedObject()
+            {
+                try { resSettingSerializedObject?.Dispose(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                finally { resSettingSerializedObject = null; }
             }
 
             private void DrawResSettingProperty(string propertyPath, string label)
@@ -384,7 +397,7 @@ namespace ES
                 reorderableListForLibraries = null;
                 filteredLibraries.Clear();
                 visibleLibraries.Clear();
-                resSettingSerializedObject = null;
+                ReleaseResSettingSerializedObject();
                 if (editor != null)
                 {
                     UnityEngine.Object.DestroyImmediate(editor);

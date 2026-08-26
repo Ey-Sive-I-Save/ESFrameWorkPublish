@@ -1382,14 +1382,22 @@ namespace ES
                     continue;
                 }
 
-                var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(info.AssetPath);
+                string normalizedPath = SimpleToolsSafetyUtility.NormalizeAssetPath(info.AssetPath);
+                if (string.IsNullOrWhiteSpace(normalizedPath)
+                    || string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(normalizedPath)))
+                {
+                    failedPaths.Add(info.AssetPath);
+                    continue;
+                }
+
+                var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(normalizedPath);
                 if (obj != null)
                 {
                     objects.Add(obj);
                 }
                 else
                 {
-                    failedPaths.Add(info.AssetPath);
+                    failedPaths.Add(normalizedPath);
                 }
             }
 

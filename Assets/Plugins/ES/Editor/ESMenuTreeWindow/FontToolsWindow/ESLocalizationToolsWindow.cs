@@ -1,4 +1,5 @@
 using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -25,6 +26,7 @@ namespace ES
         private PopupField<string> localeFilter;
         private ListView entryList;
         private VisualElement detailHost;
+        private SerializedObject detailSerializedCatalog;
         private VisualElement matrixHost;
         private Label summaryLabel;
         private VisualElement validationHost;
@@ -53,6 +55,19 @@ namespace ES
         protected override string ESWindow_Subtitle => "TextKey、语言目录、翻译审查与运行时预览";
         protected override Vector2 ESWindow_MinSize => new Vector2(820f, 560f);
         protected override Vector2 ESWindow_DefaultSize => new Vector2(1180f, 760f);
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            ReleaseDetailSerializedCatalog();
+            base.ESWindow_OnHostDisable();
+        }
+
+        private void ReleaseDetailSerializedCatalog()
+        {
+            try { detailSerializedCatalog?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            finally { detailSerializedCatalog = null; }
+        }
 
         protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
         {
@@ -352,6 +367,7 @@ namespace ES
         private void RebuildDetails()
         {
             if (detailHost == null) return;
+            ReleaseDetailSerializedCatalog();
             detailHost.Clear();
             if (catalog == null)
             {
@@ -365,10 +381,10 @@ namespace ES
             }
             ESLocalizationCatalogEntry selected = visibleEntries[selectedIndex];
             int actualIndex = catalog.entries.IndexOf(selected);
-            SerializedObject serializedCatalog = new SerializedObject(catalog);
-            SerializedProperty entryProperty = serializedCatalog.FindProperty("entries").GetArrayElementAtIndex(actualIndex);
+            detailSerializedCatalog = new SerializedObject(catalog);
+            SerializedProperty entryProperty = detailSerializedCatalog.FindProperty("entries").GetArrayElementAtIndex(actualIndex);
             var propertyField = new PropertyField(entryProperty, "条目");
-            propertyField.Bind(serializedCatalog);
+            propertyField.Bind(detailSerializedCatalog);
             propertyField.RegisterCallback<SerializedPropertyChangeEvent>(_ =>
             {
                 catalog.InvalidateIndex();

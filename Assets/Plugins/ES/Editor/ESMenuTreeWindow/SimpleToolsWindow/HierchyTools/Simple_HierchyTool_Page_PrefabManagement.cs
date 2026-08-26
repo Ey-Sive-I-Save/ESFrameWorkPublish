@@ -890,6 +890,23 @@ namespace ES
             return string.Join("/", names);
         }
 
+        private static void SaveAppliedPrefabSources(IEnumerable<GameObject> instances)
+        {
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            foreach (GameObject instance in instances ?? Enumerable.Empty<GameObject>())
+            {
+                if (instance == null)
+                    continue;
+                GameObject source = PrefabUtility.GetCorrespondingObjectFromSource(instance);
+                string path = source == null ? string.Empty : AssetDatabase.GetAssetPath(source);
+                if (string.IsNullOrEmpty(path) || !paths.Add(path))
+                    continue;
+                UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(path);
+                if (asset != null)
+                    AssetDatabase.SaveAssetIfDirty(asset);
+            }
+        }
+
         #region 基础Prefab操作
         /// <summary>
         /// 批量应用所有选中Prefab实例的更改到资产文件
@@ -943,7 +960,7 @@ namespace ES
                 }
             }
 
-            AssetDatabase.SaveAssets();
+            SaveAppliedPrefabSources(prefabTargets);
             lastResultSummary = $"应用 Prefab 修改完成: 成功 {appliedCount} / {prefabCount} | 失败 {failedMessages.Count}";
             lastResultDetail = BuildResultDetail(prefabTargets, failedMessages);
             EditorUtility.DisplayDialog("操作完成",

@@ -533,7 +533,17 @@ namespace ES
         public void RequestCancel()
         {
             if (record.cancellable && !record.cancellation.IsCancellationRequested)
-                record.cancellation.Cancel();
+            {
+                try
+                {
+                    record.cancellation.Cancel();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ESProgressHandle 取消回调执行失败。", exception));
+                }
+            }
         }
 
         public void Complete(string summary = null)
@@ -637,7 +647,19 @@ namespace ES
                 records.Add(record);
                 TrimRecordsLocked();
             }
-            EnsureUpdateSubscription();
+            try
+            {
+                EnsureUpdateSubscription();
+            }
+            catch
+            {
+                lock (gate)
+                {
+                    records.Remove(record);
+                }
+                DisposeCancellationSource(record.cancellation);
+                throw;
+            }
             return new ESProgressHandle(record);
         }
 
@@ -804,8 +826,17 @@ namespace ES
                     return false;
                 cancellation = record.cancellation;
             }
-            cancellation.Cancel();
-            return true;
+            try
+            {
+                cancellation.Cancel();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ESProgressCenter 取消回调执行失败。", exception));
+                return false;
+            }
         }
 
         public static void DismissCompleted()
@@ -886,7 +917,7 @@ namespace ES
                             ? failedCutoff
                             : cutoff))
                         continue;
-                    record.cancellation.Dispose();
+                    DisposeCancellationSource(record.cancellation);
                     records.RemoveAt(i);
                 }
                 hasRunning = false;
@@ -902,15 +933,34 @@ namespace ES
 
             if (hasVisible)
             {
-                if (window == null)
-                    window = ESProgressCenterWindow.OpenAtBottomRight();
-                else
-                    window.RefreshNow();
+                try
+                {
+                    if (window == null)
+                        window = ESProgressCenterWindow.OpenAtBottomRight();
+                    else
+                        window.RefreshNow();
+                }
+                catch (Exception windowException)
+                {
+                    // UI failures must not abort the progress-center update callback;
+                    // records and cancellation state remain authoritative and are retried.
+                    Debug.LogException(windowException);
+                }
             }
             else if (window != null)
             {
-                window.Close();
-                window = null;
+                try
+                {
+                    window.Close();
+                }
+                catch (Exception closeException)
+                {
+                    Debug.LogException(closeException);
+                }
+                finally
+                {
+                    window = null;
+                }
             }
 
             if (!hasRunning && !hasVisible)
@@ -936,7 +986,7 @@ namespace ES
                 int removable = records.FindIndex(item => item.state != ESProgressState.Running);
                 if (removable < 0)
                     break;
-                records[removable].cancellation.Dispose();
+                DisposeCancellationSource(records[removable].cancellation);
                 records.RemoveAt(removable);
             }
         }
@@ -947,7 +997,7 @@ namespace ES
             {
                 if (!predicate(records[i]))
                     continue;
-                records[i].cancellation.Dispose();
+                DisposeCancellationSource(records[i].cancellation);
                 records.RemoveAt(i);
             }
         }
@@ -961,17 +1011,24 @@ namespace ES
             updateSubscribed = false;
             Action[] shutdowns = stepShutdowns.ToArray();
             for (int i = 0; i < shutdowns.Length; i++)
-                shutdowns[i]?.Invoke();
+            {
+                try
+                {
+                    shutdowns[i]?.Invoke();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ESProgressCenter 关闭回调执行失败。", exception));
+                }
+            }
             stepTicks.Clear();
             stepShutdowns.Clear();
             lock (gate)
             {
                 for (int i = 0; i < records.Count; i++)
                 {
-                    ProgressRecord record = records[i];
-                    if (!record.cancellation.IsCancellationRequested)
-                        record.cancellation.Cancel();
-                    record.cancellation.Dispose();
+                    CancelAndDisposeCancellationSource(records[i].cancellation);
                 }
                 records.Clear();
             }
@@ -997,6 +1054,38 @@ namespace ES
                 finishedAtUtc = record.finishedAtUtc,
             };
         }
+
+        private static void DisposeCancellationSource(CancellationTokenSource cancellation)
+        {
+            if (cancellation == null)
+                return;
+            try
+            {
+                cancellation.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ESProgressCenter 释放取消源失败。", exception));
+            }
+        }
+
+        private static void CancelAndDisposeCancellationSource(CancellationTokenSource cancellation)
+        {
+            if (cancellation == null)
+                return;
+            try
+            {
+                if (!cancellation.IsCancellationRequested)
+                    cancellation.Cancel();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ESProgressCenter 取消进度任务失败。", exception));
+            }
+            DisposeCancellationSource(cancellation);
+        }
     }
 
     [ESWindowSleepContract(
@@ -1008,6 +1097,8 @@ namespace ES
     {
         private VisualElement content;
         private readonly HashSet<string> expandedIds = new HashSet<string>(StringComparer.Ordinal);
+        private bool lifecycleActive;
+        private int refreshGeneration;
 
         internal static ESProgressCenterWindow OpenAtBottomRight()
         {
@@ -1040,6 +1131,7 @@ namespace ES
 
         public void CreateGUI()
         {
+            lifecycleActive = true;
             ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             rootVisualElement.style.backgroundColor =
@@ -1076,15 +1168,23 @@ namespace ES
 
         internal void RefreshNow()
         {
-            if (content == null)
+            if (!lifecycleActive || content == null)
                 return;
+            int generation = ++refreshGeneration;
             IReadOnlyList<ESProgressSnapshot> snapshots = ESProgressCenter.GetSnapshot();
+            var visibleIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(snapshots[i].id))
+                    visibleIds.Add(snapshots[i].id);
+            }
+            expandedIds.RemoveWhere(id => !visibleIds.Contains(id));
             content.Clear();
             for (int i = snapshots.Count - 1; i >= 0; i--)
-                content.Add(CreateTaskRow(snapshots[i]));
+                content.Add(CreateTaskRow(snapshots[i], generation));
         }
 
-        private VisualElement CreateTaskRow(ESProgressSnapshot snapshot)
+        private VisualElement CreateTaskRow(ESProgressSnapshot snapshot, int generation)
         {
             var block = new VisualElement();
             block.AddToClassList("es-progress-task");
@@ -1111,14 +1211,20 @@ namespace ES
             top.Add(label);
             if (snapshot.state == ESProgressState.Running && snapshot.cancellable)
                 top.Add(ES.EditorInternal.ESWindowPresentation.CreateToolbarButton(
-                    "取消", "请求任务安全取消。", () => ESProgressCenter.RequestCancel(snapshot.id)));
+                    "取消", "请求任务安全取消。", () =>
+                    {
+                        if (lifecycleActive && generation == refreshGeneration)
+                            ESProgressCenter.RequestCancel(snapshot.id);
+                    }));
             if (snapshot.details.Count > 0)
                 top.Add(ES.EditorInternal.ESWindowPresentation.CreateToolbarButton(
                     expandedIds.Contains(snapshot.id) ? "收起" : "详情",
-                    "显示或隐藏任务细节。",
-                    () =>
-                    {
-                        if (!expandedIds.Add(snapshot.id))
+                     "显示或隐藏任务细节。",
+                     () =>
+                     {
+                         if (!lifecycleActive || generation != refreshGeneration)
+                             return;
+                         if (!expandedIds.Add(snapshot.id))
                             expandedIds.Remove(snapshot.id);
                         RefreshNow();
                     }));
@@ -1145,11 +1251,13 @@ namespace ES
 
         private void OnDisable()
         {
+            lifecycleActive = false;
             ESWindowFoundation.Suspend(this);
         }
 
         private void OnDestroy()
         {
+            lifecycleActive = false;
             ESWindowFoundation.Close(this);
         }
     }
@@ -2565,6 +2673,8 @@ namespace ES
         private ESProgressHandle activeProgress;
         private IDisposable ownerInteractionHold;
         private IVisualElementScheduledItem busyRefreshSchedule;
+        private IVisualElementScheduledItem initialFocusSchedule;
+        private EditorApplication.CallbackFunction pendingValidationDelayCallback;
         private int validationGeneration;
         private bool busy;
         private string busyMessage = string.Empty;
@@ -2889,8 +2999,20 @@ namespace ES
 
         private void Initialize(ESAdvancedDialogRequest value)
         {
-            ownerInteractionHold?.Dispose();
+            IDisposable previousHold = ownerInteractionHold;
             ownerInteractionHold = null;
+            if (previousHold != null)
+            {
+                try
+                {
+                    previousHold.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ESAdvancedDialog 旧宿主交互保持释放失败。", exception));
+                }
+            }
             request = value;
             initialized = true;
             RefreshValidation();
@@ -2999,6 +3121,8 @@ namespace ES
         {
             rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+            initialFocusSchedule?.Pause();
+            initialFocusSchedule = null;
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = null;
             CancelAsyncValidation();
@@ -3282,8 +3406,10 @@ namespace ES
 
         private void ScheduleInitialFocus()
         {
-            rootVisualElement.schedule.Execute(() =>
+            initialFocusSchedule?.Pause();
+            initialFocusSchedule = rootVisualElement.schedule.Execute(() =>
             {
+                initialFocusSchedule = null;
                 if (this == null || completed || busy)
                     return;
                 VisualElement target = null;
@@ -3986,17 +4112,42 @@ namespace ES
                 throw new InvalidOperationException("当前对话框已有操作正在执行。");
             busy = true;
             busyMessage = message ?? string.Empty;
-            operationCancellation?.Dispose();
+            CancellationTokenSource previousCancellation = operationCancellation;
+            operationCancellation = null;
+            try
+            {
+                previousCancellation?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ESAdvancedDialog 旧操作取消源释放失败。", exception));
+            }
             string progressId = string.IsNullOrWhiteSpace(DialogId)
                 ? "dialog." + GetInstanceID() + "." + operationId
                 : "dialog." + DialogId + "." + operationId;
-            activeProgress = ESProgressCenter.Begin(
-                progressId,
-                request.title,
-                message,
-                request.allowOperationCancellation);
-            operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                activeProgress.CancellationToken);
+            activeProgress = null;
+            try
+            {
+                activeProgress = ESProgressCenter.Begin(
+                    progressId,
+                    request.title,
+                    message,
+                    request.allowOperationCancellation);
+                operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    activeProgress.CancellationToken);
+            }
+            catch
+            {
+                ESProgressHandle failedProgress = activeProgress;
+                activeProgress = null;
+                operationCancellation = null;
+                try { failedProgress?.Cancel("操作初始化失败"); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                busy = false;
+                busyMessage = string.Empty;
+                throw;
+            }
             if (busyOverlay != null)
                 busyOverlay.style.display = DisplayStyle.Flex;
             if (busyLabel != null)
@@ -4429,7 +4580,7 @@ namespace ES
                 if (delay > 0)
                     await Task.Delay(delay, token);
                 ESAdvancedDialogValidation result = await request.validateAsync(BuildValues(), token);
-                EditorApplication.delayCall += () =>
+                QueueValidationDelayCallback(() =>
                 {
                     if (this == null || completed || token.IsCancellationRequested
                         || generation != validationGeneration)
@@ -4450,36 +4601,79 @@ namespace ES
                         valid
                             ? GetToneStatus()
                             : ES.EditorInternal.ESStatusKind.Warning);
-                };
+                });
             }
             catch (OperationCanceledException)
             {
             }
             catch (Exception exception)
             {
-                EditorApplication.delayCall += () =>
+                QueueValidationDelayCallback(() =>
                 {
                     if (this == null || completed || generation != validationGeneration)
                         return;
                     asyncValidationPending = false;
                     validationMessage = "异步校验发生异常；请查看 Console。";
                     invalidFieldId = string.Empty;
-                    validationPanel.style.display = DisplayStyle.Flex;
-                    validationLabel.text = "无法继续：" + validationMessage;
+                    if (validationPanel != null)
+                        validationPanel.style.display = DisplayStyle.Flex;
+                    if (validationLabel != null)
+                        validationLabel.text = "无法继续：" + validationMessage;
                     ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(confirmButton, false);
                     shell?.SetStatus(validationMessage, ES.EditorInternal.ESStatusKind.Error);
                     Debug.LogException(exception);
-                };
+                });
             }
         }
 
         private void CancelAsyncValidation()
         {
             validationGeneration++;
+            if (pendingValidationDelayCallback != null)
+            {
+                EditorApplication.delayCall -= pendingValidationDelayCallback;
+                pendingValidationDelayCallback = null;
+            }
             validationCancellation?.Cancel();
             validationCancellation?.Dispose();
             validationCancellation = null;
             asyncValidationPending = false;
+        }
+
+        private void QueueValidationDelayCallback(Action callback)
+        {
+            if (pendingValidationDelayCallback != null)
+                EditorApplication.delayCall -= pendingValidationDelayCallback;
+            pendingValidationDelayCallback = () =>
+            {
+                EditorApplication.delayCall -= pendingValidationDelayCallback;
+                pendingValidationDelayCallback = null;
+                try
+                {
+                    callback?.Invoke();
+                }
+                catch (Exception exception)
+                {
+                    if (this == null || completed)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "ESAdvancedDialog 关闭后的异步校验回调仍然抛出异常。", exception));
+                        return;
+                    }
+                    asyncValidationPending = false;
+                    validationMessage = "异步校验结果更新失败；请重试。";
+                    invalidFieldId = string.Empty;
+                    if (validationPanel != null)
+                        validationPanel.style.display = DisplayStyle.Flex;
+                    if (validationLabel != null)
+                        validationLabel.text = "无法继续：" + validationMessage;
+                    ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(confirmButton, false);
+                    shell?.SetStatus(validationMessage, ES.EditorInternal.ESStatusKind.Error);
+                    Debug.LogException(new InvalidOperationException(
+                        "ESAdvancedDialog 异步校验结果回调更新失败。", exception));
+                }
+            };
+            EditorApplication.delayCall += pendingValidationDelayCallback;
         }
 
         private void RevealInvalidField()
@@ -4659,7 +4853,10 @@ namespace ES
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = null;
-            CancelAndDispose(ref validationCancellation);
+            // CancelAsyncValidation also removes the pending delayCall callback;
+            // disposing only the token source would leave a closed dialog
+            // captured until the next editor tick.
+            CancelAsyncValidation();
             CancelAndDispose(ref operationCancellation);
             ESProgressHandle progress = activeProgress;
             activeProgress = null;

@@ -36,6 +36,8 @@ namespace ES
     public static class ESWindowCommandRegistry
     {
         private const string PreferencePrefix = "ES.WindowLauncher.";
+        private const int MaxFavoriteCount = 32;
+        private const int MaxRecentCount = 12;
         private static readonly Dictionary<string, ESWindowCommand> Commands = new Dictionary<string, ESWindowCommand>(StringComparer.Ordinal);
         private static readonly List<ESWindowCommand> SortedCommands = new List<ESWindowCommand>();
         private static readonly List<string> Favorites = new List<string>();
@@ -46,6 +48,7 @@ namespace ES
         {
             LoadLists();
             RegisterBuiltIns();
+            PrunePersistedLists();
         }
 
         // 由 AssemblyStream 的初始化器显式触发静态构造，避免把普通窗口注册挂到 Unity 全局域重载入口。
@@ -73,7 +76,6 @@ namespace ES
                 return;
             Commands[command.Id] = command;
             RebuildSortedCommands();
-            if (!FavoriteOrder.Contains(command.Id)) FavoriteOrder.Add(command.Id);
         }
 
         private static void RebuildSortedCommands()
@@ -97,6 +99,12 @@ namespace ES
             if (string.IsNullOrEmpty(id)) return;
             if (!Favorites.Remove(id)) Favorites.Add(id);
             if (!FavoriteOrder.Contains(id)) FavoriteOrder.Add(id);
+            while (Favorites.Count > MaxFavoriteCount)
+            {
+                string removed = Favorites[0];
+                Favorites.RemoveAt(0);
+                FavoriteOrder.Remove(removed);
+            }
             SaveLists();
         }
 
@@ -139,7 +147,7 @@ namespace ES
             if (Recent.Count > 0 && Recent[0] == id) return;
             Recent.Remove(id);
             Recent.Insert(0, id);
-            while (Recent.Count > 12) Recent.RemoveAt(Recent.Count - 1);
+            while (Recent.Count > MaxRecentCount) Recent.RemoveAt(Recent.Count - 1);
             SaveLists();
         }
 
@@ -219,17 +227,65 @@ namespace ES
             FavoriteOrder.Clear(); FavoriteOrder.AddRange(ReadList("favoriteOrder"));
         }
 
+        private static void PrunePersistedLists()
+        {
+            bool changed = false;
+            changed |= Favorites.RemoveAll(id => !Commands.ContainsKey(id)) > 0;
+            changed |= Recent.RemoveAll(id => !Commands.ContainsKey(id)) > 0;
+            changed |= FavoriteOrder.RemoveAll(id => !Commands.ContainsKey(id)) > 0;
+            changed |= FavoriteOrder.RemoveAll(id => !Favorites.Contains(id)) > 0;
+            for (int i = 0; i < Favorites.Count; i++)
+            {
+                if (FavoriteOrder.Contains(Favorites[i])) continue;
+                FavoriteOrder.Add(Favorites[i]);
+                changed = true;
+            }
+            while (Favorites.Count > MaxFavoriteCount)
+            {
+                string removed = Favorites[0];
+                Favorites.RemoveAt(0);
+                FavoriteOrder.Remove(removed);
+                changed = true;
+            }
+            while (Recent.Count > MaxRecentCount)
+            {
+                Recent.RemoveAt(Recent.Count - 1);
+                changed = true;
+            }
+            while (FavoriteOrder.Count > MaxFavoriteCount)
+            {
+                FavoriteOrder.RemoveAt(FavoriteOrder.Count - 1);
+                changed = true;
+            }
+            if (changed) SaveLists();
+        }
+
         private static List<string> ReadList(string suffix)
         {
-            string raw = EditorPrefs.GetString(Key(suffix), string.Empty);
-            return raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToList();
+            try
+            {
+                string raw = EditorPrefs.GetString(Key(suffix), string.Empty);
+                return raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToList();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("读取 ES 工具启动器偏好失败，已使用空列表：" + exception.Message);
+                return new List<string>();
+            }
         }
 
         private static void SaveLists()
         {
-            EditorPrefs.SetString(Key("favorites"), string.Join("\n", Favorites));
-            EditorPrefs.SetString(Key("recent"), string.Join("\n", Recent));
-            EditorPrefs.SetString(Key("favoriteOrder"), string.Join("\n", FavoriteOrder));
+            try
+            {
+                EditorPrefs.SetString(Key("favorites"), string.Join("\n", Favorites));
+                EditorPrefs.SetString(Key("recent"), string.Join("\n", Recent));
+                EditorPrefs.SetString(Key("favoriteOrder"), string.Join("\n", FavoriteOrder));
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("保存 ES 工具启动器偏好失败：" + exception.Message);
+            }
         }
     }
 
@@ -270,6 +326,12 @@ namespace ES
         protected override string ESWindow_PageStableId => "es.window-launcher";
         protected override string ESWindow_PageTitle => "窗口与工具";
         protected override string ESWindow_PageKeywords => "窗口 工具 搜索 收藏 最近使用";
+
+        protected override void ESWindow_OnHostEnable()
+        {
+            base.ESWindow_OnHostEnable();
+            maxSize = new Vector2(1400f, 1000f);
+        }
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {

@@ -3362,6 +3362,16 @@ namespace Scanner.Probes
                 dialogPath,
                 "beforeAssemblyReload -= Shutdown",
                 "CompilationPipeline.compilationFinished -= OnCompilationFinished");
+            AssertSourceContainsInMethodInOrder(
+                dialogPath,
+                "private void ScheduleInitialFocus()",
+                "initialFocusSchedule?.Pause();",
+                "initialFocusSchedule = rootVisualElement.schedule.Execute");
+            AssertSourceContainsInMethodInOrder(
+                dialogPath,
+                "private void ReleaseWindowResources()",
+                "initialFocusSchedule?.Pause();",
+                "initialFocusSchedule = null;");
         }
 
         [Test]
@@ -3466,6 +3476,19 @@ namespace Scanner.Probes
         }
 
         [Test]
+        [Test]
+        public void DuplicateInstanceViolationWakesOnlyAfterLifecycleResume()
+        {
+            const string presentationPath =
+                "Assets/Plugins/ES/Editor/ESPresentation/Core/ESEditorPresentationCore.cs";
+            AssertSourceContainsInMethodInOrder(
+                presentationPath,
+                "private static void MarkWindowBindingResumed(int id, WindowBinding binding)",
+                "binding.lifecycleSuspended = false;",
+                "if (binding.singleInstanceViolation && IsSleepingOrTargetingSleep(binding))",
+                "RestoreSemiSleep(binding, true);");
+        }
+
         public void DetachedWindowRootsUseTheSameDeterministicSuspendTeardown()
         {
             const string presentationPath =

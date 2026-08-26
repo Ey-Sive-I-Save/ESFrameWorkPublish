@@ -124,8 +124,17 @@ namespace ES
             });
             ESFontBuildProfileEditor.ApplyStandardTenLanguageTemplate(asset);
             string path = AssetDatabase.GenerateUniqueAssetPath(profileFolder + "/ESFontBuildProfile.asset");
-            AssetDatabase.CreateAsset(asset, path);
-            AssetDatabase.SaveAssets();
+            try
+            {
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            catch
+            {
+                if (asset != null && !EditorUtility.IsPersistent(asset))
+                    DestroyImmediate(asset);
+                throw;
+            }
+            AssetDatabase.SaveAssetIfDirty(asset);
             profile = asset;
             Selection.activeObject = asset;
             EditorGUIUtility.PingObject(asset);
@@ -454,15 +463,31 @@ namespace ES
             previewText = null;
             previewFont = null;
             renderedSample = null;
-            if (previewUtility != null)
+            PreviewRenderUtility utility = previewUtility;
+            previewUtility = null;
+            if (utility != null)
             {
-                previewUtility.Cleanup();
-                previewUtility = null;
+                try
+                {
+                    utility.Cleanup();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
-            if (previewObject != null)
+            GameObject objectToDestroy = previewObject;
+            previewObject = null;
+            if (objectToDestroy != null)
             {
-                UnityEngine.Object.DestroyImmediate(previewObject);
-                previewObject = null;
+                try
+                {
+                    UnityEngine.Object.DestroyImmediate(objectToDestroy);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
         }
 

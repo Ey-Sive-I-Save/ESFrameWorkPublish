@@ -521,7 +521,7 @@ namespace ES
 #if UNITY_EDITOR
             if (ESGlobalEditorDefaultConfi.Instance != null)
                 EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
         }
 
@@ -535,7 +535,7 @@ namespace ES
 #if UNITY_EDITOR
                 if (ESGlobalEditorDefaultConfi.Instance != null)
                     EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
                 EditorUtility.DisplayDialog("成功", "配置已保存！", "确定");
             }
@@ -568,7 +568,7 @@ namespace ES
 #if UNITY_EDITOR
                 if (ESGlobalEditorDefaultConfi.Instance != null)
                     EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
             }
         }
@@ -598,7 +598,7 @@ namespace ES
 #if UNITY_EDITOR
                         if (ESGlobalEditorDefaultConfi.Instance != null)
                             EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
-                        AssetDatabase.SaveAssets();
+                        AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
                     }
                 }
@@ -1060,7 +1060,7 @@ namespace ES
                     // 标记全局配置为已修改
 #if UNITY_EDITOR
                     EditorUtility.SetDirty(globalConfig);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
                 }
             }
@@ -1079,7 +1079,7 @@ namespace ES
 #if UNITY_EDITOR
                     if (ESGlobalEditorDefaultConfi.Instance != null)
                         EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
                 }
             }
@@ -1126,7 +1126,7 @@ namespace ES
             config.PackageCollectPath = allPaths.ToList();
 #if UNITY_EDITOR
             EditorUtility.SetDirty(config);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
             EditorUtility.DisplayDialog("成功", "已将设置应用到全局配置！", "确定");
         }

@@ -2030,11 +2030,25 @@ namespace ES
                 if (exampleObject != null)
                     UnityEngine.Object.DestroyImmediate(exampleObject);
                 if (groundObject != null)
+                {
+                    DestroyTransientGroundMaterial(groundObject);
                     UnityEngine.Object.DestroyImmediate(groundObject);
+                }
                 lastResultSummary = "粒子场景案例创建失败。";
                 lastResultDetail = exception.GetType().Name + ": " + exception.Message;
                 Debug.LogException(exception);
             }
+        }
+
+        private static void DestroyTransientGroundMaterial(GameObject groundObject)
+        {
+            if (groundObject == null)
+                return;
+
+            Renderer renderer = groundObject.GetComponent<Renderer>();
+            Material material = renderer != null ? renderer.sharedMaterial : null;
+            if (material != null && !EditorUtility.IsPersistent(material))
+                UnityEngine.Object.DestroyImmediate(material);
         }
 
         private static ParticleLookPreset ResolveSceneExamplePreset(string templateId)

@@ -291,7 +291,6 @@ namespace ES
                     ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toPack, EnglishCodeName + "DataPack", Attribute:
                         $"[ESCreatePath({"数据包"._AsStringValue()}, \"{ChineseDisplayName}数据包\")]", parent: $": SoDataPack<{infoName}>");
                 }
-                AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
             }
         }
@@ -343,7 +342,6 @@ namespace ES
                         string normalName = (EnglishCodeName + "SO")._ToValidIdentName();
                         ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(folderUse, normalName, Attribute:
                             $"[ESCreatePath({chineseGroupPathName._AsStringValue()}, \"{ChineseDisplayName}SO\")]", parent: ": ESSO");
-                        AssetDatabase.SaveAssets();
                         AssetDatabase.Refresh();
 
                     }
@@ -393,7 +391,6 @@ namespace ES
             public bool AutoParentFolder = true;
             private void Refresh()
             {
-                AssetDatabase.Refresh();
                 if (ESSODataInfoWindow.UsingWindow != null)
                     ESSODataInfoWindow.UsingWindow.selectPackTypeName_ = createPackType_;
                 createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createPackType_, "DataPack");
@@ -519,6 +516,10 @@ namespace ES
 
             public override ESWindowPageBase ES_Refresh()
             {
+                if (pack == null)
+                {
+                    return base.ES_Refresh();
+                }
                 pack.Check();
                 if (pack.EnableAutoRefresh && CachingGroups != null)
                 {
@@ -538,7 +539,10 @@ namespace ES
                         }
                     }
 
-                    AssetDatabase.SaveAssets();
+                    if (pack is ScriptableObject packAsset && AssetDatabase.Contains(packAsset))
+                    {
+                        AssetDatabase.SaveAssetIfDirty(packAsset);
+                    }
                     AssetDatabase.Refresh();
                 }
                 return base.ES_Refresh();
@@ -552,6 +556,11 @@ namespace ES
             [Button("查找匹配组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void SearchAllGroup()
             {   //找到全部数据组
+                if (pack == null)
+                {
+                    CachingGroups = null;
+                    return;
+                }
                 var GroupType = ESSODataWindowHelper.GetGroupTypeForPackType(pack.GetType());
                 CachingGroups = ESEditorSO.GetGroup<ISoDataGroup>(GroupType) ?? CachingGroups;
             }
@@ -561,7 +570,7 @@ namespace ES
             public void PushInDataGroup()
             {
 
-                if (CachingGroups != null)
+                if (pack is ScriptableObject packAsset && AssetDatabase.Contains(packAsset) && CachingGroups != null)
                 {
 
                     Undo.RecordObject(this.pack as ScriptableObject, "this");
@@ -581,7 +590,7 @@ namespace ES
 
                     }
                     Undo.RecordObject(this.pack as ScriptableObject, "this");
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(packAsset);
                     AssetDatabase.Refresh();
 
                 }
@@ -617,7 +626,6 @@ namespace ES
             public string FolderPath_ = "Assets/Resources/Data/GroupData";
             private void Refresh()
             {
-                AssetDatabase.Refresh();
                 if (ESSODataInfoWindow.UsingWindow != null)
                     ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
                 createText = $"--新建【{createGroup_}】--";
@@ -811,11 +819,7 @@ namespace ES
                         if (IsGameCoreGroup(group))
                             PersistGameCoreCandidate(@object, group, DataKey, groupAssetPath);
                         else
-                        {
-                            group._TryAddInfoToDic(DataKey, @object);
-                            AssetDatabase.AddObjectToAsset(@object, groupAssetPath);
-                            MarkGroupAssetDirtyAndSave(group, groupAssetPath, "新建单元信息");
-                        }
+                            PersistStandardInfoCandidate(@object, group, DataKey, groupAssetPath, "新建单元信息");
                     }
                     else
                     {
@@ -855,11 +859,7 @@ namespace ES
                         if (IsGameCoreGroup(group))
                             PersistGameCoreCandidate(copy, group, DataKey, groupAssetPath);
                         else
-                        {
-                            group._TryAddInfoToDic(DataKey, copy);
-                            AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
-                            MarkGroupAssetDirtyAndSave(group, groupAssetPath, "拷贝选定信息");
-                        }
+                            PersistStandardInfoCandidate(copy, group, DataKey, groupAssetPath, "拷贝选定信息");
                     }
                     else
                     {
@@ -915,11 +915,7 @@ namespace ES
                             if (IsGameCoreGroup(group))
                                 PersistGameCoreCandidate(copy, group, DataKey, groupAssetPath);
                             else
-                            {
-                                group._TryAddInfoToDic(DataKey, copy);
-                                AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
-                                MarkGroupAssetDirtyAndSave(group, groupAssetPath, "持久粘贴");
-                            }
+                                PersistStandardInfoCandidate(copy, group, DataKey, groupAssetPath, "持久粘贴");
                         }
                         else
                         {
@@ -974,7 +970,16 @@ namespace ES
                     throw new InvalidOperationException("GameCore Group 没有有效目录，无法创建独立 DataInfo 资产。");
                 string safeName = string.Join("_", candidate.name.Split(Path.GetInvalidFileNameChars()));
                 string candidatePath = AssetDatabase.GenerateUniqueAssetPath(folder + "/" + safeName + ".asset");
-                AssetDatabase.CreateAsset(candidate, candidatePath);
+                try
+                {
+                    AssetDatabase.CreateAsset(candidate, candidatePath);
+                }
+                catch
+                {
+                    if (candidate != null && !EditorUtility.IsPersistent(candidate))
+                        UnityEngine.Object.DestroyImmediate(candidate);
+                    throw;
+                }
                 AssetDatabase.SaveAssetIfDirty(candidate);
                 ESResourceCollectionWorkflowWindow.OpenForGameCoreRegistration(
                     candidate,
@@ -1009,11 +1014,52 @@ namespace ES
 
                 // 只标记Group主资产为脏，不对Info子资产调用SetDirty。
                 EditorUtility.SetDirty(groupAsset);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(groupAsset);
 
                 if (!string.IsNullOrEmpty(groupAssetPath))
                 {
                     AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+                }
+            }
+
+            private static void PersistStandardInfoCandidate(
+                ScriptableObject candidate,
+                ISoDataGroup targetGroup,
+                string key,
+                string groupAssetPath,
+                string actionName)
+            {
+                if (candidate == null || targetGroup == null || string.IsNullOrEmpty(groupAssetPath))
+                    throw new InvalidOperationException($"[{actionName}] Info、Group 或 Group 资产路径无效。");
+                if (string.IsNullOrWhiteSpace(key))
+                    throw new InvalidOperationException($"[{actionName}] Info Key 不能为空。");
+                if (!targetGroup.NotContainsInfoKey(key))
+                    throw new InvalidOperationException($"[{actionName}] Info Key 已存在，拒绝覆盖：{key}");
+                Type infoType = targetGroup.GetSOInfoType();
+                if (infoType == null || !infoType.IsAssignableFrom(candidate.GetType()))
+                    throw new InvalidOperationException($"[{actionName}] Info 类型不属于当前 Group：{candidate.GetType().FullName}");
+
+                bool dictionaryAdded = false;
+                bool assetAttached = false;
+                try
+                {
+                    targetGroup._TryAddInfoToDic(key, candidate);
+                    if (!ReferenceEquals(targetGroup.GetInfoByKey(key), candidate))
+                        throw new InvalidOperationException($"[{actionName}] Group 未接受该 Info，拒绝继续挂载。");
+                    dictionaryAdded = true;
+                    AssetDatabase.AddObjectToAsset(candidate, groupAssetPath);
+                    assetAttached = true;
+                    MarkGroupAssetDirtyAndSave(targetGroup, groupAssetPath, actionName);
+                }
+                catch
+                {
+                    if (dictionaryAdded)
+                        targetGroup._RemoveInfoFromDic(key);
+                    if (assetAttached && AssetDatabase.IsSubAsset(candidate))
+                        AssetDatabase.RemoveObjectFromAsset(candidate);
+                    if (candidate != null)
+                        UnityEngine.Object.DestroyImmediate(candidate, true);
+                    throw;
                 }
             }
             public void RefreshInfos()
@@ -1056,7 +1102,10 @@ namespace ES
                     return;
                 List<string> ToRemove = new List<string>();
                 bool hasChange = false;
-                if (group != null)
+                string groupPath = group != null
+                    ? AssetDatabase.GetAssetPath(group as ScriptableObject)
+                    : string.Empty;
+                if (group != null && !string.IsNullOrEmpty(groupPath))
                     foreach (var i in group.AllKeys)
                     {
 
@@ -1064,6 +1113,28 @@ namespace ES
                         ScriptableObject so_ = so as ScriptableObject;
                         if (so_ != null)
                         {
+                            string infoPath = AssetDatabase.GetAssetPath(so_);
+                            if (!AssetDatabase.IsSubAsset(so_)
+                                || !string.Equals(groupPath, infoPath, StringComparison.Ordinal))
+                            {
+                                Debug.LogError("[SOData] 校验发现跨资产或主资产引用，已移除当前 Group 中的失效索引：" + i);
+                                ToRemove.Add(i);
+                                hasChange = true;
+                                continue;
+                            }
+                            string internalKey = so.GetKey();
+                            if (!string.IsNullOrWhiteSpace(internalKey)
+                                && !string.Equals(internalKey, i, StringComparison.Ordinal))
+                            {
+                                ISoDataInfo conflicting = group.GetInfoByKey(internalKey);
+                                if (conflicting != null && !ReferenceEquals(conflicting, so))
+                                {
+                                    Debug.LogError("[SOData] 校验发现 Info Key 冲突，已移除当前 Group 中的冲突索引：" + i);
+                                    ToRemove.Add(i);
+                                    hasChange = true;
+                                    continue;
+                                }
+                            }
                             if (so.GetKey() != i)
                             {
                                 so.SetKey(i);
@@ -1096,6 +1167,11 @@ namespace ES
             [Button("重建索引", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Collect()
             {
+                if (group == null || !(group is ScriptableObject groupAsset))
+                {
+                    Debug.LogError("[SOData] 重建索引需要有效的 Group 资产。");
+                    return;
+                }
                 if (IsGameCoreGroup(group))
                 {
                     EditorUtility.DisplayDialog(
@@ -1104,17 +1180,24 @@ namespace ES
                         "确定");
                     return;
                 }
-                UnityEngine.Object ob = group as ScriptableObject;
+                UnityEngine.Object ob = groupAsset;
                 string groupPath = AssetDatabase.GetAssetPath(ob);
+                Type infoType = group.GetSOInfoType();
 
                 foreach (var i in soInfos)
                 {
                     ScriptableObject obd = i as ScriptableObject;
                     string soPath = AssetDatabase.GetAssetPath(obd);
-                    if (!string.IsNullOrEmpty(soPath) && soPath.StartsWith(groupPath, StringComparison.OrdinalIgnoreCase))
+                    if (i == null || obd == null || string.IsNullOrEmpty(groupPath)
+                        || !string.Equals(soPath, groupPath, StringComparison.Ordinal)
+                        || !AssetDatabase.IsSubAsset(obd)
+                        || infoType == null
+                        || !infoType.IsAssignableFrom(obd.GetType())
+                        || string.IsNullOrWhiteSpace(i.GetKey()))
                     {
-                        group._TryAddInfoToDic(i.GetKey(), obd);
+                        continue;
                     }
+                    group._TryAddInfoToDic(i.GetKey(), obd);
                 }
 
                 var groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
@@ -1154,9 +1237,9 @@ namespace ES
                 var file = data as ScriptableObject;
                 if (file != null)
                 {
+                    Undo.RecordObject(file, "重命名数据文件");
                     file.name = renameFile;
-                    AssetDatabase.Refresh();
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(file);
                     AssetDatabase.Refresh();
                 }
             }
@@ -1176,9 +1259,20 @@ namespace ES
                 var parentGroup = ESSODataInfoWindow.UsingWindow?.pageForGroupOnChoose?.group;
                 if (parentGroup != null)
                 {
+                    ScriptableObject parentGroupAsset = parentGroup as ScriptableObject;
+                    string parentPath = AssetDatabase.GetAssetPath(parentGroupAsset);
+                    string dataPath = AssetDatabase.GetAssetPath(dataSO);
+                    if (parentGroupAsset == null
+                        || string.IsNullOrEmpty(parentPath)
+                        || !string.Equals(parentPath, dataPath, StringComparison.Ordinal)
+                        || !AssetDatabase.IsSubAsset(dataSO))
+                    {
+                        Debug.LogError("拒绝删除：当前 Info 不是父 Group 资产中的子资产。");
+                        return;
+                    }
                     string key = data.GetKey();
                     // 先记录 Group 的 Undo 状态，保证撤销时能恢复字典
-                    Undo.RecordObject(parentGroup as ScriptableObject, "Delete Info");
+                    Undo.RecordObject(parentGroupAsset, "Delete Info");
                     // 从字典移除
                     parentGroup._RemoveInfoFromDic(key);
 
@@ -1187,11 +1281,17 @@ namespace ES
                 }
                 else
                 {
-                    // 没有找到父 Group，仅销毁（非子资产情况）
+                    if (AssetDatabase.IsPersistent(dataSO) && !AssetDatabase.IsSubAsset(dataSO))
+                    {
+                        Debug.LogError("拒绝删除：未解析到父 Group，不能删除已持久化主资产。");
+                        return;
+                    }
+                    // 没有找到父 Group，仅允许销毁尚未持久化的临时对象。
                     Undo.DestroyObjectImmediate(dataSO);
                 }
 
-                AssetDatabase.SaveAssets(); // 先保存再刷新，避免丢失引用
+                if (parentGroup != null)
+                    AssetDatabase.SaveAssetIfDirty(parentGroup as ScriptableObject);
                 AssetDatabase.Refresh();
                 ESSODataInfoWindow.UsingWindow?.pageForGroupOnChoose?.RefreshInfos();
             }
@@ -1226,7 +1326,6 @@ namespace ES
             public string FolderPath_ = "Assets/Resources/Data/Normal";
             private void Refresh()
             {
-                AssetDatabase.Refresh();
                 if (ESSODataInfoWindow.UsingWindow != null)
                 {
                     ESSODataInfoWindow.UsingWindow.selectNormalCategoryName_ = createNormalCategory_;
@@ -1921,6 +2020,23 @@ namespace ES
             /// 删除 Info 并清理字典
             public static void DeleteInfoFromGroup(ISoDataGroup group, ISoDataInfo info, ScriptableObject infoAsset)
             {
+                if (group == null)
+                    throw new ArgumentNullException(nameof(group), "删除 Info 前必须提供有效的 Group。");
+                if (info == null)
+                    throw new ArgumentNullException(nameof(info), "删除 Info 前必须提供有效的 Info。");
+                if (infoAsset == null)
+                    throw new ArgumentNullException(nameof(infoAsset), "删除 Info 前必须提供有效的资产对象。");
+                ScriptableObject groupAsset = group as ScriptableObject;
+                string groupPath = AssetDatabase.GetAssetPath(groupAsset);
+                string infoPath = AssetDatabase.GetAssetPath(infoAsset);
+                if (groupAsset == null
+                    || string.IsNullOrEmpty(groupPath)
+                    || !string.Equals(groupPath, infoPath, StringComparison.Ordinal)
+                    || !AssetDatabase.IsSubAsset(infoAsset))
+                {
+                    throw new InvalidOperationException(
+                        "只允许删除当前 Group 资产中的子资产，拒绝删除主资产或跨资产对象。");
+                }
                 int groupIdx = Undo.GetCurrentGroup();
                 Undo.SetCurrentGroupName("Delete Info from Group");
                 RecordGroupModification(group, "Before Delete Info");
@@ -1949,10 +2065,17 @@ namespace ES
 
             public static void Flush()
             {
+                EditorApplication.delayCall -= Flush;
                 scheduled = false;
-                foreach (var o in dirty) if (o) EditorUtility.SetDirty(o);
+                if (dirty.Count == 0)
+                    return;
+                foreach (var o in dirty)
+                {
+                    if (!o) continue;
+                    EditorUtility.SetDirty(o);
+                    AssetDatabase.SaveAssetIfDirty(o);
+                }
                 dirty.Clear();
-                AssetDatabase.SaveAssets();
             }
 
             public static void RefreshNow()

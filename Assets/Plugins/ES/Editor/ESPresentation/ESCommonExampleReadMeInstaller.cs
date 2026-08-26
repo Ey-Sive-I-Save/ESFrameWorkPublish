@@ -186,7 +186,6 @@ namespace ES.EditorInternal
                     changedPaths);
 
                 UpdateEditorExtensionDemo(changedPaths);
-                AssetDatabase.SaveAssets();
             }
             catch (Exception exception)
             {

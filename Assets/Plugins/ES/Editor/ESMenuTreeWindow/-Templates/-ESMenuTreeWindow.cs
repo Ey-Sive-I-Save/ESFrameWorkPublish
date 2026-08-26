@@ -16,6 +16,9 @@ using System.Linq;
 namespace ES {
     internal static class ESMenuTreeUnityIconResolver
     {
+        private const int MaxCachedIcons = 128;
+        private const int MaxCachedBrandIcons = 64;
+
         private static readonly Dictionary<string, Texture> Cache =
             new Dictionary<string, Texture>(StringComparer.Ordinal);
 
@@ -28,7 +31,14 @@ namespace ES {
                 return null;
             string normalized = iconName.Trim();
             if (Cache.TryGetValue(normalized, out Texture cached))
-                return cached;
+            {
+                if (cached != null)
+                    return cached;
+                // Unity asset reimport can invalidate a cached native object while
+                // retaining the managed reference. Remove the stale entry so the
+                // next lookup can resolve the replacement icon.
+                Cache.Remove(normalized);
+            }
 
             Texture icon = EditorGUIUtility.Load("Icons/" + normalized + ".png") as Texture;
             if (icon == null && normalized.StartsWith("d_", StringComparison.Ordinal))
@@ -39,6 +49,7 @@ namespace ES {
             if (icon == null)
                 icon = ES.EditorInternal.ESEditorPresentation.LoadUnityIcon(
                     "d_console.infoicon");
+            TrimCache(Cache, MaxCachedIcons);
             Cache[normalized] = icon;
             return icon;
         }
@@ -69,11 +80,27 @@ namespace ES {
                         "d_console.infoicon");
             }
             if (BrandCache.TryGetValue(iconName, out Texture cached))
-                return cached;
+            {
+                if (cached != null)
+                    return cached;
+                BrandCache.Remove(iconName);
+            }
 
             Texture icon = ES.EditorInternal.ESEditorPresentation.LoadESBrandIcon(iconName);
+            TrimCache(BrandCache, MaxCachedBrandIcons);
             BrandCache[iconName] = icon;
             return icon;
+        }
+
+        private static void TrimCache(Dictionary<string, Texture> cache, int capacity)
+        {
+            while (cache.Count >= capacity)
+            {
+                string firstKey = cache.Keys.FirstOrDefault();
+                if (string.IsNullOrEmpty(firstKey))
+                    break;
+                cache.Remove(firstKey);
+            }
         }
 
         internal static string ResolveExplicitSemanticIcon(
@@ -6333,11 +6360,17 @@ namespace ES {
             OpenWindow();
             if (string.IsNullOrWhiteSpace(stableId))
                 return;
-            EditorApplication.delayCall += () =>
+            This expectedWindow = UsingWindow;
+            EditorApplication.CallbackFunction selectMigrationCallback = null;
+            selectMigrationCallback = () =>
             {
+                EditorApplication.delayCall -= selectMigrationCallback;
+                if (expectedWindow == null || !ReferenceEquals(UsingWindow, expectedWindow))
+                    return;
                 if (!TrySelectMigrationPage(stableId))
                     Debug.LogWarning("[ESOdinMenuTreeWindow] 未找到迁移页面：" + stableId);
             };
+            EditorApplication.delayCall += selectMigrationCallback;
         }
 
         private void PlaceInitialWindow()

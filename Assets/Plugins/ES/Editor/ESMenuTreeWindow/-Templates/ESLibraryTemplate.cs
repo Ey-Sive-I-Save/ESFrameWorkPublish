@@ -56,8 +56,6 @@ namespace ES
             {
                 LibName = GetLibTypeName_NewCreate();
                 FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_;
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
                 return base.ES_Refresh();
 
             }
@@ -136,6 +134,37 @@ namespace ES
             private static GUIStyle buttonStyle;
             private static Texture2D buttonBackground;
 
+            static Page_Index_Library()
+            {
+                AssemblyReloadEvents.beforeAssemblyReload -= ReleaseStaticStyles;
+                AssemblyReloadEvents.beforeAssemblyReload += ReleaseStaticStyles;
+                EditorApplication.quitting -= ReleaseStaticStyles;
+                EditorApplication.quitting += ReleaseStaticStyles;
+            }
+
+            private static void ReleaseStaticStyles()
+            {
+                if (buttonBackground != null)
+                {
+                    try
+                    {
+                        ESEditorPreviewUtility.DestroyObject(buttonBackground);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                    finally
+                    {
+                        buttonBackground = null;
+                    }
+                }
+
+                buttonStyle = null;
+                _smallLabelStyle = null;
+                _smallButtonStyle = null;
+            }
+
             // 静态样式缓存，避免频繁修改GUI.skin
             private static GUIStyle _smallLabelStyle;
             private static GUIStyle SmallLabelStyle => _smallLabelStyle ?? (_smallLabelStyle = new GUIStyle(GUI.skin.label) { fontSize = 11 });
@@ -205,6 +234,9 @@ namespace ES
                 {
                     Debug.LogWarning("[Page_Index_Library] Library为null，无法保存");
                 }
+
+                thumbnailCache.Clear();
+                thumbnailCacheOrder.Clear();
             }
 
             #region UI绘制
@@ -1381,7 +1413,7 @@ namespace ES
                 {
                     EditorUtility.SetDirty(library);
                 }
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(library);
                 pendingSave = false;
                 Debug.Log("[Page_Index_Library] SaveAssetsImmediate - 保存完成，pendingSave已重置为false");
             }
@@ -1578,7 +1610,7 @@ namespace ES
                 }
 
                 EditorUtility.SetDirty(lib);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(lib);
 
                 EditorUtility.DisplayDialog("合并完成", $"已合并 {duplicates.Count - 1} 个重复Page，保留在 {keepPage.book.Name}", "确定");
             }
@@ -1843,8 +1875,21 @@ namespace ES
                     AssetDatabase.CreateFolder(basePath, "Consumer");
                 }
                 string path = AssetDatabase.GenerateUniqueAssetPath(consumerFolder + "/" + ConsumerName + ".asset");
-                AssetDatabase.CreateAsset(consumer, path);
-                AssetDatabase.SaveAssets();
+                bool assetCommitted = false;
+                try
+                {
+                    AssetDatabase.CreateAsset(consumer, path);
+                    assetCommitted = true;
+                    AssetDatabase.SaveAssetIfDirty(consumer);
+                }
+                catch
+                {
+                    if (assetCommitted && string.Equals(AssetDatabase.GetAssetPath(consumer), path, StringComparison.Ordinal))
+                        AssetDatabase.DeleteAsset(path);
+                    else if (consumer != null && !EditorUtility.IsPersistent(consumer))
+                        DestroyImmediate(consumer);
+                    throw;
+                }
                 AssetDatabase.Refresh();
 
                 Debug.Log("Consumer created: " + path);
@@ -2511,8 +2556,6 @@ namespace ES
 
             public override ESWindowPageBase ES_Refresh()
             {
-                if (package is ESAssetLibraryConsumer resourceConsumer && resourceConsumer.EnsureStableIdentity())
-                    EditorUtility.SetDirty(resourceConsumer);
                 createText = $"--编辑Consumer【{package.Name}】--";
                 return base.ES_Refresh();
             }
@@ -2521,7 +2564,7 @@ namespace ES
             {
                 base.OnPageDisable();
                 if (package != null && EditorUtility.IsDirty(package))
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(package);
             }
         }
 
@@ -2536,26 +2579,17 @@ namespace ES
             if (libs != null)
             {
                 List<string> strings = new List<string>(3);
-                bool hasModified = false;
                 foreach (var i in libs)
                 {
                     if (i != null)
                     {
-                        while (strings.Contains(i.Name))
-                        {
-                            Undo.RecordObject(i, "Rename Library");
-                            i.Name += "_re";
-                            EditorUtility.SetDirty(i);
-                            hasModified = true;
-                        }
-                        strings.Add(i.Name);
-                        from.RegisterAndAddPage(tree, menuName + $"/库：{i.Name}", new Page_Index_Library() { library = i }.ES_Refresh(), SdfIconType.Cart);
+                        string displayName = i.Name;
+                        int suffix = 1;
+                        while (strings.Contains(displayName))
+                            displayName = i.Name + "_re" + suffix++;
+                        strings.Add(displayName);
+                        from.RegisterAndAddPage(tree, menuName + $"/库：{displayName}", new Page_Index_Library() { library = i }.ES_Refresh(), SdfIconType.Cart);
                     }
-                }
-                // 批量修改后保存
-                if (hasModified)
-                {
-                    AssetDatabase.SaveAssets();
                 }
             }
 
@@ -2567,21 +2601,13 @@ namespace ES
                 {
                     if (i != null)
                     {
-                        while (strings.Contains(i.Name))
-                        {
-                            Undo.RecordObject(i, "Rename Consumer");
-                            i.Name += "_re";
-                            EditorUtility.SetDirty(i);
-                        }
-                        strings.Add(i.Name);
-                        from.RegisterAndAddPage(tree, "Consumer" + $"/包：{i.Name}", new Page_Index_Consumer() { package = i }.ES_Refresh(), SdfIconType.Box);
+                        string displayName = i.Name;
+                        int suffix = 1;
+                        while (strings.Contains(displayName))
+                            displayName = i.Name + "_re" + suffix++;
+                        strings.Add(displayName);
+                        from.RegisterAndAddPage(tree, "Consumer" + $"/包：{displayName}", new Page_Index_Consumer() { package = i }.ES_Refresh(), SdfIconType.Box);
                     }
-                }
-
-                // 批量修改后保存
-                if (strings.Count > 0)
-                {
-                    AssetDatabase.SaveAssets();
                 }
             }
         }

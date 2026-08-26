@@ -33,17 +33,40 @@ namespace ES
             if (!viewId.IsValid || sceneEpoch <= 0 || outputCamera == null || brain == null)
                 return;
 
-            adapter = new ESCameraCinemachine2ViewAdapter(
-                outputCamera,
-                brain,
-                definitionCatalog,
-                rigCatalog,
-                rigRoot);
-            if (adapter.IsReady && director.RegisterView(viewId, sceneEpoch, adapter))
-                return;
+            ESCameraCinemachine2ViewAdapter candidate = null;
+            bool registered = false;
+            try
+            {
+                candidate = new ESCameraCinemachine2ViewAdapter(
+                    outputCamera,
+                    brain,
+                    definitionCatalog,
+                    rigCatalog,
+                    rigRoot);
+                if (candidate.IsReady && director.RegisterView(viewId, sceneEpoch, candidate))
+                {
+                    registered = true;
+                    adapter = candidate;
+                    candidate = null;
+                    return;
+                }
+            }
+            catch
+            {
+                if (registered)
+                {
+                    try { director.UnregisterView(viewId, sceneEpoch, candidate); }
+                    catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                }
 
-            adapter.Dispose();
-            adapter = null;
+                try { candidate?.Dispose(); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                throw;
+            }
+
+            try { candidate?.Dispose(); }
+            catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+            finally { adapter = null; }
         }
 
         public ESCameraViewId ViewId => viewId;
@@ -83,14 +106,40 @@ namespace ES
                 return;
 
             disposed = true;
-            if (adapter != null)
+            ESCameraCinemachine2ViewAdapter currentAdapter = adapter;
+            adapter = null;
+            if (currentAdapter != null)
             {
-                director.UnregisterView(viewId, sceneEpoch, adapter);
-                adapter.Dispose();
-                adapter = null;
+                try
+                {
+                    director.UnregisterView(viewId, sceneEpoch, currentAdapter);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "Camera Preview View 注销失败，继续执行资源释放。", exception));
+                }
+
+                try
+                {
+                    currentAdapter.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "Camera Preview View Adapter 释放失败。", exception));
+                }
             }
 
-            director.Dispose();
+            try
+            {
+                director.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "Camera Preview View Director 释放失败。", exception));
+            }
         }
     }
 }

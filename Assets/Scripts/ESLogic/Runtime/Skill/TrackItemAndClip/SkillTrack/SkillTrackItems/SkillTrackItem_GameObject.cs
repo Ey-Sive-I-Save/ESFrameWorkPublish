@@ -41,31 +41,44 @@ namespace ES
                 ownsEditorTarget = true;
             }
 
-            TrackSequenceEditorSettings settings = TrackSequenceEditorSettings.Instance;
-            bool debugSampler = settings != null && settings.gameObjectDebug;
-            var trackSampler = new GameObjectTrackEditorSampler(this, target, ownsEditorTarget, DisplayName, debugSampler);
-            lastCreatedEditorSampler = trackSampler;
-
-            var list = new System.Collections.Generic.List<IEditorTimeSampler>
+            try
             {
-                trackSampler
-            };
+                TrackSequenceEditorSettings settings = TrackSequenceEditorSettings.Instance;
+                bool debugSampler = settings != null && settings.gameObjectDebug;
+                var trackSampler = new GameObjectTrackEditorSampler(this, target, ownsEditorTarget, DisplayName, debugSampler);
+                lastCreatedEditorSampler = trackSampler;
 
-            if (clips == null)
+                var list = new System.Collections.Generic.List<IEditorTimeSampler>
+                {
+                    trackSampler
+                };
+
+                if (clips == null)
+                    return list;
+
+                for (int i = 0; i < clips.Count; i++)
+                {
+                    SkillTrackClip_GameObject clip = clips[i];
+                    if (clip == null || !clip.Enabled)
+                        continue;
+
+                    var clipSampler = clip.CreateEditorSampler(sequence, this, target);
+                    if (clipSampler != null)
+                        list.Add(new TrackClipEditorSampler(clip, clipSampler));
+                }
+
                 return list;
-
-            for (int i = 0; i < clips.Count; i++)
-            {
-                SkillTrackClip_GameObject clip = clips[i];
-                if (clip == null || !clip.Enabled)
-                    continue;
-
-                var clipSampler = clip.CreateEditorSampler(sequence, this, target);
-                if (clipSampler != null)
-                    list.Add(new TrackClipEditorSampler(clip, clipSampler));
             }
-
-            return list;
+            catch
+            {
+                lastCreatedEditorSampler = null;
+                if (ownsEditorTarget && target != null && !target.IsRecycled)
+                {
+                    try { target.ForcePushToPool(); }
+                    catch (System.Exception cleanupException) { Debug.LogException(cleanupException); }
+                }
+                throw;
+            }
         }
 
         public GameObjectTrackEditorSampler GetLastCreatedEditorSampler()

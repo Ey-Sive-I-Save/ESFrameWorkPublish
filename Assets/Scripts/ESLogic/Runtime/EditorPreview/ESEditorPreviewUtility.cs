@@ -23,24 +23,54 @@ namespace ES
 
         public static GameObject CreatePreviewGameObject(string name, params Type[] components)
         {
-            GameObject go = components != null && components.Length > 0
-                ? new GameObject(name, components)
-                : new GameObject(name);
-            go.hideFlags = PreviewHideFlags;
-            return go;
+            GameObject go = null;
+            try
+            {
+                go = components != null && components.Length > 0
+                    ? new GameObject(name, components)
+                    : new GameObject(name);
+                go.hideFlags = PreviewHideFlags;
+                return go;
+            }
+            catch
+            {
+                if (go != null)
+                    DestroyObject(go);
+                throw;
+            }
         }
 
         public static void MarkPreviewObject(GameObject obj, string owner, string note = null)
         {
             if (obj == null)
                 return;
+            if (string.IsNullOrWhiteSpace(owner))
+                return;
+            // 清理标记只允许用于临时预览对象；持久化 Prefab/场景资产不得被添加标记组件或改 HideFlags。
+            if (EditorUtility.IsPersistent(obj))
+                return;
+            if (!HasPreviewOwnershipFlags(obj))
+                return;
 
             EditorPreviewGameObjectSign marker = obj.GetComponent<EditorPreviewGameObjectSign>();
-            if (marker == null)
-                marker = obj.AddComponent<EditorPreviewGameObjectSign>();
+            bool createdMarker = false;
+            try
+            {
+                if (marker == null)
+                {
+                    marker = obj.AddComponent<EditorPreviewGameObjectSign>();
+                    createdMarker = true;
+                }
 
-            marker.Setup(owner, note);
-            marker.hideFlags = PreviewHideFlags;
+                marker.Setup(owner, note);
+                marker.hideFlags = PreviewHideFlags;
+            }
+            catch
+            {
+                if (createdMarker && marker != null)
+                    DestroyObject(marker);
+                throw;
+            }
         }
 
         public static bool TryMarkPreviewObject(GameObject obj, string owner, string note, out string status)
@@ -49,6 +79,21 @@ namespace ES
             if (obj == null)
             {
                 status = "Preview object marker skipped: object is null.";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(owner))
+            {
+                status = "Preview object marker skipped: owner is required.";
+                return false;
+            }
+            if (EditorUtility.IsPersistent(obj))
+            {
+                status = "Preview object marker skipped: persistent asset is not owned by preview cleanup.";
+                return false;
+            }
+            if (!HasPreviewOwnershipFlags(obj))
+            {
+                status = "Preview object marker skipped: object has no preview ownership flags.";
                 return false;
             }
 
@@ -70,19 +115,38 @@ namespace ES
             if (root == null)
                 return;
 
-            root.gameObject.hideFlags = flags;
-            for (int i = 0; i < root.childCount; i++)
-                SetHideFlagsRecursive(root.GetChild(i), flags);
+            List<Transform> hierarchy = CollectHierarchy(root);
+            for (int i = 0; i < hierarchy.Count; i++)
+                hierarchy[i].gameObject.hideFlags = flags;
         }
 
         public static void SetLayerRecursive(Transform root, int layer)
         {
             if (root == null)
                 return;
+            if (layer < 0 || layer > 31)
+                throw new ArgumentOutOfRangeException(nameof(layer), layer, "Unity layer must be between 0 and 31.");
 
-            root.gameObject.layer = layer;
-            for (int i = 0; i < root.childCount; i++)
-                SetLayerRecursive(root.GetChild(i), layer);
+            List<Transform> hierarchy = CollectHierarchy(root);
+            for (int i = 0; i < hierarchy.Count; i++)
+                hierarchy[i].gameObject.layer = layer;
+        }
+
+        private static List<Transform> CollectHierarchy(Transform root)
+        {
+            var result = new List<Transform>();
+            CollectHierarchy(root, result);
+            return result;
+        }
+
+        private static void CollectHierarchy(Transform current, List<Transform> result)
+        {
+            if (current == null)
+                return;
+
+            result.Add(current);
+            for (int i = 0; i < current.childCount; i++)
+                CollectHierarchy(current.GetChild(i), result);
         }
 
         public static RenderTexture CreateRenderTexture(
@@ -102,7 +166,22 @@ namespace ES
                 antiAliasing = Mathf.Max(1, antiAliasing),
                 filterMode = FilterMode.Bilinear
             };
-            renderTexture.Create();
+            try
+            {
+                renderTexture.Create();
+                if (!renderTexture.IsCreated())
+                {
+                    DestroyObject(renderTexture);
+                    return null;
+                }
+            }
+            catch
+            {
+                // Create() 可能因平台格式、显存或无效抗锯齿参数抛出；
+                // 不能把尚未提交给调用方的临时 RT 留在编辑器场景中。
+                DestroyObject(renderTexture);
+                throw;
+            }
             return renderTexture;
         }
 
@@ -111,9 +190,15 @@ namespace ES
             if (renderTexture == null)
                 return;
 
-            renderTexture.Release();
-            DestroyObject(renderTexture);
-            renderTexture = null;
+            RenderTexture owned = renderTexture;
+            try
+            {
+                DestroyObject(owned);
+            }
+            finally
+            {
+                renderTexture = null;
+            }
         }
 
         public static Texture2D CopyTexture(Texture source, int width, int height, string name = null)
@@ -125,11 +210,14 @@ namespace ES
             height = Mathf.Max(1, height);
             RenderTexture temporary = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
             RenderTexture previous = RenderTexture.active;
+            Texture2D copy = null;
             try
             {
+                if (temporary == null)
+                    return null;
                 Graphics.Blit(source, temporary);
                 RenderTexture.active = temporary;
-                var copy = new Texture2D(width, height)
+                copy = new Texture2D(width, height)
                 {
                     name = string.IsNullOrEmpty(name) ? "ES Editor Preview Texture" : name,
                     hideFlags = PreviewHideFlags,
@@ -139,10 +227,17 @@ namespace ES
                 copy.Apply(false, false);
                 return copy;
             }
+            catch
+            {
+                if (copy != null)
+                    DestroyObject(copy);
+                throw;
+            }
             finally
             {
                 RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(temporary);
+                if (temporary != null)
+                    RenderTexture.ReleaseTemporary(temporary);
             }
         }
 
@@ -150,15 +245,18 @@ namespace ES
         {
             if (camera == null || renderTexture == null)
                 return null;
+            if (width <= 0 || height <= 0 || width > renderTexture.width || height > renderTexture.height)
+                return null;
 
             RenderTexture oldTarget = camera.targetTexture;
             RenderTexture oldActive = RenderTexture.active;
+            Texture2D texture = null;
             try
             {
                 camera.targetTexture = renderTexture;
                 camera.Render();
                 RenderTexture.active = renderTexture;
-                var texture = new Texture2D(width, height)
+                texture = new Texture2D(width, height)
                 {
                     name = string.IsNullOrEmpty(name) ? "ES Editor Preview Snapshot" : name,
                     hideFlags = PreviewHideFlags,
@@ -168,9 +266,19 @@ namespace ES
                 texture.Apply(false, false);
                 return texture;
             }
+            catch
+            {
+                if (texture != null)
+                    DestroyObject(texture);
+                throw;
+            }
             finally
             {
-                camera.targetTexture = oldTarget;
+                // UnityEngine.Object may become a fake-null object while Render/ReadPixels
+                // is unwinding (domain reload, preview teardown, or external destruction).
+                // Do not let cleanup mask the original render exception.
+                if (camera != null)
+                    camera.targetTexture = oldTarget;
                 RenderTexture.active = oldActive;
             }
         }
@@ -201,8 +309,15 @@ namespace ES
                 if (obj == null || EditorUtility.IsPersistent(obj))
                     continue;
 
-                DestroyObject(obj);
-                removed++;
+                try
+                {
+                    DestroyObject(obj);
+                    removed++;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
 
             return removed;
@@ -418,11 +533,43 @@ namespace ES
         {
             if (obj == null)
                 return;
+            // 这是预览临时对象底层销毁入口；任何持久化资产都必须由资产管线显式管理，
+            // 防止误传项目资产或 Prefab 后发生不可逆 DestroyImmediate。
+            if (EditorUtility.IsPersistent(obj))
+                return;
 
             if (obj is RenderTexture renderTexture)
-                renderTexture.Release();
+            {
+                try
+                {
+                    renderTexture.Release();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
 
-            UnityEngine.Object.DestroyImmediate(obj);
+            try
+            {
+                UnityEngine.Object.DestroyImmediate(obj);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        /// <summary>判断对象是否已经声明为由 ES 预览临时资源链路拥有。</summary>
+        public static bool HasPreviewOwnershipFlags(GameObject obj)
+        {
+            if (obj == null)
+                return false;
+
+            HideFlags ownershipFlags = HideFlags.HideAndDontSave
+                | HideFlags.DontSaveInEditor
+                | HideFlags.DontSaveInBuild;
+            return (obj.hideFlags & ownershipFlags) == ownershipFlags;
         }
 
         private static void SetProperty(object target, string propertyName, object value)

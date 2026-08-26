@@ -750,21 +750,28 @@ namespace ES
             UnregisterPreviewRenderUpdate();
             _previewRenderPlaying = false;
             _previewRenderCompleted = false;
-            StopPreviewAnimationMode();
+            try { StopPreviewAnimationMode(); }
+            catch (Exception exception) { Debug.LogException(exception); }
 
             if (_previewRenderPlayer != null)
             {
-                _previewRenderPlayer.Pause();
-                _previewRenderPlayer.StopAllSamplers();
-                _previewRenderPlayer.DisposeEditorPreviewTarget();
+                try { _previewRenderPlayer.Pause(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try { _previewRenderPlayer.StopAllSamplers(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try { _previewRenderPlayer.DisposeEditorPreviewTarget(); }
+                catch (Exception exception) { Debug.LogException(exception); }
                 _previewRenderPlayer = null;
             }
 
-            _previewModelHandle?.Dispose();
+            try { _previewModelHandle?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             _previewModelHandle = null;
-            _previewRenderContext?.Dispose();
+            try { _previewRenderContext?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             _previewRenderContext = null;
-            _previewResourceScope?.Dispose();
+            try { _previewResourceScope?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             _previewResourceScope = null;
             _previewRenderRoot = null;
             _previewRenderEntity = null;

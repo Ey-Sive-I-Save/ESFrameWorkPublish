@@ -78,11 +78,36 @@ namespace ES
             ThrowIfDisposed();
             if (obj == null)
                 return null;
+            // Scope 只拥有运行时创建的临时对象；项目资产、Prefab 等持久化对象
+            // 必须继续由 AssetDatabase/调用方持有，禁止改 HideFlags 或在 Dispose 时销毁。
+            if (EditorUtility.IsPersistent(obj))
+                return obj;
+            if (obj is GameObject gameObject && !ESEditorPreviewUtility.HasPreviewOwnershipFlags(gameObject))
+                return obj;
+            if (obj is not GameObject)
+            {
+                HideFlags ownershipFlags = HideFlags.HideAndDontSave
+                    | HideFlags.DontSaveInEditor
+                    | HideFlags.DontSaveInBuild;
+                if ((obj.hideFlags & ownershipFlags) != ownershipFlags)
+                    return obj;
+            }
+            if (unityObjects.Contains(obj))
+                return obj;
 
-            obj.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
             unityObjects.Add(obj);
-            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
-            return obj;
+            try
+            {
+                obj.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                return obj;
+            }
+            catch
+            {
+                // 保留登记，确保调用方即使捕获初始化异常，后续 Dispose 仍能回收对象。
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                throw;
+            }
         }
 
         public Texture2D RegisterTexture(Texture2D texture)
@@ -95,15 +120,31 @@ namespace ES
             ThrowIfDisposed();
             if (gameObject == null)
                 return null;
-
-            gameObject.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
-            MarkPreviewObject(gameObject, owner, note);
-            if (recursiveHideFlags)
-                ESEditorPreviewUtility.SetHideFlagsRecursive(gameObject.transform, ESEditorPreviewUtility.PreviewHideFlags);
+            // Prefab/场景资产不能进入临时资源所有权集合，避免 Dispose 销毁用户资产。
+            if (EditorUtility.IsPersistent(gameObject))
+                return gameObject;
+            if (!ESEditorPreviewUtility.HasPreviewOwnershipFlags(gameObject))
+                return gameObject;
+            if (unityObjects.Contains(gameObject))
+                return gameObject;
 
             unityObjects.Add(gameObject);
-            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
-            return gameObject;
+            try
+            {
+                gameObject.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                MarkPreviewObject(gameObject, owner, note);
+                if (recursiveHideFlags)
+                    ESEditorPreviewUtility.SetHideFlagsRecursive(gameObject.transform, ESEditorPreviewUtility.PreviewHideFlags);
+
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                return gameObject;
+            }
+            catch
+            {
+                // 保留登记，确保部分初始化失败也不会把临时对象遗忘在编辑器中。
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                throw;
+            }
         }
 
         public RenderTexture RegisterRenderTexture(RenderTexture renderTexture)
@@ -114,7 +155,7 @@ namespace ES
         public void RegisterDisposeAction(Action disposeAction)
         {
             ThrowIfDisposed();
-            if (disposeAction != null)
+            if (disposeAction != null && !customDisposers.Contains(disposeAction))
             {
                 customDisposers.Add(disposeAction);
                 ESEditorPreviewLifecycleHub.NotifyResourceChanged();
@@ -128,24 +169,47 @@ namespace ES
 
             disposed = true;
             ESEditorPreviewLifecycleHub.UnregisterScope(this);
+            Exception firstFailure = null;
 
             for (int i = customDisposers.Count - 1; i >= 0; i--)
             {
                 try
                 {
                     customDisposers[i]?.Invoke();
+                    customDisposers.RemoveAt(i);
                 }
                 catch (Exception e)
                 {
+                    firstFailure ??= e;
                     Debug.LogException(e);
                 }
             }
-            customDisposers.Clear();
 
             for (int i = unityObjects.Count - 1; i >= 0; i--)
-                DestroyRegisteredObject(unityObjects[i]);
+            {
+                try
+                {
+                    DestroyRegisteredObject(unityObjects[i]);
+                    unityObjects.RemoveAt(i);
+                }
+                catch (Exception e)
+                {
+                    firstFailure ??= e;
+                    Debug.LogException(e);
+                }
+            }
 
-            unityObjects.Clear();
+            if (firstFailure != null)
+            {
+                // 失败项仍保留在列表中；重新注册后由下一次 CleanupAll 重试，
+                // 防止一次瞬态 Unity 销毁异常把资源从治理链路中遗忘。
+                disposed = false;
+                ESEditorPreviewLifecycleHub.RegisterScope(this);
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                throw new InvalidOperationException(
+                    "预览资源 Scope 清理未完成，失败项已保留等待重试。", firstFailure);
+            }
+
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
         }
 

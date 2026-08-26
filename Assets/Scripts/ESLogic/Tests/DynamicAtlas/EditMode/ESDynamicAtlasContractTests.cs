@@ -198,14 +198,35 @@ namespace ES.Tests.DynamicAtlas
         [Test]
         public void Graphic_EditorSpritePreview_UsesSpriteGeometryAndUvs()
         {
-            const string TightSpritePath = "Assets/Sprite Shaders Ultimate/Textures/Shapes/Ring.png";
             var gameObject = new GameObject("ES Dynamic Atlas Sprite Preview Test",
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(ESDynamicAtlasGraphic));
-            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(TightSpritePath);
+            var texture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+            var pixels = new Color32[64 * 64];
+            for (int y = 0; y < 64; y++)
+            {
+                for (int x = 0; x < 64; x++)
+                {
+                    float dx = x - 31.5f;
+                    float dy = y - 31.5f;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    pixels[y * 64 + x] = distance > 24f && distance < 30f
+                        ? new Color32(255, 255, 255, 255)
+                        : new Color32(0, 0, 0, 0);
+                }
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, 64, 64),
+                new Vector2(0.5f, 0.5f),
+                64f,
+                0,
+                SpriteMeshType.Tight);
             var mesh = new VertexHelper();
             try
             {
-                Assert.That(sprite, Is.Not.Null, "缺少 Tight Sprite 测试夹具：" + TightSpritePath);
+                Assert.That(sprite, Is.Not.Null, "无法创建 ES 自有 Tight Sprite 测试夹具。");
                 Vector2[] expectedVertices = sprite.vertices;
                 Assert.That(expectedVertices.Length, Is.GreaterThan(4),
                     "测试输入必须生成非矩形的 Tight Sprite 几何。");
@@ -242,6 +263,8 @@ namespace ES.Tests.DynamicAtlas
             {
                 mesh.Dispose();
                 UnityEngine.Object.DestroyImmediate(gameObject);
+                UnityEngine.Object.DestroyImmediate(sprite);
+                UnityEngine.Object.DestroyImmediate(texture);
             }
         }
 

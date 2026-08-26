@@ -895,8 +895,9 @@ namespace ES
             UnregisterUpdate();
             if (renderContext != null)
             {
-                renderContext.Dispose();
-                renderContext = null;
+                try { renderContext.Dispose(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                finally { renderContext = null; }
             }
 
             modelHandles.Clear();

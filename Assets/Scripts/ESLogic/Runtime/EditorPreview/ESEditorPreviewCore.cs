@@ -655,6 +655,7 @@ namespace ES
     public static class ESEditorPreviewLifecycleHub
     {
         private static readonly HashSet<IDisposable> ActiveScopes = new HashSet<IDisposable>();
+        private static readonly HashSet<IDisposable> FailedScopes = new HashSet<IDisposable>();
         private static readonly List<IDisposable> DisposeBuffer = new List<IDisposable>(32);
         private static bool registered;
         private static long totalScopeRegistrations;
@@ -671,6 +672,8 @@ namespace ES
         private static long peakEstimatedRenderTextureBytes;
 
         public static int ActiveScopeCount => ActiveScopes.Count;
+        /// <summary>当前上一次清理失败、仍等待下一次 CleanupAll 重试的 Scope 数量。</summary>
+        public static int FailedScopeCount => FailedScopes.Count;
 
         public static void RegisterGlobalHooks()
         {
@@ -693,6 +696,7 @@ namespace ES
                 return;
 
             RegisterGlobalHooks();
+            FailedScopes.Remove(scope);
             if (ActiveScopes.Add(scope))
             {
                 totalScopeRegistrations++;
@@ -710,6 +714,7 @@ namespace ES
                 totalScopeReleases++;
                 RefreshPeaks();
             }
+            FailedScopes.Remove(scope);
         }
 
         public static ESEditorPreviewDiagnosticsSnapshot CaptureDiagnosticsSnapshot()
@@ -728,10 +733,16 @@ namespace ES
             lastCleanupReason = string.IsNullOrWhiteSpace(reason) ? "Unknown" : reason.Trim();
             DisposeBuffer.Clear();
             DisposeBuffer.AddRange(ActiveScopes);
+            foreach (IDisposable failedScope in FailedScopes)
+            {
+                if (failedScope != null && !DisposeBuffer.Contains(failedScope))
+                    DisposeBuffer.Add(failedScope);
+            }
             ActiveScopes.Clear();
-            totalScopeReleases += DisposeBuffer.Count;
+            FailedScopes.Clear();
 
             int disposed = 0;
+            int releasedScopes = 0;
             int failures = 0;
             for (int i = DisposeBuffer.Count - 1; i >= 0; i--)
             {
@@ -739,10 +750,13 @@ namespace ES
                 {
                     DisposeBuffer[i]?.Dispose();
                     disposed++;
+                    releasedScopes++;
                 }
                 catch (Exception e)
                 {
                     failures++;
+                    if (DisposeBuffer[i] != null)
+                        FailedScopes.Add(DisposeBuffer[i]);
                     Debug.LogWarning("[ESEditorPreviewLifecycle] Dispose failed. reason=" + reason + " error=" + e.Message);
                 }
             }
@@ -751,6 +765,7 @@ namespace ES
             if (includeMarkedObjects)
                 disposed += ESEditorPreviewUtility.CleanupAllMarkedPreviewObjects();
 
+            totalScopeReleases += releasedScopes;
             cleanupFailureCount += failures;
             lastCleanupReleasedCount = disposed;
             RefreshPeaks();
@@ -893,6 +908,7 @@ namespace ES
         private ESEditorPreviewQuality renderTextureQuality;
         private double lastRenderTime;
         private bool disposed;
+        private bool cellReleased;
 
         public Camera Camera { get; private set; }
         public Vector3 GroupOrigin => groupOrigin;
@@ -943,6 +959,7 @@ namespace ES
 
         public void Ensure()
         {
+            ThrowIfDisposed();
             if (IsReady)
                 return;
 
@@ -957,6 +974,11 @@ namespace ES
         {
             if (obj == null)
                 return;
+            if (EditorUtility.IsPersistent(obj) || !ESEditorPreviewUtility.HasPreviewOwnershipFlags(obj))
+            {
+                LastStatus = "Preview object rejected: object is not an owned temporary preview object.";
+                return;
+            }
 
             Ensure();
             bool moved = MoveToContextScene(obj);
@@ -1084,17 +1106,26 @@ namespace ES
                 return null;
 
             Ensure();
-            GameObject instance = UnityEngine.Object.Instantiate(source);
-            NormalizeTransform(instance.transform);
-            return AdoptModelGroup(
-                source,
-                instance,
-                instanceName,
-                samplingTarget,
-                copyRendererState,
-                disableRuntimeBehaviours,
-                ensureRenderersEnabled,
-                activateInstance);
+            GameObject instance = null;
+            try
+            {
+                instance = UnityEngine.Object.Instantiate(source);
+                NormalizeTransform(instance.transform);
+                return AdoptModelGroup(
+                    source,
+                    instance,
+                    instanceName,
+                    samplingTarget,
+                    copyRendererState,
+                    disableRuntimeBehaviours,
+                    ensureRenderersEnabled,
+                    activateInstance);
+            }
+            catch
+            {
+                ESEditorPreviewUtility.DestroyObject(instance);
+                throw;
+            }
         }
 
         /// <summary>
@@ -1116,38 +1147,63 @@ namespace ES
                 return null;
 
             Ensure();
-            instance.SetActive(false);
-            instance.name = string.IsNullOrWhiteSpace(instanceName) ? source.name + "_ESPreview" : instanceName;
-            PreparePreviewObject(instance, "Preview model group.", samplingTarget);
-            if (moveToGroupOrigin)
-                MoveToGroupOrigin(instance.transform);
-
-            if (copyRendererState)
-                ESEditorPreviewUtility.CopyRendererState(source, instance);
-            if (disableRuntimeBehaviours)
-                ESEditorPreviewUtility.DisableRuntimeBehaviours(instance);
-            ESEditorPreviewUtility.EnsureParticleRendererMaterials(instance, EnsureFallbackParticleMaterial());
-
-            ParticleSystem[] particleSystems = instance.GetComponentsInChildren<ParticleSystem>(true);
-            for (int i = 0; i < particleSystems.Length; i++)
+            ESEditorPreviewModelHandle handle = null;
+            try
             {
-                ParticleSystem.MainModule main = particleSystems[i].main;
-                main.playOnAwake = false;
+                instance.SetActive(false);
+                instance.name = string.IsNullOrWhiteSpace(instanceName) ? source.name + "_ESPreview" : instanceName;
+                ESEditorPreviewUtility.SetHideFlagsRecursive(
+                    instance.transform,
+                    samplingTarget
+                        ? ESEditorPreviewUtility.SamplingSafeHideFlags
+                        : ESEditorPreviewUtility.PreviewHideFlags);
+                PreparePreviewObject(instance, "Preview model group.", samplingTarget);
+                if (moveToGroupOrigin)
+                    MoveToGroupOrigin(instance.transform);
+
+                if (copyRendererState)
+                    ESEditorPreviewUtility.CopyRendererState(source, instance);
+                if (disableRuntimeBehaviours)
+                    ESEditorPreviewUtility.DisableRuntimeBehaviours(instance);
+                ESEditorPreviewUtility.EnsureParticleRendererMaterials(instance, EnsureFallbackParticleMaterial());
+
+                ParticleSystem[] particleSystems = instance.GetComponentsInChildren<ParticleSystem>(true);
+                for (int i = 0; i < particleSystems.Length; i++)
+                {
+                    ParticleSystem.MainModule main = particleSystems[i].main;
+                    main.playOnAwake = false;
+                }
+                if (ensureRenderersEnabled)
+                    ESEditorPreviewUtility.EnsureRenderersEnabled(instance);
+                if (activateInstance)
+                    instance.SetActive(true);
+                handle = new ESEditorPreviewModelHandle(this, source, instance);
+                modelHandles.Add(handle);
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                return handle;
             }
-            if (ensureRenderersEnabled)
-                ESEditorPreviewUtility.EnsureRenderersEnabled(instance);
-            if (activateInstance)
-                instance.SetActive(true);
-            var handle = new ESEditorPreviewModelHandle(this, source, instance);
-            modelHandles.Add(handle);
-            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
-            return handle;
+            catch
+            {
+                if (handle != null)
+                    modelHandles.Remove(handle);
+                ESEditorPreviewUtility.DestroyObject(instance);
+                throw;
+            }
         }
 
         public void DestroyAllModelGroups()
         {
             for (int i = modelHandles.Count - 1; i >= 0; i--)
-                modelHandles[i]?.DisposeFromOwner();
+            {
+                try
+                {
+                    modelHandles[i]?.DisposeFromOwner();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
 
             modelHandles.Clear();
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
@@ -1258,32 +1314,77 @@ namespace ES
             if (disposed)
                 return;
 
+            try { DestroyAllModelGroups(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            SafeReleaseRenderTexture();
+            SafeDestroyPreviewObject(ref cameraObject);
+            SafeDestroyPreviewObject(ref keyLightObject);
+            SafeDestroyPreviewObject(ref fillLightObject);
+            SafeDestroyPreviewObject(ref groundPlaneObject);
+            SafeDestroyPreviewObject(ref groundPlaneMaterial);
+            SafeDestroyPreviewObject(ref scaleReferenceObject);
+            SafeDestroyPreviewObject(ref scaleReferenceMaterial);
+            SafeDestroyPreviewObject(ref fallbackParticleMaterial);
+            Camera = null;
+
+            bool previewSceneCloseFailed = false;
+            try
+            {
+                if (previewScene.IsValid())
+                    EditorSceneManager.ClosePreviewScene(previewScene);
+            }
+            catch (Exception exception)
+            {
+                previewSceneCloseFailed = true;
+                LastStatus = "Preview scene cleanup pending; will retry on the next lifecycle cleanup.";
+                Debug.LogException(exception);
+            }
+
+            if (previewSceneCloseFailed)
+            {
+                // Do not mark the context disposed or lose the retry path. CleanupAll
+                // clears its active set before invoking Dispose, so explicitly
+                // re-register this context for the next reload/quit/manual cleanup.
+                ESEditorPreviewLifecycleHub.RegisterScope(this);
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+                return;
+            }
+
+            previewScene = default;
+            if (!cellReleased)
+            {
+                ReleaseCell(allocatedCell);
+                cellReleased = true;
+            }
             disposed = true;
             ESEditorPreviewLifecycleHub.UnregisterScope(this);
-            DestroyAllModelGroups();
-            ESEditorPreviewUtility.ReleaseRenderTexture(ref renderTexture);
-            ESEditorPreviewUtility.DestroyObject(cameraObject);
-            ESEditorPreviewUtility.DestroyObject(keyLightObject);
-            ESEditorPreviewUtility.DestroyObject(fillLightObject);
-            ESEditorPreviewUtility.DestroyObject(groundPlaneObject);
-            ESEditorPreviewUtility.DestroyObject(groundPlaneMaterial);
-            ESEditorPreviewUtility.DestroyObject(scaleReferenceObject);
-            ESEditorPreviewUtility.DestroyObject(scaleReferenceMaterial);
-            ESEditorPreviewUtility.DestroyObject(fallbackParticleMaterial);
-            Camera = null;
-            groundPlaneObject = null;
-            groundPlaneMaterial = null;
-            scaleReferenceObject = null;
-            scaleReferenceMaterial = null;
-            fallbackParticleMaterial = null;
-            ReleaseCell(allocatedCell);
-
-            if (previewScene.IsValid())
-            {
-                EditorSceneManager.ClosePreviewScene(previewScene);
-                previewScene = default;
-            }
+            LastStatus = "Preview context disposed.";
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+        }
+
+        private void SafeReleaseRenderTexture()
+        {
+            RenderTexture owned = renderTexture;
+            renderTexture = null;
+            if (owned == null)
+                return;
+
+            try { owned.Release(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { UnityEngine.Object.DestroyImmediate(owned); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            renderTextureWidth = 0;
+            renderTextureHeight = 0;
+        }
+
+        private static void SafeDestroyPreviewObject<T>(ref T value) where T : UnityEngine.Object
+        {
+            T owned = value;
+            value = null;
+            if (owned == null)
+                return;
+            try { ESEditorPreviewUtility.DestroyObject(owned); }
+            catch (Exception exception) { Debug.LogException(exception); }
         }
 
         private void EnsurePreviewScene()
@@ -1292,6 +1393,12 @@ namespace ES
                 return;
 
             previewScene = EditorSceneManager.NewPreviewScene();
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+                throw new ObjectDisposedException(nameof(ESEditorPreviewRenderContext));
         }
 
         internal void UnregisterModel(ESEditorPreviewModelHandle handle)
@@ -1308,22 +1415,36 @@ namespace ES
             if (Camera != null)
                 return;
 
-            cameraObject = ESEditorPreviewUtility.CreatePreviewGameObject(owner + " Preview Camera", typeof(Camera));
-            MoveToContextScene(cameraObject);
-            ESEditorPreviewUtility.TryMarkPreviewObject(cameraObject, owner, "Preview camera.", out _);
-            Camera = cameraObject.GetComponent<Camera>();
-            Camera.enabled = false;
-            Camera.fieldOfView = 30f;
-            Camera.clearFlags = CameraClearFlags.Color;
-            Camera.backgroundColor = new Color(0.16f, 0.18f, 0.21f, 1f);
-            Camera.cullingMask = 1 << previewLayer;
-            Camera.nearClipPlane = 0.01f;
-            Camera.farClipPlane = CameraFarClip;
-            Camera.stereoTargetEye = StereoTargetEyeMask.None;
-            Camera.useOcclusionCulling = false;
-            Camera.depthTextureMode = DepthTextureMode.None;
-            TrySetCameraScene(Camera, previewScene);
-            ESEditorPreviewUtility.TryConfigureUniversalCameraData(Camera);
+            GameObject created = null;
+            try
+            {
+                created = ESEditorPreviewUtility.CreatePreviewGameObject(owner + " Preview Camera", typeof(Camera));
+                MoveToContextScene(created);
+                ESEditorPreviewUtility.TryMarkPreviewObject(created, owner, "Preview camera.", out _);
+                Camera camera = created.GetComponent<Camera>();
+                if (camera == null)
+                    throw new InvalidOperationException("Preview camera component was not created.");
+                camera.enabled = false;
+                camera.fieldOfView = 30f;
+                camera.clearFlags = CameraClearFlags.Color;
+                camera.backgroundColor = new Color(0.16f, 0.18f, 0.21f, 1f);
+                camera.cullingMask = 1 << previewLayer;
+                camera.nearClipPlane = 0.01f;
+                camera.farClipPlane = CameraFarClip;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+                camera.useOcclusionCulling = false;
+                camera.depthTextureMode = DepthTextureMode.None;
+                TrySetCameraScene(camera, previewScene);
+                ESEditorPreviewUtility.TryConfigureUniversalCameraData(camera);
+                cameraObject = created;
+                Camera = camera;
+            }
+            catch
+            {
+                if (created != null)
+                    ESEditorPreviewUtility.DestroyObject(created);
+                throw;
+            }
         }
 
         private void EnsureLights()
@@ -1336,23 +1457,46 @@ namespace ES
 
         private GameObject CreateLight(string name, float intensity, Quaternion rotation)
         {
-            GameObject go = ESEditorPreviewUtility.CreatePreviewGameObject(name, typeof(Light));
-            MoveToContextScene(go);
-            ESEditorPreviewUtility.SetLayerRecursive(go.transform, previewLayer);
-            ESEditorPreviewUtility.TryMarkPreviewObject(go, owner, "Preview light.", out _);
-            Light light = go.GetComponent<Light>();
-            light.type = sceneMode == ESEditorPreviewSceneMode.PreviewScene ? LightType.Directional : LightType.Spot;
-            light.intensity = sceneMode == ESEditorPreviewSceneMode.PreviewScene ? intensity : intensity * 5f;
-            light.range = 60f;
-            light.spotAngle = 75f;
-            light.cullingMask = 1 << previewLayer;
-            light.transform.rotation = rotation;
-            if (sceneMode != ESEditorPreviewSceneMode.PreviewScene)
-                light.transform.position = groupOrigin - light.transform.forward * 18f + Vector3.up * 8f;
-            return go;
+            GameObject created = null;
+            try
+            {
+                created = ESEditorPreviewUtility.CreatePreviewGameObject(name, typeof(Light));
+                MoveToContextScene(created);
+                ESEditorPreviewUtility.SetLayerRecursive(created.transform, previewLayer);
+                ESEditorPreviewUtility.TryMarkPreviewObject(created, owner, "Preview light.", out _);
+                Light light = created.GetComponent<Light>();
+                if (light == null)
+                    throw new InvalidOperationException("Preview light component was not created.");
+                light.type = sceneMode == ESEditorPreviewSceneMode.PreviewScene ? LightType.Directional : LightType.Spot;
+                light.intensity = sceneMode == ESEditorPreviewSceneMode.PreviewScene ? intensity : intensity * 5f;
+                light.range = 60f;
+                light.spotAngle = 75f;
+                light.cullingMask = 1 << previewLayer;
+                light.transform.rotation = rotation;
+                if (sceneMode != ESEditorPreviewSceneMode.PreviewScene)
+                    light.transform.position = groupOrigin - light.transform.forward * 18f + Vector3.up * 8f;
+                return created;
+            }
+            catch
+            {
+                if (created != null)
+                    ESEditorPreviewUtility.DestroyObject(created);
+                throw;
+            }
         }
 
         private void EnsureGroundPlane()
+        {
+            try { EnsureGroundPlaneCore(); }
+            catch
+            {
+                SafeDestroyPreviewObject(ref groundPlaneMaterial);
+                SafeDestroyPreviewObject(ref groundPlaneObject);
+                throw;
+            }
+        }
+
+        private void EnsureGroundPlaneCore()
         {
             if (groundPlaneObject != null)
                 return;
@@ -1401,6 +1545,17 @@ namespace ES
 
         private void EnsureScaleReference()
         {
+            try { EnsureScaleReferenceCore(); }
+            catch
+            {
+                SafeDestroyPreviewObject(ref scaleReferenceMaterial);
+                SafeDestroyPreviewObject(ref scaleReferenceObject);
+                throw;
+            }
+        }
+
+        private void EnsureScaleReferenceCore()
+        {
             if (scaleReferenceObject != null)
                 return;
 
@@ -1447,13 +1602,24 @@ namespace ES
             if (shader == null)
                 return null;
 
-            fallbackParticleMaterial = new Material(shader)
+            Material created = null;
+            try
             {
-                name = owner + " Particle Preview Fallback Material",
-                hideFlags = ESEditorPreviewUtility.PreviewHideFlags,
-                color = Color.white
-            };
-            return fallbackParticleMaterial;
+                created = new Material(shader)
+                {
+                    name = owner + " Particle Preview Fallback Material",
+                    hideFlags = ESEditorPreviewUtility.PreviewHideFlags,
+                    color = Color.white
+                };
+                fallbackParticleMaterial = created;
+                return created;
+            }
+            catch
+            {
+                if (created != null)
+                    ESEditorPreviewUtility.DestroyObject(created);
+                throw;
+            }
         }
 
         private void ApplyCameraPose(float aspect, ESEditorPreviewCameraPose pose, ESEditorPreviewQuality quality)
@@ -1482,11 +1648,22 @@ namespace ES
             if (renderTexture != null && renderTextureWidth == width && renderTextureHeight == height && renderTextureQuality == quality)
                 return;
 
-            ESEditorPreviewUtility.ReleaseRenderTexture(ref renderTexture);
+            RenderTexture previous = renderTexture;
+            RenderTexture replacement = ESEditorPreviewUtility.CreateRenderTexture(
+                width,
+                height,
+                24,
+                GetAntiAliasing(quality),
+                owner + " Preview RT");
+            renderTexture = replacement;
             renderTextureWidth = width;
             renderTextureHeight = height;
             renderTextureQuality = quality;
-            renderTexture = ESEditorPreviewUtility.CreateRenderTexture(width, height, 24, GetAntiAliasing(quality), owner + " Preview RT");
+            if (previous != null)
+            {
+                try { ESEditorPreviewUtility.ReleaseRenderTexture(ref previous); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
         }
 

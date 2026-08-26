@@ -875,7 +875,9 @@ namespace ES
         public static void MenuRebuildEditorConfigQueryTableFromLibraries()
         {
             ESAssetAutoRegisterReport report = RebuildEditorConfigQueryTableFromLibraries(true, true);
-            AssetDatabase.SaveAssets();
+            foreach (ESAssetLibrary library in ESEditorSO.GetGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>())
+                if (library != null)
+                    AssetDatabase.SaveAssetIfDirty(library);
             Debug.Log(report.ToString());
         }
 
@@ -883,31 +885,50 @@ namespace ES
         {
             ESAssetAutoRegisterReport report = new ESAssetAutoRegisterReport();
             List<ESAssetLibrary> indexedLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>(0);
-            List<ESAssetLibrary> libraries = new List<ESAssetLibrary>(indexedLibraries.Count);
+            var librarySnapshots = new Dictionary<ESAssetLibrary, string>();
             for (int i = 0; i < indexedLibraries.Count; i++)
             {
                 ESAssetLibrary library = indexedLibraries[i];
-                if (library == null)
-                    continue;
-
-                if (libraries.Contains(library))
-                    continue;
-
-                report.normalizedPageCount += library.NormalizePagesEditor();
-                libraries.Add(library);
-                EditorUtility.SetDirty(library);
+                if (library != null && !librarySnapshots.ContainsKey(library))
+                    librarySnapshots.Add(library, EditorJsonUtility.ToJson(library));
             }
 
-            report.libraryCount = libraries.Count;
-            ESAssetRegistry.BuildFromAssetLibraries(libraries, clearBeforeBuild);
-            report.registeredPageCount = ESAssetRegistry.EditorConfigQueryTable.Count;
+            try
+            {
+                List<ESAssetLibrary> libraries = new List<ESAssetLibrary>(indexedLibraries.Count);
+                for (int i = 0; i < indexedLibraries.Count; i++)
+                {
+                    ESAssetLibrary library = indexedLibraries[i];
+                    if (library == null || libraries.Contains(library))
+                        continue;
 
-            if (rebuildAssetConfigTables)
-                RebuildAssetConfigTablesFromPages(ESAssetRegistry.Pages);
+                    report.normalizedPageCount += library.NormalizePagesEditor();
+                    libraries.Add(library);
+                    EditorUtility.SetDirty(library);
+                }
 
-            report.conflictCount = GetAssetConflictCount();
-            report.conflictReport = GetAssetConflictReport();
-            return report;
+                report.libraryCount = libraries.Count;
+                ESAssetRegistry.BuildFromAssetLibraries(libraries, clearBeforeBuild);
+                report.registeredPageCount = ESAssetRegistry.EditorConfigQueryTable.Count;
+
+                if (rebuildAssetConfigTables)
+                    RebuildAssetConfigTablesFromPages(ESAssetRegistry.Pages);
+
+                report.conflictCount = GetAssetConflictCount();
+                report.conflictReport = GetAssetConflictReport();
+                return report;
+            }
+            catch
+            {
+                foreach (KeyValuePair<ESAssetLibrary, string> snapshot in librarySnapshots)
+                {
+                    if (snapshot.Key == null || string.IsNullOrEmpty(snapshot.Value))
+                        continue;
+                    EditorJsonUtility.FromJsonOverwrite(snapshot.Value, snapshot.Key);
+                    EditorUtility.SetDirty(snapshot.Key);
+                }
+                throw;
+            }
         }
 
         public static int RebuildAssetConfigTablesFromPages(IReadOnlyList<ESAssetPage> pages)

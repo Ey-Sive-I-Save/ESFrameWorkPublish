@@ -30,6 +30,9 @@ namespace ES
         private readonly string _trackName;
         private readonly List<AnimationClipEditorSampler> _clips = new List<AnimationClipEditorSampler>();
         private bool _loggedEmpty;
+        private bool _animationModeAcquired;
+        private static int activeAnimationModeUsers;
+        private static bool animationModeOwned;
 
         public AnimationTrackEditorSampler(ITrackItem track, string trackName)
             : base(track, null, false)
@@ -45,13 +48,51 @@ namespace ES
 
         public override void OnEditorPreviewStart()
         {
-            EnsureAnimationMode();
+            if (_animationModeAcquired)
+                return;
+
+            try
+            {
+                if (activeAnimationModeUsers == 0 && !AnimationMode.InAnimationMode())
+                {
+                    AnimationMode.StartAnimationMode();
+                    animationModeOwned = true;
+                }
+
+                activeAnimationModeUsers++;
+                _animationModeAcquired = true;
+            }
+            catch
+            {
+                if (animationModeOwned && activeAnimationModeUsers == 0)
+                {
+                    try { AnimationMode.StopAnimationMode(); }
+                    catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                    animationModeOwned = false;
+                }
+                throw;
+            }
         }
 
         public override void OnEditorPreviewStop()
         {
-            if (AnimationMode.InAnimationMode())
-                AnimationMode.StopAnimationMode();
+            if (!_animationModeAcquired)
+                return;
+
+            _animationModeAcquired = false;
+            activeAnimationModeUsers = Mathf.Max(0, activeAnimationModeUsers - 1);
+            if (activeAnimationModeUsers == 0 && animationModeOwned)
+            {
+                try
+                {
+                    // Unity or another editor tool may have already ended the
+                    // global mode while this sampler was still registered.
+                    // Avoid a second Stop call in that case.
+                    if (AnimationMode.InAnimationMode())
+                        AnimationMode.StopAnimationMode();
+                }
+                finally { animationModeOwned = false; }
+            }
         }
 
         public override void SampleTime(float time)
@@ -68,7 +109,7 @@ namespace ES
             if (sampler == null)
                 return;
 
-            EnsureAnimationMode();
+            OnEditorPreviewStart();
             sampler.SampleAnimation(time, useEndFrame);
         }
 
@@ -82,12 +123,6 @@ namespace ES
             }
 
             return null;
-        }
-
-        private static void EnsureAnimationMode()
-        {
-            if (!AnimationMode.InAnimationMode())
-                AnimationMode.StartAnimationMode();
         }
 
         private void LogEmptyOnce()
@@ -170,8 +205,14 @@ namespace ES
             float localTime = _clipStartOffset + elapsed * _playbackSpeed;
             localTime = _loopClip ? Mathf.Repeat(localTime, _clip.length) : Mathf.Clamp(localTime, 0f, _clip.length);
             AnimationMode.BeginSampling();
-            AnimationMode.SampleAnimationClip(_target, _clip, localTime);
-            AnimationMode.EndSampling();
+            try
+            {
+                AnimationMode.SampleAnimationClip(_target, _clip, localTime);
+            }
+            finally
+            {
+                AnimationMode.EndSampling();
+            }
             SceneView.RepaintAll();
         }
 
@@ -425,14 +466,34 @@ namespace ES
                 Graph = PlayableGraph.Create($"ES Preview Animation Track - {_trackName} - {animator.name}")
             };
 
-            mixer.Graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
-            mixer.Mixer = AnimationMixerPlayable.Create(mixer.Graph, 0);
-            var output = AnimationPlayableOutput.Create(mixer.Graph, "AnimationPreview", animator);
-            output.SetSourcePlayable(mixer.Mixer);
-            mixer.CaptureOriginalPose();
-            AddBasePoseInput(mixer);
-            _mixers.Add(mixer);
-            return mixer;
+            try
+            {
+                mixer.Graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+                mixer.Mixer = AnimationMixerPlayable.Create(mixer.Graph, 0);
+                var output = AnimationPlayableOutput.Create(mixer.Graph, "AnimationPreview", animator);
+                output.SetSourcePlayable(mixer.Mixer);
+                mixer.CaptureOriginalPose();
+                AddBasePoseInput(mixer);
+                _mixers.Add(mixer);
+                return mixer;
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    mixer.Dispose();
+                    mixer.RestoreOriginalPose();
+                }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "高级动画预览 Mixer 构建失败，回滚也失败。", cleanupException));
+                }
+
+                Debug.LogException(new InvalidOperationException(
+                    "高级动画预览 Mixer 构建失败，已回滚候选 Graph。", exception));
+                return null;
+            }
         }
 
         private static void AddBasePoseInput(TargetMixer mixer)
@@ -725,15 +786,24 @@ namespace ES
         {
             for (int i = 0; i < _mixers.Count; i++)
             {
+                TargetMixer mixer = _mixers[i];
                 try
                 {
-                    var animator = _mixers[i].Animator;
-                    _mixers[i].Dispose();
-                    _mixers[i].RestoreOriginalPose();
+                    mixer?.Dispose();
                 }
                 catch (Exception e)
                 {
                     Debug.LogException(e);
+                }
+
+                try
+                {
+                    mixer?.RestoreOriginalPose();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "高级动画预览原始姿态恢复失败。", e));
                 }
             }
 
@@ -826,6 +896,8 @@ namespace ES
             public bool HasAppliedActive;
             public int LastRequestFrame;
             public bool RequestedActive;
+            public string LastRequestClip;
+            public bool HasConflictWarning;
         }
 
         private readonly string _trackName;
@@ -906,8 +978,23 @@ namespace ES
 
             if (isInside)
             {
+                if (targetState.LastRequestFrame == _sampleFrame
+                    && targetState.RequestedActive != activate
+                    && !targetState.HasConflictWarning)
+                {
+                    Debug.LogWarning(
+                        "[GameObjectTrackEditorSampler] 同一采样帧内多个 Clip 对对象“"
+                        + GetTargetName(target)
+                        + "”提出了相反激活请求；先请求="
+                        + (targetState.LastRequestClip ?? "<未知>")
+                        + "，后请求="
+                        + (clipName ?? "<未知>")
+                        + "，当前保持既有顺序语义。");
+                    targetState.HasConflictWarning = true;
+                }
                 targetState.RequestedActive = activate;
                 targetState.LastRequestFrame = _sampleFrame;
+                targetState.LastRequestClip = clipName;
                 LogDebug($"Update | Clip={clipName} | Time={time:F3} | Target={GetTargetName(target)} | Active={activate}");
             }
 
@@ -928,18 +1015,36 @@ namespace ES
 
         public override void OnEditorPreviewStop()
         {
-            for (int i = 0; i < _targets.Count; i++)
+            try
             {
-                TargetState targetState = _targets[i];
-                if (targetState.Target == null || !targetState.HasOriginal)
-                    continue;
+                for (int i = 0; i < _targets.Count; i++)
+                {
+                    TargetState targetState = _targets[i];
+                    if (targetState.Target == null || !targetState.HasOriginal)
+                        continue;
 
-                LogDebug($"StopRestore | Target={GetTargetName(targetState.Target)} | Restore={targetState.OriginalActive}");
-                ApplyActiveState(ref targetState, targetState.OriginalActive, false);
-                _targets[i] = targetState;
+                    try
+                    {
+                        LogDebug($"StopRestore | Target={GetTargetName(targetState.Target)} | Restore={targetState.OriginalActive}");
+                        ApplyActiveState(ref targetState, targetState.OriginalActive, false);
+                        _targets[i] = targetState;
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogWarning("[GameObjectTrackEditorSampler] 停止预览时恢复对象状态失败：" + exception.Message);
+                    }
+                }
             }
-
-            base.OnEditorPreviewStop();
+            finally
+            {
+                // A sampler can be reused after Stop/Play or a domain-reload-like
+                // rebuild. Do not carry old active-state baselines or destroyed
+                // GameObject references into the next preview session.
+                _targets.Clear();
+                _sampleFrame = 0;
+                _lastSubmitTime = float.NaN;
+                base.OnEditorPreviewStop();
+            }
         }
 
         private int EnsureTarget(GameObject target)
@@ -1061,13 +1166,25 @@ namespace ES
 
         public override void OnEditorPreviewStop()
         {
-            if (_trackSampler == null && _target != null && _hasCachedOriginal)
+            try
             {
-                LogDebug($"StopRestore | Target={GetTargetName()} | Restore={_originalActiveState}");
-                ApplyActiveState(_originalActiveState);
+                if (_trackSampler == null && _target != null && _hasCachedOriginal)
+                {
+                    LogDebug($"StopRestore | Target={GetTargetName()} | Restore={_originalActiveState}");
+                    ApplyActiveState(_originalActiveState);
+                }
             }
-
-            _wasInside = false;
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[GameObjectEditorSampler] 停止预览时恢复对象状态失败：" + exception.Message);
+            }
+            finally
+            {
+                _hasCachedOriginal = false;
+                _hasAppliedActiveState = false;
+                _lastAppliedActiveState = false;
+                _wasInside = false;
+            }
         }
 
         private void ApplyActiveState(bool activeState)
@@ -1108,6 +1225,11 @@ namespace ES
     {
         private ParticleSystem particleSystem;
         private float startTime; // 轨道起始时间偏移。
+        private bool originalStateCaptured;
+        private bool originalPlaying;
+        private bool originalPaused;
+        private float originalTime;
+        private bool originalEmissionEnabled;
 
         public ParticleEditorSampler(ParticleSystem ps, float trackStartTime = 0f)
         {
@@ -1118,6 +1240,8 @@ namespace ES
         public override void SampleTime(float time)
         {
             if (particleSystem == null) return;
+
+            CaptureOriginalState();
 
             float localTime = Mathf.Max(0, time - startTime);
             // 模拟粒子到指定时间，restart=true 表示从初始状态开始模拟。
@@ -1130,8 +1254,67 @@ namespace ES
 
         public override void OnEditorPreviewStop()
         {
-            if (particleSystem != null)
-                particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            if (particleSystem == null || !originalStateCaptured)
+                return;
+
+            try
+            {
+                try
+                {
+                    particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[ParticleEditorSampler] 停止预览时清理粒子失败：" + exception.Message);
+                }
+
+                try
+                {
+                    particleSystem.Simulate(Mathf.Max(0f, originalTime), true, true);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[ParticleEditorSampler] 恢复粒子时间失败：" + exception.Message);
+                }
+
+                try
+                {
+                    var emission = particleSystem.emission;
+                    emission.enabled = originalEmissionEnabled;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[ParticleEditorSampler] 恢复粒子发射状态失败：" + exception.Message);
+                }
+
+                try
+                {
+                    if (originalPlaying)
+                        particleSystem.Play(true);
+                    else if (originalPaused)
+                        particleSystem.Pause(true);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[ParticleEditorSampler] 恢复粒子播放状态失败：" + exception.Message);
+                }
+            }
+            finally
+            {
+                originalStateCaptured = false;
+            }
+        }
+
+        private void CaptureOriginalState()
+        {
+            if (originalStateCaptured || particleSystem == null)
+                return;
+
+            originalStateCaptured = true;
+            originalPlaying = particleSystem.isPlaying;
+            originalPaused = particleSystem.isPaused;
+            originalTime = particleSystem.time;
+            originalEmissionEnabled = particleSystem.emission.enabled;
         }
     }
 
@@ -1143,6 +1326,7 @@ namespace ES
     private readonly float _startTime;
     private AudioSource _audioSource;
     private float _lastSampledTime = -1f;
+    private bool _loggedPlaybackFailure;
     private const float SeekThreshold = 0.05f;
 
     public AudioEditorSampler(AudioClip clip, float startTime)
@@ -1155,53 +1339,90 @@ namespace ES
     private void CreateAudioSource()
     {
         if (_clip == null) return;
-        var go = new GameObject($"AudioPreview_{_clip.name}_{GetHashCode()}")
+        GameObject go = null;
+        try
         {
-            hideFlags = HideFlags.HideAndDontSave
-        };
-        _audioSource = go.AddComponent<AudioSource>();
-        _audioSource.playOnAwake = false;
-        _audioSource.clip = _clip;
-        _audioSource.Stop(); // 确保初始状态为停止。
+            go = new GameObject($"AudioPreview_{_clip.name}_{GetHashCode()}")
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            AudioSource source = go.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.clip = _clip;
+            source.Stop(); // 确保初始状态为停止。
+            _audioSource = source;
+        }
+        catch
+        {
+            if (go != null)
+            {
+                try { UnityEngine.Object.DestroyImmediate(go); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+            }
+            throw;
+        }
     }
 
     public override void SampleTime(float time)
     {
         if (_clip == null || _audioSource == null) return;
 
-        float localTime = time - _startTime;
-        bool isValid = localTime >= 0 && localTime < _clip.length;
-
-        if (!isValid)
+        try
         {
-            // 不在有效区间内：停止播放并清除最后采样记录。
-            if (_audioSource.isPlaying)
-                _audioSource.Stop();
+            float localTime = time - _startTime;
+            bool isValid = localTime >= 0 && localTime < _clip.length;
+
+            if (!isValid)
+            {
+                // 不在有效区间内：停止播放并清除最后采样记录。
+                if (_audioSource.isPlaying)
+                    _audioSource.Stop();
+                _lastSampledTime = -1f;
+                return;
+            }
+
+            // 有效区间内：根据时间变化决定是否重新定位。
+            bool shouldSeek = !_audioSource.isPlaying ||
+                              Mathf.Abs(localTime - _lastSampledTime) > SeekThreshold;
+
+            if (shouldSeek)
+            {
+                _audioSource.time = localTime;
+                if (!_audioSource.isPlaying)
+                    _audioSource.Play();
+            }
+
+            _lastSampledTime = localTime;
+        }
+        catch (Exception exception)
+        {
             _lastSampledTime = -1f;
-            return;
+            try { _audioSource.Stop(); }
+            catch (Exception stopException) { Debug.LogException(stopException); }
+            if (!_loggedPlaybackFailure)
+            {
+                _loggedPlaybackFailure = true;
+                Debug.LogWarning("[AudioEditorSampler] 音频预览采样失败，本次采样已停止：" + exception.Message);
+            }
         }
-
-        // 有效区间内：根据时间变化决定是否重新定位。
-        bool shouldSeek = !_audioSource.isPlaying ||
-                          Mathf.Abs(localTime - _lastSampledTime) > SeekThreshold;
-
-        if (shouldSeek)
-        {
-            _audioSource.time = localTime;
-            if (!_audioSource.isPlaying)
-                _audioSource.Play();
-        }
-
-        _lastSampledTime = localTime;
     }
 
     public override void OnEditorPreviewStop()
     {
-        if (_audioSource != null)
+        AudioSource source = _audioSource;
+        _audioSource = null;
+        _lastSampledTime = -1f;
+        _loggedPlaybackFailure = false;
+        if (source != null)
         {
-            _audioSource.Stop();
-            UnityEngine.Object.DestroyImmediate(_audioSource.gameObject);
-            _audioSource = null;
+            try { source.Stop(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try
+            {
+                if (source.gameObject != null)
+                    UnityEngine.Object.DestroyImmediate(source.gameObject);
+            }
+            catch (Exception exception) { Debug.LogException(exception); }
         }
     }
 }
@@ -1216,59 +1437,128 @@ namespace ES
     {
         private readonly Dictionary<ITrackClip, IEditorTimeSampler>
             _map = new();
+        private readonly List<IEditorTimeSampler> _tickBuffer = new(16);
+        private bool _isTicking;
+        private int _rebuildGeneration;
 
         public void Rebuild(ITrackSequence sequence)
         {
+            _rebuildGeneration++;
             StopAll();
             _map.Clear();
 
             if (sequence == null || sequence.Tracks == null)
                 return;
 
-            foreach (var track in sequence.Tracks)
+            Dictionary<ITrackClip, IEditorTimeSampler> rebuilt = new();
+            try
             {
-                if (track == null || track.Clips == null)
-                    continue;
-
-                foreach (var clip in track.Clips)
+                foreach (var track in sequence.Tracks)
                 {
-                    if (clip == null)
+                    if (track == null || track.Clips == null)
                         continue;
 
-                    var sampler = clip.CreateSampler(sequence, track);
-                    if (sampler == null)
+                    foreach (var clip in track.Clips)
                     {
-                        // 没有专用采样器时，使用默认调试采样器。
-                        sampler = new DefaultEditorDebugSampler(sequence.Name, track.DisplayName, clip);
+                        if (clip == null)
+                            continue;
+
+                        var sampler = clip.CreateSampler(sequence, track);
+                        if (sampler == null)
+                        {
+                            // 没有专用采样器时，使用默认调试采样器。
+                            sampler = new DefaultEditorDebugSampler(sequence.Name, track.DisplayName, clip);
+                        }
+
+                        bool duplicateClip = rebuilt.TryGetValue(
+                            clip,
+                            out IEditorTimeSampler previousSampler)
+                            && !ReferenceEquals(previousSampler, sampler);
+                        // Register the candidate before diagnostics so any
+                        // exception while formatting a warning is still covered
+                        // by the rebuild rollback path.
+                        rebuilt[clip] = sampler;
+                        if (duplicateClip)
+                        {
+                            StopSamplers(new[] { previousSampler });
+                            Debug.LogWarning(
+                                "[EditorSamplerRegistry] 检测到同一 Clip 被多个轨道引用；"
+                                + "已释放旧采样器并保持后一个轨道的覆盖语义。Clip="
+                                + (clip.DisplayName ?? "<未命名>"));
+                        }
                     }
-                    _map[clip] = sampler;
                 }
             }
+            catch (Exception exception)
+            {
+                StopSamplers(rebuilt.Values);
+                rebuilt.Clear();
+                Debug.LogWarning("[EditorSamplerRegistry] 重建采样器失败，已清理本次已创建的采样器：" + exception.Message);
+                throw;
+            }
+
+            foreach (var pair in rebuilt)
+                _map[pair.Key] = pair.Value;
         }
         public void Tick(float time)
         {
-            foreach (var sampler in _map.Values)
-            {
-                if (sampler == null)
-                    continue;
+            if (_isTicking)
+                return;
 
-                try
+            _isTicking = true;
+            int generation = _rebuildGeneration;
+            _tickBuffer.Clear();
+            foreach (var sampler in _map.Values)
+                if (sampler != null)
+                    _tickBuffer.Add(sampler);
+
+            try
+            {
+                for (int i = 0; i < _tickBuffer.Count; i++)
                 {
-                    sampler.SampleTime(time);
+                    // A sampler may synchronously trigger Rebuild. Do not sample
+                    // the old snapshot after that generation has been replaced.
+                    if (generation != _rebuildGeneration)
+                        break;
+
+                    IEditorTimeSampler sampler = _tickBuffer[i];
+                    try
+                    {
+                        sampler.SampleTime(time);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
                 }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
+            }
+            finally
+            {
+                _tickBuffer.Clear();
+                _isTicking = false;
             }
         }
 
         public void StopAll()
         {
-            foreach (var sampler in _map.Values)
+            StopSamplers(_map.Values);
+        }
+
+        private static void StopSamplers(IEnumerable<IEditorTimeSampler> samplers)
+        {
+            foreach (var sampler in samplers)
             {
-                if (sampler is IEditorTimeSamplerLifecycle lifecycle)
+                if (sampler is not IEditorTimeSamplerLifecycle lifecycle)
+                    continue;
+
+                try
+                {
                     lifecycle.OnEditorPreviewStop();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[EditorSamplerRegistry] 采样器停止失败，继续清理其他采样器：" + exception.Message);
+                }
             }
         }
     }

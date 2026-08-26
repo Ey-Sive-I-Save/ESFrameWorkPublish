@@ -28,6 +28,9 @@ namespace ES
             get => activeSequences.Count > 0 ? activeSequences[0] : null;
             set
             {
+                if (ReferenceEquals(ActiveSequence, value))
+                    return;
+
                 try
                 {
                     Stop();
@@ -78,8 +81,8 @@ namespace ES
         {
             if (activeSequences.Count == 0) return;
 
-            foreach (var seq in activeSequences)
-                seq.Play();
+            for (int i = activeSequences.Count - 1; i >= 0; i--)
+                activeSequences[i]?.Play();
 
             if (!IsUpdateRegistered)
             {
@@ -155,8 +158,8 @@ namespace ES
 
         public void Pause()
         {
-            foreach (var seq in activeSequences)
-                seq.Pause();
+            for (int i = activeSequences.Count - 1; i >= 0; i--)
+                activeSequences[i]?.Pause();
 
             // 如果所有序列都暂停，注销 update。
             if (AllSequencesPaused())
@@ -165,8 +168,8 @@ namespace ES
 
         public void Stop()
         {
-            foreach (var seq in activeSequences)
-                seq.Stop();
+            for (int i = activeSequences.Count - 1; i >= 0; i--)
+                activeSequences[i]?.Stop();
 
             UnregisterUpdate();
         }
@@ -174,8 +177,8 @@ namespace ES
         public void SetTime(float time)
         {
             // 对当前所有激活序列设置时间（每个序列内部会 clamp 到自身 Duration）。
-            foreach (var seq in activeSequences)
-                seq.SetTime(time);
+            for (int i = activeSequences.Count - 1; i >= 0; i--)
+                activeSequences[i]?.SetTime(time);
         }
 
         // ---------- 内部实现 ----------
@@ -249,8 +252,11 @@ namespace ES
 
         // 采样器集合
         private HashSet<IEditorTimeSampler> samplers = new HashSet<IEditorTimeSampler>();
+        private readonly Stack<List<IEditorTimeSampler>> samplerIterationBufferPool =
+            new Stack<List<IEditorTimeSampler>>();
         private Dictionary<ITrackItem, TrackEditorSampler> trackEditorSamplers = new Dictionary<ITrackItem, TrackEditorSampler>();
         private Dictionary<ITrackClip, ITrackClipEditorSampler> clipEditorSamplers = new Dictionary<ITrackClip, ITrackClipEditorSampler>();
+        private bool stoppingSamplers;
 
         // 事件
         public event System.Action<float> OnTimeUpdated;
@@ -345,56 +351,59 @@ namespace ES
 
         public void StartAllSamplers()
         {
-            foreach (var sampler in samplers)
+            List<IEditorTimeSampler> buffer = AcquireSamplerIterationBuffer();
+            try
             {
-                if (sampler is not IEditorTimeSamplerLifecycle lifecycle)
-                    continue;
-
-                try
+                CopySamplersForIteration(buffer);
+                for (int i = 0; i < buffer.Count; i++)
                 {
-                    lifecycle.OnEditorPreviewStart();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
+                    var sampler = buffer[i];
+                    if (sampler == null || !samplers.Contains(sampler)
+                        || sampler is not IEditorTimeSamplerLifecycle lifecycle)
+                        continue;
+                    try { lifecycle.OnEditorPreviewStart(); }
+                    catch (Exception e) { Debug.LogException(e); }
                 }
             }
+            finally { ReleaseSamplerIterationBuffer(buffer); }
         }
 
         public void SetPreviewIdleWeight(float weight)
         {
-            foreach (var sampler in samplers)
+            List<IEditorTimeSampler> buffer = AcquireSamplerIterationBuffer();
+            try
             {
-                if (sampler is not IEditorPreviewIdleWeightController controller)
-                    continue;
-
-                try
+                CopySamplersForIteration(buffer);
+                for (int i = 0; i < buffer.Count; i++)
                 {
-                    controller.SetPreviewIdleWeight(weight, CurrentTime);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
+                    var sampler = buffer[i];
+                    if (sampler == null || !samplers.Contains(sampler)
+                        || sampler is not IEditorPreviewIdleWeightController controller)
+                        continue;
+                    try { controller.SetPreviewIdleWeight(weight, CurrentTime); }
+                    catch (Exception e) { Debug.LogException(e); }
                 }
             }
+            finally { ReleaseSamplerIterationBuffer(buffer); }
         }
 
         public void UsePreviewIdleAutoBlend()
         {
-            foreach (var sampler in samplers)
+            List<IEditorTimeSampler> buffer = AcquireSamplerIterationBuffer();
+            try
             {
-                if (sampler is not IEditorPreviewIdleWeightController controller)
-                    continue;
-
-                try
+                CopySamplersForIteration(buffer);
+                for (int i = 0; i < buffer.Count; i++)
                 {
-                    controller.UsePreviewIdleAutoBlend(CurrentTime);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
+                    var sampler = buffer[i];
+                    if (sampler == null || !samplers.Contains(sampler)
+                        || sampler is not IEditorPreviewIdleWeightController controller)
+                        continue;
+                    try { controller.UsePreviewIdleAutoBlend(CurrentTime); }
+                    catch (Exception e) { Debug.LogException(e); }
                 }
             }
+            finally { ReleaseSamplerIterationBuffer(buffer); }
         }
 
         public void Pause()
@@ -412,9 +421,31 @@ namespace ES
         public void DisposeEditorPreviewTarget()
         {
             Pause();
-            StopAllSamplers();
-            if (PreviewTarget != null && !PreviewTarget.IsRecycled)
-                PreviewTarget.ForcePushToPool();
+            if (PreviewTarget == null || PreviewTarget.IsRecycled)
+            {
+                ClearDisposedState();
+                return;
+            }
+
+            try
+            {
+                StopAllSamplers();
+                if (!PreviewTarget.IsRecycled)
+                    PreviewTarget.ForcePushToPool();
+            }
+            finally
+            {
+                ClearDisposedState();
+            }
+        }
+
+        private void ClearDisposedState()
+        {
+            OnTimeUpdated = null;
+            samplers.Clear();
+            trackEditorSamplers.Clear();
+            clipEditorSamplers.Clear();
+            samplerIterationBufferPool.Clear();
         }
 
         /// <summary>
@@ -424,7 +455,7 @@ namespace ES
         {
             CurrentTime = Mathf.Clamp(time, 0f, Duration);
             SampleAll();
-            OnTimeUpdated?.Invoke(CurrentTime);
+            NotifyTimeUpdated();
         }
 
         /// <summary>
@@ -451,44 +482,89 @@ namespace ES
             }
 
             SampleAll();
-            OnTimeUpdated?.Invoke(CurrentTime);
+            NotifyTimeUpdated();
         }
 
         // ========== 内部采样 ==========
 
         private void SampleAll()
         {
-            foreach (var sampler in samplers)
+            List<IEditorTimeSampler> buffer = AcquireSamplerIterationBuffer();
+            try
             {
-                if (sampler == null)
-                    continue;
-
-                try
+                CopySamplersForIteration(buffer);
+                for (int i = 0; i < buffer.Count; i++)
                 {
-                    sampler.SampleTime(CurrentTime);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
+                    var sampler = buffer[i];
+                    if (sampler == null || !samplers.Contains(sampler))
+                        continue;
+                    try { sampler.SampleTime(CurrentTime); }
+                    catch (Exception e) { Debug.LogException(e); }
                 }
             }
+            finally { ReleaseSamplerIterationBuffer(buffer); }
         }
 
         public void StopAllSamplers()
         {
-            foreach (var sampler in samplers)
-            {
-                if (sampler is not IEditorTimeSamplerLifecycle lifecycle)
-                    continue;
+            if (stoppingSamplers)
+                return;
 
-                try
+            stoppingSamplers = true;
+            List<IEditorTimeSampler> buffer = null;
+            try
+            {
+                buffer = AcquireSamplerIterationBuffer();
+                CopySamplersForIteration(buffer);
+                for (int i = 0; i < buffer.Count; i++)
                 {
-                    lifecycle.OnEditorPreviewStop();
+                    var sampler = buffer[i];
+                    if (sampler == null || !samplers.Contains(sampler)
+                        || sampler is not IEditorTimeSamplerLifecycle lifecycle)
+                        continue;
+                    try { lifecycle.OnEditorPreviewStop(); }
+                    catch (Exception e) { Debug.LogException(e); }
                 }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
+            }
+            finally
+            {
+                if (buffer != null)
+                    ReleaseSamplerIterationBuffer(buffer);
+                stoppingSamplers = false;
+            }
+        }
+
+        private List<IEditorTimeSampler> AcquireSamplerIterationBuffer()
+        {
+            return samplerIterationBufferPool.Count > 0
+                ? samplerIterationBufferPool.Pop()
+                : new List<IEditorTimeSampler>(16);
+        }
+
+        private void ReleaseSamplerIterationBuffer(List<IEditorTimeSampler> buffer)
+        {
+            buffer.Clear();
+            samplerIterationBufferPool.Push(buffer);
+        }
+
+        private void CopySamplersForIteration(List<IEditorTimeSampler> buffer)
+        {
+            buffer.Clear();
+            foreach (var sampler in samplers)
+                if (sampler != null)
+                    buffer.Add(sampler);
+        }
+
+        private void NotifyTimeUpdated()
+        {
+            try
+            {
+                OnTimeUpdated?.Invoke(CurrentTime);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "EditorSequencePlayer 时间更新通知失败，采样状态已保留。", exception));
             }
         }
     }

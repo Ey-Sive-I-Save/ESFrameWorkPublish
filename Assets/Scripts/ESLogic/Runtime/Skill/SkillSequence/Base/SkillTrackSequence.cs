@@ -168,18 +168,31 @@ namespace ES
             if (!overrideTrackPreviewTarget)
                 return base.CreateEditorSamplers(sequence, runtimeTarget);
 
-            ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-            target.SetEntity(runtimeTarget != null ? runtimeTarget.userEntity : null);
-            target.SetUser(runtimeTarget != null ? runtimeTarget.userEntity : null);
+            ESRuntimeTargetPack target = null;
+            try
+            {
+                target = ESRuntimeTargetPack.Pool.GetInPool();
+                target.SetEntity(runtimeTarget != null ? runtimeTarget.userEntity : null);
+                target.SetUser(runtimeTarget != null ? runtimeTarget.userEntity : null);
 
-            GameObject targetObject = trackTargetExpression != null
-                ? trackTargetExpression.Evaluate(runtimeTarget, null)
-                : null;
+                GameObject targetObject = trackTargetExpression != null
+                    ? trackTargetExpression.Evaluate(runtimeTarget, null)
+                    : null;
 
-            if (targetObject != null)
-                target.SetEntityMainTarget(FindEntityInSelfOrParents(targetObject));
+                if (targetObject != null)
+                    target.SetEntityMainTarget(FindEntityInSelfOrParents(targetObject));
 
-            return CreateClipEditorSamplers(sequence, target, true);
+                return CreateClipEditorSamplers(sequence, target, true);
+            }
+            catch
+            {
+                if (target != null && !target.IsRecycled)
+                {
+                    try { target.ForcePushToPool(); }
+                    catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                }
+                throw;
+            }
         }
 
         private static Entity FindEntityInSelfOrParents(GameObject gameObject)

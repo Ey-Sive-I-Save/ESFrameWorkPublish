@@ -1,0 +1,197 @@
+{
+    "schemaVersion":  1,
+    "validator":  "es-static-deep-replay",
+    "skillName":  "es-resource-pipeline",
+    "case":  "StaticDeepReplay",
+    "status":  "passed",
+    "evidenceLevel":  "S1",
+    "receiptPath":  "Documentation/AIKnowledge/validation/ES-ResourcePipeline-DeepReplay-Continuation.json",
+    "sourceRefs":  [
+                       ".agents/skills/es-resource-pipeline/agents/openai.yaml",
+                       ".agents/skills/es-resource-pipeline/governance.json",
+                       ".agents/skills/es-resource-pipeline/references/control-contract.md",
+                       ".agents/skills/es-resource-pipeline/references/evidence-receipt-contract.md",
+                       ".agents/skills/es-resource-pipeline/references/project-map.md",
+                       ".agents/skills/es-resource-pipeline/references/static-replay-adapter.md",
+                       ".agents/skills/es-resource-pipeline/references/static-specialized-acceptance.md",
+                       ".agents/skills/es-resource-pipeline/scripts/Test-es-resource-pipeline-StaticReplay.ps1",
+                       ".agents/skills/es-resource-pipeline/scripts/Test-ESResourceStageManifest.ps1",
+                       ".agents/skills/es-resource-pipeline/scripts/Test-ESSkillEvidence.ps1",
+                       ".agents/skills/es-resource-pipeline/SKILL.md",
+                       ".agents/skills/es-resource-pipeline/static-replay.manifest.json"
+                   ],
+    "sourceRefHashes":  {
+                            ".agents/skills/es-resource-pipeline/agents/openai.yaml":  "a789e740ac92093f2f4811a1bd844c3b7855ba583ca8608eb93e206c94c87b28",
+                            ".agents/skills/es-resource-pipeline/governance.json":  "e39b0773b776686971b4b9ea47d61a7bcb5fa4674b5379153511eb7fe1f89b58",
+                            ".agents/skills/es-resource-pipeline/references/control-contract.md":  "9ba35689d715c34a90ab1af63b885f7cfcb004bb4685a5b9368d3ee253038149",
+                            ".agents/skills/es-resource-pipeline/references/evidence-receipt-contract.md":  "6200d8178982010bbdbae30a19b9de92f53ea0ca2fea47aa0ccefa3777fc0d94",
+                            ".agents/skills/es-resource-pipeline/references/project-map.md":  "5089b69423691d9b4f37cc30ae673e19d094e711baa1e45bdee347809edbbe22",
+                            ".agents/skills/es-resource-pipeline/references/static-replay-adapter.md":  "114e738ae96f8929cbc86c5405ebeab5f6f2724f9c18757beb9faf76a4f3d040",
+                            ".agents/skills/es-resource-pipeline/references/static-specialized-acceptance.md":  "8a09bed0163022acf7b1272494620565c337ebbda6ddedcac40700456f6d307f",
+                            ".agents/skills/es-resource-pipeline/scripts/Test-es-resource-pipeline-StaticReplay.ps1":  "721fe353ace93226a5b9ab5907f85c94d25bbf6e52e426ccda7c79b2c655f60e",
+                            ".agents/skills/es-resource-pipeline/scripts/Test-ESResourceStageManifest.ps1":  "1370e1b87f73ce7a153eb771f13b5ccc47c27c57e7fd06bdf7cca557c0f6a434",
+                            ".agents/skills/es-resource-pipeline/scripts/Test-ESSkillEvidence.ps1":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909",
+                            ".agents/skills/es-resource-pipeline/SKILL.md":  "ed8e47ede2af35ddc499f6ce8d0141948b67a843d86fb4caaa330a70a83d4765",
+                            ".agents/skills/es-resource-pipeline/static-replay.manifest.json":  "e1418cbb792559e4ed3d6dcc712f1ccee0a2aa3c6fca3d67f8434c73e4deb6d8"
+                        },
+    "toolId":  "es-static-deep-replay",
+    "unityVersion":  "not-run",
+    "capturedUtc":  "2026-08-25T17:54:09.8812406Z",
+    "planHash":  "b1fa6f48a1f21f5cd20bb97a83727b1066b64397213ca5c31bd31077ab7a9d41",
+    "profile":  "StaticReview",
+    "responsibilityProfile":  "authoring",
+    "responsibilityChecks":  [
+                                 "change-boundary",
+                                 "resource-projection",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "staticStatus":  "static-passed",
+    "runtimeStatus":  "runtime-not-run",
+    "overallVerdict":  "StaticDeepReplayComplete",
+    "claimsNotProven":  [
+                            "Unity/editor/process behavior",
+                            "timing and visual behavior",
+                            "Profiler/Player/IL2CPP/release behavior"
+                        ],
+    "nextAction":  "Do not start Runtime unless the declared escalation is authorized.",
+    "cases":  [
+                  {
+                      "id":  "normal-input",
+                      "status":  "passed",
+                      "assertion":  "source roots and required Skill files are present"
+                  },
+                  {
+                      "id":  "invalid-input",
+                      "status":  "passed",
+                      "assertion":  "invalid input is rejected by the declared contract"
+                  },
+                  {
+                      "id":  "denied-expansion",
+                      "status":  "passed",
+                      "assertion":  "permission or path expansion is denied"
+                  },
+                  {
+                      "id":  "repeat-idempotency",
+                      "status":  "passed",
+                      "assertion":  "repeat execution is idempotent"
+                  },
+                  {
+                      "id":  "hash-change-cache-invalidation",
+                      "status":  "passed",
+                      "assertion":  "hash or cache changes invalidate stale state"
+                  },
+                  {
+                      "id":  "interruption-recovery",
+                      "status":  "passed",
+                      "assertion":  "interruption and recovery are declared"
+                  },
+                  {
+                      "id":  "deterministic-output",
+                      "status":  "passed",
+                      "assertion":  "deterministic output and stable ordering are declared"
+                  }
+              ],
+    "customCheckResults":  [
+                               {
+                                   "id":  "change-boundary",
+                                   "status":  "passed",
+                                   "detail":  "change/write/stop boundary is declared"
+                               },
+                               {
+                                   "id":  "resource-projection",
+                                   "status":  "passed",
+                                   "detail":  "responsibility source projection is hash-bound"
+                               },
+                               {
+                                   "id":  "deterministic-replay",
+                                   "status":  "passed",
+                                   "detail":  "deterministic claim and source hashes exist"
+                               },
+                               {
+                                   "id":  "evidence-contract",
+                                   "status":  "passed",
+                                   "detail":  "Skill declares evidence/receipt/acceptance boundary"
+                               }
+                           ],
+    "specializedAcceptance":  [
+                                  {
+                                      "id":  "stage-manifest",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "provider-identity",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "dependency-closure",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "duplicate-resource",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "recovery-boundary",
+                                      "status":  "passed"
+                                  }
+                              ],
+    "sourceHashes":  [
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/agents/openai.yaml",
+                             "sha256":  "a789e740ac92093f2f4811a1bd844c3b7855ba583ca8608eb93e206c94c87b28"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/governance.json",
+                             "sha256":  "e39b0773b776686971b4b9ea47d61a7bcb5fa4674b5379153511eb7fe1f89b58"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/references/control-contract.md",
+                             "sha256":  "9ba35689d715c34a90ab1af63b885f7cfcb004bb4685a5b9368d3ee253038149"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/references/evidence-receipt-contract.md",
+                             "sha256":  "6200d8178982010bbdbae30a19b9de92f53ea0ca2fea47aa0ccefa3777fc0d94"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/references/project-map.md",
+                             "sha256":  "5089b69423691d9b4f37cc30ae673e19d094e711baa1e45bdee347809edbbe22"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/references/static-replay-adapter.md",
+                             "sha256":  "114e738ae96f8929cbc86c5405ebeab5f6f2724f9c18757beb9faf76a4f3d040"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/references/static-specialized-acceptance.md",
+                             "sha256":  "8a09bed0163022acf7b1272494620565c337ebbda6ddedcac40700456f6d307f"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/scripts/Test-es-resource-pipeline-StaticReplay.ps1",
+                             "sha256":  "721fe353ace93226a5b9ab5907f85c94d25bbf6e52e426ccda7c79b2c655f60e"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/scripts/Test-ESResourceStageManifest.ps1",
+                             "sha256":  "1370e1b87f73ce7a153eb771f13b5ccc47c27c57e7fd06bdf7cca557c0f6a434"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/scripts/Test-ESSkillEvidence.ps1",
+                             "sha256":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/SKILL.md",
+                             "sha256":  "ed8e47ede2af35ddc499f6ce8d0141948b67a843d86fb4caaa330a70a83d4765"
+                         },
+                         {
+                             "path":  ".agents/skills/es-resource-pipeline/static-replay.manifest.json",
+                             "sha256":  "e1418cbb792559e4ed3d6dcc712f1ccee0a2aa3c6fca3d67f8434c73e4deb6d8"
+                         }
+                     ],
+    "issues":  [
+
+               ],
+    "runtimeEscalation":  {
+                              "required":  false,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "generatedUtc":  "2026-08-25T17:54:09.8812406Z"
+}

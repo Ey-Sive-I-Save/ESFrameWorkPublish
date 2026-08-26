@@ -1,0 +1,1454 @@
+{
+    "schemaVersion":  1,
+    "validator":  "es-editor-availability-validator",
+    "validationMode":  "StaticReview",
+    "status":  "Blocked",
+    "staticStatus":  "static-blocked",
+    "runtimeStatus":  "runtime-not-run",
+    "runtimeAuthorizationRequired":  false,
+    "runtimeAuthorizationStatus":  "not-required",
+    "overallVerdict":  "StaticBlocked",
+    "scope":  "source/configuration/boundary-only",
+    "claimsNotProven":  [
+                            "compile",
+                            "reloadDomain",
+                            "interaction",
+                            "visual",
+                            "recovery",
+                            "performance"
+                        ],
+    "nextAction":  "Fix source/configuration/boundary findings; do not start Runtime.",
+    "targetPath":  "Assets/Plugins/ES/Editor",
+    "targetKind":  "Workbench",
+    "targetKindSource":  "inferred",
+    "requiredDimensions":  [
+                               "compile",
+                               "reloadDomain",
+                               "interaction",
+                               "visual",
+                               "recovery",
+                               "performance"
+                           ],
+    "targetContractProvided":  false,
+    "editorRuleRegistry":  {
+                               "registryId":  "es-editor-window-production-rules",
+                               "ruleCount":  21,
+                               "staticRules":  [
+                                                   {
+                                                       "ruleId":  "EW-01",
+                                                       "title":  "window-kind",
+                                                       "status":  "passed",
+                                                       "severity":  "critical",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "host-reachability"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-02",
+                                                       "title":  "singleton-entry",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "duplicate-window"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-03",
+                                                       "title":  "opening-position",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "multi-display-position"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-04",
+                                                       "title":  "size-bounds",
+                                                       "status":  "passed",
+                                                       "severity":  "critical",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "narrow-wide-dpi"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-05",
+                                                       "title":  "first-screen-conclusion",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "first-screen-screenshot"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-06",
+                                                       "title":  "phase-separation",
+                                                       "status":  "passed",
+                                                       "severity":  "medium",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "phase-navigation"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-07",
+                                                       "title":  "section-identity",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "reselection-domain-reload"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-08",
+                                                       "title":  "single-axis-scroll",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "horizontal-overflow"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-09",
+                                                       "title":  "action-host-layers",
+                                                       "status":  "passed",
+                                                       "severity":  "medium",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "event-routing"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-10",
+                                                       "title":  "phase-primary-action",
+                                                       "status":  "passed",
+                                                       "severity":  "medium",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "primary-action-visibility"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-11",
+                                                       "title":  "state-failure-closure",
+                                                       "status":  "passed",
+                                                       "severity":  "critical",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "failure-recovery"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-12",
+                                                       "title":  "mutation-recovery",
+                                                       "status":  "passed",
+                                                       "severity":  "critical",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "undo-reopen-recovery"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-13",
+                                                       "title":  "target-event-isolation",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "click-scroll-drag-isolation"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-14",
+                                                       "title":  "owner-lifecycle",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "parent-child-close"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-15",
+                                                       "title":  "sleep-host-unification",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "sleep-wake-geometry"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-16",
+                                                       "title":  "reload-playmode",
+                                                       "status":  "passed",
+                                                       "severity":  "critical",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "reload-domain-playmode"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-17",
+                                                       "title":  "hot-path-budget",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "profiler-threshold"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-18",
+                                                       "title":  "preview-ownership",
+                                                       "status":  "passed",
+                                                       "severity":  "high",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "rendertexture-cleanup"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-19",
+                                                       "title":  "es-token",
+                                                       "status":  "passed",
+                                                       "severity":  "medium",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "light-dark-contrast"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-20",
+                                                       "title":  "long-value-accessibility",
+                                                       "status":  "passed",
+                                                       "severity":  "medium",
+                                                       "details":  "Static source evidence matched the responsibility-specific rule pattern.",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "long-value-dpi"
+                                                                         ]
+                                                   },
+                                                   {
+                                                       "ruleId":  "EW-21",
+                                                       "title":  "event-routing-phase-contract",
+                                                       "status":  "blocked",
+                                                       "severity":  "critical",
+                                                       "details":  "Event-routing contract failed: RegisterCallback\u003cDragUpdatedEvent\u003e\\s*\\(\\s*OnDragUpdated\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); RegisterCallback\u003cDragPerformEvent\u003e\\s*\\(\\s*OnDragPerform\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); RegisterCallback\u003cDragLeaveEvent\u003e\\s*\\(\\s*OnDragLeave\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); UnregisterCallback\u003cDragUpdatedEvent\u003e\\s*\\(\\s*OnDragUpdated\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); UnregisterCallback\u003cDragPerformEvent\u003e\\s*\\(\\s*OnDragPerform\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); UnregisterCallback\u003cDragLeaveEvent\u003e\\s*\\(\\s*OnDragLeave\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); RegisterCallback\u003cDragExitedEvent\u003e\\s*\\(\\s*OnDragExited\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); UnregisterCallback\u003cDragExitedEvent\u003e\\s*\\(\\s*OnDragExited\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); RegisterCallback\u003cPointerCaptureOutEvent\u003e\\s*\\(\\s*OnRootPointerCaptureOut\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); RegisterCallback\u003cFocusOutEvent\u003e\\s*\\(\\s*OnRootFocusOut\\s*,\\s*TrickleDown\\.TrickleDown\\s*\\); all-owner-release-paths-call-CancelWorkbenchDrag(true)",
+                                                       "evidenceLevel":  "S2",
+                                                       "runtimeChecks":  [
+                                                                             "drag-route-behavior"
+                                                                         ]
+                                                   }
+                                               ],
+                               "blockedCount":  1
+                           },
+    "targetHashes":  [
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESAdvancedDialog/ESAdvancedDialog.cs",
+                             "sha256":  "29e6333f5a3be95f07dba11cde059b3882e723ea7ea569d1d13087d385dcb58f"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESAdvancedDialog/ESAdvancedDialogExamples.cs",
+                             "sha256":  "a7f26bf9a8ac8b137d867c25e8bc02ae583911b9cb458b8dfc144390bbe6d6ee"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESAdvancedDialog/ESEditorDialogPresenter.cs",
+                             "sha256":  "963368e73bbb3e024a7dba329c972708cb28315707c29c28f0466fa3c3ed78fe"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteContracts.cs",
+                             "sha256":  "5894d4c8aa22fd7366acb1d069dc876142c3dc9b00202aaf5338774818763e4e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteExecutors.cs",
+                             "sha256":  "9880aaeedf16023d2ee55fbff51536ca3f8980ba222c265977343e13b12359e3"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteRegistry.cs",
+                             "sha256":  "0d3c87f330aaf9275e57f15a46b797250705f196b4532e6b1b1fe68aa26fe693"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteWindow.cs",
+                             "sha256":  "968d9b04749e89f1b7eae5a289a6658464f808d5ba7e6d074f609d3abdfc6a42"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCompactChoicePopup.cs",
+                             "sha256":  "dd9c373049f4280736169fb07c023c393b8c50f3f95c97fd4e862f5a0f5405eb"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCompactChoicePopup.uss",
+                             "sha256":  "b14775814405e37eb859ddd0330d7fd9c102bdbf1f379fe7dd7e58c97eba70cd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESDeveloperCockpit/ESDeveloperCockpitWindow.cs",
+                             "sha256":  "432a918f0d47cb8f5f6873e9d2de5ea6c31ac3b59b5d6366ffee2ae7985b8ced"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESDeveloperCockpit/ESDeveloperTraceProvider.cs",
+                             "sha256":  "13447624dbe255e02daa8fc89bbabfec7970b9dfe27cb560f3a69a1211991e95"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorFeedbackSound/ESEditorFeedbackSound.cs",
+                             "sha256":  "84cda550e966cf3d04e676c4c674faa222e5fc6f4630ff6230127e8b66b0bc20"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorHandle/ESEditorHandle.cs",
+                             "sha256":  "3d44acb20588091f3f87895d18b72223d77c0ca5bef48fcab127f81fa3b3e73d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorHandle/ESLongTaskDiagnostics.cs",
+                             "sha256":  "fc8f808a9d70c21e856ceed82802e9702cf016a2eca919ab6a78b260e3e8fed7"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/ER_ESEditorInspectorUser.cs",
+                             "sha256":  "055c22dcb3464b8d4c0d78e9a7c8794bf1203b0ccad973993e1d3d4458d7a83c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/ESEditorInspectorContext.cs",
+                             "sha256":  "820bea6096fda6036d28f11c2faeb89417085cc8ec836f87d23c53ac2cacf8ab"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/ESEditorInspectorUser.cs",
+                             "sha256":  "34add8757a099c7e3784d9f3700a68462fa80e2b041800923f40b18663f91fe4"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/ESInspectorScriptOrigin.cs",
+                             "sha256":  "005c8cadeb7b5de00d61ad2509472282235004bc4af87092eb882dd15b44fc91"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/InspectorUser_AssetQuickInfo.cs",
+                             "sha256":  "0723d4ed39f6318e4be0d31a63e6d790a054df14d92ca3399cb10c21b275febd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/InspectorUser_ScriptQuickFilter.cs",
+                             "sha256":  "2c285adcc6e68b35fc989d10abe9360b0a54d7ca7994ea19e264c4da69711c09"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorPreview/BasePreviewEditor.cs",
+                             "sha256":  "9ca89a7483c81e3d6f38c072319e6f71a7d926575c33e6745c148a221cbef4c0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorPreview/CorePreviewEditor.cs",
+                             "sha256":  "76ae2e790d7b936c1ee16a4ac39b99f2221a7c613630bd0eb69b15628139147f"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorPreview/MonoBehaviourPreviewEditor.cs",
+                             "sha256":  "59de8223d8ee65e9af5faede4365f95f919b66260547d2e59abc476d26efdd55"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                             "sha256":  "09acba833de9d6295f0bb6da09946fc1c726700cb4ca2dd685dc5b291fe40f9d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESSearchDropdown.cs",
+                             "sha256":  "308b7a8e0a7b323b0fb3ad570d1b71129c92358b900932a88709469c9b60108a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/ESWindowLauncher.cs",
+                             "sha256":  "f871fbd47f0447a4686e2c72c150ab3b6d17e18d95910001c93269b840214dc0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/SceneHierarchyExpansionState.cs",
+                             "sha256":  "9b834d221ec589b6f6c7d5d86f1959206d9ca5c4bfb5d7e6c3899fea4f100df5"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/EditorTools/SerializedDependency/ESSerializedDependencyExpander.cs",
+                             "sha256":  "5e82674698dcd50eb74492ee49231c8888bfc31813b21c5ffd5d210176239186"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ES_Editor.asmdef",
+                             "sha256":  "ee8d9ed36f861a66cb2143927b7d9ca9f3c664e110265f87ee6e341fd4e3e6ed"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAgentGraphAutomationEndpoint.cs",
+                             "sha256":  "0bc253ebba46f4deb28cc4820677ee02a7233a070d57b682bbe91242640fd13c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs",
+                             "sha256":  "64843f7d0bed648e33c853528c758d1c2a6115ab4b6498240f418274921de999"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs",
+                             "sha256":  "20b63b3db889b705ae740d366fa234b8ae49b50a60bf72056cd2a96b86db9b57"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                             "sha256":  "85bd442e6a2a8e0d013e9d83f62eb90b91fe82c4824fedb822e358a5cd2a31f5"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationFacade.cs",
+                             "sha256":  "e61a58d14237555a09207cf3e3c596b48e0ee2de6188d10584b950c62606d4d2"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                             "sha256":  "cbff3ea53d3054997be91621d6f5ac945e2f5f34c6870cbf649127c625a2a4e7"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationUnityEditorControl.cs",
+                             "sha256":  "c656a1925d31cc22decc8694c30198c914dc216111077026fe942692faf31749"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuIdentityAutomation.cs",
+                             "sha256":  "90e486d7de1d26228353b47ebf185718ff4300f5eb8cdadab24ba3b9ac82d948"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs",
+                             "sha256":  "4abfcc41a21a17e289e617451c8d06e119de8ac5e0b4d1635d93dc8e049e11b0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuTaskAutomation.cs",
+                             "sha256":  "fdc0b137ccf8211ba482147979e9cc3d9e5831bae14f7a8c07d26caaf15ec25f"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentAssemblyInfo.cs",
+                             "sha256":  "9a85d8b85dc6732bd36ad85f9c79a807e75a8ed458f00a09555ab84049e3e032"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentBootstrapHost.cs",
+                             "sha256":  "32d1c62910ad13d4107c623052e7953665eccbcd43bfeaea8f07aaccbdae1333"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentCodexVisibleEventTail.cs",
+                             "sha256":  "8aabbb627f89fd81ffec206da70ec7998bb4cb3f7ce0190a3a4841aa04e1ec4e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentForegroundCmdObserver.cs",
+                             "sha256":  "685128326b95153fb149b63c31a20bc23b7b5e2c6efd4cb1a158c8d0000ec37d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                             "sha256":  "b635cce29021ad46075d3479fbf43a87b6d4670030f7be305760acb84714f9f9"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.uss",
+                             "sha256":  "bc15974b0cfa04f330758b4ced589ca3103bbd26c002ad7212ba5f98f8466ed8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/Tests/ES.CmdAgent.Editor.Tests.asmdef",
+                             "sha256":  "1798fef6167956470227e658ee85a746123ba19885ea1319dbe52b6969bbfc30"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/Tests/ESCmdAgentRecoveryTests.cs",
+                             "sha256":  "1a4c4aa0ee5da3cb3722131f18e779ba9909b4a8801d9138393bdd22242fa164"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCommand/ESCommandEventDrawer.cs",
+                             "sha256":  "0add756f133c685e9a9788ee13a7bf6c1a2f4a1f93fd281f55666926dcd652b4"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESCommand/ESCommandPlayerEditor.cs",
+                             "sha256":  "731322fe5cd850f18313c835e4af886ab4b8c7a078c83e92995df5232db5846a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESAssetKeyMutationAuthoring.cs",
+                             "sha256":  "a0d424c868bf8458867c497679b4c874a6ca4bf4e20e71be63a1161e1280c05d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESAssetRegistrationAuthoring.cs",
+                             "sha256":  "5dd547224bbc5cc0be4bb03a7b9e1df30d24e0b66afd6a3b2bc47ee220c74fdd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESContentRegistrationAuthoring.cs",
+                             "sha256":  "2184f8b6e14f4cb557e59cf813e34750105838c7155b9efbf973bb2abb9539ac"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESContentRegistrationContracts.cs",
+                             "sha256":  "f14296126acff7981e44f146b7fe51e0d1f2024d103e81794da999c6816ac0af"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESContentStringKeyRules.cs",
+                             "sha256":  "1575f285be77bfbff3ae0193473cbddde3bd82404d54a2e5e1cf8deade14f0d6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESGameCoreRegistrationAuthoring.cs",
+                             "sha256":  "2f7cbbfb99c43aeda0938d9165bdc88a7a264e8dd5efd0bcf2d721151a0730ed"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESGameCoreRootRegistrationAuthoring.cs",
+                             "sha256":  "696ce1885acb43457bb2ba4653ea678c41d844dc62d5019f32b37ead57b385ba"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/MCP/ES.ContentRegistration.MCP.Editor.asmdef",
+                             "sha256":  "67732cbce6f576cf2f63085ef27ad475268fe3407d1672b01058a20d11ae1cb4"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/MCP/ESContentRegistrationMcpTool.cs",
+                             "sha256":  "438603346b547953fdd20be11ad06de10db39a31838187a61749844973f256ae"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/Tests/ES.ContentRegistration.Editor.Tests.asmdef",
+                             "sha256":  "d0d2ca2bd2c729c14fc8c5fc5055599cc9a87a6890f81ab01419683c38edcff7"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/Tests/ESContentRegistrationTests.cs",
+                             "sha256":  "c773e81fa71707fd13fa49acbeff9ceec1f9ffb0a996308b1d53c4505fbd0eb0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESBackGroundAttributeDrawer.cs",
+                             "sha256":  "c7171a0833ba69f968f45e4356ced7a06cc10eae4c4aedc8a2c3db9588788314"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESBoolOptionAttributeDrawer.cs",
+                             "sha256":  "618240f7cdbc0811406c99fe09680214fad364c9fd9e1408a270ca8137279791"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESDragAttributeDrawer.cs",
+                             "sha256":  "8d4dc6ee747fcc600b40ec599fb2798d07383e9164c964a2f87111a3ae4d8f49"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESDragToFieldSolverAttributeDrawer.cs",
+                             "sha256":  "3f4866592b3801243c42372bb81195d4889f916e6fb3c01089a8386bca6ea546"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESEnumStringTableAttributeDrawer.cs",
+                             "sha256":  "cdff0d357f741d602e535641ff08176f7c902efc7ef32f5c01f32069e717dc9c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESFieldAttributeDrawer.cs",
+                             "sha256":  "7b16483224fcd09e150450f56088e5e4d519229464db3a5256cb925d1bd7fce0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESGetAddAttributeDrawer.cs",
+                             "sha256":  "1aac4f609b6b88214e52fc04390d1eef5272ead472d57eb0ded5209809cf3c3b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/AttributeDrawers/ESTwoPaneListAttributeDrawer.cs",
+                             "sha256":  "298f30cdb0feffcfe1a2b5eabb9b1c9e2e72e3f1ed5aed64f28d6c86ba6005a0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESAssetConfigKeyDrawer.cs",
+                             "sha256":  "75c913a51dee0b461bbb70b70942385c73f81c88a05c91a0066ca6e623e19dd5"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESAssetLibraryConsumerEditor.cs",
+                             "sha256":  "5df5d318afa60eb9a96d6941cde1a1806b971f452371f4a62b7b9dc061f0c8cd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESAssetReferInlineProcessor.cs",
+                             "sha256":  "2d63c85c909d770cbff5a5ecb2357c41c605d4bbb4fe01b2e12c8848a2ca0192"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESCollectionDrawStyleAttributeDrawer.cs",
+                             "sha256":  "9a096e0ef50517a2b43280d67e4f697c61f0c27bb060fea79c36cce009ebbffa"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESConfigKeyPriorityProcessor.cs",
+                             "sha256":  "d0662755535a8a84d7acea16d3c95612902c1eb7bc7bb6f2e4e9992e0395f494"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSectionAttributeProcessor.cs",
+                             "sha256":  "aecac96497ac72cbe71c06e6a8f0c4296ef467dbf62cb35452e3ba5f1629f3fb"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSectionNavigatorDrawer.cs",
+                             "sha256":  "621c2374834bb2a7df7d8945904439489553e8907f07a5511a1c172ffae0a527"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSectionNavigatorIMGUI.cs",
+                             "sha256":  "0994d4217820b429eee124e39e5c92424d6c06989ecab2c34791979da723288b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSerializedMutation.cs",
+                             "sha256":  "67f4e4077bb7cd504f4b22a2a926c72ce03bf3cd4370a9feeca1b5c0e8404091"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESGameCoreConfigKeyDrawer.cs",
+                             "sha256":  "1127b329a08394ce6317694445c807dd1e044dc107f480f7d2cebb5f514cd9a8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputActionDefineDrawer.cs",
+                             "sha256":  "fb0cbf91162edc0774064fe0ac601f2a2778bb1c5edca7fb1495c1a8dca07fe4"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputBindingDefineDrawer.cs",
+                             "sha256":  "15c3584b739948cad705d3088ba7936969e82bfd3842fa7f7a25e01b1828dd5d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputSelfTestMenu.cs",
+                             "sha256":  "fe1cc9188076ed2658162b02cb43a26251833eba76b6a9ffa6220f57bd5cffd0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESLocalizedTextRefDrawer.cs",
+                             "sha256":  "52fa9e81f68c25a2ba19c51547986721407e53584755ee3fd0259d85fc91c139"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESPolymorphicReferenceDrawer.cs",
+                             "sha256":  "6d59201f074986294a6d4c02adc64eae14ce220925330489e40c46862c62ce92"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESTagEditorCatalogCacheInitializer.cs",
+                             "sha256":  "6fed2ea49c029d4ee08ae798364827b858ee356b03fd0227fcc7895488c8154f"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESTagStableReferenceDrawer.cs",
+                             "sha256":  "cca1f7799b289ee245e4857f36e4b5f120ddc8bcc8a91fc710122972b7ed4935"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/GameObjectRefer.Editor.cs",
+                             "sha256":  "3f34c004cd174bf25546d9a9544a03d6f4b12eb43eeeb7d34381bf508f07428b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESDrawer/Special/ResGlobalDrawer.cs",
+                             "sha256":  "43e76233d793266882773a3b1a92940a21c3d3d3adc6c76b4d6b1b1fba13f7db"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESFontTools/ESFontBuildProfile.cs",
+                             "sha256":  "e86aa2741ac3d81410f3c25c00d364a0dadd9f45efeb95a811ae245696fa7f49"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESFontTools/ESFontBuildProfileEditor.cs",
+                             "sha256":  "497d4c7cdae69014bd0842ea4d38d730c2ce0710c65ce704107c7517438eed55"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationPlan.cs",
+                             "sha256":  "05c4568c14c2c60609f6abbfaba85853c05fc80c93abb096f3360302c31d74b8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                             "sha256":  "40c52342d8af6e71e3cc944c1e55c0d74ac091f155c8f28fb996e66686bb6c6d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactRecords.cs",
+                             "sha256":  "e49abfbb74905cbda6d3d7bf79e5d9ec92b281967e7d3f24a9033fe95e210a2c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactTypes.cs",
+                             "sha256":  "94f94e81b80221773ae84796d8e5506088e48fe0582044da31f483c68eb43cf8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentAuthoringGraphIntegration.cs",
+                             "sha256":  "0f5dcc2f90a8ca147e5a45cbc1af148458a047cb9e56b67cd655b79f2b65cfb9"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentAuthoringPresets.cs",
+                             "sha256":  "f9556158ae8b6b1d07152c7905bbb355c2ebe1ae52bc7669893f2b3791341a1a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentGenerationModel.cs",
+                             "sha256":  "48e3da3c1d5a28d393a0993c45556239f633e58fbba44f5ef8610922cdf1c853"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentGenerationTypes.cs",
+                             "sha256":  "44853f3e933db02d0740b7b23f2060cee694ede383c8825c884e1f0c6a05bbe6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentImportRecords.cs",
+                             "sha256":  "970ea5df2e24171f06398ba3608dc8449ba35f3e3c0a6b20c6588ff577b3bb8c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentPayloadInspectorBase.cs",
+                             "sha256":  "65fc6e9e711715e344072f7f0589dae4af4de032d4cd2df66b6a3a19233c58f1"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentPayloadInspectors.cs",
+                             "sha256":  "ed7a6e455383e8ed68977cbb0736e3b1154f55c8d55d3d7aafcea03acdbba450"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentPayloadMigrations.cs",
+                             "sha256":  "e6a921527258b6f9451c4e3f47a49304496b84d8b04043e77711156a0f378d33"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentPayloads.cs",
+                             "sha256":  "9730dd04687483c2fc4a98b2cf156cad3d5d211378deca545d8a583f5261a3da"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentSessionRecords.cs",
+                             "sha256":  "1c24849b6e7c0829ed7ae4c4ec3f7435dd6ae18cd56079e6e2fa4ebc8ea4d575"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs",
+                             "sha256":  "7b17d81c0dc4bbf04d2e91df2c8e47e46c9b811de622dfef03c7f408476a192e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESGraphAuthoringProfiles.cs",
+                             "sha256":  "c4c079c55ae0cb1dd3ba004cd77f84aa45ee4117ba149ef62f527a35a041b010"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESGraphBakeCache.cs",
+                             "sha256":  "f2078b506bd3794ed3e2516fdff3401abc56195798111b6879baeffaf46fec79"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESGraphChange.cs",
+                             "sha256":  "22dafe115176f419f43ab30209e126d9ee3e17fa0aa64592d9ffbb07b5b091f8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESGraphEditService.cs",
+                             "sha256":  "9583044a3dff31f12a1a5a4c8be2c9a4d932a67e01a45c1cc0da96cd0f0f887e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphAssetEditor.cs",
+                             "sha256":  "276db1633cb0ccf16888545049006ac6a2ab3afeae60f252e00661e8b5b4aa9e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphInspector.cs",
+                             "sha256":  "7f4d84d7ecdd688a68b8db5a8d538fc3adb016e259b383178b322ff4e2493ed8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphViewWindow.cs",
+                             "sha256":  "faf6943b157b557f7c9a28e05d89ea847df20064239f547e37c3ebfca3309ae7"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                             "sha256":  "5ae3632dd1482d0c11362056cfd45478fbb4419b39b1cd79a08e5c059bed3e5f"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/ESAssetPackageBakeWindow.cs",
+                             "sha256":  "63bcc53fb911ea07b5b6cdb7fc54a490344bb5ae685d00f72810e5437b4a252e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/ESTaskWindow/ESTaskWindow.cs",
+                             "sha256":  "04922b5199af82da5b242c58e527eda4ab8fce01cd904c8fdea5e16af952693a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/ESFontToolsWindow.cs",
+                             "sha256":  "6bf5fbe2dc5f7d272371f6aea94422f572a46a815220a1fbd627f61b4adcf280"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/ESLocalizationToolsWindow.cs",
+                             "sha256":  "74425823254a007c08b643ede5f04a1601924673682ca1078eebe17ec8690f6c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                             "sha256":  "29544ea5d9865ea4b2d516b3494e86d21505ab7a16d819ecd8bb35cfdf203021"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/ResWindow/ESResWindow.cs",
+                             "sha256":  "365eff666834af4c3fb287ed54796b14bf2c2094465f38968cff28a390121910"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/ESFrameworkPublishContentPolicy.cs",
+                             "sha256":  "59f280f7c77509fc55a9dcfe1d8e3a57651567abd3a13ea6b10a81f626144ed2"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                             "sha256":  "3bad961547e4b245a1ee5dbdb2709e68f4e531e6907af4deed42baf46bfa1588"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_TextureSpriteTool.cs",
+                             "sha256":  "8c32447c5c80351554e03fc893287330478c84647c2a8dfcafd78cc9b24c2440"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                             "sha256":  "ef79060404ab49c68ddae6970ef0371d115a33ca16271d04bbb43232399ca103"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/ER_ESRuntimeWatch.cs",
+                             "sha256":  "250523d6e9f9c4baa5c70666bc98a795714619cba122a8917dc3b0dc556ed8dd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                             "sha256":  "e7bd19cdf0e4243daee92b0a7cdf5b4b515320c75dd712f7b639e30f58a0bf9b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_RuntimeWatch.cs",
+                             "sha256":  "fc635a026b4e3b2b322f08c454db6a1ea88acffe7125b06e8adf9da2abe88431"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                             "sha256":  "b1a22a4a37e29d77805784b02aee57292cdb4469e2f32736b4a1a6f6e8921b63"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                             "sha256":  "52e5a350863eaa6dc07b8dbd3561c9dabb6b8ebad309d0099ca9c203f045a3b9"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                             "sha256":  "8ec9ca07740e2b03c9cbe87292e402bd342388d6ea046266ea75b63363ce87d3"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                             "sha256":  "888fd1647f60e9202fcca27139fcd28ef66676d52408c0ee88025171a838cb32"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                             "sha256":  "96c7a24d70f5d7174f15e5d674ef91b93bc689c5f1304106ed2cfd6bec3048a1"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                             "sha256":  "278a7e18b47f42493d3a9f4cb91e46ea0897ffdbf414a632bc5a866f5e5bd61e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_HierarchyTools.cs",
+                             "sha256":  "f8c9cb8a8604781f428a69dfd5f33db701be570c01e161641fdaf7e53de90737"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                             "sha256":  "b1882e0ee2ef147cea9c8795983b51a4ccd93174cd261d7cc9cf9867c2529d74"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                             "sha256":  "dce9867152920b1718d18f9859656a484dcc1f4ff05d3d4b9a40026ae4e6c52e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                             "sha256":  "ea39a2627da95f16b4dd7d8a628a8b21c0f9c34ec37162d655f810710f84464e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                             "sha256":  "0334f558beb8e9a4e36ede121484355f8c54450bc41329002b2c69651239a679"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                             "sha256":  "dab2d4a91bcb4bdfb93cab7974a4be9c9793b9dfd3eabe6ae187912c464a3bdd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                             "sha256":  "4c309509de99ecb777561d8f1ced674fb73b5f34580a2a3d83aed622c7bbb0d6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsPanelUtility.cs",
+                             "sha256":  "804c3d9c9f233d2ca710cb6855c3adcabf6802203d26a9a945201d8c3fd7097d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsSafetyUtility.cs",
+                             "sha256":  "408c3bb4c901b3a841895c3d84b9f311fe7d82b073c264db42dd5cbc7d75feeb"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsWindow.cs",
+                             "sha256":  "cfb38064030ec11a322f084ab8ee701f0f1f1040f653af4ad4b2b51e3d706ddc"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SODataInfoWindow/ESSODataInfoWindow.cs",
+                             "sha256":  "81cba9bb28b45c6e7e4a61ce77f4be5af96c2abcc290a29bd1fa9eca3f9345fe"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SODataInfoWindow/ESSODataInfoWindow.MenuExpansion.cs",
+                             "sha256":  "c140b37a3d9deef38c734c9d9c932d0e9909df4fcfcfa85bb676ff05acd66949"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SODataInfoWindow/ESSODataInfoWindow.State.cs",
+                             "sha256":  "c3ef424a45ad1bfb22ca771a107a8f7f1d12aa259d3dec63bb37f0aedb1ec583"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/AssetCollectionDebugTest.cs",
+                             "sha256":  "05448e19f2fae51f7c0016c14333bbf9feee7c0dc1a963792afae788e6d5f479"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESIndependentInspectorWindow.cs",
+                             "sha256":  "499548abc348a616c48e3ea41951bf116115a86844cf2c0a0959d42d54e09566"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                             "sha256":  "7eb1df82a3e37841632523beb8f41a6fa30502cf8977d0a48ea7e4e94f7a58aa"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESMenuTreeToolkitTestWindow.cs",
+                             "sha256":  "52f3fb1aa5a777a8b1d4ae7daf154f2c23deb7ff9c2d9a26dd531adda10bb9a6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/-ESMenuTreeWindow.cs",
+                             "sha256":  "c84bc34be132c92d6c9cdc13ad271361570fcbf93d0fcd66f765f8a330a9ca8e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESMenuWindowDebugTest.cs",
+                             "sha256":  "12444c2be9c07c884a617d379416cb4259f9d09b4da3f283e73899431e7e5484"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ES.MenuTree.Editor.Tests.asmdef",
+                             "sha256":  "4920546b5da0f98c9d60b3b2fe5ab970f931d7e090f5aa19e517d6937d0752cc"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ESEditorSerializedMutationTests.cs",
+                             "sha256":  "03b377ada8b7d43385c58bf93401637220d96642202a98f86c12999b0d71fb40"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ESMenuTreeCommercialTests.cs",
+                             "sha256":  "84994a2ffaa578fce17f64e5ce3c8f8e4c4154c84b5d98e6960a5cc0afa778f3"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ESWindowSleepLifetimeTests.cs",
+                             "sha256":  "ccf5c8f17bc929d536adcc4d7294654f3147453d7bc4c4968c996f5fe0fc018c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/Core/ESEditorPresentationCore.cs",
+                             "sha256":  "e6bdd701c0fd202f3183099de131530bd16cf4eea09046441f306a353708d3a5"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/Core/ESFieldRow.cs",
+                             "sha256":  "8641b78692965ca4787f3423bdbc0f4c243bf802abf97b371bf5207985c9b55b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/Core/ESStatus.cs",
+                             "sha256":  "89feffdf44cbc8700a8a3315c02e985142cf761d459778895a58490b5ca174ed"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESCommonExampleReadMeInstaller.cs",
+                             "sha256":  "30f042632528a7a82d917269c0f2850d35d589e6e6875907063146a5e9af263a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESEditorHealthWindow.cs",
+                             "sha256":  "2c775586199933cbb0b3b5496ef7fed8cd8f7d9e8e8ebb80c4ed674548ffb928"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESEditorThemeWindow.cs",
+                             "sha256":  "a58caa6df4c07760c312694754460a6ea95cdb90b79373655bb7ade438846358"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESGlobalEditorThemeMenu.cs",
+                             "sha256":  "2c0c9fab3e684d45a1636f063371339c975b84773c85e2e6509cadde9d72eb82"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                             "sha256":  "077a7c44c5c2a00a2f178b1f8005f6feef69152ccfbb0891a67b94451f28b09c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/Reference/ESTypeCatalog.cs",
+                             "sha256":  "36817e51c1357ac3178a41ec865077e6c1f44be085a1edc9e73d5faff7de5adb"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/Styles/ESBrandTypography.uss",
+                             "sha256":  "4370ed8b9e69985c78fc1d5ad423e79c95ff8c1076e8498f7b21efe98953d995"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESPresentation/Styles/ESGlobalEditorDeepSkin.uss",
+                             "sha256":  "5e43c236147ad315f582431d771e2db2ba17d4ca90606c2a4762f728541d1580"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESProfileWorkbench/Generic/ESGenericProfileEditor.cs",
+                             "sha256":  "13778928fc52eda374fb40ab5945200fcaecbe6b08fb8052aa3486ee71f179c6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESProfileWorkbench/Migration/ESGenericProfileMigrationService.cs",
+                             "sha256":  "751ae225556cd546ef6662bd6152439a63f6cc19ba6a2c5d0e91be3917b35eb4"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAliyunOssReleaseUploadProvider.cs",
+                             "sha256":  "30d930838653d5b0304e25a0fc725ebc2e01b27653b7cd692c24ef8efbad269f"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetBundleBuilder.cs",
+                             "sha256":  "5c483a4620431b6abe772c646aad9f5812f0c90fd2ad8bdc774a433f42eae00e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetBundleBuildPlanner.cs",
+                             "sha256":  "a8e63d34125600d693ed1acc11934e71b53ac4bca5133e1bae68fca358a64e03"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetBundlePublisher.cs",
+                             "sha256":  "40bfd9e328f68cf19f24bcf21c3e4ef6dd75024f882e6e0ca33ee768bcabc97c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetConsumerBuildRevision.cs",
+                             "sha256":  "0810a04676d8d14ba4e33f39f241adb934219dd296af7ebbdd0893f591da47f8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetConsumerReferenceAuthoring.cs",
+                             "sha256":  "a82fb18aba7c06dfd92392eac0eeccaac527f7a6036248a984b9e23e7bb45a37"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetDeliveryModeEditorUtility.cs",
+                             "sha256":  "d8fa39d22d63a5d0388f9090eb9ff5b2b8c1d40c0ef5fec24c2b0b3451cbb37e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetFlowTestSceneGenerator.cs",
+                             "sha256":  "25220c8204227feee5a31d3d859f6ec3a0786491fba026a09d2b0b8d2a0783d9"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetPipelineContracts.cs",
+                             "sha256":  "3d3a5d44965ddf0aa666d97fd8d9a802a4ab8041a0465a6c603947d404cd1013"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetReferenceBaker.cs",
+                             "sha256":  "e6d1680524d52a14c00cc81dac08403ff486c975eed5cc5b63c58bbdd9b5a405"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetReleaseUploadProviders.cs",
+                             "sha256":  "b2cf0f570d4cf3aefe9a2d757b2704c6d5c4ac334e4b6b864c30330e740778c2"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetReleaseUploadSettings.cs",
+                             "sha256":  "99ebff5ec9608fee36d7ed769fb8ad130abaf37bb93485bf3bd643bd935cf168"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetReleaseUploadWindow.cs",
+                             "sha256":  "bf061021ce69e7d35960162c6b25d6c852cb0a0057d2ad87be8c492db5cf72b4"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESEditorResourceSessionBootstrap.cs",
+                             "sha256":  "1fb4e24b6f4639bc6379cc88d7fc31fc92e1c04215baf9283881d8463e3e09bd"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESHybridCLREditorIntegration.cs",
+                             "sha256":  "d48f4053c6dc9143040fca8d72128460db9258bd7bf510b00105728f40ea46ba"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESLevelAssetValidationAutoGenerator.cs",
+                             "sha256":  "55b83f4bedbfb36c3d6606e3fe36e55b9951034de6788f93bd4e2494bb8f61a6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESLevelAssetValidationGenerator.cs",
+                             "sha256":  "27832a14a1ff1aa70926a4cf4fc0c1b54966662ff8848957b6b862fabb83787a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESResourceCollectionWorkflowWindow.cs",
+                             "sha256":  "1812ce1e68f0e73187d3b4aa747d91706f93b103a0ccb93bb1125aa8e7b95046"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESResourcePipelineStageValidators.cs",
+                             "sha256":  "bb8e32c92f73713babe2900a60604140476b3870d696cd8acbb83cd6e227d192"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanBakeExtensions.cs",
+                             "sha256":  "48bfac6922d3fcb2d576737d445b75775ef1af79f77ae9aaea7e97e6ef5a53e0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanConfigKeySynchronizer.cs",
+                             "sha256":  "0e1d9e77b9c87da027a11408e6d4026f723d922b8801cda0a3e354773c670655"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanDependencyCollector.cs",
+                             "sha256":  "973148225902458503a54aeb67b4689268b6daa2f16652043efcfe049da67c83"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanExtensionBakeCompanion.cs",
+                             "sha256":  "63a3619f1b6cc3d7e1da2c48cec87a6a12943b39af51134c44ac43346d63595e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanGameCoreExpansion.cs",
+                             "sha256":  "767aa6bb993cef62562f73fbf8b7c272fdbe00fdd3d71b5bf24db861a942d6bc"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                             "sha256":  "962083d9cd14fc92e622dfc514833b56f00aa69c7fe18f0670b83629c327bfb8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeCodingHelper.cs",
+                             "sha256":  "0324e8f70e2beb498a97edf48dd307fbda3038ebe610ac4784a66156ea9a5f11"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeCodingHelper.Generation.cs",
+                             "sha256":  "7f3e354c8a9767935959f77f7cd9e79f781fc95288e4cfda762c9ba191ce48c2"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeCodingHelper.HelpCatalog.cs",
+                             "sha256":  "05adefcb3ab0e94af1cd51d1cb240fa600b4f2060273a69017d1313e62e188b1"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeMaterialMigration.cs",
+                             "sha256":  "da9459f76cb7614273a19358cd429ee965c9b24f23b6389d4c090a00eba73111"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderBakeWindow.cs",
+                             "sha256":  "f73bfb407246ded7b97c1746d8b32ae1678436d81af2bde0834386b0c8e98e9a"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderFaderEditor.cs",
+                             "sha256":  "787cba1cb368fadf8f6e8acad253571df117be2595f880becdb1c9f2cf4ef961"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.cs",
+                             "sha256":  "0de47615b427002adbc352734d7351b339d3d7bdb82a080f34b711474e56d605"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Diagnostics.cs",
+                             "sha256":  "2b50fee80bb749d6ca4d38130aba03e7ebe0ff189a821d6debedddaf669ace6c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Drawing.cs",
+                             "sha256":  "455c0b7526eb51b20958c685ec956c3dbc14a20fb2c17972979b1763c0abd9b0"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.MaterialState.cs",
+                             "sha256":  "c551bc4db95734eb48a7d13351eb126c966983ee65816ccd01a498ab0c64fe1c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Metadata.cs",
+                             "sha256":  "68ed53ca9adb8bb1031021b130834b99114247d91c076cbed24194b6278b380b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Migration.cs",
+                             "sha256":  "a2ff303b365823f5b67e8627f66ea589d66b7f6fc0b07a465417410c0643236c"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Production.cs",
+                             "sha256":  "49d2bc61591467a5c573f997ccc503fe143912146b51ef095759bc62d674bb48"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Productivity.cs",
+                             "sha256":  "f12baef6c93063386bd7f6a6d6c21eacf4df5bd5de2acf2ff5b21c542804f706"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.TextureImport.cs",
+                             "sha256":  "79ccc0dd21eb3cf5faf504be01972e405f8b172b69c22055ba88fc7e5bcd0928"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderPreset.cs",
+                             "sha256":  "195ceb60249330ba7978cfec124c4e832e3d0760aa005bc4b233af531194ea9d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/Tests/ES.CompositeShader.Editor.Tests.asmdef",
+                             "sha256":  "3bb0a0cd625cca657e96ed2c411dd7a56aa87c1f3151841450378cd07221962d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/Tests/ESCompositeShaderContractTests.cs",
+                             "sha256":  "b313881ca373e15b5deebb33a04b16589ba1825b51e38eb5892875952f813f46"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/Tests/ESCompositeShaderHostVisualTests.cs",
+                             "sha256":  "981c49f7d1d58dff2cafa5e31181459d88184af11ae8cc9e65f8bed2d89c0d89"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESShader/Tests/ESCompositeShaderVisualTests.cs",
+                             "sha256":  "30ddc8e53b022df18fea9123b9afb98bb810a08f886c1caeac78a44dfd8fc365"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESSoTable/ESSoTableDataRuleAssetMenu.cs",
+                             "sha256":  "7f384aba9e8a49d68c903c28dfd8c6958bc2b8f505d43ded3c941e468b8f13d5"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESCreateSkillWindow.cs",
+                             "sha256":  "eaefdc365d287aadb7547456a6113f1ea92dd5933f9739bd768b25f0ad8ca066"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESEditorTrackItemRegister.cs",
+                             "sha256":  "6f490e16745a6fa9aaba336db069d5f9562046b4000a5b92e09d5ece51d30578"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackCreatorToolbar.cs",
+                             "sha256":  "f9326515679d607f8bdb99146cfed80a8efc4834133dcd47524cefda44c61dff"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackRuler.cs",
+                             "sha256":  "f827360f515a72bfc2258a6a9386bda013106ea777adf2a260ff61f4ed5a410e"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackTemporaryInspectorWindow.cs",
+                             "sha256":  "c36c50f94b107a54eaa2fbf930d3fa6d946dba9a773bcbc629714056f06025e6"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackTimerToolbar.cs",
+                             "sha256":  "8e3d98ca532e3c7c057050f076758788b5bfe32ff7de7f0a49dd5b6add174fb5"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewTheme.cs",
+                             "sha256":  "64cf8513bf454b895dcc4a47634ac4c8765183f58b68f390149af24b85c0ce74"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                             "sha256":  "090de1bfa35d258f5640a6454ab2faf4ee5fc49e3af71724bd8e5f34618a8206"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.uss",
+                             "sha256":  "46ccfe948f04b4cce2da7078f7774ca324a8b574415906b25b0704d4060e271d"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.uxml",
+                             "sha256":  "a33ab900aa9ac396752dfa5ebb9629c1b32fccbc265210a1950b582a46ddc349"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindowHelper.cs",
+                             "sha256":  "1cc3668f636f0d853cfa8b5c5735af7ae670ae05e01fadbd0fbc2415c6bdf5bf"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/TrackElements/ESEditorTrackClip.cs",
+                             "sha256":  "03adc05689752a1983bfd5874af55846ef4ec7755f018b1f75816b875d9f7473"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/TrackElements/ESEditorTrackItem.cs",
+                             "sha256":  "e9d6b23583bfe96bc6ff78d97319c5ffb24debadc2e9411ab58116232fa51160"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTreeCollector/ESTree_Center/ESTreeCollector.cs",
+                             "sha256":  "70d1e23c4f1ad6377e700ebcef1d4738934ada45ae5879c990cbaae94c03b5e1"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTreeCollector/ESTree_Center/ESTreeMenuBuilder.cs",
+                             "sha256":  "c55f058dcce26b297ab2ba439847d45352762ba1e25e3804de3884b4f6a54a06"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/ESTreeCollector/ESTree_FOR_ESCreate/ESTree_CreateMenu.cs",
+                             "sha256":  "7f48e20fc908e08c82ae9cd3dae62d69b8adb54c454c437907d3ec94a1a25edb"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Initer/EditorInitAndUpdater.cs",
+                             "sha256":  "46fd28e49d193459cba073a9333a4594b23309e7fc40aefcb783e25a1605bc43"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/Downloads/Main/package.json",
+                             "sha256":  "0d3d414be286fcda1698f4044a9a54959ea40bf8418b240cd894289c572193ad"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/Downloads/OnlySamples/package.json",
+                             "sha256":  "72f453c676b17aeedab5f863967fa974ae912f66fe93c9c0bffff8d31fb68075"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/Downloads/Whisper/package.json",
+                             "sha256":  "47d323ed44622d32d2492be20ecb97d9de65fb160458ceabf9d93a93eeab0f44"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/ESExternalPackageMenuSuppressor.cs",
+                             "sha256":  "b2a57dd9e01952acc28bad65d5e0790c295309f034735e135a2e63ac6c44277b"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.asmdef",
+                             "sha256":  "98274c5b5c17a4cdf4e9d326bea2f66d7271f303a33a8882c3e44c3b7b3d8bcb"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                             "sha256":  "80114be738a2a9b134c9621a0a0b42cb30a105107e7d360ad16573224523bd18"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller_Config.json",
+                             "sha256":  "260327b5edfbbaa681a9b3cfa59f1dd19ba05320b4643119c384abb39d5e0690"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/ESInstallerPackageTrust.cs",
+                             "sha256":  "74c8f2b6fb1e7740cf022a0b68cb527ee76126534d8699d2f293b26d9e0611d1"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Installer/MenuItemPathDefine.cs",
+                             "sha256":  "5362604001c995ed63f7157c0475e3506057d164585bbacd60e9acea0e0ce846"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Out/ToolbarCallback.cs",
+                             "sha256":  "5288ef7b8b652b704a59b7ac476946a310796adbcad842ee0155fd8c6807d2cc"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/Out/ToolbarExtender.cs",
+                             "sha256":  "fd079b9feaad145d507a0a26dcbab2b743ee639e1fbd3d1baf4782477269b7c8"
+                         },
+                         {
+                             "path":  "Assets/Plugins/ES/Editor/RelationMaskMapDrawer.cs",
+                             "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                         }
+                     ],
+    "dimensions":  [
+                       {
+                           "id":  "structural",
+                           "status":  "passed",
+                           "evidenceLevel":  "S1",
+                           "weight":  1,
+                           "critical":  false,
+                           "details":  "Target, editor scope, and UTF-8 checks completed.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "framework-integration",
+                           "status":  "passed",
+                           "evidenceLevel":  "S1",
+                           "weight":  3,
+                           "critical":  true,
+                           "details":  "ES framework foundation, sleep lifecycle, and unbind integration check.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "static-boundary",
+                           "status":  "passed",
+                           "evidenceLevel":  "S1",
+                           "weight":  2,
+                           "critical":  false,
+                           "details":  "Static lifecycle, scan, Undo, and callback checks completed.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "compile",
+                           "status":  "not-run",
+                           "evidenceLevel":  "S1",
+                           "weight":  1,
+                           "critical":  false,
+                           "details":  "Unity or behavioral evidence manifest was not supplied.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "reloadDomain",
+                           "status":  "not-run",
+                           "evidenceLevel":  "S1",
+                           "weight":  1,
+                           "critical":  false,
+                           "details":  "Unity or behavioral evidence manifest was not supplied.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "interaction",
+                           "status":  "not-run",
+                           "evidenceLevel":  "S1",
+                           "weight":  2,
+                           "critical":  false,
+                           "details":  "Unity or behavioral evidence manifest was not supplied.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "visual",
+                           "status":  "not-run",
+                           "evidenceLevel":  "S1",
+                           "weight":  3,
+                           "critical":  true,
+                           "details":  "Unity or behavioral evidence manifest was not supplied.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "recovery",
+                           "status":  "not-run",
+                           "evidenceLevel":  "S1",
+                           "weight":  1,
+                           "critical":  false,
+                           "details":  "Unity or behavioral evidence manifest was not supplied.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       },
+                       {
+                           "id":  "performance",
+                           "status":  "not-run",
+                           "evidenceLevel":  "S1",
+                           "weight":  1,
+                           "critical":  false,
+                           "details":  "Unity or behavioral evidence manifest was not supplied.",
+                           "evidence":  "",
+                           "bounds":  null,
+                           "viewports":  [
+
+                                         ],
+                           "strategy":  ""
+                       }
+                   ],
+    "policy":  {
+                   "defaultOrder":  "StaticDeepReplay-first",
+                   "staticWeight":  0.7,
+                   "runtimeWeight":  0.3,
+                   "runtimeAuthorizationRequired":  false,
+                   "criticalDimensions":  [
+                                              "framework-integration",
+                                              "visual"
+                                          ],
+                   "weights":  {
+                                   "framework-integration":  3,
+                                   "visual":  3,
+                                   "interaction":  2,
+                                   "structural":  1,
+                                   "static-boundary":  2,
+                                   "compile":  1,
+                                   "reloadDomain":  1,
+                                   "recovery":  1,
+                                   "performance":  1
+                               },
+                   "layoutBoundsRequired":  true,
+                   "detectedStaticMaxStrategy":  "fixed",
+                   "approvedMaxStrategies":  [
+                                                 "fixed",
+                                                 "adaptive-resolve",
+                                                 "content-adaptive",
+                                                 "host-bounded",
+                                                 "unbounded-flexible"
+                                             ],
+                   "extremeViewportEvidenceRequired":  true,
+                   "targetKindMatrix":  {
+                                            "EditorWindow":  [
+                                                                 "compile",
+                                                                 "reloadDomain",
+                                                                 "interaction",
+                                                                 "visual",
+                                                                 "recovery",
+                                                                 "performance"
+                                                             ],
+                                            "Workbench":  [
+                                                              "compile",
+                                                              "reloadDomain",
+                                                              "interaction",
+                                                              "visual",
+                                                              "recovery",
+                                                              "performance"
+                                                          ],
+                                            "InspectorDrawer":  [
+                                                                    "compile",
+                                                                    "serialization",
+                                                                    "multiSelection",
+                                                                    "undo",
+                                                                    "prefabOverride",
+                                                                    "visual"
+                                                                ],
+                                            "MenuAction":  [
+                                                               "compile",
+                                                               "menuReachability",
+                                                               "invalidInput",
+                                                               "boundary",
+                                                               "repeatIdempotency"
+                                                           ],
+                                            "PreviewImport":  [
+                                                                  "compile",
+                                                                  "previewLifecycle",
+                                                                  "missingAsset",
+                                                                  "cleanup",
+                                                                  "reloadDomain",
+                                                                  "performance"
+                                                              ],
+                                            "BackgroundService":  [
+                                                                      "compile",
+                                                                      "startupScope",
+                                                                      "cancellation",
+                                                                      "cleanup",
+                                                                      "reloadDomain",
+                                                                      "performance"
+                                                                  ]
+                                        }
+               },
+    "findings":  [
+
+                 ],
+    "evidencePath":  "",
+    "generatedUtc":  "2026-08-25T17:38:12.0091298Z"
+}

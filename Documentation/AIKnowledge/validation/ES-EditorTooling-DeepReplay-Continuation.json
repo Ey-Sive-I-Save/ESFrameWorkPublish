@@ -1,0 +1,197 @@
+{
+    "schemaVersion":  1,
+    "validator":  "es-static-deep-replay",
+    "skillName":  "es-editor-tooling",
+    "case":  "StaticDeepReplay",
+    "status":  "passed",
+    "evidenceLevel":  "S1",
+    "receiptPath":  "Documentation/AIKnowledge/validation/ES-EditorTooling-DeepReplay-Continuation.json",
+    "sourceRefs":  [
+                       ".agents/skills/es-editor-tooling/agents/openai.yaml",
+                       ".agents/skills/es-editor-tooling/governance.json",
+                       ".agents/skills/es-editor-tooling/references/control-contract.md",
+                       ".agents/skills/es-editor-tooling/references/evidence-receipt-contract.md",
+                       ".agents/skills/es-editor-tooling/references/project-map.md",
+                       ".agents/skills/es-editor-tooling/references/static-replay-adapter.md",
+                       ".agents/skills/es-editor-tooling/references/static-specialized-acceptance.md",
+                       ".agents/skills/es-editor-tooling/scripts/Test-ESEditorBoundary.ps1",
+                       ".agents/skills/es-editor-tooling/scripts/Test-es-editor-tooling-StaticReplay.ps1",
+                       ".agents/skills/es-editor-tooling/scripts/Test-ESSkillEvidence.ps1",
+                       ".agents/skills/es-editor-tooling/SKILL.md",
+                       ".agents/skills/es-editor-tooling/static-replay.manifest.json"
+                   ],
+    "sourceRefHashes":  {
+                            ".agents/skills/es-editor-tooling/agents/openai.yaml":  "6e65e033c17f452b59e81019b3ff5e4fe9bcdb04d87ffeacd69e269dc77372ce",
+                            ".agents/skills/es-editor-tooling/governance.json":  "a03f79bd3ee8ac895cc1d97fb336ee1f521a9b935c068d2ba1b0e01009519dd7",
+                            ".agents/skills/es-editor-tooling/references/control-contract.md":  "7f89288e92926787301c4eba8abb864bae1740c68368f6d28f3acc745a558d46",
+                            ".agents/skills/es-editor-tooling/references/evidence-receipt-contract.md":  "6200d8178982010bbdbae30a19b9de92f53ea0ca2fea47aa0ccefa3777fc0d94",
+                            ".agents/skills/es-editor-tooling/references/project-map.md":  "cce7f53ac5e68c0c098e7aaf094a1a4d3e91ad4734706f61a9b169660c822a43",
+                            ".agents/skills/es-editor-tooling/references/static-replay-adapter.md":  "33e66934116e1b55ff5c39bcecf6c5f45a5182ab689479936a992dc06d2af7cb",
+                            ".agents/skills/es-editor-tooling/references/static-specialized-acceptance.md":  "49a5f7d2ba3733db77644195f5b646de32bdf9eb05b45547850ad55ba4332e64",
+                            ".agents/skills/es-editor-tooling/scripts/Test-ESEditorBoundary.ps1":  "0313ae41fb30161b3c8936e8d368c5e70c20c18171f94d136b367f2bba3d004f",
+                            ".agents/skills/es-editor-tooling/scripts/Test-es-editor-tooling-StaticReplay.ps1":  "1df1dbcf8abbc9dc64920eb6b3fb82d0e44f4b1a8bab15a06b5b9d0fc6f0b065",
+                            ".agents/skills/es-editor-tooling/scripts/Test-ESSkillEvidence.ps1":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909",
+                            ".agents/skills/es-editor-tooling/SKILL.md":  "e9aefdc7e931a14516f2807ecc588e0bb088d34677ed7800c3cd0ff758ad147e",
+                            ".agents/skills/es-editor-tooling/static-replay.manifest.json":  "4b7fb66ef02e3801ebd0da18bebce2d1a1b319efa265a5d966c747835127363d"
+                        },
+    "toolId":  "es-static-deep-replay",
+    "unityVersion":  "not-run",
+    "capturedUtc":  "2026-08-25T17:48:30.8768489Z",
+    "planHash":  "dbeac9281effbe818c289f423fec3abe2ea8f5707dec9443a633e30077579d09",
+    "profile":  "StaticReview",
+    "responsibilityProfile":  "editor",
+    "responsibilityChecks":  [
+                                 "editor-layout-static",
+                                 "lifecycle-boundary",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "staticStatus":  "static-passed",
+    "runtimeStatus":  "runtime-not-run",
+    "overallVerdict":  "StaticDeepReplayComplete",
+    "claimsNotProven":  [
+                            "Unity/editor/process behavior",
+                            "timing and visual behavior",
+                            "Profiler/Player/IL2CPP/release behavior"
+                        ],
+    "nextAction":  "Do not start Runtime unless the declared escalation is authorized.",
+    "cases":  [
+                  {
+                      "id":  "normal-input",
+                      "status":  "passed",
+                      "assertion":  "source roots and required Skill files are present"
+                  },
+                  {
+                      "id":  "invalid-input",
+                      "status":  "passed",
+                      "assertion":  "invalid input is rejected by the declared contract"
+                  },
+                  {
+                      "id":  "denied-expansion",
+                      "status":  "passed",
+                      "assertion":  "permission or path expansion is denied"
+                  },
+                  {
+                      "id":  "repeat-idempotency",
+                      "status":  "passed",
+                      "assertion":  "repeat execution is idempotent"
+                  },
+                  {
+                      "id":  "hash-change-cache-invalidation",
+                      "status":  "passed",
+                      "assertion":  "hash or cache changes invalidate stale state"
+                  },
+                  {
+                      "id":  "interruption-recovery",
+                      "status":  "passed",
+                      "assertion":  "interruption and recovery are declared"
+                  },
+                  {
+                      "id":  "deterministic-output",
+                      "status":  "passed",
+                      "assertion":  "deterministic output and stable ordering are declared"
+                  }
+              ],
+    "customCheckResults":  [
+                               {
+                                   "id":  "editor-layout-static",
+                                   "status":  "passed",
+                                   "detail":  "layout constraints and extreme viewport evidence are declared"
+                               },
+                               {
+                                   "id":  "lifecycle-boundary",
+                                   "status":  "passed",
+                                   "detail":  "lifecycle/reload/unbind boundary is declared"
+                               },
+                               {
+                                   "id":  "deterministic-replay",
+                                   "status":  "passed",
+                                   "detail":  "deterministic claim and source hashes exist"
+                               },
+                               {
+                                   "id":  "evidence-contract",
+                                   "status":  "passed",
+                                   "detail":  "Skill declares evidence/receipt/acceptance boundary"
+                               }
+                           ],
+    "specializedAcceptance":  [
+                                  {
+                                      "id":  "host-selection",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "window-lifecycle",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "serialized-property-boundary",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "undo-dirty-contract",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "panel-rebuild",
+                                      "status":  "passed"
+                                  }
+                              ],
+    "sourceHashes":  [
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/agents/openai.yaml",
+                             "sha256":  "6e65e033c17f452b59e81019b3ff5e4fe9bcdb04d87ffeacd69e269dc77372ce"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/governance.json",
+                             "sha256":  "a03f79bd3ee8ac895cc1d97fb336ee1f521a9b935c068d2ba1b0e01009519dd7"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/references/control-contract.md",
+                             "sha256":  "7f89288e92926787301c4eba8abb864bae1740c68368f6d28f3acc745a558d46"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/references/evidence-receipt-contract.md",
+                             "sha256":  "6200d8178982010bbdbae30a19b9de92f53ea0ca2fea47aa0ccefa3777fc0d94"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/references/project-map.md",
+                             "sha256":  "cce7f53ac5e68c0c098e7aaf094a1a4d3e91ad4734706f61a9b169660c822a43"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/references/static-replay-adapter.md",
+                             "sha256":  "33e66934116e1b55ff5c39bcecf6c5f45a5182ab689479936a992dc06d2af7cb"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/references/static-specialized-acceptance.md",
+                             "sha256":  "49a5f7d2ba3733db77644195f5b646de32bdf9eb05b45547850ad55ba4332e64"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/scripts/Test-ESEditorBoundary.ps1",
+                             "sha256":  "0313ae41fb30161b3c8936e8d368c5e70c20c18171f94d136b367f2bba3d004f"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/scripts/Test-es-editor-tooling-StaticReplay.ps1",
+                             "sha256":  "1df1dbcf8abbc9dc64920eb6b3fb82d0e44f4b1a8bab15a06b5b9d0fc6f0b065"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/scripts/Test-ESSkillEvidence.ps1",
+                             "sha256":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/SKILL.md",
+                             "sha256":  "e9aefdc7e931a14516f2807ecc588e0bb088d34677ed7800c3cd0ff758ad147e"
+                         },
+                         {
+                             "path":  ".agents/skills/es-editor-tooling/static-replay.manifest.json",
+                             "sha256":  "4b7fb66ef02e3801ebd0da18bebce2d1a1b319efa265a5d966c747835127363d"
+                         }
+                     ],
+    "issues":  [
+
+               ],
+    "runtimeEscalation":  {
+                              "required":  true,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "generatedUtc":  "2026-08-25T17:48:30.8768489Z"
+}

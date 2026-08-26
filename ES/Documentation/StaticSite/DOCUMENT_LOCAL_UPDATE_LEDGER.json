@@ -2451,11 +2451,11 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-26T22:43:32+08:00",
-                       "head":  "7f103f93245d7767e30402739bd01bf345cf9d70",
-                       "stagedSourcePatchSha256":  "93f9b78376fd8100b5d78de1703116d70cb3a51832b368a3f9825093b1e39deb",
-                       "stagedSourceManifestSha256":  "3236d05d0f2a75ca3026f1158de6a0d0d59cf037267b9334382b16ede6fe274d",
-                       "stagedSourceFileCount":  39,
+                       "preparedAt":  "2026-08-26T22:44:31+08:00",
+                       "head":  "1ac7a0db6487e6a4226de79b2992727ee2601356",
+                       "stagedSourcePatchSha256":  "d335db7f54e1583981dc6e6245360adb5467b0774bfc8c2e9ff453810206c53a",
+                       "stagedSourceManifestSha256":  "a74ef3480074f8bea4b00d1f15d3d04dbfaaa87e044c029f5559af4de4f6e816",
+                       "stagedSourceFileCount":  13,
                        "entryIds":  [
                                         "LOCAL-20260803-013",
                                         "LOCAL-20260808-001",

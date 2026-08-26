@@ -19,9 +19,8 @@ namespace ES
             {
                 consumer.IncrementBuildRevision();
                 EditorUtility.SetDirty(consumer);
+                AssetDatabase.SaveAssetIfDirty(consumer);
             }
-
-            AssetDatabase.SaveAssets();
             return consumers;
         }
     }

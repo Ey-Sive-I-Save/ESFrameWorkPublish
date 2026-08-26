@@ -37,7 +37,9 @@ namespace ES.EditorInternal
                 if (plans[i] != null && Bake(plans[i]))
                     changed++;
             if (changed > 0)
-                AssetDatabase.SaveAssets();
+                foreach (ESResourcePlanInfo plan in plans)
+                    if (plan != null)
+                        AssetDatabase.SaveAssetIfDirty(plan);
             return changed;
         }
 

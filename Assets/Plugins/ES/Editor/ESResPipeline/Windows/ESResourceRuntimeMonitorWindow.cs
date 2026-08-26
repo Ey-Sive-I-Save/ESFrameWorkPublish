@@ -14,6 +14,7 @@ namespace ES
         private Vector2 scrollPosition;
         private bool autoRefresh = true;
         private bool operationRunning;
+        private int operationGeneration;
         private string lastOperationResult = "尚未执行验收操作。";
         private double nextRepaintTime;
         private ESResourcePlanInfo lifecycleValidationPlan;
@@ -83,6 +84,8 @@ namespace ES
 
         protected override void ESWindow_OnHostEnable()
         {
+            operationGeneration++;
+            maxSize = new Vector2(1400f, 1000f);
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
             nextRepaintTime = 0d;
@@ -90,6 +93,8 @@ namespace ES
 
         protected override void ESWindow_OnHostDisable()
         {
+            operationGeneration++;
+            operationRunning = false;
             EditorApplication.update -= OnEditorUpdate;
             nextRepaintTime = 0d;
         }
@@ -346,10 +351,10 @@ namespace ES
                     "运行",
                     "取消"))
                 return;
-            RunScopeAcceptanceAsync().Forget();
+            RunScopeAcceptanceAsync(operationGeneration).Forget();
         }
 
-        private async UniTaskVoid RunScopeAcceptanceAsync()
+        private async UniTaskVoid RunScopeAcceptanceAsync(int generation)
         {
             operationRunning = true;
             var evidence = new StringBuilder(2048);
@@ -360,30 +365,54 @@ namespace ES
 
                 ESResourcePlanRuntimeService service = ESGameManager.ResourcePlans;
                 await EnsurePlanFullyReleasedAsync(service, lifecycleValidationPlan);
+                EnsureOperationActive(generation);
                 await RunP1Async(service, lifecycleValidationPlan, evidence);
+                EnsureOperationActive(generation);
                 await RunP2Async(service, lifecycleValidationPlan, evidence);
+                EnsureOperationActive(generation);
                 await RunP3Async(service, lifecycleValidationPlan, evidence);
+                EnsureOperationActive(generation);
                 await RunP4Async(service, lifecycleValidationPlan, evidence);
+                EnsureOperationActive(generation);
                 await RunBinderCaseAsync(lifecycleValidationPlan, true, "P5", evidence);
+                EnsureOperationActive(generation);
                 await RunP8Async(service, lifecycleValidationPlan, evidence);
+                EnsureOperationActive(generation);
                 await EnsurePlanFullyReleasedAsync(service, manualValidationPlan);
+                EnsureOperationActive(generation);
                 await RunBinderCaseAsync(manualValidationPlan, false, "P10", evidence);
+                EnsureOperationActive(generation);
                 evidence.AppendLine("[NOT RUN] P6/P7：必须使用可观察慢加载计划，在加载中途取消。");
                 evidence.AppendLine("[NOT RUN] P9：必须执行真实 Provider 重建，不在通用按钮中伪造。");
                 lastOperationResult = evidence.ToString();
                 Debug.Log("[ESRes][ScopeAcceptance]\n" + lastOperationResult);
             }
+            catch (OperationCanceledException)
+            {
+            }
             catch (Exception exception)
             {
-                evidence.AppendLine("[FAIL] " + exception);
-                lastOperationResult = evidence.ToString();
+                if (this != null && generation == operationGeneration)
+                {
+                    evidence.AppendLine("[FAIL] " + exception);
+                    lastOperationResult = evidence.ToString();
+                }
                 Debug.LogException(exception);
             }
             finally
             {
-                operationRunning = false;
-                Repaint();
+                if (this != null && generation == operationGeneration)
+                {
+                    operationRunning = false;
+                    Repaint();
+                }
             }
+        }
+
+        private void EnsureOperationActive(int generation)
+        {
+            if (this == null || generation != operationGeneration)
+                throw new OperationCanceledException("资源验收宿主已关闭或重建，停止写入旧窗口状态。");
         }
 
         private static async UniTask RunP1Async(ESResourcePlanRuntimeService service, ESResourcePlanInfo plan, StringBuilder evidence)
@@ -458,13 +487,19 @@ namespace ES
             string caseName,
             StringBuilder evidence)
         {
+            // ES-EDITOR-VALIDATOR: intentional-no-undo
+            // This Binder exists only for the acceptance probe and is destroyed
+            // before the operation completes; deliberately keep it out of the
+            // user's Undo history.
             GameObject target = new GameObject("ESResourcePlanBinder_Acceptance_" + caseName);
             target.SetActive(false);
             ESResourcePlanBinder binder = target.AddComponent<ESResourcePlanBinder>();
-            var serialized = new SerializedObject(binder);
-            serialized.FindProperty("plan").objectReferenceValue = plan;
-            serialized.FindProperty("applyOnEnable").boolValue = true;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
+            using (var serialized = new SerializedObject(binder))
+            {
+                serialized.FindProperty("plan").objectReferenceValue = plan;
+                serialized.FindProperty("applyOnEnable").boolValue = true;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
             target.SetActive(true);
             await WaitUntilAsync(() => binder.LastReport != null
                 && (binder.LastReport.State == ESResourcePlanState.Ready || binder.LastReport.State == ESResourcePlanState.Failed), 30f, caseName + " Binder Apply");
@@ -540,29 +575,37 @@ namespace ES
         {
             if (!EditorUtility.DisplayDialog("执行增量安全点", "会等待在途请求，并卸载零引用 AssetBundle。继续吗？", "执行", "取消"))
                 return;
-            RunIncrementalSafePointAsync().Forget();
+            RunIncrementalSafePointAsync(operationGeneration).Forget();
         }
 
-        private async UniTaskVoid RunIncrementalSafePointAsync()
+        private async UniTaskVoid RunIncrementalSafePointAsync(int generation)
         {
             operationRunning = true;
             double started = EditorApplication.timeSinceStartup;
             try
             {
                 ESRuntimeUnusedAssetBundleUnloadResult result = await ESAssets.UnloadReleasedAssetBundlesAtSafePointAsync();
+                EnsureOperationActive(generation);
                 lastOperationResult = "[PASS] 增量安全点完成，卸载 Bundle=" + result.UnloadedAssetBundleCount
                     + "，清理缓存资产=" + result.EvictedCachedAssetCount
                     + "，耗时=" + FormatSeconds(started);
             }
+            catch (OperationCanceledException)
+            {
+            }
             catch (Exception exception)
             {
-                lastOperationResult = "[FAIL] 增量安全点失败\n" + exception;
+                if (this != null && generation == operationGeneration)
+                    lastOperationResult = "[FAIL] 增量安全点失败\n" + exception;
                 Debug.LogException(exception);
             }
             finally
             {
-                operationRunning = false;
-                Repaint();
+                if (this != null && generation == operationGeneration)
+                {
+                    operationRunning = false;
+                    Repaint();
+                }
             }
         }
 
@@ -574,10 +617,10 @@ namespace ES
                     "执行",
                     "取消"))
                 return;
-            RunFullSafePointAsync().Forget();
+            RunFullSafePointAsync(operationGeneration).Forget();
         }
 
-        private async UniTaskVoid RunFullSafePointAsync()
+        private async UniTaskVoid RunFullSafePointAsync(int generation)
         {
             operationRunning = true;
             double started = EditorApplication.timeSinceStartup;
@@ -589,17 +632,25 @@ namespace ES
                 if (service == null || !service.IsInitialized)
                     throw new InvalidOperationException("AssetLoadingService 尚未初始化。");
                 await service.UnloadAllAssetsAtSafePointAsync();
+                EnsureOperationActive(generation);
                 lastOperationResult = "[PASS] 全量安全点完成并重新绑定 AssetTable Loader，耗时=" + FormatSeconds(started);
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception exception)
             {
-                lastOperationResult = "[FAIL] 全量安全点失败\n" + exception;
+                if (this != null && generation == operationGeneration)
+                    lastOperationResult = "[FAIL] 全量安全点失败\n" + exception;
                 Debug.LogException(exception);
             }
             finally
             {
-                operationRunning = false;
-                Repaint();
+                if (this != null && generation == operationGeneration)
+                {
+                    operationRunning = false;
+                    Repaint();
+                }
             }
         }
 

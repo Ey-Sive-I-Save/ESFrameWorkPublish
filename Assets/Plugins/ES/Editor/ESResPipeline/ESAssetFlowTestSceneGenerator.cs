@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -15,18 +16,29 @@ namespace ES
         public static void CreateOrRefresh()
         {
             Directory.CreateDirectory(Folder);
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-            scene.name = "ESAssetGameCoreFlowHotUpdateTest";
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Additive);
+            try
+            {
+                scene.name = "ESAssetGameCoreFlowHotUpdateTest";
 
-            GameObject root = new GameObject("ES Asset + GameCore Flow Test");
+                GameObject root = new GameObject("ES Asset + GameCore Flow Test");
+                SceneManager.MoveGameObjectToScene(root, scene);
 
-            // The runtime sample assembly is optional, so keep this editor utility independent of it.
-            AddOptionalRuntimeController(root);
+                // The runtime sample assembly is optional, so keep this editor utility independent of it.
+                AddOptionalRuntimeController(root);
 
-            GameObject instructions = new GameObject("README - Initialize Consumer then use the runtime panel");
-            instructions.transform.SetParent(root.transform, false);
+                GameObject instructions = new GameObject("README - Initialize Consumer then use the runtime panel");
+                instructions.transform.SetParent(root.transform, false);
+                SceneManager.MoveGameObjectToScene(instructions, scene);
 
-            EditorSceneManager.SaveScene(scene, ScenePath);
+                if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                    throw new InvalidOperationException("资源热更新验收场景保存失败：" + ScenePath);
+            }
+            finally
+            {
+                if (SceneManager.sceneCount > 1 && scene.IsValid() && scene.isLoaded)
+                    EditorSceneManager.CloseScene(scene, true);
+            }
             AssetDatabase.ImportAsset(ScenePath, ImportAssetOptions.ForceUpdate);
             Selection.activeObject = AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath);
             Debug.Log("[ESFlowTestScene][Editor] Scene created: " + ScenePath);

@@ -134,7 +134,7 @@ MonoBehaviour:
     expandedTransformPaths: []
   - sceneGuid: 56b71f36d8040a44ebdacf759edc04ca
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/02_CompositeShader_UI_Cases.unity
-    savedUtcTicks: 639227855280144431
+    savedUtcTicks: 639232651000524882
     expandedTransformPaths: []
   - sceneGuid: 6b375c60c399eee48bcc8c14f94b7d14
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/03_CompositeShader_3D_Lit_Cases.unity
@@ -147,6 +147,38 @@ MonoBehaviour:
   - sceneGuid: c583a1ba42f1fcf4dbf72cbeaf17df55
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/05_CompositeShader_ProductionRecipes.unity
     savedUtcTicks: 639227855300448036
+    expandedTransformPaths: []
+  - sceneGuid: c5123d6c36a7d5b45ad77850c093d98c
+    scenePath: Assets/UI/Scenes/Generated/PlatformMainMenuFixture.unity
+    savedUtcTicks: 639231767525745727
+    expandedTransformPaths: []
+  - sceneGuid: 6c23fa7f2fc503b488ddf742d269d5f1
+    scenePath: Assets/Sprite Shaders Ultimate/Demo/SSU_Demo.unity
+    savedUtcTicks: 639231943015964700
+    expandedTransformPaths: []
+  - sceneGuid: eb4f6d197eccd234eb1d29abc390801c
+    scenePath: Assets/UI/Scenes/Generated/ESCompositeShaderShowcaseFixture.unity
+    savedUtcTicks: 639232169162857964
+    expandedTransformPaths: []
+  - sceneGuid: 50820cbbc1d27e340bef90e338d86a58
+    scenePath: Assets/UI/Scenes/Generated/ArenaMobaLobbyFixture.unity
+    savedUtcTicks: 639232301854502678
+    expandedTransformPaths: []
+  - sceneGuid: c738dc7cde635ca4bbd21091cbeab96b
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-rebuildFixture.unity
+    savedUtcTicks: 639232450234134351
+    expandedTransformPaths: []
+  - sceneGuid: 1f09cbb4e26f04647be43ee0b9f7a1a1
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-iterationFixture.unity
+    savedUtcTicks: 639232450296872190
+    expandedTransformPaths: []
+  - sceneGuid: cac429e7e48a6b8458a1cfe3537b6a50
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-rebuild-nextFixture.unity
+    savedUtcTicks: 639232650917885986
+    expandedTransformPaths: []
+  - sceneGuid: 83071ee2bf66a63448904924b04b5bc8
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-iteration-nextFixture.unity
+    savedUtcTicks: 639232651003083316
     expandedTransformPaths: []
   displayTitleFontSize: 22
   displayHintFontSize: 14

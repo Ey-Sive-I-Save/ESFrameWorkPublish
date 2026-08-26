@@ -102,6 +102,7 @@ namespace ES
         public static void SetConsumerHotUpdateEnabled(ESAssetLibraryConsumer consumer, bool enabled)
         {
             if (consumer == null) throw new ArgumentNullException(nameof(consumer));
+            Undo.RecordObject(consumer, "修改 Consumer 代码热更开关");
             consumer.EnableCodeHotUpdate = enabled;
             List<ESAssetLibraryConsumer> consumers = GetAllConsumers();
             if (!consumers.Contains(consumer)) consumers.Add(consumer);
@@ -109,9 +110,9 @@ namespace ES
                 consumer.CodePackages.RemoveAll(item => item != null
                     && item.ManagedByHybridCLR
                     && string.Equals(item.PackageKey, GetConsumerHotUpdatePackageKey(consumer), StringComparison.Ordinal));
-            PrepareSettings(consumers, false);
+            PrepareSettingsSafely(consumers, false);
             EditorUtility.SetDirty(consumer);
-            AssetDatabase.SaveAssets();
+            SavePreparedSettings(consumers);
         }
 
         public static AssemblyDefinitionAsset GetConsumerAssemblyDefinition(ESAssetLibraryConsumer consumer)
@@ -124,6 +125,7 @@ namespace ES
         public static void SetConsumerAssemblyDefinition(ESAssetLibraryConsumer consumer, AssemblyDefinitionAsset definition)
         {
             if (consumer == null) throw new ArgumentNullException(nameof(consumer));
+            Undo.RecordObject(consumer, "配置 Consumer 代码模块");
             consumer.EnsureStableIdentity();
             if (definition == null)
             {
@@ -141,8 +143,9 @@ namespace ES
                 consumer.HotUpdateSourceFolder = Path.GetDirectoryName(path)?.Replace('\\', '/') ?? string.Empty;
             }
             EditorUtility.SetDirty(consumer);
-            PrepareSettings(GetAllConsumers(), false);
-            AssetDatabase.SaveAssets();
+            List<ESAssetLibraryConsumer> consumers = GetAllConsumers();
+            PrepareSettingsSafely(consumers, false);
+            SavePreparedSettings(consumers);
         }
 
         public static void PrepareConsumerReleaseCode(
@@ -223,25 +226,47 @@ namespace ES
                 throw new InvalidOperationException("生成代码热更包前至少需要一个 Consumer。");
             List<ESAssetLibraryConsumer> enabledConsumers = consumers.Where(item => item.EnableCodeHotUpdate).ToList();
             ESAssetLibraryConsumer frameworkConsumer = consumers.FirstOrDefault(item => item.IsTotalConsumer) ?? consumers[0];
-
-            PrepareSettings(consumers, true);
-            EnsureHybridCLRInstalledAndCurrent();
-            PrebuildCommand.GenerateAll();
-            if (SyncPatchAotAssembliesFromGeneratedReferences())
+            var consumerSnapshots = consumers.ToDictionary(item => item, item => EditorJsonUtility.ToJson(item));
+            HybridCLRSettings settings = HybridCLRSettings.Instance;
+            string settingsSnapshot = settings != null ? EditorJsonUtility.ToJson(settings) : string.Empty;
+            try
             {
-                // 第一次生成得到热更新代码真实使用的 AOT 泛型程序集集合；同步设置后再生成一次，
-                // 确保所有需要补充元数据的 stripped AOT DLL 都真实产出并进入 Consumer。
+                PrepareSettingsSafely(consumers, true);
+                EnsureHybridCLRInstalledAndCurrent();
                 PrebuildCommand.GenerateAll();
+                if (SyncPatchAotAssembliesFromGeneratedReferences())
+                {
+                    // 第一次生成得到热更新代码真实使用的 AOT 泛型程序集集合；同步设置后再生成一次，
+                    // 确保所有需要补充元数据的 stripped AOT DLL 都真实产出并进入 Consumer。
+                    PrebuildCommand.GenerateAll();
+                }
+                Dictionary<ESAssetLibraryConsumer, int> loadOrders = BuildConsumerLoadOrders(consumers);
+                foreach (ESAssetLibraryConsumer consumer in consumers)
+                {
+                    SyncGeneratedPackages(consumer, ReferenceEquals(consumer, frameworkConsumer), true, loadOrders[consumer]);
+                    EditorUtility.SetDirty(consumer);
+                }
+                SavePreparedSettings(consumers);
+                Debug.Log("[ESCodeModule] 已准备框架默认热更程序集 ES_Design、ES_Logic、ESPlayer（不包含 Assembly-CSharp），附加 Consumer 代码模块 "
+                    + enabledConsumers.Count + " 个。");
             }
-            Dictionary<ESAssetLibraryConsumer, int> loadOrders = BuildConsumerLoadOrders(consumers);
-            foreach (ESAssetLibraryConsumer consumer in consumers)
+            catch
             {
-                SyncGeneratedPackages(consumer, ReferenceEquals(consumer, frameworkConsumer), true, loadOrders[consumer]);
-                EditorUtility.SetDirty(consumer);
+                foreach (KeyValuePair<ESAssetLibraryConsumer, string> snapshot in consumerSnapshots)
+                {
+                    if (snapshot.Key == null || string.IsNullOrEmpty(snapshot.Value))
+                        continue;
+                    EditorJsonUtility.FromJsonOverwrite(snapshot.Value, snapshot.Key);
+                    EditorUtility.SetDirty(snapshot.Key);
+                }
+                if (settings != null && !string.IsNullOrEmpty(settingsSnapshot))
+                {
+                    EditorJsonUtility.FromJsonOverwrite(settingsSnapshot, settings);
+                    EditorUtility.SetDirty(settings);
+                    AssetDatabase.SaveAssetIfDirty(settings);
+                }
+                throw;
             }
-            AssetDatabase.SaveAssets();
-            Debug.Log("[ESCodeModule] 已准备框架默认热更程序集 ES_Design、ES_Logic、ESPlayer（不包含 Assembly-CSharp），附加 Consumer 代码模块 "
-                + enabledConsumers.Count + " 个。");
         }
 
         private static string ComputeConsumerPreparationFingerprint(
@@ -290,12 +315,46 @@ namespace ES
         {
             if (consumer == null || !consumer.EnableCodeHotUpdate) throw new InvalidOperationException("当前 Consumer 未启用代码热更。");
             RequireConsumerAssemblyDefinition(consumer);
-            PrepareSettings(GetAllConsumers(), true);
+            PrepareSettingsSafely(GetAllConsumers(), true);
             bool assemblyLoaded = AppDomain.CurrentDomain.GetAssemblies()
                 .Any(item => string.Equals(item.GetName().Name, consumer.HotUpdateAssemblyName, StringComparison.Ordinal));
             if (!assemblyLoaded)
                 throw new InvalidOperationException("代码模块尚未完成编译，请等待脚本刷新后重试。");
             return "检查通过：代码模块已编译，关联关系与加载顺序正常。";
+        }
+
+        private static void PrepareSettingsSafely(
+            IEnumerable<ESAssetLibraryConsumer> sourceConsumers,
+            bool requireAllConfigured)
+        {
+            List<ESAssetLibraryConsumer> consumers = (sourceConsumers ?? Enumerable.Empty<ESAssetLibraryConsumer>())
+                .Where(item => item != null)
+                .Distinct()
+                .ToList();
+            var consumerSnapshots = consumers.ToDictionary(item => item, item => EditorJsonUtility.ToJson(item));
+            HybridCLRSettings settings = HybridCLRSettings.Instance;
+            string settingsSnapshot = settings != null ? EditorJsonUtility.ToJson(settings) : string.Empty;
+            try
+            {
+                PrepareSettings(consumers, requireAllConfigured);
+            }
+            catch
+            {
+                foreach (KeyValuePair<ESAssetLibraryConsumer, string> snapshot in consumerSnapshots)
+                {
+                    if (snapshot.Key == null || string.IsNullOrEmpty(snapshot.Value))
+                        continue;
+                    EditorJsonUtility.FromJsonOverwrite(snapshot.Value, snapshot.Key);
+                    EditorUtility.SetDirty(snapshot.Key);
+                }
+                if (settings != null && !string.IsNullOrEmpty(settingsSnapshot))
+                {
+                    EditorJsonUtility.FromJsonOverwrite(settingsSnapshot, settings);
+                    EditorUtility.SetDirty(settings);
+                    AssetDatabase.SaveAssetIfDirty(settings);
+                }
+                throw;
+            }
         }
 
         private static void PrepareSettings(IEnumerable<ESAssetLibraryConsumer> consumers, bool requireAllConfigured)
@@ -332,6 +391,7 @@ namespace ES
             string sourceFolder = Path.GetDirectoryName(path)?.Replace('\\', '/') ?? string.Empty;
             if (string.Equals(consumer.HotUpdateAssemblyName, assemblyName, StringComparison.Ordinal)
                 && string.Equals(consumer.HotUpdateSourceFolder, sourceFolder, StringComparison.Ordinal)) return;
+            Undo.RecordObject(consumer, "同步 Consumer 代码模块信息");
             consumer.HotUpdateAssemblyName = assemblyName;
             consumer.HotUpdateSourceFolder = sourceFolder;
             EditorUtility.SetDirty(consumer);
@@ -340,6 +400,7 @@ namespace ES
         private static void EnsureSettings(IReadOnlyList<AssemblyDefinitionAsset> definitions)
         {
             HybridCLRSettings settings = HybridCLRSettings.Instance;
+            Undo.RecordObject(settings, "更新 HybridCLR 设置");
             settings.enable = true;
             settings.hybridclrRepoURL = "https://github.com/focus-creative-games/hybridclr.git";
             settings.il2cppPlusRepoURL = "https://github.com/focus-creative-games/il2cpp_plus.git";
@@ -519,6 +580,17 @@ namespace ES
         {
             return ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()?.Where(item => item != null).ToList()
                 ?? new List<ESAssetLibraryConsumer>();
+        }
+
+        private static void SavePreparedSettings(IEnumerable<ESAssetLibraryConsumer> consumers)
+        {
+            foreach (ESAssetLibraryConsumer consumer in (consumers ?? Enumerable.Empty<ESAssetLibraryConsumer>())
+                .Where(item => item != null)
+                .Distinct())
+            {
+                AssetDatabase.SaveAssetIfDirty(consumer);
+            }
+            AssetDatabase.SaveAssetIfDirty(HybridCLRSettings.Instance);
         }
 
         private static string ToProjectRelativePath(string path)

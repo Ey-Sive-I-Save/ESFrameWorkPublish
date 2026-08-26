@@ -20,6 +20,7 @@ namespace ES
         private bool preflightPassed;
         private bool lastUploadFailed;
         private ESEditorLongTask activeUploadTask;
+        private int lifecycleGeneration;
         private string status = "请选择或读取第四步生成的上传计划。";
         private Vector2 scrollPosition;
 
@@ -107,8 +108,15 @@ namespace ES
 
         protected override void ESWindow_OnHostEnable()
         {
+            lifecycleGeneration++;
+            maxSize = new Vector2(1400f, 1000f);
             settings = ESAssetReleaseUploadSettings.Load();
             TryLoadLatestPlan();
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            lifecycleGeneration++;
         }
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
@@ -148,30 +156,74 @@ namespace ES
                     return;
                 }
 
-                ESAssetReleaseUploadTarget target = settings.target ??= new ESAssetReleaseUploadTarget();
-                EditorGUI.BeginChangeCheck();
-                target.displayName = EditorGUILayout.TextField("显示名称", target.displayName);
-                target.mode = (ESAssetReleaseUploadMode)EditorGUILayout.EnumPopup("发布方式", target.mode);
-                target.region = EditorGUILayout.TextField("OSS 地域", target.region);
-                target.endpoint = EditorGUILayout.TextField("Endpoint", target.endpoint);
-                target.bucket = EditorGUILayout.TextField("Bucket", target.bucket);
-                target.objectPrefix = EditorGUILayout.TextField("对象前缀", target.objectPrefix);
-                target.validationPrefix = EditorGUILayout.TextField("验证隔离前缀", target.validationPrefix);
-                target.publicBaseUrl = EditorGUILayout.TextField("客户端访问根地址", target.publicBaseUrl);
-                target.credentialProfile = EditorGUILayout.TextField("凭据配置名", target.credentialProfile);
-                target.verifyRemoteAfterUpload = EditorGUILayout.Toggle("上传后 HEAD 校验", target.verifyRemoteAfterUpload);
-                target.refreshCdnAfterUpload = EditorGUILayout.Toggle("发布后刷新 Root CDN", target.refreshCdnAfterUpload);
-                if (EditorGUI.EndChangeCheck())
+                if (settings.target == null)
                 {
+                    Undo.RecordObject(settings, "初始化远端发布配置");
+                    settings.target = new ESAssetReleaseUploadTarget();
                     EditorUtility.SetDirty(settings);
-                    AssetDatabase.SaveAssets();
                 }
 
+                SerializedObject serializedSettings;
+                try
+                {
+                    serializedSettings = new SerializedObject(settings);
+                    serializedSettings.UpdateIfRequiredOrScript();
+                }
+                catch (Exception exception)
+                {
+                    EditorGUILayout.HelpBox("远端发布配置在重载或外部修改后已失效，已取消本次编辑：" + exception.Message, MessageType.Warning);
+                    return;
+                }
+                using (serializedSettings)
+                {
+                    SerializedProperty targetProperty = serializedSettings.FindProperty("target");
+                    bool schemaValid = true;
+                    schemaValid &= DrawTargetProperty(targetProperty, "displayName", new GUIContent("显示名称"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "mode", new GUIContent("发布方式"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "region", new GUIContent("OSS 地域"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "endpoint", new GUIContent("Endpoint"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "bucket", new GUIContent("Bucket"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "objectPrefix", new GUIContent("对象前缀"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "validationPrefix", new GUIContent("验证隔离前缀"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "publicBaseUrl", new GUIContent("客户端访问根地址"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "credentialProfile", new GUIContent("凭据配置名"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "verifyRemoteAfterUpload", new GUIContent("上传后 HEAD 校验"));
+                    schemaValid &= DrawTargetProperty(targetProperty, "refreshCdnAfterUpload", new GUIContent("发布后刷新 Root CDN"));
+                    if (!schemaValid)
+                    {
+                        EditorGUILayout.HelpBox("远端发布配置字段不完整，已取消本次写回。请重新创建或迁移该配置。", MessageType.Error);
+                        return;
+                    }
+                    try
+                    {
+                        if (serializedSettings.ApplyModifiedProperties())
+                        {
+                            EditorUtility.SetDirty(settings);
+                            AssetDatabase.SaveAssetIfDirty(settings);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        EditorGUILayout.HelpBox("远端发布配置写回失败，已取消本次保存：" + exception.Message, MessageType.Warning);
+                        return;
+                    }
+                }
+
+                ESAssetReleaseUploadTarget target = settings.target;
                 if (target.mode == ESAssetReleaseUploadMode.ManualPlan)
                     EditorGUILayout.HelpBox("“手动上传计划”只能导出交接清单，不能伪装为一键远端发布。选择真实 OSS、S3 或 HTTP PUT Provider 后才允许执行。", MessageType.Warning);
                 else
                     EditorGUILayout.HelpBox("客户端访问根地址必须包含对象前缀、但不包含平台目录。例如对象前缀为 es-release 时填写 https://<bucket-domain>/es-release/；预检会与第四步 Manifest 严格比对。", MessageType.None);
             }
+        }
+
+        private bool DrawTargetProperty(SerializedProperty targetProperty, string relativeName, GUIContent label)
+        {
+            if (targetProperty == null) return false;
+            SerializedProperty property = targetProperty.FindPropertyRelative(relativeName);
+            if (property == null) return false;
+            EditorGUILayout.PropertyField(property, label);
+            return true;
         }
 
         private void DrawPlan()
@@ -220,12 +272,20 @@ namespace ES
 
         private void RunPreflight()
         {
-            ESAssetReleaseUploadPreflightResult result = ESAssetReleaseUploadCoordinator.Preflight(CreateRequest());
-            preflightPassed = result.IsSuccess;
-            status = result.Message;
-            ESResWindow.SetRemotePlanPreflightStatus(
-                result.IsSuccess ? "Ready" : "不可用",
-                result.Message);
+            try
+            {
+                ESAssetReleaseUploadPreflightResult result = ESAssetReleaseUploadCoordinator.Preflight(CreateRequest());
+                preflightPassed = result.IsSuccess;
+                status = result.Message;
+                ESResWindow.SetRemotePlanPreflightStatus(
+                    result.IsSuccess ? "Ready" : "不可用",
+                    result.Message);
+            }
+            catch (Exception exception)
+            {
+                preflightPassed = false;
+                status = "预检未执行：" + exception.Message;
+            }
             ESWindow_CurrentPageContext?.RefreshPageActions();
             Repaint();
         }
@@ -237,8 +297,12 @@ namespace ES
                 return;
             try
             {
-                ESAssetReleaseUploadCoordinator.EnqueueValidation(settings.target, result =>
+                int generation = lifecycleGeneration;
+                activeUploadTask = ESAssetReleaseUploadCoordinator.EnqueueValidation(settings.target, result =>
                 {
+                    if (generation != lifecycleGeneration)
+                        return;
+                    activeUploadTask = null;
                     status = result.Message;
                     ESWindow_CurrentPageContext?.RefreshPageActions();
                     ShowNotification(new GUIContent(result.IsSuccess ? "远端隔离区验证通过" : "远端隔离区验证失败"));
@@ -265,7 +329,17 @@ namespace ES
                 return;
             }
 
-            ESAssetReleaseUploadPreflightResult preflight = ESAssetReleaseUploadCoordinator.Preflight(CreateRequest());
+            ESAssetReleaseUploadPreflightResult preflight;
+            try
+            {
+                preflight = ESAssetReleaseUploadCoordinator.Preflight(CreateRequest());
+            }
+            catch (Exception exception)
+            {
+                preflightPassed = false;
+                status = "发布未开始：预检失败：" + exception.Message;
+                return;
+            }
             if (!preflight.IsSuccess)
             {
                 status = "发布未开始：" + preflight.Message;
@@ -275,8 +349,11 @@ namespace ES
             if (!EditorUtility.DisplayDialog("确认发布到远端", preflight.Message + "\n\n确认后将开始上传；根发布清单会在所有叶子文件成功后最后上传。", "发布", "取消"))
                 return;
             lastUploadFailed = false;
+            int generation = lifecycleGeneration;
             activeUploadTask = ESAssetReleaseUploadCoordinator.Enqueue(CreateRequest(), result =>
             {
+                if (generation != lifecycleGeneration)
+                    return;
                 activeUploadTask = null;
                 lastUploadFailed = !result.IsSuccess;
                 status = result.Message;
@@ -312,7 +389,8 @@ namespace ES
 
         private ESAssetReleaseUploadRequest CreateRequest()
         {
-            if (settings == null || selectedPlan == null) throw new InvalidOperationException("缺少远端发布配置或上传计划。");
+            if (settings == null || settings.target == null || selectedPlan == null)
+                throw new InvalidOperationException("缺少有效的远端发布配置或上传计划。");
             return new ESAssetReleaseUploadRequest(settings.target, selectedPlan);
         }
 

@@ -71,14 +71,19 @@ namespace ES.EditorInternal
                 "取消"))
                 return 0;
 
-            int syncCount = CollectPendingChanges(false, null, out ownerCount);
-            if (syncCount > 0)
-                AssetDatabase.SaveAssets();
+            var changedOwners = new List<UnityEngine.Object>();
+            int syncCount = CollectPendingChanges(false, null, out ownerCount, changedOwners);
+            foreach (UnityEngine.Object owner in changedOwners.Distinct())
+                AssetDatabase.SaveAssetIfDirty(owner);
             Debug.Log("[ESRes][ConfigKey] managed owner scan=" + ownerCount + ", synchronized=" + syncCount + ".");
             return syncCount;
         }
 
-        private static int CollectPendingChanges(bool dryRun, List<string> changes, out int ownerCount)
+        private static int CollectPendingChanges(
+            bool dryRun,
+            List<string> changes,
+            out int ownerCount,
+            ICollection<UnityEngine.Object> changedOwners = null)
         {
             ownerCount = 0;
             int syncCount = 0;
@@ -93,7 +98,10 @@ namespace ES.EditorInternal
                     if (!(owner is ScriptableObject))
                         continue;
                     ownerCount++;
-                    syncCount += Synchronize(owner, dryRun, changes);
+                    int ownerChanges = Synchronize(owner, dryRun, changes);
+                    syncCount += ownerChanges;
+                    if (!dryRun && ownerChanges > 0 && changedOwners != null)
+                        changedOwners.Add(owner);
                 }
             }
             return syncCount;
@@ -130,29 +138,31 @@ namespace ES.EditorInternal
                 if (plan == null)
                     continue;
 
-                var serialized = new SerializedObject(plan);
-                SerializedProperty iterator = serialized.GetIterator();
-                bool enterChildren = true;
-                while (iterator.NextVisible(enterChildren))
+                using (var serialized = new SerializedObject(plan))
                 {
-                    enterChildren = true;
-                    if (!TryResolveKind(iterator.type, out ESAssetReferKind kind))
-                        continue;
+                    SerializedProperty iterator = serialized.GetIterator();
+                    bool enterChildren = true;
+                    while (iterator.NextVisible(enterChildren))
+                    {
+                        enterChildren = true;
+                        if (!TryResolveKind(iterator.type, out ESAssetReferKind kind))
+                            continue;
 
-                    ESAssetCatalogKeyPicker.Candidate source = ESAssetCatalogKeyPicker.FindCurrent(kind, iterator);
-                    if (ESAssetCatalogKeyPicker.HasLibraryKeyConflict(source))
-                    {
-                        errors.Add(path + " :: " + iterator.propertyPath + " - same asset has conflicting Keys across Libraries.");
+                        ESAssetCatalogKeyPicker.Candidate source = ESAssetCatalogKeyPicker.FindCurrent(kind, iterator);
+                        if (ESAssetCatalogKeyPicker.HasLibraryKeyConflict(source))
+                        {
+                            errors.Add(path + " :: " + iterator.propertyPath + " - same asset has conflicting Keys across Libraries.");
+                        }
+                        else if (ESAssetCatalogKeyPicker.IsBoundSourceMissing(iterator, source))
+                        {
+                            errors.Add(path + " :: " + iterator.propertyPath + " - bound source is not registered in any project Library/Catalog.");
+                        }
+                        else if (ESAssetCatalogKeyPicker.IsStale(iterator, source))
+                        {
+                            errors.Add(path + " :: " + iterator.propertyPath + " - source Key changed; synchronize the Key snapshot before baking.");
+                        }
+                        enterChildren = false;
                     }
-                    else if (ESAssetCatalogKeyPicker.IsBoundSourceMissing(iterator, source))
-                    {
-                        errors.Add(path + " :: " + iterator.propertyPath + " - bound source is not registered in any project Library/Catalog.");
-                    }
-                    else if (ESAssetCatalogKeyPicker.IsStale(iterator, source))
-                    {
-                        errors.Add(path + " :: " + iterator.propertyPath + " - source Key changed; synchronize the Key snapshot before baking.");
-                    }
-                    enterChildren = false;
                 }
             }
 
@@ -169,46 +179,50 @@ namespace ES.EditorInternal
                 return 0;
 
             var pending = new List<PendingSync>();
-            var scan = new SerializedObject(owner);
-            SerializedProperty iterator = scan.GetIterator();
-            bool enterChildren = true;
-            while (iterator.NextVisible(enterChildren))
+            using (var scan = new SerializedObject(owner))
             {
-                enterChildren = true;
-                if (!TryResolveKind(iterator.type, out ESAssetReferKind kind))
-                    continue;
+                SerializedProperty iterator = scan.GetIterator();
+                bool enterChildren = true;
+                while (iterator.NextVisible(enterChildren))
+                {
+                    enterChildren = true;
+                    if (!TryResolveKind(iterator.type, out ESAssetReferKind kind))
+                        continue;
 
-                SerializedProperty guid = iterator.FindPropertyRelative("guid");
-                if (guid == null || string.IsNullOrEmpty(guid.stringValue))
-                    continue; // Advanced manual Key mode: never overwrite.
-                pending.Add(new PendingSync(iterator.propertyPath, kind));
-                enterChildren = false;
+                    SerializedProperty guid = iterator.FindPropertyRelative("guid");
+                    if (guid == null || string.IsNullOrEmpty(guid.stringValue))
+                        continue; // Advanced manual Key mode: never overwrite.
+                    pending.Add(new PendingSync(iterator.propertyPath, kind));
+                    enterChildren = false;
+                }
             }
 
             int synchronized = 0;
             bool undoRecorded = false;
             for (int i = 0; i < pending.Count; i++)
             {
-                var serialized = new SerializedObject(owner);
-                SerializedProperty key = serialized.FindProperty(pending[i].PropertyPath);
-                ESAssetCatalogKeyPicker.Candidate candidate = ESAssetCatalogKeyPicker.FindCurrent(pending[i].Kind, key);
-                if (ESAssetCatalogKeyPicker.HasLibraryKeyConflict(candidate))
-                    continue;
-                if (!ESAssetCatalogKeyPicker.IsStale(key, candidate))
-                    continue;
-
-                synchronized++;
-                if (changes != null)
-                    changes.Add(owner.name + " :: " + pending[i].PropertyPath + " (" + pending[i].Kind + ")");
-                if (dryRun)
-                    continue;
-
-                if (!undoRecorded)
+                using (var serialized = new SerializedObject(owner))
                 {
-                    Undo.RecordObject(owner, "Synchronize ConfigKey Snapshots");
-                    undoRecorded = true;
+                    SerializedProperty key = serialized.FindProperty(pending[i].PropertyPath);
+                    ESAssetCatalogKeyPicker.Candidate candidate = ESAssetCatalogKeyPicker.FindCurrent(pending[i].Kind, key);
+                    if (ESAssetCatalogKeyPicker.HasLibraryKeyConflict(candidate))
+                        continue;
+                    if (!ESAssetCatalogKeyPicker.IsStale(key, candidate))
+                        continue;
+
+                    synchronized++;
+                    if (changes != null)
+                        changes.Add(owner.name + " :: " + pending[i].PropertyPath + " (" + pending[i].Kind + ")");
+                    if (dryRun)
+                        continue;
+
+                    if (!undoRecorded)
+                    {
+                        Undo.RecordObject(owner, "Synchronize ConfigKey Snapshots");
+                        undoRecorded = true;
+                    }
+                    ESAssetCatalogKeyPicker.ApplyCandidate(key, candidate, recordUndo: false);
                 }
-                ESAssetCatalogKeyPicker.ApplyCandidate(key, candidate, recordUndo: false);
             }
             return synchronized;
         }

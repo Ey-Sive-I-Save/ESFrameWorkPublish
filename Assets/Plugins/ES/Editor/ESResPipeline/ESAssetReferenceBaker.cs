@@ -820,15 +820,16 @@ namespace ES
                 ESAssetReferBase refer = destination[index];
                 ScriptableObject root = ResolveExactScriptableObject(refer.GUID, refer.LocalFileId);
                 if (root == null) continue;
-                var serializedObject = new SerializedObject(root);
-                SerializedProperty iterator = serializedObject.GetIterator();
-                bool enterChildren = true;
-                while (iterator.Next(enterChildren))
+                using (var serializedObject = new SerializedObject(root))
                 {
-                    enterChildren = true;
-                    if (!string.Equals(iterator.name, "definitionGuid", StringComparison.Ordinal)
-                        || iterator.propertyType != SerializedPropertyType.String)
-                        continue;
+                    SerializedProperty iterator = serializedObject.GetIterator();
+                    bool enterChildren = true;
+                    while (iterator.Next(enterChildren))
+                    {
+                        enterChildren = true;
+                        if (!string.Equals(iterator.name, "definitionGuid", StringComparison.Ordinal)
+                            || iterator.propertyType != SerializedPropertyType.String)
+                            continue;
 
                     string parentPath = iterator.propertyPath;
                     int separator = parentPath.LastIndexOf('.');
@@ -860,7 +861,8 @@ namespace ES
                         continue;
                     }
 
-                    AddGameCoreAsset(dependency, destination, identities, paths);
+                        AddGameCoreAsset(dependency, destination, identities, paths);
+                    }
                 }
             }
         }

@@ -60,7 +60,6 @@ namespace ES
             {
                 CreateOrUpdateScene();
             }
-            AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("[ESValidation] 已修复入口场景控制器脚本引用。");
         }
@@ -89,7 +88,7 @@ namespace ES
             RegisterGeneratedAssets(levelPrefabs, library);
             RegisterGeneratedGameCoreRoot(gameCore, consumer);
             CreateOrUpdateScene();
-            AssetDatabase.SaveAssets();
+            SaveGeneratedAssets();
             AssetDatabase.Refresh();
             Selection.activeObject = gameCore;
             EditorGUIUtility.PingObject(gameCore);
@@ -108,22 +107,32 @@ namespace ES
                 string baseName = LevelNames[level] + "_" + ColorNames[i];
                 Material material = CreateMaterial(materialPath + "/" + baseName + ".mat", Colors[i]);
                 GameObject temporary = GameObject.CreatePrimitive(Shapes[level]);
-                temporary.name = baseName;
-                temporary.transform.localScale = Vector3.one * (0.65f + i * 0.18f);
-                temporary.GetComponent<Renderer>().sharedMaterial = material;
-                if (level == 0)
+                try
                 {
-                    switch (i % 3)
+                    temporary.name = baseName;
+                    temporary.transform.localScale = Vector3.one * (0.65f + i * 0.18f);
+                    temporary.GetComponent<Renderer>().sharedMaterial = material;
+                    if (level == 0)
                     {
-                        case 0: AddHotUpdateMotion(temporary, "ES.ESHotUpdateLoopMoveHorizontal"); break;
-                        case 1: AddHotUpdateMotion(temporary, "ES.ESHotUpdateLoopMoveVertical"); break;
-                        default: AddHotUpdateMotion(temporary, "ES.ESHotUpdateLoopMoveDepth"); break;
+                        switch (i % 3)
+                        {
+                            case 0: AddHotUpdateMotion(temporary, "ES.ESHotUpdateLoopMoveHorizontal"); break;
+                            case 1: AddHotUpdateMotion(temporary, "ES.ESHotUpdateLoopMoveVertical"); break;
+                            default: AddHotUpdateMotion(temporary, "ES.ESHotUpdateLoopMoveDepth"); break;
+                        }
                     }
+
+                    string prefabPath = levelPath + "/" + baseName + ".prefab";
+                    GameObject prefab = PrefabUtility.SaveAsPrefabAsset(temporary, prefabPath);
+                    if (prefab == null)
+                        throw new InvalidOperationException("验收 Prefab 保存失败：" + prefabPath);
+                    result.Add(prefab);
                 }
-                string prefabPath = levelPath + "/" + baseName + ".prefab";
-                GameObject prefab = PrefabUtility.SaveAsPrefabAsset(temporary, prefabPath);
-                UnityEngine.Object.DestroyImmediate(temporary);
-                result.Add(prefab);
+                finally
+                {
+                    if (temporary != null)
+                        UnityEngine.Object.DestroyImmediate(temporary);
+                }
             }
             return result;
         }
@@ -135,7 +144,21 @@ namespace ES
             {
                 Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
                 material = new Material(shader);
-                AssetDatabase.CreateAsset(material, path);
+                try
+                {
+                    AssetDatabase.CreateAsset(material, path);
+                }
+                catch
+                {
+                    if (material != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(material)))
+                        UnityEngine.Object.DestroyImmediate(material);
+                    throw;
+                }
+                Undo.RegisterCreatedObjectUndo(material, "创建验收材质");
+            }
+            else
+            {
+                Undo.RecordObject(material, "更新验收材质");
             }
             material.color = color;
             EditorUtility.SetDirty(material);
@@ -149,7 +172,21 @@ namespace ES
             if (gameCore == null)
             {
                 gameCore = ScriptableObject.CreateInstance<ESLevelAssetValidationGameCore>();
-                AssetDatabase.CreateAsset(gameCore, path);
+                try
+                {
+                    AssetDatabase.CreateAsset(gameCore, path);
+                }
+                catch
+                {
+                    if (gameCore != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(gameCore)))
+                        UnityEngine.Object.DestroyImmediate(gameCore);
+                    throw;
+                }
+                Undo.RegisterCreatedObjectUndo(gameCore, "创建关卡验收 GameCore");
+            }
+            else
+            {
+                Undo.RecordObject(gameCore, "更新关卡验收 GameCore");
             }
             gameCore.levels.Clear();
             for (int level = 0; level < 3; level++)
@@ -169,7 +206,21 @@ namespace ES
             if (plan == null)
             {
                 plan = ScriptableObject.CreateInstance<ESResourcePlanInfo>();
-                AssetDatabase.CreateAsset(plan, path);
+                try
+                {
+                    AssetDatabase.CreateAsset(plan, path);
+                }
+                catch
+                {
+                    if (plan != null && !EditorUtility.IsPersistent(plan))
+                        UnityEngine.Object.DestroyImmediate(plan);
+                    throw;
+                }
+                Undo.RegisterCreatedObjectUndo(plan, "创建关卡资源 Plan");
+            }
+            else
+            {
+                Undo.RecordObject(plan, "更新关卡资源 Plan");
             }
             plan.releaseOnExit = true;
             plan.releaseDelaySeconds = 0f;
@@ -240,7 +291,21 @@ namespace ES
                 library.LibFolderName = "es_level_asset_validation";
                 library.ContainsBuild = true;
                 library.DeliveryMode = ESAssetDeliveryMode.Updateable;
-                AssetDatabase.CreateAsset(library, path);
+                try
+                {
+                    AssetDatabase.CreateAsset(library, path);
+                }
+                catch
+                {
+                    if (library != null && !EditorUtility.IsPersistent(library))
+                        UnityEngine.Object.DestroyImmediate(library);
+                    throw;
+                }
+                Undo.RegisterCreatedObjectUndo(library, "创建关卡验收资源库");
+            }
+            else
+            {
+                Undo.RecordObject(library, "更新关卡验收资源库");
             }
             EditorUtility.SetDirty(library);
             return library;
@@ -257,7 +322,21 @@ namespace ES
                 consumer.ConsumerId = "es_level_asset_validation";
                 consumer.Version = "1.0.0";
                 consumer.Desc = "三关独占几何 Prefab 与 ResourcePlan/AB 释放验收。";
-                AssetDatabase.CreateAsset(consumer, path);
+                try
+                {
+                    AssetDatabase.CreateAsset(consumer, path);
+                }
+                catch
+                {
+                    if (consumer != null && !EditorUtility.IsPersistent(consumer))
+                        UnityEngine.Object.DestroyImmediate(consumer);
+                    throw;
+                }
+                Undo.RegisterCreatedObjectUndo(consumer, "创建关卡验收 Consumer");
+            }
+            else
+            {
+                Undo.RecordObject(consumer, "更新关卡验收 Consumer");
             }
             consumer.ConsumerLibFolders.Clear();
             consumer.ConsumerLibFolders.Add(library);
@@ -376,9 +455,12 @@ namespace ES
             if (entryType == null)
                 throw new InvalidOperationException("ESHotUpdateSceneEntry 尚未完成编译，请等待 Unity 脚本刷新后重试。");
             Component entry = controller.AddComponent(entryType);
-            var serializedEntry = new SerializedObject(entry);
-            serializedEntry.FindProperty("componentTypeName").stringValue = "ES.ESLevelAssetValidationSceneController, ES_Logic";
-            serializedEntry.ApplyModifiedPropertiesWithoutUndo();
+            Undo.RegisterCreatedObjectUndo(entry, "创建验收入口组件");
+            using (var serializedEntry = new SerializedObject(entry))
+            {
+                serializedEntry.FindProperty("componentTypeName").stringValue = "ES.ESLevelAssetValidationSceneController, ES_Logic";
+                serializedEntry.ApplyModifiedPropertiesWithoutUndo();
+            }
         }
 
         private static void EnsureFolder(string path)
@@ -388,6 +470,19 @@ namespace ES
             string name = Path.GetFileName(path);
             if (!string.IsNullOrEmpty(parent) && !AssetDatabase.IsValidFolder(parent)) EnsureFolder(parent);
             AssetDatabase.CreateFolder(parent, name);
+        }
+
+        private static void SaveGeneratedAssets()
+        {
+            foreach (string guid in AssetDatabase.FindAssets(string.Empty, new[] { Root }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrWhiteSpace(path) || AssetDatabase.IsValidFolder(path))
+                    continue;
+                UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(path);
+                if (asset != null)
+                    AssetDatabase.SaveAssetIfDirty(asset);
+            }
         }
     }
 }

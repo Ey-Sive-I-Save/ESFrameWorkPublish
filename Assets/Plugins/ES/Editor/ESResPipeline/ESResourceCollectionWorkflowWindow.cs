@@ -123,6 +123,7 @@ namespace ES
             private const int CatalogFormatVersion = ESAssetPipelineIO.CatalogFormatVersion;
             private const int BuildPlanFormatVersion = 2;
             private const int MaxReportedIssues = 8;
+            private const int MaxIntegrityCacheEntries = 2048;
             private static readonly Dictionary<string, IntegrityCacheEntry> IntegrityCache = new Dictionary<string, IntegrityCacheEntry>(StringComparer.OrdinalIgnoreCase);
 
             public static PipelineStageSnapshot Evaluate(string platform)
@@ -806,6 +807,8 @@ namespace ES
                     return cached.Valid;
 
                 bool valid = ESResManifestIntegrity.VerifyFileSha256(path, expected);
+                if (!IntegrityCache.ContainsKey(path) && IntegrityCache.Count >= MaxIntegrityCacheEntries)
+                    IntegrityCache.Clear();
                 IntegrityCache[path] = new IntegrityCacheEntry
                 {
                     Length = info.Length,
@@ -970,6 +973,7 @@ namespace ES
 
         protected override void ESWindow_OnHostEnable()
         {
+            maxSize = new Vector2(1400f, 1000f);
             SyncFromSelection();
             InvalidateStageStatus();
             Selection.selectionChanged -= OnSelectionChanged;
@@ -1569,25 +1573,44 @@ namespace ES
             if (targetPlan == null)
                 return;
 
-            UnityEngine.Object[] assets = Selection.objects.Where(IsCollectableAsset).Distinct().ToArray();
+            UnityEngine.Object[] selectedAssets = Selection.objects.Where(IsCollectableAsset).Distinct().ToArray();
+            var failures = new List<string>();
+            var supportedAssets = new List<UnityEngine.Object>(selectedAssets.Length);
+            for (int i = 0; i < selectedAssets.Length; i++)
+            {
+                UnityEngine.Object asset = selectedAssets[i];
+                ESAssetReferKind kind = ESAssetPage.DetermineKind(asset);
+                if (!FindPlanField(kind).HasValue)
+                {
+                    failures.Add(asset.name + "：ResourcePlan 暂不支持类型 " + kind);
+                    continue;
+                }
+                supportedAssets.Add(asset);
+            }
+
+            // 先完成 Plan 类型能力筛选，再进入 Library 注册预检。
+            // 不支持的资源不能因为一次“收集并加入计划”操作而产生注册副作用。
+            UnityEngine.Object[] assets = supportedAssets.ToArray();
             UnityEngine.Object[] unregisteredAssets = assets.Where(asset => !IsRegisteredAsset(asset)).ToArray();
             if (unregisteredAssets.Length > 0 && !CollectAssets(unregisteredAssets))
                 return;
 
+            if (assets.Length == 0)
+            {
+                workflowStatus = failures.Count == 0
+                    ? "没有可加入 ResourcePlan 的资源。"
+                    : "没有可加入 ResourcePlan 的资源；失败 " + failures.Count + "：" + string.Join("；", failures);
+                return;
+            }
+
             int added = 0;
             int duplicate = 0;
-            var failures = new List<string>();
-            Undo.RecordObject(targetPlan, "Add Assets To ResourcePlan");
+            bool undoRecorded = false;
 
             foreach (UnityEngine.Object asset in assets)
             {
                 ESAssetReferKind kind = ESAssetPage.DetermineKind(asset);
                 PlanField? mapping = FindPlanField(kind);
-                if (!mapping.HasValue)
-                {
-                    failures.Add(asset.name + "：ResourcePlan 暂不支持类型 " + kind);
-                    continue;
-                }
                 if (!ESAssetCatalogKeyPicker.TryFindByAsset(kind, asset, out ESAssetCatalogKeyPicker.Candidate candidate))
                 {
                     failures.Add(asset.name + "：尚未收集到 Library");
@@ -1617,12 +1640,20 @@ namespace ES
                     continue;
                 }
                 ApplyCandidateToKey(key, candidate);
+                if (!undoRecorded)
+                {
+                    Undo.RecordObject(targetPlan, "Add Assets To ResourcePlan");
+                    undoRecorded = true;
+                }
                 list.Add(entry);
                 added++;
             }
 
-            EditorUtility.SetDirty(targetPlan);
-            AssetDatabase.SaveAssets();
+            if (added > 0)
+            {
+                EditorUtility.SetDirty(targetPlan);
+                AssetDatabase.SaveAssetIfDirty(targetPlan);
+            }
             workflowStatus = "ResourcePlan【" + targetPlan.name + "】新增 " + added + "，重复跳过 " + duplicate
                 + (failures.Count > 0 ? "，失败 " + failures.Count + "：" + string.Join("；", failures) : "。" );
             Selection.activeObject = targetPlan;
@@ -1799,10 +1830,32 @@ namespace ES
                 ESResourcePlanInfo plan = AssetDatabase.LoadAssetAtPath<ESResourcePlanInfo>(path);
                 if (plan == null) continue;
                 planCount++;
-                SerializedObject serialized = new SerializedObject(plan);
-                var seen = new HashSet<string>(StringComparer.Ordinal);
-                foreach (PlanField field in ResourcePlanFields)
+                SerializedObject serialized = null;
+                try
                 {
+                    serialized = new SerializedObject(plan);
+                    serialized.UpdateIfRequiredOrScript();
+                }
+                catch (Exception exception)
+                {
+                    try { serialized?.Dispose(); }
+                    catch (Exception disposeException) { Debug.LogException(disposeException); }
+                    serialized = null;
+                    errors++;
+                    issues.Add(new Issue
+                    {
+                        Owner = plan,
+                        Title = plan.name,
+                        Message = "ResourcePlan 序列化对象已失效，已跳过本次扫描：" + exception.Message,
+                        Error = true
+                    });
+                    continue;
+                }
+                try
+                {
+                    var seen = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (PlanField field in ResourcePlanFields)
+                    {
                     SerializedProperty list = serialized.FindProperty(field.FieldName);
                     if (list == null || !list.isArray) continue;
                     for (int i = 0; i < list.arraySize; i++)
@@ -1865,28 +1918,33 @@ namespace ES
                             issues.Add(new Issue { Owner = plan, Title = plan.name + " / " + field.DisplayName + "[" + i + "]", Message = "ConfigKey 同时映射到 " + keyMatchCount + " 个资产，运行时解析存在歧义。", Error = true });
                         }
                     }
-                }
+                    }
 
-                SerializedProperty prewarms = serialized.FindProperty("prefabPrewarms");
-                if (prewarms != null && prewarms.isArray)
-                {
-                    for (int i = 0; i < prewarms.arraySize; i++)
+                    SerializedProperty prewarms = serialized.FindProperty("prefabPrewarms");
+                    if (prewarms != null && prewarms.isArray)
                     {
-                        SerializedProperty element = prewarms.GetArrayElementAtIndex(i);
-                        SerializedProperty data = element.FindPropertyRelative("data");
-                        bool required = element.FindPropertyRelative("required")?.boolValue ?? true;
-                        if (data != null && data.objectReferenceValue == null)
+                        for (int i = 0; i < prewarms.arraySize; i++)
                         {
-                            if (required) errors++; else warnings++;
-                            issues.Add(new Issue
+                            SerializedProperty element = prewarms.GetArrayElementAtIndex(i);
+                            SerializedProperty data = element.FindPropertyRelative("data");
+                            bool required = element.FindPropertyRelative("required")?.boolValue ?? true;
+                            if (data != null && data.objectReferenceValue == null)
                             {
-                                Owner = plan,
-                                Title = plan.name + " / PrefabPrewarm[" + i + "]",
-                                Message = "预热配置为空。",
-                                Error = required
-                            });
+                                if (required) errors++; else warnings++;
+                                issues.Add(new Issue
+                                {
+                                    Owner = plan,
+                                    Title = plan.name + " / PrefabPrewarm[" + i + "]",
+                                    Message = "预热配置为空。",
+                                    Error = required
+                                });
+                            }
                         }
                     }
+                }
+                finally
+                {
+                    serialized.Dispose();
                 }
             }
             scanSummary = "Plan=" + planCount + "，Key 条目=" + entryCount + "，错误=" + errors + "，警告=" + warnings;

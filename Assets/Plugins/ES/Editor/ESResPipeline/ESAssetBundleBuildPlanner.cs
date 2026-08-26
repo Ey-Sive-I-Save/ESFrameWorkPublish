@@ -143,7 +143,6 @@ namespace ES
             ApplyManagedLabels(previousPlan, plan, editorOnlyPaths);
             ESAssetPipelineIO.WriteJson(previousPlanPath, plan, true);
             ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.AssetListFileName), assetList, true);
-            AssetDatabase.SaveAssets();
             Debug.Log($"[ESAssetBundleBuildPlanner] 规划 {plan.assignments.Count} 个资产，{plan.warnings.Count} 条警告。输出：{outputFolder}");
         }
 
@@ -403,8 +402,19 @@ namespace ES
             {
                 var importer = AssetImporter.GetAtPath(assignment.assetPath);
                 if (importer == null) throw new InvalidOperationException("AssetImporter 不存在：" + assignment.assetPath);
-                if (!string.Equals(importer.assetBundleName, assignment.assetBundleKey, StringComparison.Ordinal)) importer.assetBundleName = assignment.assetBundleKey;
-                if (!string.IsNullOrEmpty(importer.assetBundleVariant)) importer.assetBundleVariant = string.Empty;
+                bool changed = false;
+                if (!string.Equals(importer.assetBundleName, assignment.assetBundleKey, StringComparison.Ordinal))
+                {
+                    importer.assetBundleName = assignment.assetBundleKey;
+                    changed = true;
+                }
+                if (!string.IsNullOrEmpty(importer.assetBundleVariant))
+                {
+                    importer.assetBundleVariant = string.Empty;
+                    changed = true;
+                }
+                if (changed)
+                    AssetDatabase.WriteImportSettingsIfDirty(assignment.assetPath);
             }
             AssetDatabase.RemoveUnusedAssetBundleNames();
         }
@@ -412,6 +422,7 @@ namespace ES
         {
             importer.assetBundleName = string.Empty;
             importer.assetBundleVariant = string.Empty;
+            AssetDatabase.WriteImportSettingsIfDirty(importer.assetPath);
         }
     }
 }

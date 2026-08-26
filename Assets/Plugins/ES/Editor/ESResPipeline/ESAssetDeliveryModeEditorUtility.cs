@@ -15,6 +15,8 @@ namespace ES
             if (library != null)
             {
                 bool migrated = !library.HasExplicitDeliveryMode;
+                if (migrated)
+                    Undo.RecordObject(library, "迁移资产库分发方式");
                 library.EnsureDeliveryModeMigrated();
                 if (migrated)
                     EditorUtility.SetDirty(library);

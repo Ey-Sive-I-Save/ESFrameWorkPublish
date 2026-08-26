@@ -25,8 +25,18 @@ namespace ES
             if (string.IsNullOrEmpty(folder)) throw new InvalidOperationException("远端发布设置路径无效。");
             Directory.CreateDirectory(folder);
             var settings = CreateInstance<ESAssetReleaseUploadSettings>();
-            AssetDatabase.CreateAsset(settings, AssetPath);
-            AssetDatabase.SaveAssets();
+            try
+            {
+                AssetDatabase.CreateAsset(settings, AssetPath);
+            }
+            catch
+            {
+                if (settings != null && !EditorUtility.IsPersistent(settings))
+                    DestroyImmediate(settings);
+                throw;
+            }
+            Undo.RegisterCreatedObjectUndo(settings, "创建远端发布配置");
+            AssetDatabase.SaveAssetIfDirty(settings);
             return settings;
         }
     }

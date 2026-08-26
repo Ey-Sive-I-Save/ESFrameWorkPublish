@@ -33,7 +33,16 @@ namespace ES
             {
                 target = ScriptableObject.CreateInstance<ESInputConfig>();
                 target.name = "ESInputConfig";
-                AssetDatabase.CreateAsset(target, DefaultAssetPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(target, DefaultAssetPath);
+                }
+                catch
+                {
+                    if (target != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(target)))
+                        UnityEngine.Object.DestroyImmediate(target);
+                    throw;
+                }
             }
 
             if (source != null && source != target)
@@ -50,7 +59,7 @@ namespace ES
                 Debug.Log("未找到旧输入配置，已创建默认独立输入配置：" + DefaultAssetPath, target);
             }
 
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(target);
             AssetDatabase.Refresh();
             Selection.activeObject = target;
             EditorGUIUtility.PingObject(target);

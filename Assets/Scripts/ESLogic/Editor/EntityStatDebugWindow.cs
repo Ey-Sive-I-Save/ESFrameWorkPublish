@@ -24,6 +24,7 @@ namespace ES
         {
             EntityStatDebugWindow window = GetWindow<EntityStatDebugWindow>("Entity Stat Monitor");
             window.minSize = new Vector2(620f, 380f);
+            window.maxSize = new Vector2(1400f, 1000f);
             window.TryBindSelection(force: false);
             window.Show();
         }

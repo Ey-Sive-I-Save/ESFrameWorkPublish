@@ -59,8 +59,17 @@ namespace ES
             config.HasConfirm = true;
 
             string assetPath = AssetDatabase.GenerateUniqueAssetPath(Path.Combine(ConfigFolder, "StateMachineConfig.asset").Replace('\\', '/'));
-            AssetDatabase.CreateAsset(config, assetPath);
-            AssetDatabase.SaveAssets();
+            try
+            {
+                AssetDatabase.CreateAsset(config, assetPath);
+            }
+            catch
+            {
+                if (config != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(config)))
+                    UnityEngine.Object.DestroyImmediate(config);
+                throw;
+            }
+            AssetDatabase.SaveAssetIfDirty(config);
             AssetDatabase.Refresh();
             return config;
         }

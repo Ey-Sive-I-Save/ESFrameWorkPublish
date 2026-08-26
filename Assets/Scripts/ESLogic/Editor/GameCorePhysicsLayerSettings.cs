@@ -25,7 +25,7 @@ namespace ES
 
             SynchronizeLayerNames(data.physicsLayers);
             SynchronizeCollisionMatrix(data.physicsLayers, rulesByName);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
 
             List<string> validationErrors = ValidateProjectSettings(data.physicsLayers, rulesByName);
             if (validationErrors.Count > 0)
@@ -162,29 +162,34 @@ namespace ES
                 return;
             }
 
-            SerializedObject tagManager = new SerializedObject(tagManagerAssets[0]);
-            SerializedProperty layers = tagManager.FindProperty("layers");
-            if (layers == null || !layers.isArray || layers.arraySize != 32)
+            using (SerializedObject tagManager = new SerializedObject(tagManagerAssets[0]))
             {
-                Debug.LogError("[GameCorePhysicsLayer] TagManager.layers 不是 32 项 Layer 数组。");
-                return;
+                SerializedProperty layers = tagManager.FindProperty("layers");
+                if (layers == null || !layers.isArray || layers.arraySize != 32)
+                {
+                    Debug.LogError("[GameCorePhysicsLayer] TagManager.layers 不是 32 项 Layer 数组。");
+                    return;
+                }
+
+                bool changed = false;
+                for (int i = 0; i < rules.Count; i++)
+                {
+                    GameCorePhysicsLayerRule rule = rules[i];
+                    SerializedProperty layerName = layers.GetArrayElementAtIndex(rule.unityLayer);
+                    string expectedName = GetUnityLayerName(rule);
+                    if (layerName.stringValue == expectedName)
+                        continue;
+
+                    layerName.stringValue = expectedName;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    Undo.RecordObject(tagManager.targetObject, "同步 GameCore Unity Layer 名称");
+                    tagManager.ApplyModifiedProperties();
+                }
             }
-
-            bool changed = false;
-            for (int i = 0; i < rules.Count; i++)
-            {
-                GameCorePhysicsLayerRule rule = rules[i];
-                SerializedProperty layerName = layers.GetArrayElementAtIndex(rule.unityLayer);
-                string expectedName = GetUnityLayerName(rule);
-                if (layerName.stringValue == expectedName)
-                    continue;
-
-                layerName.stringValue = expectedName;
-                changed = true;
-            }
-
-            if (changed)
-                tagManager.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void SynchronizeCollisionMatrix(

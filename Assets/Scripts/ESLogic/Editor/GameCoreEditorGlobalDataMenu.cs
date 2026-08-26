@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
@@ -37,7 +38,7 @@ namespace ES
 
             data.ResetDefaultRules();
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             Selection.activeObject = data;
             EditorGUIUtility.PingObject(data);
         }
@@ -54,7 +55,7 @@ namespace ES
 
             data.EnsureGameTagRules();
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             Selection.activeObject = data;
             EditorGUIUtility.PingObject(data);
         }
@@ -170,7 +171,7 @@ namespace ES
 
             data.EnsureAttributeSchemas();
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             Selection.activeObject = data;
             EditorGUIUtility.PingObject(data);
         }
@@ -223,7 +224,7 @@ namespace ES
             // EnsureCharacterScope may have migrated a legacy asset by adding fixedApiName values.
             // Save that authored schema before importing the generated C# file and triggering reload.
             EditorUtility.SetDirty(data);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             if (!ESCharacterAttributeCodeGenerator.TryGenerate(data.characterAttributes, out bool changed, out error))
             {
                 Debug.LogError("[GameCoreAttribute] 生成失败：" + error, data);
@@ -292,28 +293,67 @@ namespace ES
                 return;
             }
 
+            string tableSnapshot = EditorJsonUtility.ToJson(table);
+            string rootSnapshot = EditorJsonUtility.ToJson(root);
+            string attributeTableSnapshot = EditorJsonUtility.ToJson(attributeTable);
+            string attributeRootSnapshot = EditorJsonUtility.ToJson(attributeRoot);
+
             // Both source sets are validated before any existing output changes. The two replace
             // calls only copy already-valid data and cannot observe editor configuration again.
-            if (!table.TryReplaceEntriesAndBake(entries, out error)
-                || !attributeTable.TryReplaceFrom(data.characterAttributes, data.itemAttributes, out error))
+            try
             {
-                Debug.LogError("[GameCore] Bake 失败：" + error, data);
+                if (!table.TryReplaceEntriesAndBake(entries, out error))
+                    throw new InvalidOperationException(error);
+                if (!attributeTable.TryReplaceFrom(data.characterAttributes, data.itemAttributes, out error))
+                    throw new InvalidOperationException(error);
+
+                root.SetBakedCatalog(table);
+                attributeRoot.SetBakedCatalog(attributeTable);
+                EditorUtility.SetDirty(data);
+                EditorUtility.SetDirty(table);
+                EditorUtility.SetDirty(root);
+                EditorUtility.SetDirty(attributeTable);
+                EditorUtility.SetDirty(attributeRoot);
+                AssetDatabase.SaveAssetIfDirty(data);
+                AssetDatabase.SaveAssetIfDirty(table);
+                AssetDatabase.SaveAssetIfDirty(root);
+                AssetDatabase.SaveAssetIfDirty(attributeTable);
+                AssetDatabase.SaveAssetIfDirty(attributeRoot);
+            }
+            catch (Exception exception)
+            {
+                RestoreBakeOutput(table, tableSnapshot);
+                RestoreBakeOutput(root, rootSnapshot);
+                RestoreBakeOutput(attributeTable, attributeTableSnapshot);
+                RestoreBakeOutput(attributeRoot, attributeRootSnapshot);
+                Debug.LogError("[GameCore] Bake 失败，已恢复本次操作前的输出状态：" + exception.Message, data);
                 return;
             }
-
-            root.SetBakedCatalog(table);
-            attributeRoot.SetBakedCatalog(attributeTable);
-            EditorUtility.SetDirty(data);
-            EditorUtility.SetDirty(table);
-            EditorUtility.SetDirty(root);
-            EditorUtility.SetDirty(attributeTable);
-            EditorUtility.SetDirty(attributeRoot);
-            AssetDatabase.SaveAssets();
             ESTagEditorCatalogCache.Invalidate();
             Debug.Log("[GameCore] Bake 完成：Tag=" + entries.Count
                       + "，Buff=" + buffCount
                       + "，Tag Schema=" + table.SchemaHash
                       + "，属性 Schema=" + attributeTable.SchemaHash + "。", data);
+        }
+
+        private static void RestoreBakeOutput(UnityEngine.Object target, string snapshot)
+        {
+            if (target == null || string.IsNullOrEmpty(snapshot))
+                return;
+            try
+            {
+                EditorJsonUtility.FromJsonOverwrite(snapshot, target);
+                EditorUtility.SetDirty(target);
+                AssetDatabase.SaveAssetIfDirty(target);
+                string assetPath = AssetDatabase.GetAssetPath(target);
+                if (!string.IsNullOrEmpty(assetPath))
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[GameCore] Bake 输出恢复失败，请人工核对资产："
+                    + target.name + "；" + exception.Message, target);
+            }
         }
 
         // Compatibility for editor automation compiled before the menu was unified. The visible
@@ -567,7 +607,7 @@ namespace ES
             GameCoreEditorGlobalData data = ScriptableObject.CreateInstance<GameCoreEditorGlobalData>();
             data.ResetDefaultRules();
             AssetDatabase.CreateAsset(data, AssetPath);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(data);
             AssetDatabase.Refresh();
             return data;
         }
@@ -579,7 +619,16 @@ namespace ES
                 return asset;
 
             T created = ScriptableObject.CreateInstance<T>();
-            AssetDatabase.CreateAsset(created, path);
+            try
+            {
+                AssetDatabase.CreateAsset(created, path);
+            }
+            catch
+            {
+                if (created != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(created)))
+                    UnityEngine.Object.DestroyImmediate(created);
+                throw;
+            }
             return created;
         }
 

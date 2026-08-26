@@ -460,22 +460,24 @@ namespace ES
 
             try
             {
-                SerializedObject serializedObject = new SerializedObject(owner);
-                SerializedProperty property = serializedObject.GetIterator();
-                bool enterChildren = true;
-                while (property.Next(enterChildren))
+                using (SerializedObject serializedObject = new SerializedObject(owner))
                 {
-                    enterChildren = true;
-                    if (property.propertyType != SerializedPropertyType.ManagedReference)
-                        continue;
+                    SerializedProperty property = serializedObject.GetIterator();
+                    bool enterChildren = true;
+                    while (property.Next(enterChildren))
+                    {
+                        enterChildren = true;
+                        if (property.propertyType != SerializedPropertyType.ManagedReference)
+                            continue;
 
-                    string typeName = property.managedReferenceFullTypename;
-                    if (!IsLegacyAudioCommandTypeName(typeName))
-                        continue;
+                        string typeName = property.managedReferenceFullTypename;
+                        if (!IsLegacyAudioCommandTypeName(typeName))
+                            continue;
 
-                    errors.Add(path + " | " + owner.name + " | " + property.propertyPath
-                               + "：发现已禁用的裸 AudioSource 命令 " + GetLegacyCommandDisplayName(typeName)
-                               + "。请替换为“播放/停止受管音频发射器”。");
+                        errors.Add(path + " | " + owner.name + " | " + property.propertyPath
+                                   + "：发现已禁用的裸 AudioSource 命令 " + GetLegacyCommandDisplayName(typeName)
+                                   + "。请替换为“播放/停止受管音频发射器”。");
+                    }
                 }
             }
             catch (Exception exception)

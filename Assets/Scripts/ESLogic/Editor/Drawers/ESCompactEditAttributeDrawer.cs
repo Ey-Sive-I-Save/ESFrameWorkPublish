@@ -94,19 +94,42 @@ namespace ES
 
             int objectId = RuntimeHelpersSafe.GetObjectId(value);
             ESCompactEditVisualState.Highlight(objectId);
+            try
+            {
+                UnityEngine.Object undoTarget = Property.SerializationRoot?.ValueEntry?.WeakSmartValue as UnityEngine.Object;
+                if (undoTarget != null)
+                    Undo.RecordObject(undoTarget, "编辑 " + displayName);
 
-            var wrapper = new ESCompactEditWindowTarget(displayName, value);
-            OdinEditorWindow window = OdinEditorWindow.InspectObject(wrapper);
-            window.titleContent = new GUIContent($"编辑 {displayName}");
-            window.minSize = new Vector2(680f, 520f);
-            window.position = new Rect(window.position.x, window.position.y, 760f, 620f);
-            window.OnClose += () =>
+                var wrapper = new ESCompactEditWindowTarget(displayName, value);
+                OdinEditorWindow window = OdinEditorWindow.InspectObject(wrapper);
+                if (window == null)
+                    throw new InvalidOperationException("Odin 编辑窗口创建失败。");
+                window.titleContent = new GUIContent($"编辑 {displayName}");
+                window.minSize = new Vector2(680f, 520f);
+                window.position = new Rect(window.position.x, window.position.y, 760f, 620f);
+                window.OnClose += () =>
+                {
+                    try
+                    {
+                        UnityEngine.Object unityObject = Property.SerializationRoot?.ValueEntry?.WeakSmartValue as UnityEngine.Object;
+                        if (unityObject != null)
+                            EditorUtility.SetDirty(unityObject);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new InvalidOperationException("紧凑编辑窗口关闭时目标已失效。", exception));
+                    }
+                    finally
+                    {
+                        ESCompactEditVisualState.ClearHighlight(objectId);
+                    }
+                };
+            }
+            catch (Exception exception)
             {
                 ESCompactEditVisualState.ClearHighlight(objectId);
-                UnityEngine.Object unityObject = Property.SerializationRoot?.ValueEntry?.WeakSmartValue as UnityEngine.Object;
-                if (unityObject != null)
-                    EditorUtility.SetDirty(unityObject);
-            };
+                Debug.LogException(new InvalidOperationException("紧凑编辑窗口创建失败，已清理编辑状态。", exception));
+            }
         }
 
         private static string GetTypeSummary(object value)

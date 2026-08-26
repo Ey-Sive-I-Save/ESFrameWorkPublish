@@ -8,6 +8,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>Editor-only trimmed-Cue preview using Unity's native preview audio service.</summary>
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Preview)]
     public sealed class ESAudioCueTrimPreviewWindow : ESSinglePageIMGUIWindow<ESAudioCueTrimPreviewWindow>
     {
         private const float MinimumWidth = 420f;
@@ -16,8 +17,10 @@ namespace ES
         private static readonly Type AudioUtilType = typeof(AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
         private static readonly BindingFlags AudioUtilFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
         private static MethodInfo playPreviewMethod;
+        private static MethodInfo playFullClipMethod;
         private static MethodInfo stopPreviewMethod;
         private static GUIStyle rightMiniLabel;
+        private static bool loggedStopPreviewFailure;
 
         private ESAudioCueInfo cue;
         private int variantIndex;
@@ -118,6 +121,7 @@ namespace ES
         protected override void ESWindow_OnHostEnable()
         {
             minSize = new Vector2(MinimumWidth, MinimumHeight);
+            maxSize = new Vector2(1400f, 1000f);
             titleContent = new GUIContent("音频 Cue 预览");
             TryUseSelectedCue();
         }
@@ -327,15 +331,20 @@ namespace ES
             }
 
             StopPreview();
-            if (!TryPlayPreviewClip(clip, startSample))
+            if (!TryPlayPreviewClip(
+                clip,
+                startSample,
+                endSample,
+                out int actualStartSample,
+                out int actualEndSample))
             {
                 status = "当前 Unity 版本不支持从指定 Sample 预览 Audio Clip。";
                 return;
             }
 
             playingClip = clip;
-            playingStartSample = startSample;
-            playingEndSample = endSample;
+            playingStartSample = actualStartSample;
+            playingEndSample = actualEndSample;
             repeatPreview = cue.loop;
             previewing = true;
             previewStartedAt = EditorApplication.timeSinceStartup;
@@ -356,12 +365,21 @@ namespace ES
                 return;
 
             StopNativePreview();
-            if (!repeatPreview || playingClip == null || !TryPlayPreviewClip(playingClip, playingStartSample))
+            if (!repeatPreview
+                || playingClip == null
+                || !TryPlayPreviewClip(
+                    playingClip,
+                    playingStartSample,
+                    playingEndSample,
+                    out int actualStartSample,
+                    out int actualEndSample))
             {
                 StopPreview();
                 return;
             }
 
+            playingStartSample = actualStartSample;
+            playingEndSample = actualEndSample;
             previewStartedAt = now;
             nextPreviewStopAt = now + (playingEndSample - playingStartSample) / (double)playingClip.frequency;
         }
@@ -523,8 +541,18 @@ namespace ES
             return Mathf.Clamp01((float)((EditorApplication.timeSinceStartup - previewStartedAt) / duration));
         }
 
-        private static bool TryPlayPreviewClip(AudioClip clip, int startSample)
+        private static bool TryPlayPreviewClip(
+            AudioClip clip,
+            int startSample,
+            int endSample,
+            out int actualStartSample,
+            out int actualEndSample)
         {
+            actualStartSample = startSample;
+            actualEndSample = endSample;
+            if (clip == null)
+                return false;
+
             playPreviewMethod ??= AudioUtilType?.GetMethod(
                 "PlayPreviewClip",
                 AudioUtilFlags,
@@ -537,18 +565,71 @@ namespace ES
                     null,
                     new[] { typeof(AudioClip), typeof(int), typeof(bool) },
                     null);
-            if (playPreviewMethod == null)
+            if (playPreviewMethod != null)
+            {
+                try
+                {
+                    playPreviewMethod.Invoke(null, new object[] { clip, startSample, false });
+                    return true;
+                }
+                catch (TargetInvocationException)
+                {
+                    return false;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+            }
+
+            // Older Unity versions may expose only PlayClip(AudioClip). It is safe
+            // to use that fallback only when the requested range is the full clip;
+            // never pretend that a trimmed range was honored.
+            if (startSample > 0 || endSample < clip.samples)
                 return false;
 
-            playPreviewMethod.Invoke(null, new object[] { clip, startSample, false });
-            return true;
+            playFullClipMethod ??= AudioUtilType?.GetMethod(
+                "PlayClip",
+                AudioUtilFlags,
+                null,
+                new[] { typeof(AudioClip) },
+                null);
+            if (playFullClipMethod == null)
+                return false;
+
+            try
+            {
+                playFullClipMethod.Invoke(null, new object[] { clip });
+                actualStartSample = 0;
+                actualEndSample = clip.samples;
+                return true;
+            }
+            catch (TargetInvocationException)
+            {
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
         }
 
         private static void StopNativePreview()
         {
-            stopPreviewMethod ??= AudioUtilType?.GetMethod("StopAllPreviewClips", AudioUtilFlags)
-                ?? AudioUtilType?.GetMethod("StopAllClips", AudioUtilFlags);
-            stopPreviewMethod?.Invoke(null, null);
+            try
+            {
+                stopPreviewMethod ??= AudioUtilType?.GetMethod("StopAllPreviewClips", AudioUtilFlags)
+                    ?? AudioUtilType?.GetMethod("StopAllClips", AudioUtilFlags);
+                stopPreviewMethod?.Invoke(null, null);
+            }
+            catch (Exception exception)
+            {
+                if (!loggedStopPreviewFailure)
+                {
+                    loggedStopPreviewFailure = true;
+                    Debug.LogWarning("[ESAudioCuePreview] Unity 音频预览停止失败，已清理 ES 本地播放状态。" + exception.Message);
+                }
+            }
         }
 
         private static string DescribePlaybackWindow(ESAudioCueInfo source)

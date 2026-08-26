@@ -21,6 +21,7 @@ namespace ES
         {
             var window = GetWindow<EntityBasicInteractionDebugWindow>("交互运行时面板");
             window.minSize = new Vector2(420f, 300f);
+            window.maxSize = new Vector2(1400f, 1000f);
             window.Show();
         }
 

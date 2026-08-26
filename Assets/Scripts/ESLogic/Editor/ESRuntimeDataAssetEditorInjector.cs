@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,7 +10,14 @@ namespace ES
         public static void MenuAutoRegisterAllLibraries()
         {
             AutoRegisterAllLibraries(true, true);
-            AssetDatabase.SaveAssets();
+            SaveEditorLibraries();
+        }
+
+        private static void SaveEditorLibraries()
+        {
+            foreach (ESAssetLibrary library in ESEditorSO.GetGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>())
+                if (library != null)
+                    AssetDatabase.SaveAssetIfDirty(library);
         }
 
         public static ESAssetAutoRegisterReport AutoRegisterAllLibraries(bool clearBeforeInject = true, bool logReport = true)

@@ -547,6 +547,13 @@ namespace ES
         public string placementId;
         public string prefabKey;
         public string editorPrefabGuid;
+        /// <summary>
+        /// Optional formal Scene binding. These strings are editor-owned evidence;
+        /// an empty value means this author placement has no formal Scene object yet.
+        /// PreviewScene objects must never populate these fields.
+        /// </summary>
+        public string formalScenePath = string.Empty;
+        public string formalObjectGlobalId = string.Empty;
         public string regionId;
         public Vector3 position;
         public Vector3 rotationEuler;
@@ -558,6 +565,8 @@ namespace ES
             error = null;
             if (string.IsNullOrWhiteSpace(placementId)) { error = "Prefab 放置 placementId 不能为空。"; return false; }
             if (string.IsNullOrWhiteSpace(prefabKey)) { error = "Prefab 放置 prefabKey 不能为空：" + placementId; return false; }
+            if (string.IsNullOrWhiteSpace(formalScenePath) != string.IsNullOrWhiteSpace(formalObjectGlobalId))
+            { error = "Prefab 正式 Scene 映射必须同时提供 formalScenePath 与 formalObjectGlobalId：" + placementId; return false; }
             if (scale.x <= 0f || scale.y <= 0f || scale.z <= 0f) { error = "Prefab 放置缩放必须大于 0：" + placementId; return false; }
             return true;
         }

@@ -69,6 +69,8 @@ namespace ES.Editor
 
         protected override void ESWindow_OnHostEnable()
         {
+            minSize = ESWindow_MinSize;
+            maxSize = new Vector2(1400f, 1000f);
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
             RefreshSnapshot();

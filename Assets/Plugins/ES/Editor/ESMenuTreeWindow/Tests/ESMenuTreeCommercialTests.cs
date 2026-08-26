@@ -12638,6 +12638,74 @@ namespace ES.Tests
         }
 
         [Test]
+        public void WorkbenchDestroyRetriesRetainedPreviewSceneCleanup()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchWindowBase.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int destroy = source.IndexOf("protected override void OnDestroy()", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(destroy, 0);
+            int identity = source.IndexOf("if (!string.IsNullOrEmpty(workbenchInstanceKey))", destroy, StringComparison.Ordinal);
+            Assert.Greater(identity, destroy);
+            string body = source.Substring(destroy, identity - destroy);
+            StringAssert.Contains("if (previewScene != null)", body);
+            StringAssert.Contains("ESWorkbench_ClosePreviewScene();", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+        }
+
+        [Test]
+        public void WorkbenchPopupRejectsSecondInstanceAndTracksOwnerLifetime()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int popup = source.IndexOf("internal sealed class ESWorkbenchPopupWindow", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(popup, 0);
+            int onEnable = source.IndexOf("private void OnEnable()", popup, StringComparison.Ordinal);
+            Assert.Greater(onEnable, popup);
+            string body = source.Substring(popup, Math.Min(5200, source.Length - popup));
+            StringAssert.Contains("现有实例关闭失败，已拒绝创建第二个实例", body);
+            StringAssert.Contains("if (activeWindow != null)", body);
+            StringAssert.Contains("private EditorWindow ownerWindow;", body);
+            StringAssert.Contains("ownerContextLost", body);
+            StringAssert.Contains("ESWindowFoundation.IsBound(ownerWindow)", body);
+        }
+
+        [Test]
+        public void WorkbenchPopupContentFailureSchedulesSafeClose()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int create = source.IndexOf("content = request?.CreateContent(context);", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(create, 0);
+            int after = source.IndexOf("if (content != null)", create, StringComparison.Ordinal);
+            Assert.Greater(after, create);
+            string body = source.Substring(create, after - create);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("configured = false;", body);
+            StringAssert.Contains("内容创建失败，已安排安全关闭", body);
+            StringAssert.Contains("CloseIfContextWasLost", body);
+        }
+
+        [Test]
+        public void WorkbenchObjectProviderFailurePreservesPreviousList()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int rebuild = source.IndexOf("private void RebuildObjectList", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(rebuild, 0);
+            int reset = source.IndexOf("contentPointerGate.Reset();", rebuild, StringComparison.Ordinal);
+            Assert.Greater(reset, rebuild);
+            string prefix = source.Substring(rebuild, reset - rebuild);
+            StringAssert.Contains("resolvedSource = getObjects?.Invoke();", prefix);
+            StringAssert.Contains("catch (Exception exception)", prefix);
+            StringAssert.Contains("已保留上一次有效列表", prefix);
+            StringAssert.Contains("return;", prefix);
+        }
+
+        [Test]
         public void AssetPackagePreviewDisposeRetainsSceneHandleWhenCloseFails()
         {
             string path = Path.Combine(

@@ -5,7 +5,11 @@ param(
 )
 
 $ErrorActionPreference='Stop'
-$payload=Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8|ConvertFrom-Json
+$pathPolicy=(Resolve-Path (Join-Path $PSScriptRoot 'ESInteractionPathPolicy.ps1')).Path
+. $pathPolicy
+$projectRoot=Get-ESInteractionProjectRoot
+$resolvedInput=Resolve-ESInteractionInputPath -Candidate $InputPath -AllowSystemTemp -Label 'InputPath'
+$payload=Get-Content -LiteralPath $resolvedInput -Raw -Encoding UTF8|ConvertFrom-Json
 $findings=@()
 $user=@($payload.userMessages)
 $assistant=@($payload.assistantMessages)
@@ -87,5 +91,5 @@ $result=[ordered]@{
   nonClaims=@('This report does not infer quality from keyword counts','No score is emitted when evidence is insufficient')
 }
 $json=$result|ConvertTo-Json -Depth 8
-if($ReportPath){$full=[IO.Path]::GetFullPath($ReportPath);$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
+if($ReportPath){$full=Resolve-ESInteractionReportPath -Candidate $ReportPath;$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};$full=Resolve-ESInteractionReportPath -Candidate $full;[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
 $json

@@ -26,6 +26,17 @@
             "statusMessage": "Checking ES collaboration messages"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \".agents/skills/es-ai-interaction-governance/scripts/Invoke-ESInteractionCloseoutHook.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \".agents\\skills\\es-ai-interaction-governance\\scripts\\Invoke-ESInteractionCloseoutHook.ps1\"",
+            "timeout": 8,
+            "statusMessage": "Collecting ES evidence-first closeout"
+          }
+        ]
       }
     ]
   }

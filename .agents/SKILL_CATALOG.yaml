@@ -10,7 +10,7 @@ registryManifest: .agents/SKILL_REGISTRY.manifest.json
 registrationRule: Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.
 hashRule: skillHash covers SKILL.md and governanceHash covers governance.json; lastModifiedUtc changes only when the generated
   catalog record projection changes. Other Skill resources are outside this hash projection.
-generatedAtUtc: '2026-08-25T14:00:38Z'
+generatedAtUtc: '2026-08-26T13:14:03Z'
 skills:
   es-adversarial-review:
     name: es-adversarial-review
@@ -45,7 +45,7 @@ skills:
     name: es-ai-collaboration-menu
     displayName: es-ai-collaboration-menu
     skillPath: .agents/skills/es-ai-collaboration-menu
-    family: governance-interaction
+    family: governance
     routeKeys:
     - menu
     - collaboration-menu
@@ -71,16 +71,16 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T18:42:24Z'
-    lastModifiedUtc: '2026-08-25T02:36:47Z'
+    lastModifiedUtc: '2026-08-26T04:26:10Z'
     lastReviewedUtc: '2026-08-24T18:42:24Z'
     skillHash: d67b94d06759e8e0cd39c39e82b6ba76f5098b47ab2efe7a789047a78f496bf8
-    governanceHash: d67de3e817770c82951afc2a0bcecce0fbb5f4f42ff747072c578ed5b390b3e2
+    governanceHash: f9001d6a521844c868c121e259cf0884f0892ae8d6d915a7969a1fc84b10f4b3
     statusNote: Initial catalog registration
   es-ai-interaction-governance:
     name: es-ai-interaction-governance
     displayName: es-ai-interaction-governance
     skillPath: .agents/skills/es-ai-interaction-governance
-    family: governance-interaction
+    family: governance
     routeKeys:
     - interaction
     - conversation
@@ -116,10 +116,10 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T13:55:00Z'
-    lastModifiedUtc: '2026-08-25T07:34:50Z'
+    lastModifiedUtc: '2026-08-26T04:26:10Z'
     lastReviewedUtc: '2026-08-24T13:55:00Z'
-    skillHash: d4e38a3bf2e87a1737de68108c81187bf9e29fe12aeda2aa3f685dbe84e9bf6f
-    governanceHash: 6f175d78e6f08d784be75ec45b4bf61e57e96112f69178a37e75c2c73be628dc
+    skillHash: 48b5da102aacbe550065550f16179f746edf5f97ef7c7a0dba674ad29238c949
+    governanceHash: d59fb438cf1eb97b111c860e0dc0ff9447a35d60cde859bd53c28e6434462d21
     statusNote: Initial catalog registration
   es-ai-knowledge-curation:
     name: es-ai-knowledge-curation
@@ -160,6 +160,8 @@ skills:
     routeKeys:
     - aibrain
     - route
+    - route-plan
+    - goal-revision
     - knowledge
     - mcp
     - plan
@@ -178,10 +180,10 @@ skills:
     owner: ESFramework AIBrain maintainers
     acceptanceOwner: AI governance owner
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-23T17:15:40Z'
+    lastModifiedUtc: '2026-08-26T12:56:36Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: 1f4924e3acb28e2301ac0e9deca4efba9415fa52676ecb8f78285ad63579a4b5
-    governanceHash: 151bf558bb11c6599b0c0124b0667f92f2d21974587e9f79cc441e94072fb570
+    skillHash: 960e01818aaf259d57b16a0e9921db810a18dfeb27a1f9363c540c34a852bf95
+    governanceHash: cf6902c39e464c8d2eb69b72bde5c3188a493fd511b72358597330370cc09a92
     statusNote: Initial catalog registration
   es-aicommand-contract-authoring:
     name: es-aicommand-contract-authoring
@@ -359,9 +361,9 @@ skills:
     owner: ESFramework es-codex-session-bootstrap maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-25T08:46:53Z'
+    lastModifiedUtc: '2026-08-25T16:43:08Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: 2a7c70cbf2d4cc4c9e1ce8fa8ce293b5972ecf2ff34dedb013d5e6fd445eb4f6
+    skillHash: 7262a4cc3d79122fb127c0327d210ec9b5a28a12a1cfc10badd43da877c02913
     governanceHash: dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd
     statusNote: Catalog hashes synchronized after session-bootstrap governance update
   es-command-authoring:
@@ -453,9 +455,9 @@ skills:
     owner: ESFramework editor tooling maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T11:52:00Z'
-    lastModifiedUtc: '2026-08-24T16:22:24Z'
+    lastModifiedUtc: '2026-08-26T04:26:10Z'
     lastReviewedUtc: '2026-08-22T11:52:00Z'
-    skillHash: 189d72692d402acc5ce22baa1a090237fdede7c13109e500ae9c9f6d183c5a96
+    skillHash: 5d69c5ec269fe37b1c84963632b24cdef7d7094108bf16eebc83ec65649b9fae
     governanceHash: 6119498a1b429c870bf6cd0aace32df922ab667587aa328631acafd025e78ac4
     statusNote: Initial catalog registration
   es-editor-tooling:
@@ -1435,6 +1437,46 @@ skills:
     skillHash: 22311fba4e42f2a10042ca67f71ffb158cc3ced128892ae48c6a246882a8c722
     governanceHash: a10e5942cf39838004ba2f3f75e8706dee492bbcc4e62aa12c7763889104c0b9
     statusNote: Initial catalog registration
+  es-task-context-runtime:
+    name: es-task-context-runtime
+    displayName: es-task-context-runtime
+    skillPath: .agents/skills/es-task-context-runtime
+    family: engineering
+    routeKeys:
+    - task-context-runtime
+    - task-lifecycle
+    - context-lifecycle
+    - completion-decision
+    - delivery-acceptance
+    - evidence-set
+    - evidence-verifier
+    - goal-revision
+    - route-plan
+    - source-scope
+    - receipt
+    - cas
+    - reopen
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: task-context-lifecycle
+    owner: ESFramework Automation maintainers
+    acceptanceOwner: task requester
+    firstRegisteredUtc: '2026-08-25T16:43:08Z'
+    lastModifiedUtc: '2026-08-26T12:56:36Z'
+    lastReviewedUtc: '2026-08-25T16:43:08Z'
+    skillHash: c453e12a2b2f863487e86dc6207ece72fc594b2a2d7a96033ca113f00979c6c5
+    governanceHash: ba5ca259af3c4415d8ddbf26c6fddf2ec386f8a72f1f213985f74713634171af
+    statusNote: Advisory /eval source route and isolation replay statically passed; Unity Runtime, production execution, and
+      global P0 remain unverified
   es-task-read-snapshot:
     name: es-task-read-snapshot
     displayName: es-task-read-snapshot
@@ -1560,9 +1602,9 @@ skills:
     owner: ESFramework Skill maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-25T07:34:50Z'
+    lastModifiedUtc: '2026-08-26T13:14:03Z'
     lastReviewedUtc: '2026-08-25T03:20:00Z'
-    skillHash: 662f898d15790781d808c4c4e14cd7c0a901a6b678e97d52c4f1ac0dc6fd24d3
+    skillHash: 29e69de5b5d3adc6b8e53ebbad05d9a1e3ccede1b05d699d681fa24ca256b9c8
     governanceHash: 9aa4d91989aac6d900a214fa02485d2f8d07fc5669081836d0a4f5485f55b5ba
     statusNote: StaticDeepReplay and user-directed materialization authorization accepted
   es-unity-compile:

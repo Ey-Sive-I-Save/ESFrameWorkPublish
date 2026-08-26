@@ -5,7 +5,7 @@
 | Structural | Skill contract, UTF-8, frontmatter and references pass | missing required file, invalid name, broken reference |
 | Governance | metadata is valid and permission-conservative | missing/stale metadata, direct execution, missing controls |
 | Catalog | exactly one record and current hashes | missing record, duplicate record, stale hash |
-| Security | no unreviewed high-risk signal | credential access, exfiltration, guard bypass or hidden network behavior |
+| Security | no raw signal, or raw signals are scoped for review | raw wording never hard-blocks by itself; executable credential access, exfiltration, guard bypass or hidden network behavior is decided by Boundary |
 | Semantic | Skill is bound to ESFramework authority, AIBrain/Knowledge routes, Resource Index and Catalog semantics | missing authority source, route binding, Knowledge binding, stale Catalog metadata or governance mismatch |
 | Boundary | AIWarnings refusal, AICommand matching, path/capability/evidence boundaries pass | any expansion, escape, undeclared external capability or evidence overclaim |
 | Evidence | required cases have current, hash-bound and plan-bound receipts | missing, stale, contradictory or over-claimed evidence |

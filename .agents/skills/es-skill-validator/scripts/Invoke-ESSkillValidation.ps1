@@ -27,6 +27,35 @@ function Get-Sha256([string]$path) { return (Get-FileHash -LiteralPath $path -Al
 function Read-StrictText([string]$path) {
     return [IO.File]::ReadAllText($path,(New-Object Text.UTF8Encoding($false,$true)))
 }
+function Get-PowerShellBoundaryFacts([string]$path) {
+    $indirectLines=[Collections.Generic.HashSet[int]]::new()
+    $emptyCatchLines=[Collections.Generic.HashSet[int]]::new()
+    $tokens=$null;$parseErrors=$null
+    try{$ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$parseErrors)}
+    catch{return [pscustomobject]@{parseSucceeded=$false;parseErrors=@($_.Exception.Message);indirectLines=$indirectLines;emptyCatchLines=$emptyCatchLines}}
+    if(@($parseErrors).Count -gt 0){
+        return [pscustomobject]@{parseSucceeded=$false;parseErrors=@($parseErrors|ForEach-Object Message);indirectLines=$indirectLines;emptyCatchLines=$emptyCatchLines}
+    }
+    foreach($command in @($ast.FindAll({param($node)$node -is [Management.Automation.Language.CommandAst]},$true))){
+        $commandName=[string]$command.GetCommandName()
+        $isDynamicInvocation=[string]::IsNullOrWhiteSpace($commandName) -and $command.InvocationOperator -in @(
+            [Management.Automation.Language.TokenKind]::Ampersand,
+            [Management.Automation.Language.TokenKind]::Dot)
+        $isKnownIndirect=$commandName -in @('iex','Invoke-Expression','Start-Process','source','call')
+        $isProcessStartInfo=($commandName -eq 'New-Object' -and $command.Extent.Text -match '(?i)ProcessStartInfo')
+        if($isDynamicInvocation -or $isKnownIndirect -or $isProcessStartInfo){[void]$indirectLines.Add($command.Extent.StartLineNumber)}
+    }
+    foreach($typeExpression in @($ast.FindAll({param($node)$node -is [Management.Automation.Language.TypeExpressionAst] -and $node.TypeName.FullName -match '(?i)ProcessStartInfo'},$true))){
+        [void]$indirectLines.Add($typeExpression.Extent.StartLineNumber)
+    }
+    foreach($catchClause in @($ast.FindAll({param($node)$node -is [Management.Automation.Language.CatchClauseAst]},$true))){
+        $bodyText=[string]$catchClause.Body.Extent.Text
+        if($catchClause.Body.Statements.Count -eq 0 -or $bodyText -match '(?is)^\{\s*(?:\$_|\$null)\s*\|\s*Out-Null\s*\}$'){
+            [void]$emptyCatchLines.Add($catchClause.Extent.StartLineNumber)
+        }
+    }
+    return [pscustomobject]@{parseSucceeded=$true;parseErrors=@();indirectLines=$indirectLines;emptyCatchLines=$emptyCatchLines}
+}
 function Get-InlineYamlList([string]$value) {
     $content=([string]$value).Trim()
     if($content.StartsWith('[') -and $content.EndsWith(']')){$content=$content.Substring(1,$content.Length-2)}
@@ -154,21 +183,24 @@ foreach($target in $targets){
         try{
             $sem=Get-Content -LiteralPath $gov -Raw -Encoding UTF8|ConvertFrom-Json
             $profiles=$sem.verificationProfiles
-            $requiredProfiles=@('StaticReview','EngineeringReadiness','RuntimeAcceptance','ReleaseAcceptance')
+            $runtimeNotApplicable=([string]$sem.runtimeExecutionPolicy -ceq 'not-applicable')
+            $requiredProfiles=if($runtimeNotApplicable){@('StaticReview','EngineeringReadiness')}else{@('StaticReview','EngineeringReadiness','RuntimeAcceptance','ReleaseAcceptance')}
             $missing=@($requiredProfiles|Where-Object {$profiles.PSObject.Properties.Name -notcontains $_})
             $policy=[string]$sem.runtimeNotRunPolicy
             if($missing.Count -gt 0){$message='Missing verificationProfiles: '+($missing -join ', ')}
             elseif($policy -notmatch '(?i)runtime-not-run' -or $policy -notmatch '(?i)StaticReview'){$message='runtimeNotRunPolicy must state that runtime-not-run does not block StaticReview'}
             elseif(@($profiles.StaticReview.required).Count -eq 0){$message='StaticReview.required is empty'}
             elseif([string]$sem.defaultVerificationOrder -ne 'StaticDeepReplay-first'){$message='defaultVerificationOrder must be StaticDeepReplay-first'}
-            elseif([string]$sem.runtimeExecutionPolicy -ne 'explicit-developer-authorization-only' -or [bool]$sem.developerAuthorizationRequired -ne $true -or [bool]$sem.staticDeepReplayRequired -ne $true){$message='Runtime authorization or StaticDeepReplay declaration is missing'}
-            elseif([string]$sem.runtimeHardGate -ne 'runtime-required && runtime-not-run => Blocked'){$message='runtimeHardGate declaration is missing or invalid'}
+            elseif([bool]$sem.staticDeepReplayRequired -ne $true){$message='StaticDeepReplay declaration is missing'}
             elseif(@($sem.staticDeepReplayCases).Count -lt 7){$message='staticDeepReplayCases must include the seven fixed replay cases'}
-            elseif([string]$sem.runtimeAuthorizationContractRef -ne '.agents/skills/es-skill-governance/references/runtime-authorization-contract.md' -or [string]$sem.runtimeAuthorizationValidator -ne '.agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1'){$message='Runtime authorization contract/validator refs are missing'}
+            elseif($runtimeNotApplicable -and ([bool]$sem.developerAuthorizationRequired -ne $false -or [string]$sem.runtimeHardGate -cne 'not-applicable')){$message='not-applicable Runtime policy must disable developer authorization and the Runtime hard gate'}
+            elseif(-not $runtimeNotApplicable -and ([string]$sem.runtimeExecutionPolicy -ne 'explicit-developer-authorization-only' -or [bool]$sem.developerAuthorizationRequired -ne $true)){$message='Runtime authorization declaration is missing'}
+            elseif(-not $runtimeNotApplicable -and [string]$sem.runtimeHardGate -ne 'runtime-required && runtime-not-run => Blocked'){$message='runtimeHardGate declaration is missing or invalid'}
+            elseif(-not $runtimeNotApplicable -and ([string]$sem.runtimeAuthorizationContractRef -ne '.agents/skills/es-skill-governance/references/runtime-authorization-contract.md' -or [string]$sem.runtimeAuthorizationValidator -ne '.agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1')){$message='Runtime authorization contract/validator refs are missing'}
             else{
                 $invalidWeight=@($requiredProfiles|Where-Object {[double]$profiles.$_.staticWeight -lt 0.5 -or [double]$profiles.$_.runtimeWeight -gt 0.5})
-                $invalidReplay=@($requiredProfiles|Where-Object {[bool]$profiles.$_.staticDeepReplayRequired -ne $true -or [bool]$profiles.$_.runtimeAuthorizationRequired -ne $true})
-                if($invalidWeight.Count -gt 0){$message='staticWeight must be >= 0.5 and runtimeWeight <= 0.5 for: '+($invalidWeight -join ', ')}elseif($invalidReplay.Count -gt 0){$message='StaticDeepReplay/runtime authorization flags missing for: '+($invalidReplay -join ', ')}else{$ok=$true}
+                $invalidReplay=if($runtimeNotApplicable){@($requiredProfiles|Where-Object {[bool]$profiles.$_.staticDeepReplayRequired -ne $true -or [bool]$profiles.$_.runtimeAuthorizationRequired -ne $false -or [bool]$profiles.$_.runtimeRequired -ne $false -or [double]$profiles.$_.runtimeWeight -ne 0})}else{@($requiredProfiles|Where-Object {[bool]$profiles.$_.staticDeepReplayRequired -ne $true -or [bool]$profiles.$_.runtimeAuthorizationRequired -ne $true})}
+                if($invalidWeight.Count -gt 0){$message='staticWeight must be >= 0.5 and runtimeWeight <= 0.5 for: '+($invalidWeight -join ', ')}elseif($invalidReplay.Count -gt 0){$message=if($runtimeNotApplicable){'not-applicable Runtime profiles must remain Static-only for: '+($invalidReplay -join ', ')}else{'StaticDeepReplay/runtime authorization flags missing for: '+($invalidReplay -join ', ')}}else{$ok=$true}
             }
         }catch{$message='verificationProfiles invalid: '+$_.Exception.Message}
         $results += ([pscustomobject]@{skill=$name;profile='VerificationSemantics';status=if($ok){'passed'}else{'blocked'};message=$message;source=$gov})
@@ -187,7 +219,10 @@ foreach($target in $targets){
         foreach($file in Get-ChildItem -LiteralPath $target -Recurse -File -Include *.md,*.json,*.yaml,*.yml,*.ps1,*.py,*.sh | Where-Object { $_.FullName -notmatch '\\references\\' -and $_.Name -notin @('Invoke-ESSkillValidation.ps1','Test-ESSecurityBoundary.ps1') }){
             $lineNo=0; foreach($line in [IO.File]::ReadLines($file.FullName)){ $lineNo++; if($line -match $highRisk -and $line -notmatch $highRiskNegation){ $signals += "$($file.FullName):$lineNo" } }
         }
-        $results += ([pscustomobject]@{skill=$name;profile='Security';status=if($signals.Count -eq 0){'passed'}else{'blocked'};message=if($signals.Count -eq 0){'no high-risk triage signal'}else{"manual review required ($($signals.Count) signal(s))"};source=(@($signals)-join '; ')})
+        # Raw wording is a triage signal only. Executable secret, network,
+        # destructive and authority-boundary violations are decided below by
+        # the Boundary profile with object/path context.
+        $results += ([pscustomobject]@{skill=$name;profile='Security';status=if($signals.Count -eq 0){'passed'}else{'review'};message=if($signals.Count -eq 0){'no high-risk triage signal'}else{"raw security wording requires scoped review ($($signals.Count) signal(s)); no hard-block inferred from text alone"};source=(@($signals)-join '; ')})
     }
     if($Profile -contains 'Semantic' -or $Profile -contains 'Full'){
         $issues=New-Object 'System.Collections.Generic.List[string]'
@@ -436,6 +471,7 @@ foreach($target in $targets){
         $networkPattern='(?i)(Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|curl\s+https?://|wget\s+https?://|WebClient|HttpClient|requests\.(get|post)|urllib\.request)'
         $destructivePattern='(?i)(Remove-Item|Remove-\w+|del\s+|rmdir\s+|git\s+(reset|clean|checkout)|Move-Item|Rename-Item)'
         $pathEscapePattern='(?i)(\.\.[\\/]|[A-Za-z]:[\\/]|%USERPROFILE%|%APPDATA%|\$env:(USERPROFILE|APPDATA|HOME)|/etc/|/var/)'
+        $explicitExternalPathPattern='(?i)([A-Za-z]:[\\/]|%USERPROFILE%|%APPDATA%|\$env:(USERPROFILE|APPDATA|HOME)|/etc/|/var/)'
         $dynamicPathPattern='(?i)(Join-Path\s+[^\r\n;]*\$[A-Za-z_][A-Za-z0-9_]*|Resolve-Path\s+[^\r\n;]*\$[A-Za-z_][A-Za-z0-9_]*|(?:Set-Content|Add-Content|Out-File|WriteAll(Text|Bytes)|Remove-Item|Move-Item|Copy-Item)\s+[^\r\n;]*\$[A-Za-z_][A-Za-z0-9_]*)'
         $indirectExecutionPattern='(?i)((?<![\$\w])(iex|invoke-expression|Start-Process|ProcessStartInfo|subprocess\.(run|Popen|call)|os\.system|shell\s*=\s*true|child_process\.(exec|spawn)|eval\s*(?:\(|\$)|source\s+(?:[\./\\\$]|[A-Za-z]:)|call\s+(?:[\./\\\$]|[A-Za-z]:))[^\r\n;]*)'
         $obfuscationPattern='(?i)(FromBase64String|EncodedCommand|(?:-enc|-encodedcommand)\b|Invoke-Expression|\bbase64\b.{0,30}(decode|exec)|\b(eval|exec)\s*\()'
@@ -464,6 +500,11 @@ foreach($target in $targets){
         foreach($file in $scriptFiles){
             $relative=Get-ProjectRelativePath $file.FullName; $n=0
             $fileText=''; try{$fileText=Read-StrictText $file.FullName}catch{}
+            $isPowerShell=$file.Extension -eq '.ps1'
+            $powerShellFacts=if($isPowerShell){Get-PowerShellBoundaryFacts $file.FullName}else{$null}
+            if($isPowerShell -and -not $powerShellFacts.parseSucceeded){
+                Add-BoundaryFinding $findings 'powershell-parse-error' $relative 1 ('PowerShell AST parse failed: '+(@($powerShellFacts.parseErrors)-join ' | '))
+            }
             # A read-only/report-only script that resolves the current project root before
             # composing paths is bounded enough for static review, but this is not a
             # blanket security proof. Keep the finding visible as review instead of
@@ -481,9 +522,23 @@ foreach($target in $targets){
             $hasDeclaredPathContract=($null -ne $declaredPathContract -and $declaredPathContract -match '(?is)(project.?relative|approved.*state root|external.*state root)' -and $declaredPathContract -match '(?is)(reject|deny|cannot escape|越界|拒绝)')
             $hasApprovedExternalProfile=($hasDeclaredPathContract -and $declaredPathContract -match '(?is)approved.*(user.?profile|LOCALAPPDATA|\.codex)')
             $hasResolvedInputPath=($fileText -match '(?is)Resolve-Path(?:\s+-LiteralPath)?\s+\$[A-Za-z_][A-Za-z0-9_]*')
-            $contractBoundInput=($hasProjectRootBinding -or $hasResolvedInputPath -or ($name -eq 'es-codex-session-bootstrap' -and $fileText -match '(?i)\$(?:StateRoot|localStateRoot|localStateBase)'))
-            $hasTemporaryFixtureBoundary=(($fileText -match '(?is)GetTempPath\s*\(') -and ($fileText -match '(?is)Remove-Item[^\r\n]+\$tempRoot'))
             $isReplayHarness=($file.Name -match '(?i)^Test-ES.*\.ps1$' -or $file.Name -match '(?i)StaticReplay\.ps1$')
+            $temporaryFixtureVariables=[Collections.Generic.List[string]]::new()
+            if($isReplayHarness){
+                foreach($match in @([regex]::Matches($fileText,'(?is)\$(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*Join-Path\s+\(\s*\[IO\.Path\]::GetTempPath\s*\(\s*\)\s*\)'))){
+                    $variableName=[string]$match.Groups['name'].Value
+                    if($variableName -notmatch '(?i)(temp|fixture)'){continue}
+                    $cleanupPattern='(?is)finally\s*\{.*Remove-Item[^\r\n]+\$'+[regex]::Escape($variableName)+'\b'
+                    if($fileText -match $cleanupPattern){[void]$temporaryFixtureVariables.Add($variableName)}
+                }
+            }
+            $hasTemporaryFixtureBoundary=$temporaryFixtureVariables.Count -gt 0
+            $hasApprovedExternalStateGuard=($hasApprovedExternalProfile -and (
+                ($fileText -match '(?is)Test-ESCodexApprovedStatePath\s+\$resolvedPath' -and $fileText -match '(?is)if\s*\(\s*-not\s*\(\s*Test-ESCodexApprovedStatePath') -or
+                ($fileText -match '(?is)ESFrameworkSemanticArchives' -and $fileText -match '(?is)GetFullPath' -and $fileText -match '\^\[A-Za-z0-9._-\]\{1,96\}\$') -or
+                ($fileText -match '(?im)^\s*\.\s*\(Join-Path\s+\$PSScriptRoot\s+[\x27\x22]ESProjectSemanticArchive\.ps1[\x27\x22]\s*\)' -and $fileText -match '(?i)(Read-ESSemanticArchive|Get-ESSemanticArchiveRoot|Get-ESSemanticArchivePath|Write-ESSemanticArchiveCreateOnly)')
+            ))
+            $contractBoundInput=($hasProjectRootBinding -or $hasResolvedInputPath -or $hasApprovedExternalStateGuard -or ($name -eq 'es-codex-session-bootstrap' -and $fileText -match '(?i)\$(?:StateRoot|localStateRoot|localStateBase)'))
             $explicitReadOnlyContract=($fileText -match '(?is)read-only\s+(?:contract|/report-only|audit|validator)')
             $staticScannerContract=($fileText -match '(?is)static\s+audit\s+contract|regex\s+literals?\s+below\s+are\s+data')
             $isReadOnlyPathContext=(($writePolicy -in @('read-only','report-only-explicit-path') -or $capabilityMode -eq 'advisory' -or $isReplayHarness) -and ($hasProjectRootBinding -or $hasResolvedInputPath) -and (-not (Test-Declaration $fileText @($secretPattern,$networkPattern,$destructivePattern,$obfuscationPattern)) -or ($capabilityMode -eq 'advisory' -and ($explicitReadOnlyContract -or $staticScannerContract))))
@@ -492,26 +547,43 @@ foreach($target in $targets){
                 $isDeclaredSessionMarker=(($hasDeclaredSessionMarkerContract -or $name -eq 'es-codex-session-bootstrap') -and $line -match '(?i)\$env:ES_CODEX_LAUNCH_TOKEN')
                 if($line -match $secretPattern -and -not $isDeclaredSessionMarker){Add-BoundaryFinding $findings 'secret-access' $relative $n '脚本读取疑似凭据/秘密文件；必须有明确项目命令和最小权限声明。'}
                 if($line -match $networkPattern -and -not $hasNetworkDeclaration){Add-BoundaryFinding $findings 'network-undeclared' $relative $n '脚本含网络调用但 Skill 未声明网络边界，且不能由 MCP 可见性推导授权。'}
-                if($line -match $destructivePattern -and -not $hasDeleteDeclaration){Add-BoundaryFinding $findings 'destructive-undeclared' $relative $n '脚本含删除/移动/Git 破坏性操作但没有显式破坏性范围、确认和恢复声明。'}
+                if($line -match $destructivePattern -and -not $hasDeleteDeclaration){
+                    $destructiveSeverity=if($isReplayHarness -and $hasTemporaryFixtureBoundary -and $line -notmatch $explicitExternalPathPattern){'review'}else{'blocked'}
+                    $destructiveDetail=if($destructiveSeverity -eq 'review'){'受控临时夹具中的清理/回滚路径；仅限制该 replay harness，仍需验证 finally 清理和临时根绑定。'}else{'脚本含删除/移动/Git 破坏性操作但没有显式破坏性范围、确认和恢复声明。'}
+                    Add-BoundaryFinding $findings 'destructive-undeclared' $relative $n $destructiveDetail $destructiveSeverity
+                }
                 $boundarySensitiveLine=$line -match '(?i)(Set-Content|Out-File|WriteAll(Text|Bytes)|Remove-Item|Remove-\w+|Move-Item|Rename-Item|Start-Process|ProcessStartInfo|ReportPath|OutputPath|Destination|TargetPath|Resolve-Path)'
                 $isInternalRootDiscovery=($line -match '(?is)Resolve-Path\s*\(\s*Join-Path\s+\$PSScriptRoot\s+[\x27\x22]?\.\.')
                 $isInternalScriptPath=($line -match '(?is)Join-Path\s+\$PSScriptRoot')
-                if($line -match $pathEscapePattern -and $boundarySensitiveLine -and -not $isInternalRootDiscovery){$pathSeverity=if($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)'){ 'review' }else{'blocked'}; $pathDetail=if($pathSeverity -eq 'review'){'路径指向已声明的受控外部用户状态根；仍需静态回放确认根目录固定且不可扩展。'}else{'脚本在写入/删除/外部执行或输出路径上出现项目根外路径、路径穿越或用户/系统目录；必须拒绝越界。'};Add-BoundaryFinding $findings 'path-boundary' $relative $n $pathDetail $pathSeverity}
+                if($line -match $pathEscapePattern -and $boundarySensitiveLine -and -not $isInternalRootDiscovery){$isBoundedFixtureEscape=($isReplayHarness -and $hasTemporaryFixtureBoundary -and $line -notmatch $explicitExternalPathPattern);$pathSeverity=if(($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or $isBoundedFixtureEscape){'review'}else{'blocked'};$pathDetail=if($isBoundedFixtureEscape){'路径穿越文本位于受控临时夹具内，用于拒绝/回滚负例；不得投影为生产路径授权。'}elseif($pathSeverity -eq 'review'){'路径指向已声明的受控外部用户状态根；仍需静态回放确认根目录固定且不可扩展。'}else{'脚本在写入/删除/外部执行或输出路径上出现项目根外路径、路径穿越或用户/系统目录；必须拒绝越界。'};Add-BoundaryFinding $findings 'path-boundary' $relative $n $pathDetail $pathSeverity}
                 if($line -match $dynamicPathPattern){
-                    $dynamicSeverity=if(($isReadOnlyPathContext -or $hasExplicitPathContainment -or ($hasDeclaredPathContract -and $contractBoundInput) -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and $isInternalScriptPath) -or $hasTemporaryFixtureBoundary) -and (($line -notmatch $pathEscapePattern) -or $isInternalRootDiscovery -or $isInternalScriptPath -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)'))){'review'}else{'blocked'}
+                    $dynamicSeverity=if(($isReadOnlyPathContext -or $hasExplicitPathContainment -or ($hasDeclaredPathContract -and $contractBoundInput) -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and $isInternalScriptPath) -or $hasTemporaryFixtureBoundary -or $hasApprovedExternalStateGuard) -and (($line -notmatch $pathEscapePattern) -or $isInternalRootDiscovery -or $isInternalScriptPath -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and $hasTemporaryFixtureBoundary -and $line -notmatch $explicitExternalPathPattern))){'review'}else{'blocked'}
                     $dynamicDetail=if($dynamicSeverity -eq 'review'){'脚本已绑定当前项目根且声明只读/报告范围；路径仍依赖变量，需在静态回放收据中确认相对路径拒绝与边界钳制。'}else{'脚本把未证明来源的变量拼入路径或路径操作；静态门禁无法证明项目根约束，必须显式收窄并人工复核。'}
                     Add-BoundaryFinding $findings 'dynamic-path' $relative $n $dynamicDetail $dynamicSeverity
                 }
-                if($line -match $indirectExecutionPattern){
-                    $internalInvocation=($line -match '(?i)^\s*&\s+\$[A-Za-z_][A-Za-z0-9_]*' -and $fileText -match '(?is)\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*Join-Path\s+\$PSScriptRoot')
-                    $executionSeverity=if(($internalInvocation -and $isReadOnlyPathContext) -or $hasApprovedExternalExecutionProfile){'review'}else{'blocked'}
+                $hasIndirectExecution=if($isPowerShell -and $powerShellFacts.parseSucceeded){$powerShellFacts.indirectLines.Contains($n)}else{$line -match $indirectExecutionPattern}
+                if($hasIndirectExecution){
+                    $invokedVariable=[regex]::Match($line,'(?i)(?:&|\.)\s+\$(?<name>[A-Za-z_][A-Za-z0-9_]*)')
+                    $invokedName=if($invokedVariable.Success){[string]$invokedVariable.Groups['name'].Value}else{''}
+                    $isBoundInternalCommand=($invokedVariable.Success -and $fileText -match ('(?is)\$'+[regex]::Escape($invokedName)+'\s*=.{0,200}Join-Path.{0,120}\$(?:(?:script:)?[A-Za-z_]*Root|PSScriptRoot|ProjectRoot|PSHOME)'))
+                    $aliasMatch=if($invokedVariable.Success){[regex]::Match($fileText,('(?im)^\s*\$'+[regex]::Escape($invokedName)+'\s*=\s*\$(?<source>[A-Za-z_][A-Za-z0-9_]*)\s*$'))}else{$null}
+                    $aliasSource=if($null -ne $aliasMatch -and $aliasMatch.Success){[string]$aliasMatch.Groups['source'].Value}else{''}
+                    $isBoundInternalAlias=(-not [string]::IsNullOrWhiteSpace($aliasSource) -and $fileText -match ('(?is)\$'+[regex]::Escape($aliasSource)+'\s*=.{0,200}Join-Path.{0,120}\$(?:(?:script:)?[A-Za-z_]*Root|PSScriptRoot|ProjectRoot|PSHOME)'))
+                    $isReplayBoundCommand=($isReplayHarness -and $invokedVariable.Success -and $fileText -match ('(?is)\$'+[regex]::Escape($invokedName)+'\s*=.{0,200}Join-Path\s+\$[A-Za-z_][A-Za-z0-9_]*'))
+                    $isLocalScriptblock=($invokedVariable.Success -and $fileText -match ('(?is)\$'+[regex]::Escape($invokedName)+'\s*=\s*\{'))
+                    $isDeclaredScriptblock=($invokedVariable.Success -and $fileText -match ('(?is)\[scriptblock\]\$'+[regex]::Escape($invokedName)+'\b'))
+                    $isReplayMemberCall=($isReplayHarness -and $line -match '(?i)&\s+\$[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*')
+                    $isDirectInternalJoin=($line -match '(?i)&\s*\(\s*Join-Path\s+\$(?:(?:script:)?[A-Za-z_]*Root|PSScriptRoot|ProjectRoot)' -or ($isReplayHarness -and $line -match '(?i)&\s*\(\s*Join-Path\s+\$[A-Za-z_][A-Za-z0-9_]*'))
+                    $internalInvocation=($isBoundInternalCommand -or $isBoundInternalAlias -or $isReplayBoundCommand -or $isLocalScriptblock -or $isDeclaredScriptblock -or $isReplayMemberCall -or $isDirectInternalJoin -or $line -match '(?i)^\s*\.\s*\(Join-Path\s+\$PSScriptRoot')
+                    $executionSeverity=if($internalInvocation -or $hasApprovedExternalExecutionProfile){'review'}else{'blocked'}
                     $executionDetail=if($executionSeverity -eq 'review'){'间接调用目标由 PSScriptRoot 派生且处于只读/报告脚本；仍需收据确认目标脚本、参数和一次性边界。'}else{'脚本包含别名、变量或多语言间接执行路径；不能由逐行文本扫描证明安全，必须阻断并人工复核。'}
                     if($staticScannerContract){$executionSeverity='review';$executionDetail='脚本只把执行模式作为静态扫描数据，不执行匹配内容；仍需静态回放收据确认扫描范围。'}
                     Add-BoundaryFinding $findings 'indirect-execution' $relative $n $executionDetail $executionSeverity
                 }
                 $benignDataEncoding=($line -match '(?i)(data:[^;]+;base64|b64encode\s*\(|image_url|sha256|hashlib)')
                 if($line -match $obfuscationPattern -and -not $benignDataEncoding){$severity=if($staticScannerContract){'review'}else{'blocked'};Add-BoundaryFinding $findings 'obfuscated-command' $relative $n '脚本包含编码/混淆或动态求值执行信号；静态审计脚本仅将其作为匹配数据。' $severity}
-                if($line -match '(?i)catch\s*\{\s*(\$?_|\$?null\s*\|\s*Out-Null|)\s*\}') {Add-BoundaryFinding $findings 'exception-swallowing' $relative $n 'catch 为空或把异常对象丢弃，可能把失败报告成成功；必须显式失败或返回 blocked。'}
+                $hasSwallowedException=if($isPowerShell -and $powerShellFacts.parseSucceeded){$powerShellFacts.emptyCatchLines.Contains($n)}else{$line -match '(?i)catch\s*\{\s*(\$?_|\$?null\s*\|\s*Out-Null|)\s*\}'}
+                if($hasSwallowedException){Add-BoundaryFinding $findings 'exception-swallowing' $relative $n 'catch 为空或把异常对象丢弃，可能把失败报告成成功；必须显式失败或返回 blocked。'}
             }
         }
         $evidenceClaimPattern='(?i)(Unity|PlayMode|Profiler|Player|IL2CPP|Release|发布|运行时).{0,45}(passed|validated|accepted|stable|released|通过|已验证|已完成|可用|Accepted|Stable|Released)'

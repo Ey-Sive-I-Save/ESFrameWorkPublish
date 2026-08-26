@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-snapshot.contract.json",
+  "schemaVersion": 1,
+  "contractId": "es-governance-snapshot-v1",
+  "headPattern": "^[0-9a-fA-F]{7,64}$",
+  "normalizationVersion": "path-sha256-v1",
+  "sourceRefs": "project-relative existing files with current SHA-256",
+  "registryFiles": [
+    ".agents/skills/es-codex-session-bootstrap/references/governance-reason-codes.json",
+    ".agents/skills/es-codex-session-bootstrap/references/governance-profile-scope.registry.json",
+    ".agents/skills/es-codex-session-bootstrap/references/governance-depth.registry.json",
+    ".agents/skills/es-codex-session-bootstrap/references/governance-effect-override.registry.json",
+    ".agents/skills/es-codex-session-bootstrap/references/governance-route-decision-table.json",
+    ".agents/SKILL_CATALOG.yaml",
+    ".agents/SKILL_REGISTRY.manifest.json"
+  ],
+  "coverage": {
+    "sourceRefsHash": "sorted unique canonical JSON of {path,sha256}",
+    "registryHash": "sorted canonical JSON of {path,sha256} for registryFiles",
+    "head": "current Git commit SHA"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-effect-override.registry.json",
+  "schemaVersion": 1,
+  "registryId": "es-governance-effect-override-v1",
+  "allowedTransitions": [
+    {
+      "id": "EVIDENCE.RECEIPT_MISSING.HI_ACCEPTANCE",
+      "reasonCode": "EVIDENCE.RECEIPT_MISSING",
+      "profile": "HIAcceptance",
+      "scopePattern": "^context:HIAcceptance$",
+      "fromEffect": "claim-cap",
+      "toEffect": "hard-block",
+      "direction": "tighten"
+    }
+  ],
+  "forbiddenTransitions": [
+    "required-stale->review",
+    "hard-block->advisory",
+    "invalid->accepted",
+    "claim-cap->review",
+    "review->advisory"
+  ]
+}

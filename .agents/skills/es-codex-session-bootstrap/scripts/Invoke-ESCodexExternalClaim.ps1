@@ -324,6 +324,7 @@ function New-ESCodexExternalClaimDirectory([string]$ClaimsRoot, [string]$Request
             })
         return [pscustomobject]@{ claimId = $claimId; directory = $directory }
     }
+    $lastClaimAllocationError = $null
     for ($attempt = 0; $attempt -lt 12; $attempt++) {
         $claimId = [Guid]::NewGuid().ToString()
         $directory = Join-Path $ClaimsRoot $claimId
@@ -337,9 +338,11 @@ function New-ESCodexExternalClaimDirectory([string]$ClaimsRoot, [string]$Request
         }
         catch [IO.IOException] {
             # The directory or owner marker belongs to another writer. Preserve it and retry.
+            $lastClaimAllocationError = $_.Exception
         }
     }
-    throw 'Could not allocate a unique external CMD claim directory.'
+    $detail = if ($null -eq $lastClaimAllocationError) { 'unknown allocation failure' } else { $lastClaimAllocationError.Message }
+    throw "Could not allocate a unique external CMD claim directory: $detail"
 }
 
 function New-ESCodexExternalClaimPrepareResult([object]$Identity, [object]$Request, [string]$Directory, [string]$RequestPath) {

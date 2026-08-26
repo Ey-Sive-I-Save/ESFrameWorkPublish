@@ -26,7 +26,10 @@ param(
 )
 
 $ErrorActionPreference='Stop'
-$base=Split-Path $PSScriptRoot -Parent
+$pathPolicy=(Resolve-Path (Join-Path $PSScriptRoot 'ESInteractionPathPolicy.ps1')).Path
+. $pathPolicy
+$projectRoot=Get-ESInteractionProjectRoot
+$base=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $profiles=Get-Content (Join-Path $base 'references/evaluation-profiles.json') -Raw -Encoding utf8|ConvertFrom-Json
 $tree=Get-Content (Join-Path $base 'references/next-step-behavior-tree.json') -Raw -Encoding utf8|ConvertFrom-Json
 $text=if($null -eq $PromptText){''}else{$PromptText.Trim()}
@@ -91,5 +94,5 @@ $next=@($tree.rules|Sort-Object priority -Descending|Where-Object{
 }|Select-Object -First ([int]$tree.maxSuggestions)|ForEach-Object -Begin {$option=0} -Process {$option++;[ordered]@{number=$option;id=$_.id;label=$_.label;reason=$_.reason;risk=$_.risk;requiresUserChoice=[bool]$_.requiresUserChoice;userInput=[string]$option}})
 $result=[ordered]@{schemaVersion=1;skill='es-ai-interaction-governance';profile=$Profile;promptScore=$promptScore;verificationScore=$verificationScore;intentAlignmentScore=$intentAlignmentScore;evidenceQualityScore=$evidenceQualityScore;calibrationScore=$calibrationScore;confidenceScore=$confidenceScore;overallScore=$overallScore;scoreSource='deterministic-assessment';riskNotice=$riskNotice;diagnosticReasons=$diagnosticReasons;objectiveClarity=$objectiveClarity;goalDrift=$goalDrift;runtimeStatus=$runtimeStatus;taskStarted=[bool]$TaskStarted;taskKind=$TaskKind;routeStatus=$RouteStatus;contextFreshness=$ContextFreshness;riskLevel=$RiskLevel;alreadyCollected=[bool]$AlreadyCollected;contextCollectionRecommended=$derivedRecommendation;recommendationReasons=@($recommendationReasons);suppressedBy=@($suppressedBy);decisionSource=$decisionSource;claimsNotProven=@(if($RuntimeRequired){'Runtime behavior not proven'});nextSteps=$next;nonClaims=@('Scores are advisory','Suggestions are not executed')}
 $json=$result|ConvertTo-Json -Depth 8
-if($ReportPath){$full=[IO.Path]::GetFullPath($ReportPath);$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
+if($ReportPath){$full=Resolve-ESInteractionReportPath -Candidate $ReportPath;$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};$full=Resolve-ESInteractionReportPath -Candidate $full;[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
 $json

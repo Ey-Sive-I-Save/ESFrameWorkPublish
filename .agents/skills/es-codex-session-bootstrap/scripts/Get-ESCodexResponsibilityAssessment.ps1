@@ -94,7 +94,7 @@ $clearWinner = $null -ne $top -and $top.Value -ge $minimumDominantNodes -and ($n
 $knownResponsibility = -not [string]::IsNullOrWhiteSpace($ResponsibilityKey) -and $profiles.Contains($ResponsibilityKey)
 $explicitScopeMatchCount = if ($knownResponsibility) { [int]$matchedNodes[$ResponsibilityKey] } else { 0 }
 $explicitScopeAccepted = $knownResponsibility -and $explicitScopeMatchCount -ge $minimumDominantNodes
-$recommended = if ($clearWinner) { [string]$top.Key } elseif ($explicitScopeAccepted) { $ResponsibilityKey } else { '' }
+$recommended = if ($explicitScopeAccepted) { $ResponsibilityKey } elseif ($clearWinner) { [string]$top.Key } else { '' }
 $status = if ($nodes.Count -eq 0 -or $assignedNodeCount -eq 0) { 'insufficient-history' } elseif ($explicitScopeAccepted) { 'assessed' } elseif (-not $clearWinner -or $confidence -lt 0.45) { 'ambiguous-history' } else { 'assessed' }
 $matchesRequested = [string]::IsNullOrWhiteSpace($ResponsibilityKey) -or [string]::Equals($ResponsibilityKey, $recommended, [StringComparison]::OrdinalIgnoreCase)
 

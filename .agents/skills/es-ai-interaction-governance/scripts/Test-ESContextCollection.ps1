@@ -8,5 +8,7 @@ $out=@(& $runner -ProjectRoot $root -TaskKey test-context -PlanHash ('b'*64) -Se
 $r=$out|ConvertFrom-Json
 if($r.decision -ne 'collected' -or @($r.readSet).Count -ne 3 -or $r.readSetHash -notmatch '^[0-9a-f]{64}$'){throw 'positive collection receipt invalid'}
 $failed=$false;try{& $runner -ProjectRoot $root -TaskKey test-context -PlanHash ('b'*64) -Selection skill-only -ReadPaths $paths -OutputPath $temp *> $null}catch{$failed=$true};if(!$failed){throw 'selection mismatch was not rejected'}
-[pscustomobject]@{status='passed';positive='passed';selectionMismatch='passed';runtimeStatus='runtime-not-run'}|ConvertTo-Json
+$rootedReadFailed=$false;try{& $runner -ProjectRoot $root -TaskKey test-context -PlanHash ('b'*64) -Selection skill-only -ReadPaths @((Join-Path $root '.agents/skills/es-ai-interaction-governance/SKILL.md')) -OutputPath $temp *> $null}catch{$rootedReadFailed=$true};if(!$rootedReadFailed){throw 'rooted ReadPath was not rejected'}
+$outputEscapeFailed=$false;try{& $runner -ProjectRoot $root -TaskKey test-context -PlanHash ('b'*64) -Selection skill-only -ReadPaths @($paths[0]) -OutputPath 'ES/Output/InteractionSibling/escape.json' *> $null}catch{$outputEscapeFailed=$true};if(!$outputEscapeFailed){throw 'OutputPath outside ES/Output/Interaction was not rejected'}
+[pscustomobject]@{status='passed';positive='passed';selectionMismatch='passed';rootedReadRejected='passed';outputEscapeRejected='passed';runtimeStatus='runtime-not-run'}|ConvertTo-Json
 exit 0

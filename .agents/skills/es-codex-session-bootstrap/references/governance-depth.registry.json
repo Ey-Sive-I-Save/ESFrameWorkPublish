@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-depth.registry.json",
+  "schemaVersion": 1,
+  "registryId": "es-governance-depth-v1",
+  "defaultMaxDepth": 1,
+  "maxDepth": 2,
+  "entries": [
+    {
+      "reasonCode": "ROUTE.DEPTH_2_AUTHORIZED",
+      "authorizesDepth": 2,
+      "allowedRouteStates": ["extension"],
+      "allowedProfiles": ["SpecializedExtension"]
+    }
+  ]
+}

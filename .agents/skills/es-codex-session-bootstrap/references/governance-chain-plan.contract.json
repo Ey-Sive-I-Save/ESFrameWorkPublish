@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-chain-plan.contract.json",
+  "schemaVersion": 1,
+  "planId": "es-ai-governance-chain-convergence-v1",
+  "unit": "12-block-76-atomic-step",
+  "globalRules": {
+    "defaultMode": "read-only",
+    "aToDWritePolicy": "candidate-artifacts-only",
+    "forbiddenWithoutExplicitAuthorization": ["delete", "merge", "route-change", "catalog-update", "registry-update", "AGENTS-update", "runtime", "release", "git-history"],
+    "authority": "user-current-request",
+    "runtimeClaims": "require-fresh-runtime-receipt",
+    "unknownHandling": "conservative-escalation"
+  },
+  "staticValidation": {
+    "required": true,
+    "keywordAuthorityRefs": [
+      ".agents/skills/es-skill-governance/references/verification-semantics.md",
+      ".agents/skills/es-skill-governance/references/evidence-receipt-contract.md",
+      ".agents/skills/es-ai-interaction-governance/references/interaction-governance-contract.md",
+      "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md"
+    ],
+    "requiredFields": [
+      "validationKeywords",
+      "requiredChecks",
+      "negativeCases",
+      "evidenceReceipt",
+      "verificationState"
+    ],
+    "verificationStates": [
+      "static-passed",
+      "runtime-not-run",
+      "runtime-passed",
+      "runtime-failed",
+      "blocked",
+      "stale"
+    ],
+    "globalKeywords": [
+      "read-only",
+      "candidate-only",
+      "authority",
+      "sourceRef",
+      "contentHash",
+      "stale",
+      "runtime-not-run",
+      "evidence-boundary",
+      "stop-condition"
+    ],
+    "blockOverridesRequired": true,
+    "baselineRef": ".agents/skills/es-codex-session-bootstrap/references/governance-chain-static-validation.baseline.json",
+    "blockOverrides": {
+      "A": {"validationKeywords":["入口清单","范围边界","UTF-8","read-only"],"requiredChecks":["path-scope","encoding","duplicate-entry"],"negativeCases":["scope-over-budget","unreadable-source"],"evidenceReceipt":"candidate-report","verificationState":"static-passed"},
+      "B": {"validationKeywords":["authoritative","P0","sourceRef","conflict","stale"],"requiredChecks":["authority-map","p0-conflict","freshness"],"negativeCases":["conflicting-p0","missing-source-ref"],"evidenceReceipt":"candidate-report","verificationState":"static-passed"},
+      "C": {"validationKeywords":["Skill","route","responsibility","trigger","governance"],"requiredChecks":["skill-structure","route-ambiguity","overlap"],"negativeCases":["multiple-route-match","missing-skill"],"evidenceReceipt":"candidate-report","verificationState":"static-passed"},
+      "D": {"validationKeywords":["Knowledge","SourceRef","ContentHash","StaleWhen","freshness"],"requiredChecks":["hash-drift","stale-when","duplicate-authority"],"negativeCases":["stale-source","missing-content-hash"],"evidenceReceipt":"candidate-report","verificationState":"static-passed"},
+      "E": {"validationKeywords":["core-route","low-risk","resolved","fresh"],"requiredChecks":["deterministic-routing","read-budget","hard-boundary"],"negativeCases":["ambiguous-route","stale-input"],"evidenceReceipt":"design-contract","verificationState":"static-passed"},
+      "F": {"validationKeywords":["extension-route","budget","recursive-expansion","runtime-boundary"],"requiredChecks":["trigger-contract","skill-budget","stop-condition"],"negativeCases":["unbounded-discovery","runtime-overclaim"],"evidenceReceipt":"design-contract","verificationState":"static-passed"},
+      "G": {"validationKeywords":["dedup-candidate","conflict","authority","rollback","no-delete"],"requiredChecks":["candidate-only","impact-map","rollback"],"negativeCases":["uncertain-authority","implicit-delete"],"evidenceReceipt":"candidate-report","verificationState":"static-passed"},
+      "H": {"validationKeywords":["core-chain","read-count","decision-utility","extension-trigger"],"requiredChecks":["deterministic-replay","read-budget","no-false-upgrade"],"negativeCases":["unexpected-extension","missing-boundary"],"evidenceReceipt":"execution-receipt","verificationState":"static-passed"},
+      "I": {"validationKeywords":["extension-chain","duplicate-read","runtime-not-run","evidence-boundary"],"requiredChecks":["bounded-discovery","static-runtime-separation","replay"],"negativeCases":["recursive-load","static-as-runtime"],"evidenceReceipt":"execution-receipt","verificationState":"static-passed"},
+      "J": {"validationKeywords":["runtime-capability","static-passed","runtime-not-run","runtime-passed","runtime-failed"],"requiredChecks":["state-separation","receipt-binding","affected-closure"],"negativeCases":["runtime-status-ambiguous","missing-receipt"],"evidenceReceipt":"capability-matrix","verificationState":"static-passed"},
+      "K": {"validationKeywords":["score-cap","hard-block","evidence-quality","calibration"],"requiredChecks":["score-cap","dimension-dedup","hard-block-preservation"],"negativeCases":["score-overrides-block","report-length-as-quality"],"evidenceReceipt":"design-contract","verificationState":"static-passed"},
+      "L": {"validationKeywords":["affected-closure","unproven","scope-drift","final-report"],"requiredChecks":["regression","claim-boundary","write-audit"],"negativeCases":["unproven-completion","scope-expansion"],"evidenceReceipt":"final-report","verificationState":"static-passed"}
+    }
+  },
+  "blocks": [
+    {"blockId":"A","objective":"治理入口基线","steps":[1,2,3,4],"inputs":["AGENTS.md",".agents/skills","AIWarnings","AIBRAIN_ENTRY.md","KnowledgeIndex.yaml"],"allowedWrites":["candidate-report"],"artifactPath":"ES/Automation/Candidates/governance-entry-inventory.v1.json","budget":{"maxFiles":600,"maxDepth":4},"stopConditions":["authority-unknown","scope-over-budget","encoding-failure"],"evidenceLevel":"S1-static","runtimeStatus":"not-applicable","rollback":"delete-only-generated-candidate-after-explicit-authorization"},
+    {"blockId":"B","objective":"规则权威映射","steps":[5,6,7,8,9],"inputs":["AIWarnings Start","P0 rules","domain rules"],"allowedWrites":["candidate-report"],"artifactPath":"ES/Automation/Candidates/governance-rule-authority-map.v1.json","budget":{"maxRules":300,"maxSourceRefs":600},"stopConditions":["conflicting-p0","stale-source","missing-source-ref"],"evidenceLevel":"S1-static","runtimeStatus":"not-applicable","rollback":"candidate-only"},
+    {"blockId":"C","objective":"Skill职责矩阵","steps":[10,11,12,13,14,15],"inputs":[".agents/skills/*/SKILL.md","governance.json","static-replay.manifest.json"],"allowedWrites":["candidate-report"],"artifactPath":"ES/Automation/Candidates/skill-responsibility-matrix.v1.json","budget":{"maxSkills":128,"maxReferencesPerSkill":24},"stopConditions":["route-ambiguity","duplicate-responsibility","skill-read-failure"],"evidenceLevel":"S1-static","runtimeStatus":"not-applicable","rollback":"candidate-only"},
+    {"blockId":"D","objective":"Knowledge来源与新鲜度映射","steps":[16,17,18,19,20,21],"inputs":["AIBRAIN_ENTRY.md","KnowledgeIndex.yaml","Knowledge SourceRefs"],"allowedWrites":["candidate-report"],"artifactPath":"ES/Automation/Candidates/knowledge-source-freshness-map.v1.json","budget":{"maxEntries":400,"maxSourceRefs":800},"stopConditions":["hash-drift","stale-when-hit","duplicate-authority"],"evidenceLevel":"S1-static","runtimeStatus":"not-applicable","rollback":"candidate-only"},
+    {"blockId":"E","objective":"核心治理链合同","steps":[22,23,24,25,26,27],"inputs":["A-D candidate reports"],"allowedWrites":["design-contract"],"artifactPath":".agents/skills/es-codex-session-bootstrap/references/core-route.contract.json","budget":{"maxSkills":3,"maxKnowledge":3,"maxWarnings":6},"stopConditions":["ambiguous-simple-route","missing-hard-boundary"],"evidenceLevel":"S1-design","runtimeStatus":"not-applicable","rollback":"revert-design-contract"},
+    {"blockId":"F","objective":"扩展治理链合同","steps":[28,29,30,31,32,33],"inputs":["A-D candidate reports","core-route contract"],"allowedWrites":["design-contract"],"artifactPath":".agents/skills/es-codex-session-bootstrap/references/extension-route.contract.json","budget":{"maxSkills":8,"maxKnowledge":12,"maxWarnings":24,"recursiveExpansion":false},"stopConditions":["budget-exceeded","unbounded-recursion","runtime-confusion"],"evidenceLevel":"S1-design","runtimeStatus":"not-applicable","rollback":"revert-design-contract"},
+    {"blockId":"G","objective":"去重候选与冲突报告","steps":[34,35,36,37,38,39,40,41],"inputs":["A-D reports","E-F contracts"],"allowedWrites":["candidate-report"],"artifactPath":"ES/Automation/Candidates/governance-dedup-candidate-report.v1.json","budget":{"maxMappings":1000},"stopConditions":["authority-uncertain","migration-impact-unknown","conflict-unresolved"],"evidenceLevel":"S1-static","runtimeStatus":"not-applicable","rollback":"candidate-only-no-delete"},
+    {"blockId":"H","objective":"核心链真实样例","steps":[42,43,44,45,46,47],"inputs":["core-route contract","simple read-only task"],"allowedWrites":["execution-receipt"],"artifactPath":"ES/Automation/Runs/GovernanceChain/core-route-sample.v1.json","budget":{"maxReads":80,"maxSkills":3},"stopConditions":["unexpected-extension","missing-boundary","decision-utility-drop"],"evidenceLevel":"S2-static-execution","runtimeStatus":"runtime-not-run-unless-authorized","rollback":"retain-receipt-no-source-mutation"},
+    {"blockId":"I","objective":"扩展链真实样例","steps":[48,49,50,51,52,53],"inputs":["extension-route contract","cross-module task"],"allowedWrites":["execution-receipt"],"artifactPath":"ES/Automation/Runs/GovernanceChain/extension-route-sample.v1.json","budget":{"maxReads":220,"maxSkills":8},"stopConditions":["duplicate-read-over-budget","static-runtime-overclaim","unbounded-discovery"],"evidenceLevel":"S2-static-execution","runtimeStatus":"runtime-not-run-unless-authorized","rollback":"retain-receipt-no-source-mutation"},
+    {"blockId":"J","objective":"Runtime能力矩阵","steps":[54,55,56,57,58,59,60,61],"inputs":["H-I receipts","runtime acceptance contracts"],"allowedWrites":["capability-matrix"],"artifactPath":"ES/Automation/Candidates/runtime-capability-matrix.v1.json","budget":{"maxCapabilities":80},"stopConditions":["runtime-status-ambiguous","missing-receipt-contract"],"evidenceLevel":"S1-static-until-runtime-receipt","runtimeStatus":"per-capability","rollback":"revert-matrix-only"},
+    {"blockId":"K","objective":"评分与收尾合同","steps":[62,63,64,65,66,67,68],"inputs":["interaction governance contract","H-I receipts","J matrix"],"allowedWrites":["design-contract"],"artifactPath":".agents/skills/es-ai-interaction-governance/references/governance-score.contract.json","budget":{"maxDimensions":6},"stopConditions":["score-overrides-hard-block","missing-evidence-cap","duplicate-dimension"],"evidenceLevel":"S1-design","runtimeStatus":"not-applicable","rollback":"revert-design-contract"},
+    {"blockId":"L","objective":"治理回归与收尾","steps":[69,70,71,72,73,74,75,76],"inputs":["A-K artifacts and receipts"],"allowedWrites":["final-report"],"artifactPath":"ES/Automation/Runs/GovernanceChain/final-convergence-report.v1.json","budget":{"maxScope":"affected-closure-only"},"stopConditions":["unproven-completion","scope-drift","unresolved-authority-conflict"],"evidenceLevel":"S2-static-summary","runtimeStatus":"runtime-not-run-unless-authorized","rollback":"retain-report-no-source-mutation"}
+  ]
+}

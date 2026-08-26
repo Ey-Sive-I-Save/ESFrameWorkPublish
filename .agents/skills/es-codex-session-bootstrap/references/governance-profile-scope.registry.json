@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-profile-scope.registry.json",
+  "schemaVersion": 1,
+  "registryId": "es-governance-profile-scope-v1",
+  "scopeKinds": ["project-object", "project-global", "task-object", "context-object"],
+  "profiles": [
+    { "id": "StaticDevelopment", "scopeKinds": ["task-object", "context-object"], "scopePatterns": ["^task:[A-Za-z0-9][A-Za-z0-9._/-]*$", "^context:[A-Za-z0-9][A-Za-z0-9._/-]*$"] },
+    { "id": "HIAcceptance", "scopeKinds": ["context-object"], "scopePatterns": ["^context:HIAcceptance$"] },
+    { "id": "ContractValidation", "scopeKinds": ["context-object"], "scopePatterns": ["^context:contract:[A-Za-z0-9][A-Za-z0-9._/-]*$"] },
+    { "id": "ProjectAcceptance", "scopeKinds": ["project-object", "project-global"], "scopePatterns": ["^project:object:[A-Za-z0-9][A-Za-z0-9._/-]*$", "^project:global$"] },
+    { "id": "SpecializedExtension", "scopeKinds": ["task-object", "context-object"], "scopePatterns": ["^task:[A-Za-z0-9][A-Za-z0-9._/-]*$", "^context:[A-Za-z0-9][A-Za-z0-9._/-]*$"] }
+  ]
+}

@@ -6,6 +6,8 @@
   "nonExecutionExemptions": [
     {"skillName":"es-adversarial-review","reason":"只生成审查结论和证据建议，不直接修改项目或启动外部执行。","allowedOutputs":["review-report","evidence-plan"]},
     {"skillName":"es-aibrain-route-authoring","reason":"自主/ManagedAIBrain 模式只生成候选路由与 Knowledge 变更；当前用户明确要求正式写入时可直接实施。","allowedOutputs":["route-candidate","knowledge-candidate"]},
+    {"skillName":"es-ai-collaboration-menu","reason":"只渲染确定性协作菜单和路由候选，不分派选项、不修改项目，也不启动会话或外部执行。","allowedOutputs":["collaboration-menu","route-candidate","non-persistent-decision-receipt"]},
+    {"skillName":"es-ai-interaction-governance","reason":"只评估可观察证据并生成收尾与下一步候选，不执行候选动作，也不修改业务或任务生命周期状态。","allowedOutputs":["evidence-assessment","interaction-closeout","next-step-candidate"]},
     {"skillName":"es-first-principles-analysis","reason":"只做分析和方案分解，明确禁止更新项目状态。","allowedOutputs":["analysis","design-proposal"]},
     {"skillName":"es-migration-planning","reason":"只生成可回滚迁移计划和兼容性证据，不直接实施迁移。","allowedOutputs":["migration-plan","rollback-matrix"]},
     {"skillName":"es-ui-intent-authoring","reason":"只生成 IntentSpec 候选与静态验证证据，不写入 Unity 资产或启动 Runtime。","allowedOutputs":["intent-spec-candidate","static-evidence"]},
@@ -25,6 +27,7 @@
     {"skillName":"es-unity-compile","commandId":"compile.reload-memory.review","commandHash":"d69252726568fd002db596ae243a7708c1d00de2fec3a79003cfed306f9cdfda","role":"review","riskLevel":"L1","writeMode":"read-only","bodyContains":["命令类型","风险等级"]},
     {"skillName":"es-publish-aitest-prompt","commandId":"estest.start","commandHash":"733379e8f2879bcc16b683104f4ad4ce29f4d2a1f92bbf2936605d55086c765b","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
     {"skillName":"es-task-read-snapshot","commandId":"task.read-snapshot.write","commandHash":"7a2a960f90c6fc32e26a64806880de01fdfbb5ca31be0c85a2f3cb075a3aa5c0","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-task-context-runtime","commandId":"task.context-runtime.mutate","commandHash":"ac8e41b425e3ede7f8ae7748768b9620e4d357f6c92fae7403e2300968e65fab","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["commandId: task.context-runtime.mutate","TaskRevision","ContextVersion","runtime-not-run"],"taskContractRequired":true,"taskContractRef":"ES/Automation/Contracts/es-task-context-runtime-v1.schema.json"},
     {"skillName":"es-codex-session-bootstrap","commandId":"session.handoff.execute","commandHash":"ade969450cf1d929020e2f94b20abaa9dc78712a42861c3c444565a33bf96e55","role":"controlled-execution","riskLevel":"L3","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
     {"skillName":"es-skill-creator","commandId":"skill.create.candidate","commandHash":"4834cf042c0758c6e2fdbeff49c9ce58dbd8dee968ce4cea159a0af1f01c06f9","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","默认改文件","禁止事项"]},
     {"skillName":"es-knowledge-creator","commandId":"knowledge.entry.update","commandHash":"9abb93f4bedd67ea1d2560655efddc4a2eb16ad6110398b24d98fe008320e1d7","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","SourceRef","ContentHash"]},

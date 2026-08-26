@@ -2,13 +2,14 @@
 param([Parameter(Mandatory=$true)][string]$PromptText,[string]$ContextJson="{}")
 $ErrorActionPreference="Stop"
 $OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
-$root=Split-Path $PSScriptRoot -Parent
-$options=Get-Content -LiteralPath (Join-Path $root "references/menu-options.json") -Raw -Encoding utf8|ConvertFrom-Json
-$sessionSubmenu=Get-Content -LiteralPath (Join-Path $root "references/session-submenu.json") -Raw -Encoding utf8|ConvertFrom-Json
-$intentRules=Get-Content -LiteralPath (Join-Path $root "references/intent-rules.json") -Raw -Encoding utf8|ConvertFrom-Json
-$areaRules=Get-Content -LiteralPath (Join-Path $root "references/area-rules.json") -Raw -Encoding utf8|ConvertFrom-Json
-$negationRules=Get-Content -LiteralPath (Join-Path $root "references/negation-rules.json") -Raw -Encoding utf8|ConvertFrom-Json
-$submenuCatalog=Get-Content -LiteralPath (Join-Path $root "references/menu-submenus.json") -Raw -Encoding utf8|ConvertFrom-Json
+$root=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$referencesRoot=(Resolve-Path (Join-Path $root 'references')).Path
+$options=Get-Content -LiteralPath (Join-Path $referencesRoot "menu-options.json") -Raw -Encoding utf8|ConvertFrom-Json
+$sessionSubmenu=Get-Content -LiteralPath (Join-Path $referencesRoot "session-submenu.json") -Raw -Encoding utf8|ConvertFrom-Json
+$intentRules=Get-Content -LiteralPath (Join-Path $referencesRoot "intent-rules.json") -Raw -Encoding utf8|ConvertFrom-Json
+$areaRules=Get-Content -LiteralPath (Join-Path $referencesRoot "area-rules.json") -Raw -Encoding utf8|ConvertFrom-Json
+$negationRules=Get-Content -LiteralPath (Join-Path $referencesRoot "negation-rules.json") -Raw -Encoding utf8|ConvertFrom-Json
+$submenuCatalog=Get-Content -LiteralPath (Join-Path $referencesRoot "menu-submenus.json") -Raw -Encoding utf8|ConvertFrom-Json
 $allowed=@("taskKind","projectArea","routeStatus","contextFreshness","riskLevel")
 $sets=@{taskKind=@("create","iterate","govern","validate","discover","collaborate","unknown");projectArea=@("gamecore","resource","entity","input","editor","ui","shader","graph","session","unknown");routeStatus=@("resolved","ambiguous","missing","unknown");contextFreshness=@("fresh","stale","unknown");riskLevel=@("low","high","unknown")}
 if([string]::IsNullOrWhiteSpace($PromptText)){throw "PromptText must not be empty."}
@@ -66,5 +67,5 @@ foreach($option in @($options.options)) {
 $primaryIntent="unknown";if($orderedIntents.Count -gt 0){$primaryIntent=[string]$orderedIntents[0].id}
 $compound=@($compoundPlan|ForEach-Object {[ordered]@{id=$_.id;optionId=$_.optionId;operation=$_.operation;order=([array]::IndexOf($compoundPlan,$_) + 1)}})
 $intent=[ordered]@{primary=$primaryIntent;operation=$operation;confidence=$confidence;candidates=@($rankedIntents|Select-Object -First 3|ForEach-Object {[ordered]@{id=$_.id;optionId=$_.optionId;operation=$_.operation;weight=$_.weight;matchedTerm=$_.matchedTerm}});negatedIntents=@($negatedIntents|Select-Object -Unique);compoundPlan=$compound;conflicts=@();requiresClarification=($confidence -eq "low" -and $rankedIntents.Count -gt 0);inferredProjectArea=$inferredArea;evidence=@($evidence|Select-Object -Unique);userSignalsAreOptional=$true}
-$sha=[Security.Cryptography.SHA256]::Create();$promptHash=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text))).Replace("-","")).ToLowerInvariant();$rulesHash=(Get-FileHash -LiteralPath (Join-Path $root "references/intent-rules.json") -Algorithm SHA256).Hash.ToLowerInvariant();$menuHash=(Get-FileHash -LiteralPath (Join-Path $root "references/menu-options.json") -Algorithm SHA256).Hash.ToLowerInvariant()
+$sha=[Security.Cryptography.SHA256]::Create();$promptHash=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text))).Replace("-","")).ToLowerInvariant();$rulesHash=(Get-FileHash -LiteralPath (Join-Path $referencesRoot "intent-rules.json") -Algorithm SHA256).Hash.ToLowerInvariant();$menuHash=(Get-FileHash -LiteralPath (Join-Path $referencesRoot "menu-options.json") -Algorithm SHA256).Hash.ToLowerInvariant()
 [ordered]@{schemaVersion=1;menuId=[string]$options.menuId;promptText=$text;signals=$signals;intent=$intent;recommendedOptionId=$recommended;recommendedSubmenuId=$recommendedSubmenu;recommendationReason=$reason;decisionSource=$decisionSource;capabilityPolicy=[ordered]@{canPresent=$true;canRecommend=$true;canInterpretIntent=$true;canRoute=$true;canDispatch=$false;canWrite=$false;canRunRuntime=$false;canStartProcess=$false;canUseNetwork=$false;canChangeGit=$false;canPublish=$false};decisionReceipt=[ordered]@{receiptType="menu-decision";promptHash=$promptHash;intentRulesHash=$rulesHash;menuSchemaHash=$menuHash;selectedOptionId=$null;readSet=@();runtimeStatus="runtime-not-run";nonClaims=@("Inference is not project fact","No action executed")};options=$rendered;nonClaims=@("Menu and submenu options are navigation only","Natural-language intent is an interpretation, not authoritative project fact","No option was executed","Fork is not window handoff","Window handoff requires the session bootstrap Skill and its acceptance gate","No write, Runtime, Git, network, release, or credential authority was granted")}|ConvertTo-Json -Depth 14

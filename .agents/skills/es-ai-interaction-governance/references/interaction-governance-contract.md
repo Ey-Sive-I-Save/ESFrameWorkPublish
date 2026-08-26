@@ -1,5 +1,13 @@
 # Interaction Governance Contract
 
+## Path and hook boundary
+
+- Persistent `ReportPath` and `OutputPath` values must be project-relative or resolve inside the project, and are accepted only below `ES/Output/Interaction` after canonical containment and reparse-point checks; escaping paths are rejected.
+- Transcript conversion may additionally write one short-lived intermediate file below the operating system Temp root; no other external output root is accepted.
+- Read-only evidence inputs are limited to the current project or system Temp. Explicit Codex transcript paths remain read-only host inputs and must resolve to an existing `.jsonl` file.
+- SessionId lookup may read only the approved external user-profile state root at `CODEX_HOME/sessions`; it never writes that root.
+- `Invoke-ESInteractionCloseoutHook.ps1` may invoke only the exact built-in closeout script. `CloseoutScriptPath` is compatibility input for identity confirmation, not an extension point.
+
 ## Intent contract gate
 
 For work that changes user-visible behavior, lifecycle, state, defaults, recovery, or an automatic action, produce a versioned intent contract before implementation. The contract is a task-scoped boundary, not a permanent AIWarning or an authorization token.

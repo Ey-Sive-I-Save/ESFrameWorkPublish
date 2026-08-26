@@ -17,6 +17,7 @@ description: >-
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- Run `scripts/Test-ESGovernanceChainContract.ps1` before reporting any new or modified governance-chain Block Contract as ready; its P0 failure is fail-closed.
 - Read [the task closeout contract](references/task-closeout-contract.md) once per session start/refresh; cache its hash and use it for final summaries without rereading every task.
 - When the task involves Skill, writes, validation, or completion claims, consume the evidence-first closeout from `es-ai-interaction-governance/scripts/Invoke-ESInteractionCloseout.ps1`; do not manually recreate its status or findings.
 - MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
@@ -24,6 +25,7 @@ description: >-
 ## Workflow controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
+- Any new or modified governance-chain Block Contract must pass `scripts/Test-ESGovernanceChainContract.ps1` before it may be reported as ready. Missing Static validation keywords/checks/negative cases/evidence receipt or an A-D write expansion is a P0 hard block; a score or prose report cannot override the failed gate.
 - A current user request directly authorizes the named session or project change. Session, Git/history, external, Runtime and audit-state actions must be explicitly named; when they are, AIBrain and AICommand are optional unless the selected host endpoint technically requires them.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 - The short-lived `ES_CODEX_LAUNCH_TOKEN` is a non-secret session marker, never a credential; it carries only the minimum launch capability and is not persisted as user authentication.

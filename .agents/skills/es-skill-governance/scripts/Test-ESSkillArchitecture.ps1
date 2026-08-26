@@ -135,9 +135,14 @@ if(-not (Test-Path $manifestPath)){
         $manifestNames=@($manifest.skills|ForEach-Object {[string]$_.skillName});$actualNames=@($skillDirectories|ForEach-Object {[string]$_.Name})
         if($manifestNames.Count -ne $actualNames.Count -or @($actualNames|Where-Object {$manifestNames -notcontains $_}).Count -gt 0){[void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-skill-set-mismatch';skill='*';detail='Registry manifest Skill set does not match direct Skill roots.'})}
         foreach($record in @($manifest.skills)){
-            $name=[string]$record.skillName;$dir=Join-Path $root ".agents/skills/$name";$govPath=Join-Path $dir 'governance.json';$skillPath=Join-Path $dir 'SKILL.md'
+            $name=[string]$record.skillName;$dir=Join-Path $root ".agents/skills/$name";$govPath=Join-Path $dir 'governance.json';$skillPath=Join-Path $dir 'SKILL.md';$evidenceBindingPath=Join-Path $dir 'evidence-contract.binding.json'
             if(-not (Test-Path $skillPath) -or -not (Test-Path $govPath)){continue}
             if([string]$record.skillHash -ne (Hash $skillPath) -or [string]$record.governanceHash -ne (Hash $govPath)){[void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-skill-hash-stale';skill=$name;detail='Registry Skill or governance hash is stale.'})}
+            if(-not (Test-Path $evidenceBindingPath -PathType Leaf)){
+                [void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-evidence-binding-missing';skill=$name;detail='Registry Skill is missing evidence-contract.binding.json.'})
+                continue
+            }
+            if([string]$record.evidenceContractBindingHash -ne (Hash $evidenceBindingPath)){[void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-evidence-binding-hash-stale';skill=$name;detail='Registry Evidence contract binding hash is stale.'})}
         }
     } catch { [void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-manifest-invalid';skill='*';detail=$_.Exception.Message}) }
 }

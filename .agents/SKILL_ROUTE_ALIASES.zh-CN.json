@@ -50,6 +50,7 @@
     "es-start-estest": ["启动ESTest", "ES测试启动", "测试环境初始化"],
     "es-static-deep-replay": ["静态深度回放", "静态确定性重放", "源码验收回放"],
     "es-tag-config": ["Tag配置", "标签配置治理", "稳定标签键设计"],
+    "es-task-context-runtime": ["任务上下文运行时", "任务状态机", "上下文状态机", "平台完成判定", "交付接受状态", "任务完成回执"],
     "es-task-read-snapshot": ["任务读取快照", "文件读取缓存", "解析投影和Hash缓存"],
     "es-test-fixture-authoring": ["测试夹具编写", "Fixture场景构建", "测试备份夹具"],
     "es-ui-intent-authoring": ["UI意图编写", "界面意图设计", "UI目标装配"],

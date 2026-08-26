@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-minimal-admission.contract.json",
+  "schemaVersion": 1,
+  "contractId": "es-governance-minimal-admission-v1",
+  "decisionModel": "routeState/evidenceState/effect",
+  "defaultRoute": "core",
+  "coreAdmission": [
+    { "id": "objective-resolved", "predicate": "target object and action are explicit", "failureReasonCode": "ROUTE.TARGET_AMBIGUOUS" },
+    { "id": "scope-resolved", "predicate": "requested scope is unique and within user-directed scope", "failureReasonCode": "AUTH.SCOPE_UNRESOLVED" },
+    { "id": "authority-route-readable", "predicate": "required authority entry and required SourceRefs are readable", "failureReasonCode": "AUTHORITY.REQUIRED_SOURCE_UNREADABLE" },
+    { "id": "required-freshness-checked", "predicate": "required SourceRefs have a current snapshot or an explicit stale decision", "failureReasonCode": "SOURCE.STALE_REQUIRED" },
+    { "id": "action-boundary-safe", "predicate": "no direct P0, authorization, or destructive-boundary violation is observed", "failureReasonCode": "P0.DIRECT_VIOLATION" },
+    { "id": "read-budget-available", "predicate": "the next required read is within the core budget", "failureReasonCode": "BUDGET.NEXT_READ_EXCEEDED" }
+  ],
+  "notRequiredForCore": [
+    "full Knowledge freshness",
+    "H receipt",
+    "I receipt",
+    "Runtime receipt",
+    "optional capability availability",
+    "unrelated source freshness"
+  ],
+  "extensionTriggers": [
+    { "id": "cross-domain-authority", "reasonCode": "ROUTE.EXTENSION_TRIGGERED", "predicate": "the target requires a second bounded authority domain" },
+    { "id": "specialized-profile", "reasonCode": "ROUTE.SPECIALIZED_PROFILE_REQUIRED", "predicate": "the requested Profile is not covered by core checks" }
+  ],
+  "depthPolicy": {
+    "defaultMaximum": 1,
+    "explicitReasonMaximum": 2,
+    "unboundedRecursion": "forbidden",
+    "depthTwoReasonPrefix": "ROUTE.DEPTH_2_"
+  },
+  "falsePositiveCases": [
+    "runtime-not-run does not block a static development Profile",
+    "missing optional capability does not block the project",
+    "unrelated stale SourceRef does not block the current scope",
+    "missing H/I receipt does not block an unrelated development Profile",
+    "budget exhaustion stops the next read instead of denying an already authorized action"
+  ],
+  "alternativePath": "retain the current route and cap only the affected evidence claim",
+  "recovery": "re-read only the affected SourceRefs or select the explicitly bounded extension Profile",
+  "rollback": "discard the decision record and re-evaluate from the same snapshot"
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-route-decision-table.json",
+  "schemaVersion": 1,
+  "tableId": "es-governance-route-decision-v1",
+  "defaultMaxExtensionDepth": 1,
+  "maxExtensionDepth": 2,
+  "unknownState": { "routeState": "core", "effect": "review", "outcome": "retain-current-scope" },
+  "effectPrecedence": ["hard-block", "stop-next-read", "claim-cap", "review"],
+  "transitions": [
+    { "from": "core", "trigger": "declared-cross-domain-dependency", "to": "extension", "reasonCode": "ROUTE.EXTENSION_TRIGGERED" },
+    { "from": "extension", "trigger": "registered-depth-2-reason-and-profile", "to": "extension", "reasonCode": "ROUTE.DEPTH_2_AUTHORIZED" },
+    { "from": "core", "trigger": "direct-P0-or-authorization-violation", "to": "blocked", "reasonCode": "P0.DIRECT_VIOLATION" },
+    { "from": "core", "trigger": "required-source-stale-in-current-profile", "to": "blocked", "reasonCode": "SOURCE.STALE_REQUIRED" }
+  ],
+  "forbiddenGlobalProjections": [
+    "runtime-not-run->project-global-blocked",
+    "optional-capability->project-global-blocked",
+    "optional-stale->project-global-blocked",
+    "budget-overflow->project-global-blocked",
+    "missing-receipt->project-global-blocked"
+  ]
+}

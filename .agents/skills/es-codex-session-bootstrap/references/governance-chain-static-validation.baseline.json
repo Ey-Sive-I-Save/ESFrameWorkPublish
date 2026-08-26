@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "es-governance-chain-static-validation-v1",
+  "requiredByBlock": {
+    "A": {"validationKeywords":["入口清单","范围边界","UTF-8","read-only"],"requiredChecks":["path-scope","encoding","duplicate-entry"],"negativeCases":["scope-over-budget","unreadable-source"]},
+    "B": {"validationKeywords":["authoritative","P0","sourceRef","conflict","stale"],"requiredChecks":["authority-map","p0-conflict","freshness"],"negativeCases":["conflicting-p0","missing-source-ref"]},
+    "C": {"validationKeywords":["Skill","route","responsibility","trigger","governance"],"requiredChecks":["skill-structure","route-ambiguity","overlap"],"negativeCases":["multiple-route-match","missing-skill"]},
+    "D": {"validationKeywords":["Knowledge","SourceRef","ContentHash","StaleWhen","freshness"],"requiredChecks":["hash-drift","stale-when","duplicate-authority"],"negativeCases":["stale-source","missing-content-hash"]},
+    "E": {"validationKeywords":["core-route","low-risk","resolved","fresh"],"requiredChecks":["deterministic-routing","read-budget","hard-boundary"],"negativeCases":["ambiguous-route","stale-input"]},
+    "F": {"validationKeywords":["extension-route","budget","recursive-expansion","runtime-boundary"],"requiredChecks":["trigger-contract","skill-budget","stop-condition"],"negativeCases":["unbounded-discovery","runtime-overclaim"]},
+    "G": {"validationKeywords":["dedup-candidate","conflict","authority","rollback","no-delete"],"requiredChecks":["candidate-only","impact-map","rollback"],"negativeCases":["uncertain-authority","implicit-delete"]},
+    "H": {"validationKeywords":["core-chain","read-count","decision-utility","extension-trigger"],"requiredChecks":["deterministic-replay","read-budget","no-false-upgrade"],"negativeCases":["unexpected-extension","missing-boundary"]},
+    "I": {"validationKeywords":["extension-chain","duplicate-read","runtime-not-run","evidence-boundary"],"requiredChecks":["bounded-discovery","static-runtime-separation","replay"],"negativeCases":["recursive-load","static-as-runtime"]},
+    "J": {"validationKeywords":["runtime-capability","static-passed","runtime-not-run","runtime-passed","runtime-failed"],"requiredChecks":["state-separation","receipt-binding","affected-closure"],"negativeCases":["runtime-status-ambiguous","missing-receipt"]},
+    "K": {"validationKeywords":["score-cap","hard-block","evidence-quality","calibration"],"requiredChecks":["score-cap","dimension-dedup","hard-block-preservation"],"negativeCases":["score-overrides-block","report-length-as-quality"]},
+    "L": {"validationKeywords":["affected-closure","unproven","scope-drift","final-report"],"requiredChecks":["regression","claim-boundary","write-audit"],"negativeCases":["unproven-completion","scope-expansion"]}
+  }
+}

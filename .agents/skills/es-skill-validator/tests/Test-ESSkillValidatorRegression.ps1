@@ -62,6 +62,47 @@ try {
     $boundaryJson=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Boundary') 2>$null | ConvertFrom-Json
     if([string]$boundaryJson.overallVerdict -ne 'StaticBoundaryBlocked'){throw 'external boundary was not classified as StaticBoundaryBlocked'}
     if([string]$boundaryJson.staticCodeStatus -ne 'passed' -or [string]$boundaryJson.blockingLayer -ne 'static-boundary'){throw 'external boundary leaked into static code layer'}
+    $dynamicExecution=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false}) '& $commandPath'
+    $dynamicExecRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Boundary') 2>$null|Out-String
+    $dynamicExecExit=$LASTEXITCODE;$dynamicExecJson=$dynamicExecRaw|ConvertFrom-Json
+    if(@($dynamicExecJson.results[0].findings|Where-Object {$_.code -eq 'indirect-execution' -and $_.severity -eq 'blocked'}).Count -ne 1 -or $dynamicExecExit -ne 1){throw 'Unbound dynamic command invocation was not hard-blocked'}
+    $methodCall=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false}) '$changes.Add((New-RefreshFinding -Source $value))'
+    $methodJson=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Boundary') 2>$null | ConvertFrom-Json
+    if(@($methodJson.results[0].findings|Where-Object code -eq 'indirect-execution').Count -ne 0){throw 'PowerShell method call/Source parameter was misclassified as indirect execution'}
+    $rawSignal=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false}) '$fixture = "Invoke-WebRequest is a denied negative case"'
+    $securityRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Security') 2>$null|Out-String
+    $securityExit=$LASTEXITCODE;$securityJson=$securityRaw|ConvertFrom-Json
+    if([string]$securityJson.results[0].status -ne 'review' -or $securityExit -ne 0){throw 'Raw security wording was promoted to a hard block'}
+    $network=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false}) 'Invoke-WebRequest -Uri $uri'
+    $networkRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Boundary') 2>$null|Out-String
+    $networkExit=$LASTEXITCODE;$networkJson=$networkRaw|ConvertFrom-Json
+    if(@($networkJson.results[0].findings|Where-Object {$_.code -eq 'network-undeclared' -and $_.severity -eq 'blocked'}).Count -ne 1 -or $networkExit -ne 1){throw 'Undeclared executable network call was not hard-blocked'}
+    $secret=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false}) '$token = Get-Content -LiteralPath $env:API_KEY'
+    $secretRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Boundary') 2>$null|Out-String
+    $secretExit=$LASTEXITCODE;$secretJson=$secretRaw|ConvertFrom-Json
+    if(@($secretJson.results[0].findings|Where-Object {$_.code -eq 'secret-access' -and $_.severity -eq 'blocked'}).Count -ne 1 -or $secretExit -ne 1){throw 'Executable secret access was not hard-blocked'}
+    $emptyCatch=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false}) 'try { Get-Item x } catch { }'
+    $catchRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Boundary') 2>$null|Out-String
+    $catchExit=$LASTEXITCODE;$catchJson=$catchRaw|ConvertFrom-Json
+    if(@($catchJson.results[0].findings|Where-Object {$_.code -eq 'exception-swallowing' -and $_.severity -eq 'blocked'}).Count -ne 1 -or $catchExit -ne 1){throw 'Empty PowerShell catch was not hard-blocked by AST analysis'}
+    $staticOnlyProfiles=[ordered]@{
+        StaticReview=[ordered]@{required=@('schema');runtimeRequired=$false;staticWeight=1.0;runtimeWeight=0.0;staticDeepReplayRequired=$true;runtimeAuthorizationRequired=$false}
+        EngineeringReadiness=[ordered]@{required=@('StaticReview');runtimeRequired=$false;staticWeight=1.0;runtimeWeight=0.0;staticDeepReplayRequired=$true;runtimeAuthorizationRequired=$false}
+    }
+    $staticOnly=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false;verificationProfiles=$staticOnlyProfiles;runtimeNotRunPolicy='runtime-not-run does not block StaticReview';defaultVerificationOrder='StaticDeepReplay-first';runtimeExecutionPolicy='not-applicable';developerAuthorizationRequired=$false;staticDeepReplayRequired=$true;staticDeepReplayCases=@('normal-input','invalid-input','denied-expansion','repeat-idempotency','hash-change-cache-invalidation','interruption-recovery','deterministic-output');runtimeHardGate='not-applicable'})
+    $staticOnlyRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('VerificationSemantics') 2>$null|Out-String
+    $staticOnlyExit=$LASTEXITCODE;$staticOnlyJson=$staticOnlyRaw|ConvertFrom-Json
+    if($staticOnlyExit -ne 0 -or [string]$staticOnlyJson.results[0].status -ne 'passed'){throw 'not-applicable Runtime policy did not accept a closed Static-only profile'}
+    $invalidStaticProfiles=$staticOnlyProfiles|ConvertTo-Json -Depth 8|ConvertFrom-Json
+    $invalidStaticProfiles.StaticReview.runtimeWeight=0.1
+    $invalidStatic=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false;verificationProfiles=$invalidStaticProfiles;runtimeNotRunPolicy='runtime-not-run does not block StaticReview';defaultVerificationOrder='StaticDeepReplay-first';runtimeExecutionPolicy='not-applicable';developerAuthorizationRequired=$false;staticDeepReplayRequired=$true;staticDeepReplayCases=@('normal-input','invalid-input','denied-expansion','repeat-idempotency','hash-change-cache-invalidation','interruption-recovery','deterministic-output');runtimeHardGate='not-applicable'})
+    $invalidStaticRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('VerificationSemantics') 2>$null|Out-String
+    $invalidStaticExit=$LASTEXITCODE;$invalidStaticJson=$invalidStaticRaw|ConvertFrom-Json
+    if($invalidStaticExit -ne 1 -or [string]$invalidStaticJson.results[0].status -ne 'blocked'){throw 'not-applicable Runtime policy accepted a non-zero Runtime weight'}
+    $runtimePolicy=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='read-only';requiresBrainPlan=$false;allowDirectExecution=$false;writePolicy='read-only';authorityClass='standard';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='none';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false;verificationProfiles=$staticOnlyProfiles;runtimeNotRunPolicy='runtime-not-run does not block StaticReview';defaultVerificationOrder='StaticDeepReplay-first';runtimeExecutionPolicy='explicit-developer-authorization-only';developerAuthorizationRequired=$true;staticDeepReplayRequired=$true;staticDeepReplayCases=@('normal-input','invalid-input','denied-expansion','repeat-idempotency','hash-change-cache-invalidation','interruption-recovery','deterministic-output');runtimeHardGate='runtime-required && runtime-not-run => Blocked';runtimeAuthorizationContractRef='.agents/skills/es-skill-governance/references/runtime-authorization-contract.md';runtimeAuthorizationValidator='.agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1'})
+    $runtimePolicyRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('VerificationSemantics') 2>$null|Out-String
+    $runtimePolicyExit=$LASTEXITCODE;$runtimePolicyJson=$runtimePolicyRaw|ConvertFrom-Json
+    if($runtimePolicyExit -ne 1 -or [string]$runtimePolicyJson.results[0].status -ne 'blocked' -or [string]$runtimePolicyJson.results[0].message -notmatch 'RuntimeAcceptance'){throw 'Runtime-capable policy no longer requires the four verification profiles'}
     $evidenceRaw=& powershell -NoProfile -File $invoke -ProjectRoot $temp -SkillName es-fixture -Profile @('Evidence') 2>$null | Out-String
     $evidenceExit=$LASTEXITCODE
     $evidenceJson=$evidenceRaw|ConvertFrom-Json
@@ -106,6 +147,10 @@ try {
     $managedValidExit=$LASTEXITCODE;$managedValidJson=$managedValidRaw|ConvertFrom-Json
     if([string]$managedValidJson.status -ne 'passed' -or [string]$managedValidJson.results[0].status -ne 'passed' -or $managedValidExit -ne 0){throw 'ManagedAIBrain valid PlanHash receipt did not pass'}
 
+    # Architecture lane isolation needs a Skill that actually declares a
+    # managed-channel side effect without a command binding.
+    $architectureFixture=Write-Fixture ([ordered]@{schemaVersion=1;skillName='es-fixture';tier='SmallTool';maturity='Stable';delivery='Implemented';evidenceLevel='S1';riskClass='test';executionMode='managed';requiresBrainPlan=$true;allowDirectExecution=$false;writePolicy='report-only';authorityClass='core-governed';owner='test';acceptanceOwner='test';requiredCases=@('positive');routeKeys=@('fixture');commandRequirement='required';commandBindings=@();requiredAuthorityRefs=@();taskContractRequired=$false})
+
     $policyPath=Join-Path $temp '.agents/SKILL_DISCOVERY_POLICY.json'
     $resourcePath=Join-Path $temp '.agents/SKILL_RESOURCE_INDEX.yaml'
     $catalogPath=Join-Path $temp '.agents/SKILL_CATALOG.yaml'
@@ -122,9 +167,10 @@ try {
     [IO.File]::WriteAllText($knowledgePath,"entries:`n  - knowledgeId: fixture`n    routeKeys: [fixture]`n    relatedSkills: [es-fixture]`n",$fixtureUtf8)
     [IO.File]::WriteAllText($brainPath,"# Fixture AIBrain`n",$fixtureUtf8)
     [IO.File]::WriteAllText($bindingPath,([ordered]@{entries=@();nonExecutionExemptions=@()}|ConvertTo-Json -Depth 6),$fixtureUtf8)
+    [IO.File]::WriteAllText((Join-Path $skillRoot 'evidence-contract.binding.json'),"{}`n",$fixtureUtf8)
     $metadata=[ordered]@{}
     foreach($metadataRelative in @('.agents/SKILL_DISCOVERY_POLICY.json','.agents/SKILL_RESOURCE_INDEX.yaml','.agents/SKILL_CATALOG.yaml','Documentation/AIKnowledge/AIBRAIN_ENTRY.md','Assets/Plugins/ES/AICommands/AICommandCatalog.json')){$metadata[$metadataRelative]=(Get-FileHash (Join-Path $temp $metadataRelative) -Algorithm SHA256).Hash.ToLowerInvariant()}
-    $manifest=[ordered]@{schemaVersion=1;manifestId='esframework-skill-registry';metadata=$metadata;skills=@([ordered]@{skillName='es-fixture';skillHash=(Get-FileHash (Join-Path $skillRoot 'SKILL.md') -Algorithm SHA256).Hash.ToLowerInvariant();governanceHash=(Get-FileHash (Join-Path $skillRoot 'governance.json') -Algorithm SHA256).Hash.ToLowerInvariant()})}
+    $manifest=[ordered]@{schemaVersion=1;manifestId='esframework-skill-registry';metadata=$metadata;skills=@([ordered]@{skillName='es-fixture';skillHash=(Get-FileHash (Join-Path $skillRoot 'SKILL.md') -Algorithm SHA256).Hash.ToLowerInvariant();governanceHash=(Get-FileHash (Join-Path $skillRoot 'governance.json') -Algorithm SHA256).Hash.ToLowerInvariant();evidenceContractBindingHash=(Get-FileHash (Join-Path $skillRoot 'evidence-contract.binding.json') -Algorithm SHA256).Hash.ToLowerInvariant()})}
     [IO.File]::WriteAllText((Join-Path $temp '.agents/SKILL_REGISTRY.manifest.json'),($manifest|ConvertTo-Json -Depth 8),$fixtureUtf8)
     $architecture=(Resolve-Path (Join-Path $sourceRoot '.agents/skills/es-skill-governance/scripts/Test-ESSkillArchitecture.ps1')).Path
     [IO.File]::WriteAllText($resourcePath,($resourceContent+"drift: true`n"),$fixtureUtf8)
@@ -165,12 +211,22 @@ try {
     [IO.File]::WriteAllText((Join-Path $contractRoot 'SKILL.md'),"---`nname: es-contract-fixture`ndescription: Contract authorization lane fixture.`n---`n`n## SmallTool controls`n",$fixtureUtf8)
     [IO.File]::WriteAllText((Join-Path $contractRoot 'agents/openai.yaml'),"interface:`n  display_name: `"Contract Fixture`"`n  short_description: `"Validate contract lane semantics`"`n  default_prompt: `"Use es-contract-fixture for validation.`"`n",$fixtureUtf8)
     [IO.File]::WriteAllText((Join-Path $contractRoot 'references/control.md'),"# Fixture control`n",$fixtureUtf8)
+    [IO.File]::WriteAllText((Join-Path $contractRoot 'evidence-contract.binding.json'),"{}`n",$fixtureUtf8)
     $contractGovernance=[ordered]@{schemaVersion=1;skillName='es-contract-fixture';tier='SmallTool';maturity='Stable';delivery='Accepted';evidenceLevel='S2';riskClass='test';executionMode='managed';writePolicy='read-only';authorityClass='core-governed';owner='test';acceptanceOwner='test';routeKeys=@('fixture');requiredCases=@('positive','invalid-input','denied-expansion','repeat-idempotency');controlRefs=@('references/control.md')}
     [IO.File]::WriteAllText((Join-Path $contractRoot 'governance.json'),($contractGovernance|ConvertTo-Json -Depth 8),$fixtureUtf8)
     $contract=(Resolve-Path (Join-Path $sourceRoot '.agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1')).Path
     $directContractRaw=& powershell -NoProfile -File $contract -SkillPath $contractRoot -RequireGovernanceMetadata 2>&1|Out-String
     $directContractExit=$LASTEXITCODE
-    if($directContractExit -ne 0 -or $directContractRaw -notmatch 'authorizationLane=CurrentUserDirect'){throw 'Contract Direct lane was constrained by managed-only governance fields'}
+    if($directContractExit -ne 0 -or $directContractRaw -notmatch 'authorizationLane=CurrentUserDirect'){throw 'Contract Direct lane rejected the central evidence binding or was constrained by managed-only governance fields'}
+    [IO.File]::WriteAllText((Join-Path $contractRoot 'unexpected.txt'),"unexpected`n",$fixtureUtf8)
+    $previousUnexpectedErrorAction=$ErrorActionPreference
+    try{
+        $ErrorActionPreference='Continue'
+        $unexpectedContractRaw=& powershell -NoProfile -File $contract -SkillPath $contractRoot -RequireGovernanceMetadata 2>&1|Out-String
+        $unexpectedContractExit=$LASTEXITCODE
+    }finally{$ErrorActionPreference=$previousUnexpectedErrorAction}
+    if($unexpectedContractExit -ne 1 -or $unexpectedContractRaw -notmatch 'Unexpected top-level entry'){throw 'Contract accepted an unregistered top-level file while admitting the central evidence binding'}
+    Remove-Item -LiteralPath (Join-Path $contractRoot 'unexpected.txt') -Force
     $previousErrorAction=$ErrorActionPreference
     try{
         $ErrorActionPreference='Continue'

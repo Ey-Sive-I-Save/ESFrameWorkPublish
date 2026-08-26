@@ -17,6 +17,17 @@ $root = if ($ProjectRoot) {
 }
 $root = $root.TrimEnd('\', '/')
 $prefix = $root + [IO.Path]::DirectorySeparatorChar
+$bindingValidator = Join-Path $root '.agents/skills/es-skill-governance/scripts/Test-ESEvidenceContractBindings.ps1'
+$centralContractPath = Join-Path $root 'ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json'
+$schemaModulePath = Join-Path $root 'ES/Automation/Contracts/ESJsonSchemaLite.psm1'
+
+if (-not (Test-Path -LiteralPath $bindingValidator -PathType Leaf)) { throw 'Central Evidence binding validator is missing' }
+& powershell -NoProfile -File $bindingValidator -ProjectRoot $root -SkillPath $skill -Quiet
+if ($LASTEXITCODE -ne 0) { throw 'Skill Evidence contract binding is missing, stale, or invalid' }
+Import-Module $schemaModulePath -Force
+$centralContractHash = (Get-FileHash -LiteralPath $centralContractPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$bindingPath = Join-Path $skill 'evidence-contract.binding.json'
+$binding = [IO.File]::ReadAllText($bindingPath, [Text.UTF8Encoding]::new($false, $true)) | ConvertFrom-Json
 
 function Get-ReceiptProperty([object]$Receipt, [string]$Name) {
     return $Receipt.PSObject.Properties[$Name]
@@ -96,6 +107,32 @@ try {
 } catch {
     throw 'Evidence receipt is not strict UTF-8 JSON'
 }
+
+$contractIdProperty = Get-ReceiptProperty $r 'evidenceContractId'
+$contractHashProperty = Get-ReceiptProperty $r 'evidenceContractHash'
+if (($null -eq $contractIdProperty) -xor ($null -eq $contractHashProperty)) {
+    throw 'evidenceContractId and evidenceContractHash must be supplied together'
+}
+if ($null -eq $contractIdProperty) {
+    # Explicit compatibility projection for receipts created before the central
+    # contract binding. The bounded window prevents new producers from using
+    # the legacy shape indefinitely.
+    $capturedProperty = Get-ReceiptProperty $r 'capturedUtc'
+    if ($null -eq $capturedProperty) { throw 'Legacy Evidence receipt requires capturedUtc' }
+    try {
+        $legacyCaptured = [DateTimeOffset]::Parse([string]$capturedProperty.Value).ToUniversalTime()
+        $legacyBefore = [DateTimeOffset]::Parse([string]$binding.compatibility.legacyReceiptBeforeUtc).ToUniversalTime()
+        $legacyEnds = [DateTimeOffset]::Parse([string]$binding.compatibility.legacyReceiptAcceptanceEndsUtc).ToUniversalTime()
+    } catch { throw 'Legacy Evidence compatibility window is invalid' }
+    if ($legacyCaptured -gt $legacyBefore) { throw 'New Evidence receipts must persist the central contract ID and hash' }
+    if ([DateTimeOffset]::UtcNow -gt $legacyEnds) { throw 'Legacy Evidence receipt compatibility window has ended' }
+    $r | Add-Member -NotePropertyName evidenceContractId -NotePropertyValue 'es.skill-evidence-receipt'
+    $r | Add-Member -NotePropertyName evidenceContractHash -NotePropertyValue $centralContractHash
+} elseif ([string]$contractIdProperty.Value -cne 'es.skill-evidence-receipt' -or [string]$contractHashProperty.Value -cne $centralContractHash) {
+    throw 'Evidence receipt central contract binding is stale or forged'
+}
+$schemaErrors = @(Test-ESJsonSchemaValue -SchemaPath $centralContractPath -Value $r)
+if ($schemaErrors.Count -gt 0) { throw "Evidence receipt does not satisfy the central schema: $($schemaErrors -join '; ')" }
 
 foreach ($field in @('skillName', 'case', 'status', 'evidenceLevel', 'receiptPath', 'sourceRefs', 'sourceRefHashes', 'toolId', 'unityVersion', 'capturedUtc')) {
     $property = Get-ReceiptProperty $r $field

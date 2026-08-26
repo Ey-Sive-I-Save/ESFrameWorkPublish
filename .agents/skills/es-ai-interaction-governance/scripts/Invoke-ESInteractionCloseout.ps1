@@ -11,13 +11,17 @@ param(
 )
 
 $ErrorActionPreference='Stop'
-$base=Split-Path $PSScriptRoot -Parent
+$pathPolicy=(Resolve-Path (Join-Path $PSScriptRoot 'ESInteractionPathPolicy.ps1')).Path
+. $pathPolicy
+$projectRoot=Get-ESInteractionProjectRoot
+$base=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $effectiveEvidencePath=$EvidenceInputPath
 $temporaryEvidence=$null
 $resolvedSessionPath=$SessionPath
 try {
   if($PSCmdlet.ParameterSetName -eq 'SessionId') {
-    $codexHome=if([string]::IsNullOrWhiteSpace($env:CODEX_HOME)){Join-Path $env:USERPROFILE '.codex'}else{[IO.Path]::GetFullPath($env:CODEX_HOME)}
+    $defaultCodexHome=Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex'
+    $codexHome=if([string]::IsNullOrWhiteSpace($env:CODEX_HOME)){$defaultCodexHome}else{[IO.Path]::GetFullPath($env:CODEX_HOME)}
     $sessionRoot=Join-Path $codexHome 'sessions'
     if(-not (Test-Path -LiteralPath $sessionRoot -PathType Container)){throw "Codex session root not found: $sessionRoot"}
     $matches=@()
@@ -38,7 +42,9 @@ try {
     $resolvedSessionPath=[string]$orderedMatches[0].path
   }
   if($PSCmdlet.ParameterSetName -eq 'Transcript') {
-    $resolvedSessionPath=$SessionPath
+    if(-not [IO.Path]::IsPathRooted($SessionPath)){throw 'SessionPath must be absolute.'}
+    $resolvedSessionPath=(Resolve-Path -LiteralPath $SessionPath).Path
+    if([IO.Path]::GetExtension($resolvedSessionPath) -cne '.jsonl'){throw 'SessionPath must identify a .jsonl transcript.'}
   }
   if($PSCmdlet.ParameterSetName -in @('Transcript','SessionId')) {
     $temporaryEvidence=[IO.Path]::GetTempFileName()
@@ -48,7 +54,7 @@ try {
   $assessment=& (Join-Path $PSScriptRoot 'Invoke-ESInteractionEvidenceAssessment.ps1') -InputPath $effectiveEvidencePath | ConvertFrom-Json
 }
 finally {
-  if($temporaryEvidence -and (Test-Path -LiteralPath $temporaryEvidence)) { Remove-Item -LiteralPath $temporaryEvidence -Force -ErrorAction SilentlyContinue }
+  if($temporaryEvidence -and (Test-Path -LiteralPath $temporaryEvidence)) { Remove-Item -LiteralPath $temporaryEvidence -Force -ErrorAction Stop }
 }
 $risk=@($assessment.findings)
 $status=[string]$assessment.status
@@ -74,5 +80,5 @@ $closeout=[ordered]@{
   nonClaims=@('No numeric quality claim is made','Completion is not inferred from assistant text alone','Runtime/release claims require their own evidence')
 }
 $json=$closeout|ConvertTo-Json -Depth 10
-if($ReportPath){$full=[IO.Path]::GetFullPath($ReportPath);$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
+if($ReportPath){$full=Resolve-ESInteractionReportPath -Candidate $ReportPath;$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};$full=Resolve-ESInteractionReportPath -Candidate $full;[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
 $json

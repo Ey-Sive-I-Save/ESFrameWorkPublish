@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 $root=Resolve-Path $ProjectRoot
 $base=Join-Path $root '.agents/skills/es-ai-interaction-governance'
 $fail=@()
-foreach($f in @('SKILL.md','references/interaction-governance-contract.md','references/intent-contract.schema.json','references/evaluation-profiles.json','references/next-step-behavior-tree.json','scripts/Invoke-ESInteractionAssessment.ps1','scripts/Invoke-ESContextCollection.ps1','scripts/Test-ESContextCollection.ps1','scripts/Resolve-ESNextStepSelection.ps1','scripts/Invoke-ESInteractionEvidenceAssessment.ps1','scripts/Convert-CodexTranscriptToEvidence.ps1','scripts/Invoke-ESInteractionCloseout.ps1','scripts/Invoke-ESInteractionCloseoutHook.ps1','scripts/Test-ESIntentContract.ps1','tests/evidence-aligned.json','tests/evidence-misaligned.json','tests/evidence-accepted.json')){if(!(Test-Path (Join-Path $base $f))){$fail+="missing:$f"}}
+foreach($f in @('SKILL.md','references/interaction-governance-contract.md','references/intent-contract.schema.json','references/evaluation-profiles.json','references/next-step-behavior-tree.json','scripts/ESInteractionPathPolicy.ps1','scripts/Invoke-ESInteractionAssessment.ps1','scripts/Invoke-ESContextCollection.ps1','scripts/Test-ESContextCollection.ps1','scripts/Resolve-ESNextStepSelection.ps1','scripts/Invoke-ESInteractionEvidenceAssessment.ps1','scripts/Convert-CodexTranscriptToEvidence.ps1','scripts/Invoke-ESInteractionCloseout.ps1','scripts/Invoke-ESInteractionCloseoutHook.ps1','scripts/Test-ESIntentContract.ps1','tests/evidence-aligned.json','tests/evidence-misaligned.json','tests/evidence-accepted.json')){if(!(Test-Path (Join-Path $base $f))){$fail+="missing:$f"}}
 $p=Get-Content (Join-Path $base 'references/evaluation-profiles.json') -Raw -Encoding utf8|ConvertFrom-Json
 $t=Get-Content (Join-Path $base 'references/next-step-behavior-tree.json') -Raw -Encoding utf8|ConvertFrom-Json
 $cc=$t.contextCollection
@@ -65,10 +65,33 @@ if(Test-Path -LiteralPath $intentValidator){
     'intent-contract-recovery'=@('tests/intent-recovery.json','interruption-recovery',$false)
   }
   foreach($name in $cases.Keys){$v=$cases[$name]; try{$fixture=Join-Path $base -ChildPath ([string]$v[0]); $out=@(& $intentValidator -ContractPath $fixture -Case ([string]$v[1]) 2>&1); $joined=$out -join "`n"; if($joined -notmatch '"status"\s*:\s*"passed"'){$fail+="${name}:failed"}}catch{$fail+="${name}:error"}}
-  try{$invalidOut=@(& $intentValidator -ContractPath (Join-Path $base 'tests/intent-invalid.json') -Case invalid-input 2>&1); $invalidJoined=$invalidOut -join "`n"; if($invalidJoined -notmatch '"status"\s*:\s*"failed"'){$fail+='intent-contract-invalid:not-rejected'}}catch{}
+  try{$invalidOut=@(& $intentValidator -ContractPath (Join-Path $base 'tests/intent-invalid.json') -Case invalid-input 2>&1); $invalidJoined=$invalidOut -join "`n"; if($invalidJoined -notmatch '"status"\s*:\s*"failed"'){$fail+='intent-contract-invalid:not-rejected'}}catch{$fail+='intent-contract-invalid:validator-error'}
 }
 $hook=Get-Content (Join-Path $base 'scripts/Invoke-ESInteractionCloseoutHook.ps1') -Raw -Encoding utf8
-if($hook -notmatch 'transcript_path' -or $hook -notmatch 'stop_hook_active' -or $hook -notmatch 'transcript-path-not-absolute' -or $hook -notmatch 'missing-explicit-scope' -or $hook -notmatch "decision='block'"){$fail+='hook-missing:bounded-transcript-guard'}
+if($hook -notmatch 'transcript_path' -or $hook -notmatch 'stop_hook_active' -or $hook -notmatch 'transcript-path-not-absolute' -or $hook -notmatch 'missing-explicit-scope' -or $hook -notmatch 'closeout-script-not-allowlisted' -or $hook -notmatch "decision='block'"){$fail+='hook-missing:bounded-transcript-guard'}
+$escapeTarget=Join-Path $root ('interaction-path-escape-'+[Guid]::NewGuid().ToString('N')+'.json')
+$assessmentRunner=Join-Path $base 'scripts/Invoke-ESInteractionAssessment.ps1'
+$reportEscapeRejected=$false
+try{& $assessmentRunner -PromptText 'bounded report path test' -ReportPath $escapeTarget *> $null}catch{$reportEscapeRejected=$true}
+if(-not $reportEscapeRejected -or (Test-Path -LiteralPath $escapeTarget)){$fail+='path-boundary:assessment-report-escape'}
+$evidenceRunner=Join-Path $base 'scripts/Invoke-ESInteractionEvidenceAssessment.ps1'
+$evidenceEscapeRejected=$false
+try{& $evidenceRunner -InputPath (Join-Path $base 'tests/evidence-aligned.json') -ReportPath $escapeTarget *> $null}catch{$evidenceEscapeRejected=$true}
+if(-not $evidenceEscapeRejected -or (Test-Path -LiteralPath $escapeTarget)){$fail+='path-boundary:evidence-report-escape'}
+$transcriptPath=Join-Path ([IO.Path]::GetTempPath()) ('es-interaction-hook-'+[Guid]::NewGuid().ToString('N')+'.jsonl')
+[IO.File]::WriteAllText($transcriptPath,"{}"+[Environment]::NewLine,(New-Object Text.UTF8Encoding($false)))
+try{
+  $converter=Join-Path $base 'scripts/Convert-CodexTranscriptToEvidence.ps1'
+  $converterEscapeRejected=$false
+  try{& $converter -SessionPath $transcriptPath -OutputPath $escapeTarget *> $null}catch{$converterEscapeRejected=$true}
+  if(-not $converterEscapeRejected -or (Test-Path -LiteralPath $escapeTarget)){$fail+='path-boundary:converter-output-escape'}
+  $hookRunner=Join-Path $base 'scripts/Invoke-ESInteractionCloseoutHook.ps1'
+  $hookPayload=[ordered]@{hook_event_name='Stop';stop_hook_active=$false;transcript_path=$transcriptPath;allow_writes=$false;allow_runtime=$false;last_assistant_message='evidence-first closeout'}|ConvertTo-Json -Compress
+  $hookOutput=@(& $hookRunner -InputJson $hookPayload -CloseoutScriptPath (Join-Path $base 'scripts/Test-ESInteractionGovernance.ps1')) -join "`n"
+  if($hookOutput -notmatch 'closeout-script-not-allowlisted'){$fail+='hook-boundary:arbitrary-script-not-rejected'}
+} finally {
+  if(Test-Path -LiteralPath $transcriptPath){Remove-Item -LiteralPath $transcriptPath -Force}
+}
 $hooksPath=Join-Path $root '.codex/hooks.json'
 if(Test-Path -LiteralPath $hooksPath){
   try {$hooks=Get-Content $hooksPath -Raw -Encoding utf8|ConvertFrom-Json; $stopCommands=@($hooks.hooks.Stop.hooks.command)+@($hooks.hooks.Stop | ForEach-Object { @($_.hooks)|ForEach-Object command }); if(-not ($stopCommands -match 'Invoke-ESInteractionCloseoutHook\.ps1')){$fail+='hook-config-missing:closeout-stop'} } catch {$fail+='hook-config-invalid'}

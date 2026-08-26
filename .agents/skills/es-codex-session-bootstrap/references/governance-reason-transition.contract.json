@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-reason-transition.contract.json",
+  "schemaVersion": 1,
+  "contractId": "es-governance-reason-transition-v1",
+  "decisionModel": "routeState/evidenceState/effect",
+  "defaultStatePolicy": {
+    "routeState": "exact",
+    "evidenceState": "exact",
+    "effect": "exact",
+    "deviation": "registered-transition-and-directional-override-only"
+  },
+  "transitionExceptions": [
+    {
+      "id": "EVIDENCE.RECEIPT_MISSING.HI_ACCEPTANCE",
+      "reasonCode": "EVIDENCE.RECEIPT_MISSING",
+      "profileIds": ["HIAcceptance"],
+      "scopePattern": "^context:HIAcceptance$",
+      "from": {
+        "routeState": "core",
+        "evidenceState": "pending",
+        "effect": "claim-cap"
+      },
+      "to": {
+        "routeState": "blocked",
+        "evidenceState": "pending",
+        "effect": "hard-block"
+      },
+      "override": {
+        "fromEffect": "claim-cap",
+        "toEffect": "hard-block",
+        "profile": "HIAcceptance",
+        "predicate": "the H/I acceptance Profile directly targets the missing receipt",
+        "requiredEvidenceRefs": ["snapshot:decision", "profile:HIAcceptance"]
+      },
+      "alternativePath": "continue development with a claim cap outside H/I acceptance",
+      "recovery": "produce the bounded H/I receipt and re-evaluate the acceptance Profile",
+      "rollback": "remove the scoped transition and restore the default core claim-cap decision"
+    }
+  ],
+  "forbiddenTransitions": [
+    "RUNTIME.NOT_RUN -> hard-block",
+    "CAPABILITY.OPTIONAL_UNAVAILABLE -> hard-block",
+    "SOURCE.STALE_OPTIONAL -> hard-block",
+    "BUDGET.NEXT_READ_EXCEEDED -> blocked",
+    "unregistered-effect-override -> any-state-deviation"
+  ]
+}

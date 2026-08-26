@@ -10,7 +10,7 @@ composition:
   discoveryPolicy: .agents/SKILL_DISCOVERY_POLICY.json
   registryManifest: .agents/SKILL_REGISTRY.manifest.json
   specializedAcceptanceRegistry: .agents/skills/es-static-deep-replay/references/specialized-acceptance-registry.json
-  required: [SKILL.md, agents/openai.yaml, governance.json, references/evidence-receipt-contract.md, scripts/Test-ESSkillEvidence.ps1, static-replay.manifest.json, references/static-replay-adapter.md]
+  required: [SKILL.md, agents/openai.yaml, governance.json, evidence-contract.binding.json, scripts/Test-ESSkillEvidence.ps1, static-replay.manifest.json, references/static-replay-adapter.md]
   optional: [references/, scripts/, mcp/, assets/]
   evidence: [positive, invalid-input, denied-expansion, repeat-idempotency, interruption-recovery]
 rules:
@@ -48,6 +48,8 @@ rules:
     statement: Every direct Skill must be discoverable through AIBRAIN_ENTRY, appear in at least one KnowledgeIndex relatedSkills binding with an overlapping routeKey, exist in SKILL_RESOURCE_INDEX and have matching Catalog skillHash/governanceHash; missing bindings block acceptance.
 currentSkills:
   - {name: es-adversarial-review, family: governance, routeKeys: [review, risk, validation], mcp: [none-required]}
+  - {name: es-ai-collaboration-menu, family: governance, routeKeys: [menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination], mcp: [none-required]}
+  - {name: es-ai-interaction-governance, family: governance, routeKeys: [interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, goal-drift, handover, closeout, evaluation, dialogue-quality], mcp: [none-required]}
   - {name: es-codex-session-bootstrap, family: session, routeKeys: [startup, session, handover], mcp: [session-host]}
   - {name: es-command-authoring, family: project-command, routeKeys: [command, runtime, contract], mcp: [unity-editor]}
   - {name: es-editor-tooling, family: project-editor, routeKeys: [editor, ui, graph], mcp: [unity-editor]}
@@ -66,6 +68,7 @@ currentSkills:
   - {name: es-skill-creator, family: governance, routeKeys: [skill, creator, governance], mcp: [none-required]}
   - {name: es-static-deep-replay, family: governance, routeKeys: [static-replay, deep-replay, deterministic, hash, cache-invalidation, evidence], mcp: [none-required]}
   - {name: es-skill-governance, family: governance, routeKeys: [skill, governance, evidence, skill-performance, execution-cost, fast-path, deep-path, cache], mcp: [none-required]}
+  - {name: es-task-context-runtime, family: engineering, routeKeys: [task-context-runtime, task-lifecycle, context-lifecycle, completion-decision, delivery-acceptance, evidence-set, source-scope, receipt, cas, reopen], mcp: [none-required]}
   - {name: es-task-read-snapshot, family: engineering, routeKeys: [task, read, snapshot, cache, hash, stale, consistency, aibrain], mcp: [none-required]}
   - {name: es-skill-session-refresh, family: engineering, routeKeys: [skill, session, refresh, capability, delta, stale, routing, aibrain, understanding-drift, skill-understanding-refresh, capability-refresh, incremental-discovery], mcp: [none-required]}
   - {name: es-start-estest, family: project-test, routeKeys: [estest, test, runtime], mcp: [unity-editor]}

@@ -7,6 +7,8 @@ description: "Evaluate user prompts and task closeout quality, classify objectiv
 
 Use this Skill for the interaction-control plane, not for business implementation. It owns prompt quality, objective clarity, verification sufficiency, uncertainty disclosure, goal drift, handoff summaries, and bounded next-step suggestions.
 
+All persistent reports are restricted to `ES/Output/Interaction`. Transcript conversion may use only that report root or the operating system Temp directory for a short-lived intermediate file. Hook execution accepts only the built-in `Invoke-ESInteractionCloseout.ps1`; a caller-supplied script path cannot select another executable.
+
 For semantic-risk work (lifecycle, user-visible state, defaults, automatic transitions, recovery, or a user correction), create and validate the versioned intent contract in `references/intent-contract.schema.json` before routing to a domain Skill. The contract freezes `mustPreserve`, `allowedTransitions`, `forbiddenTransitions`, acceptance signals and counterexamples. `aligned` is the only state that permits implementation; `partial`/`unverifiable` are analysis-only and `misaligned` is deny-and-revise. Validate it with `scripts/Test-ESIntentContract.ps1`.
 
 For real-work evaluation, use `scripts/Convert-CodexTranscriptToEvidence.ps1` then `scripts/Invoke-ESInteractionEvidenceAssessment.ps1` first. This evaluates observable transcript/tool/diff/verification evidence; the numeric assessment is only a secondary projection. Run `scripts/Test-es-ai-interaction-governance-StaticReplay.ps1` for the Skill-level deterministic replay gate before Runtime escalation.

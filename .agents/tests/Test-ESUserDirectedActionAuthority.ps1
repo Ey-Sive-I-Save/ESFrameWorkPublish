@@ -216,7 +216,8 @@ Add-TextContractCase 'managed-authorization-source-contract' 'Assets/Plugins/ES/
     'AuthorizationStatusExhausted'
 )
 Add-TextContractCase 'external-bridge-cannot-assert-user-directed' 'Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs' @(
-    'new[] { "skillNames", "dryRun", "approvedPlanHash", "invocationId", "idempotencyKey" }'
+    'new[] { "skillNames", "dryRun", "approvedPlanHash", "invocationId", "idempotencyKey",'
+    '"routeProfileId", "goalRevisionPath"'
     '"es.automation.ai-bridge", string.Empty, false'
 ) @(
     '"idempotencyKey", "userDirected"'

@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference='Stop'
 $OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
+$skillRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$builtInCloseout=(Resolve-Path (Join-Path $PSScriptRoot 'Invoke-ESInteractionCloseout.ps1')).Path
 
 function Read-HookInput {
   param([string]$Explicit)
@@ -41,8 +43,11 @@ try {
   if(-not [IO.Path]::IsPathRooted($transcript)){Emit-Unverifiable 'transcript-path-not-absolute';return}
   $resolved=[IO.Path]::GetFullPath($transcript)
   if([IO.Path]::GetExtension($resolved) -ne '.jsonl' -or -not (Test-Path -LiteralPath $resolved -PathType Leaf)){Emit-Unverifiable 'transcript-path-not-readable-jsonl';return}
-  $script=if([string]::IsNullOrWhiteSpace($CloseoutScriptPath)){Join-Path $PSScriptRoot 'Invoke-ESInteractionCloseout.ps1'}else{[IO.Path]::GetFullPath($CloseoutScriptPath)}
-  if(-not (Test-Path -LiteralPath $script -PathType Leaf)){Emit-Unverifiable 'closeout-script-not-found';return}
+  $script=$builtInCloseout
+  if(-not [string]::IsNullOrWhiteSpace($CloseoutScriptPath)){
+    try{$requestedScript=(Resolve-Path -LiteralPath $CloseoutScriptPath).Path}catch{Emit-Unverifiable 'closeout-script-not-found';return}
+    if(-not $requestedScript.Equals($builtInCloseout,[StringComparison]::OrdinalIgnoreCase)){Emit-Unverifiable 'closeout-script-not-allowlisted';return}
+  }
   $scopeWrites=$hook.PSObject.Properties['allow_writes']
   $scopeRuntime=$hook.PSObject.Properties['allow_runtime']
   if($null -eq $scopeWrites -and $null -eq $scopeRuntime) {
@@ -67,5 +72,5 @@ try {
   }
 }
 catch {
-  Emit-Unverifiable 'hook-input-or-evaluation-error'
+  Emit-Unverifiable ('hook-input-or-evaluation-error:' + $_.Exception.GetType().Name)
 }

@@ -141,7 +141,7 @@ function New-ESRegistryInputSnapshot([string]$Root) {
         $files[$relativePath] = Read-ESRegistryInputFile -Root $Root -RelativePath $relativePath
     }
     foreach ($skillName in $skillNames) {
-        foreach ($leafName in @('SKILL.md', 'governance.json')) {
+        foreach ($leafName in @('SKILL.md', 'governance.json', 'evidence-contract.binding.json')) {
             $relativePath = ".agents/skills/$skillName/$leafName"
             $files[$relativePath] = Read-ESRegistryInputFile -Root $Root -RelativePath $relativePath
         }
@@ -335,6 +335,7 @@ try {
     foreach ($skillName in $snapshot.SkillNames) {
         $skillRelative = ".agents/skills/$skillName/SKILL.md"
         $governanceRelative = ".agents/skills/$skillName/governance.json"
+        $evidenceBindingRelative = ".agents/skills/$skillName/evidence-contract.binding.json"
         $governance = Get-ESRegistrySnapshotText $snapshot $governanceRelative | ConvertFrom-Json
         $catalogBlock = Get-ESRegistryCatalogBlock $catalogText $skillName
         if ($null -eq $catalogBlock) { throw "Catalog record missing: $skillName" }
@@ -360,6 +361,7 @@ try {
             acceptanceOwner = [string]$governance.acceptanceOwner
             skillHash = [string]$snapshot.Files[$skillRelative].Sha256
             governanceHash = [string]$snapshot.Files[$governanceRelative].Sha256
+            evidenceContractBindingHash = [string]$snapshot.Files[$evidenceBindingRelative].Sha256
         })
     }
 

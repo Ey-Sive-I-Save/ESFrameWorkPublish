@@ -16,6 +16,16 @@ Invoke-Case 'existing-bootstrap-skill-is-major' {
     $o = & $evaluator -ProjectRoot $ProjectRoot -SkillPath (Join-Path $ProjectRoot '.agents/skills/es-codex-session-bootstrap') | ConvertFrom-Json
     if ($o.skillChangeImpact -ne 'major' -or $o.decisionSource -ne 'derived') { throw 'Bootstrap change impact was not derived as major.' }
 }
+Invoke-Case 'binary-changes-use-path-impact-without-text-decoding' {
+    $creatorPath = Join-Path $ProjectRoot '.agents/skills/es-skill-creator'
+    $binaryChange = @(Get-ChildItem -LiteralPath $creatorPath -Recurse -File -Filter '*.pyc' -ErrorAction SilentlyContinue | Select-Object -First 1)
+    $o = & $evaluator -ProjectRoot $ProjectRoot -SkillPath $creatorPath | ConvertFrom-Json
+    if ($binaryChange.Count -gt 0) {
+        $reported = @($o.changedFiles | Where-Object { [string]$_.path -match '\.pyc$' })
+        if ($reported.Count -eq 0) { throw 'Binary change was not retained in path-based impact classification.' }
+    }
+    if ([string]$o.skillChangeImpact -notin @('small','medium','major')) { throw 'Binary-safe evaluator did not emit a valid impact class.' }
+}
 Invoke-Case 'path-boundary-fails-closed' {
     $failed = $false
     try { & $evaluator -ProjectRoot $ProjectRoot -SkillPath $ProjectRoot | Out-Null } catch { $failed = $true }

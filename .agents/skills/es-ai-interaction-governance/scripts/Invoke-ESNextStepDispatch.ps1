@@ -10,7 +10,8 @@ param(
   [string]$OutputPath='ES/Output/Interaction/context-collection-receipt.json'
 )
 $ErrorActionPreference='Stop'
-$resolver=Join-Path $PSScriptRoot 'Resolve-ESNextStepSelection.ps1'
+$skillRoot=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$resolver=(Resolve-Path (Join-Path $PSScriptRoot 'Resolve-ESNextStepSelection.ps1')).Path
 $selected=@(& $resolver -AssessmentPath $AssessmentPath -Selection $Selection)|ConvertFrom-Json
 switch([string]$selected.selectedId){
   'clarify-objective' {
@@ -19,7 +20,7 @@ switch([string]$selected.selectedId){
   'offer-context-collection' {
     if([string]::IsNullOrWhiteSpace($ProjectRoot) -or [string]::IsNullOrWhiteSpace($TaskKey) -or [string]::IsNullOrWhiteSpace($PlanHash)){throw 'context collection dispatch requires ProjectRoot, TaskKey and PlanHash'}
     if(@($ReadPaths).Count -eq 0){throw 'context collection dispatch requires caller-resolved ReadPaths'}
-    $collector=Join-Path $PSScriptRoot 'Invoke-ESContextCollection.ps1'
+    $collector=(Resolve-Path (Join-Path $PSScriptRoot 'Invoke-ESContextCollection.ps1')).Path
     & $collector -ProjectRoot $ProjectRoot -TaskKey $TaskKey -PlanHash $PlanHash -Selection $CollectionSelection -ReadPaths $ReadPaths -OutputPath $OutputPath
   }
   'run-static-validation' {

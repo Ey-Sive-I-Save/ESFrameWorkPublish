@@ -2,7 +2,9 @@
     "schemaVersion":  1,
     "skillName":  "es-skill-governance",
     "sourceRoots":  [
-                        ".agents/skills/es-skill-governance"
+                        ".agents/skills/es-skill-governance",
+                        "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json",
+                        "ES/Automation/Contracts/es-skill-evidence-binding-v1.schema.json"
                     ],
     "cases":  [
                   "normal-input",
@@ -71,6 +73,8 @@
                                                             "scripts/Test-ESAutomationCompatibility.ps1",
                                                             "scripts/Test-ESCommercialCoherence.ps1",
                                                             "scripts/Test-ESStaticAcceptanceCoverage.ps1",
+                                                            "scripts/Test-ESEvidenceContractBindings.ps1",
+                                                            "scripts/Test-ESStrictEvidenceReceiptContract.ps1",
                                                             "references/commercial-coherence-contract.md"
                                                         ],
                                   "sourceAssertions":  [

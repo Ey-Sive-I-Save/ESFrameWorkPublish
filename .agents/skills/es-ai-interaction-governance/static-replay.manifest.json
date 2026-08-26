@@ -22,8 +22,8 @@
     "id": "interaction-governance-static",
     "title": "interaction intent contract static gate",
     "requiredStaticCases": ["intent-contract-positive", "intent-contract-invalid", "intent-contract-denied", "intent-contract-idempotency", "intent-contract-recovery"],
-    "evidenceArtifacts": ["SKILL.md", "governance.json", "references/intent-contract.schema.json", "scripts/Test-ESIntentContract.ps1", "scripts/Test-ESInteractionGovernance.ps1"],
-    "sourceAssertions": ["intent-contract", "alignment-gate", "counterexample", "revision", "runtime-boundary"],
+    "evidenceArtifacts": ["SKILL.md", "governance.json", "references/intent-contract.schema.json", "scripts/ESInteractionPathPolicy.ps1", "scripts/Test-ESIntentContract.ps1", "scripts/Test-ESInteractionGovernance.ps1"],
+    "sourceAssertions": ["intent-contract", "alignment-gate", "counterexample", "revision", "report-path-boundary", "hook-script-allowlist", "runtime-boundary"],
     "runtimeBoundary": "Static acceptance proves contract structure and deterministic replay only; it does not prove that an AI understood unobserved user intent or that Unity/editor behavior is correct."
   },
   "specializedGuidanceRef": "references/static-specialized-acceptance.md"

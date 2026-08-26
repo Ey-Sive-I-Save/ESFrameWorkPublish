@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-legacy-projection.schema.json",
+  "schemaVersion": 1,
+  "title": "Executable legacy governance projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectionId", "entries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "projectionId": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["legacyState", "projectedState", "source", "object", "field", "profile", "scope", "scopeKind", "routeState", "evidenceState", "effect", "reasonCode"],
+        "properties": {
+          "legacyState": { "type": "string", "minLength": 1 },
+          "projectedState": { "type": "string", "minLength": 1 },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["object", "field", "profile", "scope", "scopeKind"],
+            "properties": {
+              "object": { "type": "string", "minLength": 1 },
+              "field": { "type": "string", "minLength": 1 },
+              "profile": { "type": "string", "minLength": 1 },
+              "scope": { "type": "string", "minLength": 1 },
+              "scopeKind": { "enum": ["project-object", "project-global", "task-object", "context-object"] }
+            }
+          },
+          "object": { "type": "string", "minLength": 1 },
+          "field": { "type": "string", "minLength": 1 },
+          "profile": { "type": "string", "minLength": 1 },
+          "scope": { "type": "string", "minLength": 1 },
+          "scopeKind": { "enum": ["project-object", "project-global", "task-object", "context-object"] },
+          "routeState": { "enum": ["core", "extension", "blocked"] },
+          "evidenceState": { "enum": ["unknown", "pending", "partial", "closed", "stale", "runtime-not-run"] },
+          "effect": { "enum": ["hard-block", "claim-cap", "review", "stop-next-read"] },
+          "reasonCode": { "type": "string", "minLength": 1 },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

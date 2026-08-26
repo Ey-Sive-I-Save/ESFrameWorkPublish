@@ -2,7 +2,13 @@
     "schemaVersion":  1,
     "skillName":  "es-aibrain-route-authoring",
     "sourceRoots":  [
-                        ".agents/skills/es-aibrain-route-authoring"
+                        ".agents/skills/es-aibrain-route-authoring",
+                        "ES/Automation/RoutePlan/ESRoutePlanContract.psm1",
+                        "ES/Automation/RoutePlan/Test-ESRoutePlanContract.ps1",
+                        "ES/Automation/Contracts/es-route-plan-v1.schema.json",
+                        "ES/Automation/Contracts/es-route-stage.registry.json",
+                        "ES/Automation/Contracts/es-route-stage-registry-v1.schema.json",
+                        "Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs"
                     ],
     "cases":  [
                   "normal-input",
@@ -18,7 +24,9 @@
                          "governance",
                          "source-hashes",
                          "deterministic-replay",
-                         "boundary-contract"
+                         "boundary-contract",
+                         "route-plan-artifact-replay",
+                         "route-stage-membership"
                      ],
     "runtimeClaimsNotProven":  [
                                    "Unity/editor/process behavior",
@@ -60,6 +68,7 @@
                                                             "SKILL.md",
                                                             "references/route-contract.md",
                                                             "scripts/Test-ESAIBrainRoute.ps1",
+                                                            "scripts/Test-ESRoutePlanContract.ps1",
                                                             "references/evidence-receipt-contract.md",
                                                             "governance.json"
                                                         ],
@@ -68,7 +77,11 @@
                                                            "routeKeys",
                                                            "KnowledgeIndex",
                                                            "collision",
-                                                           "stale"
+                                                           "stale",
+                                                           "RoutePlan",
+                                                           "GoalRevision",
+                                                           "depthReasonCode",
+                                                           "executionEnabled"
                                                        ],
                                   "runtimeBoundary":  "Only Runtime can prove listCapabilities behavior; static checks prove route declarations and closure."
                               },

@@ -118,6 +118,12 @@
                        "responsibilityProfile":  "release"
                    },
                    {
+                       "skillName":  "es-task-context-runtime",
+                       "acceptanceId":  "task-context-runtime-state-machine",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
                        "skillName":  "es-task-read-snapshot",
                        "acceptanceId":  "task-snapshot-consistency",
                        "guidanceRef":  "references/static-specialized-acceptance.md",

@@ -139,7 +139,7 @@ if (Test-Path -LiteralPath $governanceFile -PathType Leaf) {
 # Official Skill structure plus the governance contract and Creator license.
 foreach ($entry in (Get-ChildItem -LiteralPath $resolved -Force)) {
     $entryName = ([string]$entry.Name).ToLowerInvariant()
-    if ($entryName -notmatch '^(skill\.md|agents|references|scripts|assets|tests|governance\.json|license\.txt|session-product\.json|static-replay\.manifest\.json)$') {
+    if ($entryName -notmatch '^(skill\.md|agents|references|scripts|assets|tests|governance\.json|evidence-contract\.binding\.json|license\.txt|session-product\.json|static-replay\.manifest\.json)$') {
         Add-Issue "Unexpected top-level entry: $($entry.Name)"
     }
 }

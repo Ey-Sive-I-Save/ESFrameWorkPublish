@@ -27,6 +27,14 @@ description: Design and validate AIBrain routeKeys, Knowledge bindings, Skill se
 3. 检查 route 冲突、缺失 Skill、缺 SourceRef、MCP 未连接、authorityClass 和 PlanHash 绑定。
 4. 用 `listCapabilities`/`planTask` 的只读输入回放；旧索引漂移时阻断并重新规划。
 
+## RoutePlan V1 boundary
+
+- `RoutePlan` is a read-only, snapshot-bound projection attached to `ESAIBrainPlan`; it does not replace or execute the legacy production route.
+- A composable plan binds one frozen `GoalRevision`, an ordinal exact `routeKeys` set, current Git HEAD, normalized SourceRefs, SourceRefs Hash, and the central Route Stage Registry Hash.
+- Every stage resolves by exact Skill/Profile/frozen-routeKey membership and declares `requires`, `produces`, and failure conditions. Core depth is 0, the default extension limit is 1, and depth 2 requires a registered directional `depthReasonCode`. The PowerShell consumer and validator replay this relation through `ES/Automation/RoutePlan/ESRoutePlanContract.psm1`; fixtures may not copy the canonical hash field set.
+- The real `planTask` source path now emits one read-only shadow candidate only for `profile=governance` and `scope=task-object`. Its decision ID is derived from the frozen route decision plus GoalRevision, stages, issues, and snapshot; a new snapshot must produce a new ID. The C# producer cannot self-certify match or no-bypass: the shared PowerShell consumer independently recomputes the ID and derives `matched/no-bypass/rollback-available`. Every other Profile returns `not-selected` without changing the legacy decision.
+- `executionEnabled` is always `false`. Missing evidence caps only the RoutePlan claim; malformed dependencies block only that RoutePlan Profile and do not become project-global P0 or narrow `CurrentUserDirect` authority.
+
 ## Specialized static acceptance
 
 - Guidance: `references/static-specialized-acceptance.md`

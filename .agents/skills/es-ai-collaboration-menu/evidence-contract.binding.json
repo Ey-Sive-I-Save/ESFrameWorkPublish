@@ -1,0 +1,29 @@
+{
+    "schemaVersion":  1,
+    "bindingId":  "es.skill-evidence-binding.es-ai-collaboration-menu.v1",
+    "skillName":  "es-ai-collaboration-menu",
+    "contract":  {
+                     "id":  "es.skill-evidence-receipt",
+                     "version":  "1",
+                     "path":  "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json",
+                     "hash":  "9fbf168a71ff71c0b16d45ec8fdc18d7891a42b3c3f17638b28d3d3541b1f880"
+                 },
+    "localContract":  {
+                          "path":  "",
+                          "hash":  "",
+                          "mode":  "central-authoritative"
+                      },
+    "stableEntrypoint":  {
+                             "path":  "scripts/Test-ESSkillEvidence.ps1",
+                             "hash":  "88a9bf480d3b99be221b57e6a7ab963648820801eb070ba4baa7f6cb7b11e255",
+                             "mode":  "central-delegate",
+                             "centralValidatorPath":  ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1"
+                         },
+    "compatibility":  {
+                          "legacyReadable":  true,
+                          "legacyReceiptBeforeUtc":  "2026-08-26T03:45:00Z",
+                          "legacyReceiptAcceptanceEndsUtc":  "2026-09-02T03:45:00Z",
+                          "newReceiptBinding":  "required",
+                          "retirementState":  "not-authorized"
+                      }
+}

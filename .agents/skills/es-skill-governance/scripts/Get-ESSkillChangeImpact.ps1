@@ -24,21 +24,33 @@ function Get-Classification([string]$relative) {
     foreach ($pattern in @($rules.smallPathPatterns)) { if ($relative -match [string]$pattern) { return [pscustomobject]@{ class = 'small'; reason = "small-path:$pattern" } } }
     return [pscustomobject]@{ class = 'medium'; reason = 'unclassified-skill-file' }
 }
+function Test-SemanticTextPath([string]$path) {
+    $extension = [IO.Path]::GetExtension($path).ToLowerInvariant()
+    return $extension -in @(
+        '.md', '.txt', '.json', '.yaml', '.yml', '.xml', '.toml', '.ini',
+        '.ps1', '.psm1', '.psd1', '.py', '.sh', '.bash', '.bat', '.cmd',
+        '.js', '.mjs', '.cjs', '.ts', '.cs'
+    )
+}
 function Add-Changed([System.Collections.Generic.List[object]]$list, [string]$path, [string]$kind) {
     $relative = Get-Rel $path
     if ([string]::IsNullOrWhiteSpace($relative) -or @($list | Where-Object path -eq $relative).Count -gt 0) { return }
     $classification = Get-Classification $relative
     $content = ''
-    if (Test-Path -LiteralPath $path -PathType Leaf) { $content = [IO.File]::ReadAllText($path, [Text.UTF8Encoding]::new($false,$true)) }
+    # Binary/generated files still participate in path-based impact, but only
+    # known text formats are decoded and inspected for semantic markers.
+    if ((Test-Path -LiteralPath $path -PathType Leaf) -and (Test-SemanticTextPath $path)) {
+        $content = [IO.File]::ReadAllText($path, [Text.UTF8Encoding]::new($false,$true))
+    }
     $semanticReasons = [Collections.Generic.List[string]]::new()
     foreach ($pattern in @($rules.majorSemanticPatterns)) { if ($content -match [string]$pattern) { [void]$semanticReasons.Add('major-semantic-marker'); break } }
     if ($semanticReasons.Count -gt 0) { $classification = [pscustomobject]@{ class = 'major'; reason = 'major-semantic-marker' } }
     [void]$list.Add([ordered]@{ path = $relative; changeKind = $kind; impactClass = $classification.class; reasons = @($classification.reason) })
 }
 $changed = [Collections.Generic.List[object]]::new()
-$gitProbe = [string]((& git -C $root rev-parse --is-inside-work-tree 2>$null) | Select-Object -First 1)
+$gitProbe = [string]((& git -c core.quotepath=false -C $root rev-parse --is-inside-work-tree 2>$null) | Select-Object -First 1)
 if ($LASTEXITCODE -ne 0 -or $gitProbe.Trim() -ne 'true') { throw 'ProjectRoot must be a Git worktree for change impact evaluation.' }
-$status = @(& git -C $root status --short --untracked-files=all -- (Join-Path '.agents/skills' $skillName) 2>$null)
+$status = @(& git -c core.quotepath=false -C $root status --short --untracked-files=all -- (Join-Path '.agents/skills' $skillName) 2>$null)
 foreach ($line in $status) {
     $text = [string]$line
     if ($text.Length -lt 4) { continue }
@@ -51,8 +63,8 @@ $rank = @{ small = 1; medium = 2; major = 3 }
 $impact = 'small'
 foreach ($item in @($changed)) { if ($rank[$item.impactClass] -gt $rank[$impact]) { $impact = $item.impactClass } }
 $definition = $rules.classes.PSObject.Properties[$impact].Value
-$head = [string]((& git -C $root rev-parse HEAD 2>$null) | Select-Object -First 1)
-$branch = [string]((& git -C $root branch --show-current 2>$null) | Select-Object -First 1)
+$head = [string]((& git -c core.quotepath=false -C $root rev-parse HEAD 2>$null) | Select-Object -First 1)
+$branch = [string]((& git -c core.quotepath=false -C $root branch --show-current 2>$null) | Select-Object -First 1)
 $result = [ordered]@{
     schemaVersion = 1
     evaluator = 'es-skill-change-impact'

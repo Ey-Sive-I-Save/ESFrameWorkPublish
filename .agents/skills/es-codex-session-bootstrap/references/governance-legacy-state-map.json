@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/governance-legacy-state-map.json",
+  "schemaVersion": 1,
+  "mappingId": "es-governance-legacy-state-map-v1",
+  "states": [
+    { "legacy": "static-passed", "routeState": "core", "evidenceState": "closed", "defaultEffect": "review", "note": "does not imply Runtime or Release acceptance" },
+    { "legacy": "runtime-not-run", "routeState": "core", "evidenceState": "runtime-not-run", "defaultEffect": "claim-cap", "note": "not a failure" },
+    { "legacy": "runtime-passed", "routeState": "core", "evidenceState": "closed", "defaultEffect": "review", "note": "scope remains Profile-limited" },
+    { "legacy": "runtime-failed", "routeState": "core", "evidenceState": "partial", "defaultEffect": "claim-cap", "note": "may hard-block only the affected Runtime Profile" },
+    { "legacy": "stale", "routeState": "core", "evidenceState": "stale", "defaultEffect": "review", "note": "required-source stale may use SOURCE.STALE_REQUIRED" },
+    { "legacy": "blocked", "routeState": "blocked", "evidenceState": "unknown", "defaultEffect": "hard-block", "note": "scope must be preserved" },
+    { "legacy": "Accepted", "routeState": "core", "evidenceState": "closed", "defaultEffect": "review", "note": "requires explicit object, Profile, scope and evidence references" }
+  ],
+  "forbiddenConversions": [
+    "runtime-not-run -> runtime-failed",
+    "optional-stale -> project-blocked",
+    "missing-receipt -> project-blocked",
+    "contract-invalid -> project-blocked"
+  ],
+  "recovery": "preserve the legacy observation, attach the new scoped decision, and re-evaluate only the affected Profile",
+  "rollback": "remove the compatibility projection without changing the legacy source state"
+}

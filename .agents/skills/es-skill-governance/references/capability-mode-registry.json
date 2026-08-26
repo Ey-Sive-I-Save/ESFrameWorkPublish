@@ -7,6 +7,8 @@
   "modes": ["advisory", "candidate", "mutating"],
   "entries": [
     {"skillName":"es-adversarial-review","capabilityMode":"advisory","reason":"只输出可行性、风险和验收建议，不直接授予项目写入权限。"},
+    {"skillName":"es-ai-collaboration-menu","capabilityMode":"advisory","reason":"菜单只展示和解释已注册选项，不执行选项、写入项目或启动 Runtime。"},
+    {"skillName":"es-ai-interaction-governance","capabilityMode":"advisory","reason":"交互治理只评估可观察证据并生成有界报告或候选下一步，不自行执行业务动作。"},
     {"skillName":"es-first-principles-analysis","capabilityMode":"advisory","reason":"只输出问题分解、约束和方案分析，不直接修改项目资产。"},
     {"skillName":"es-change-risk-register","capabilityMode":"advisory","reason":"风险登记是变更前的决策材料，不等于变更执行授权。"},
     {"skillName":"es-migration-planning","capabilityMode":"advisory","reason":"Skill 自主运行只产生可审计计划；当前用户明确要求迁移时可直接实施，受管通道才要求独立命令和 TaskContract。"},

@@ -79,6 +79,12 @@ description: Fixture Skill.
   "acceptanceOwner": "fixture-acceptance-owner"
 }
 '@
+    Write-FixtureText (Join-Path $projectRoot '.agents/skills/es-fixture/evidence-contract.binding.json') @'
+{
+  "schemaVersion": 1,
+  "bindingId": "es.skill-evidence-binding.es-fixture.v1"
+}
+'@
 
     # First creation and existing-file replacement must both be deterministic.
     $null = & $builder -ProjectRoot $projectRoot
@@ -89,6 +95,7 @@ description: Fixture Skill.
     Assert-Fixture ([string]$first.manifestId -eq 'esframework-skill-registry') 'Manifest identity is invalid.'
     Assert-Fixture ([string]$first.inputSnapshotHash -match '^[0-9a-f]{64}$') 'Manifest does not bind an input snapshot hash.'
     Assert-Fixture (@($first.skills).Count -eq 1) 'Fixture Skill was not registered exactly once.'
+    Assert-Fixture ([string]$first.skills[0].evidenceContractBindingHash -match '^[0-9a-f]{64}$') 'Manifest does not bind the Skill Evidence contract binding hash.'
 
     $stableWriteTime = [DateTime]::SpecifyKind([DateTime]'2001-02-03T04:05:06', [DateTimeKind]::Utc)
     [IO.File]::SetLastWriteTimeUtc($manifestPath, $stableWriteTime)

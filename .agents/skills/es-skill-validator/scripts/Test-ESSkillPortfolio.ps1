@@ -10,10 +10,13 @@ $skillsRoot = Join-Path $root '.agents\skills'
 $catalog = Join-Path $root '.agents\SKILL_CATALOG.yaml'
 $validator = Join-Path $skillsRoot 'es-skill-validator\scripts\Invoke-ESSkillValidation.ps1'
 $contract = Join-Path $skillsRoot 'es-skill-governance\scripts\Test-ESSkillContract.ps1'
+$evidenceBindings = Join-Path $skillsRoot 'es-skill-governance\scripts\Test-ESEvidenceContractBindings.ps1'
 $pathBoundary = Join-Path $skillsRoot 'es-skill-governance\scripts\ESPathBoundary.Common.ps1'
+$decisionModule = Join-Path $skillsRoot 'es-skill-validator\scripts\ESPortfolioDecision.psm1'
 if (-not (Test-Path -LiteralPath $skillsRoot -PathType Container)) { Write-Error 'Missing .agents/skills'; exit 2 }
 if (-not (Test-Path -LiteralPath $validator -PathType Leaf)) { Write-Error 'Missing Skill Validator'; exit 2 }
 . $pathBoundary
+Import-Module $decisionModule -Force
 
 function Resolve-ESPortfolioOutputPath([string]$Candidate) {
     $target = Resolve-ESContainedRelativePath -Candidate $Candidate -ContainerRoot $root -Label 'ReportPath'
@@ -32,7 +35,7 @@ try {
 $reportRelative = $reportTarget.RelativePath
 
 $skillDirs = @(Get-ChildItem -LiteralPath $skillsRoot -Directory | Sort-Object Name)
-$required = @('SKILL.md','agents/openai.yaml','governance.json','references/evidence-receipt-contract.md','scripts/Test-ESSkillEvidence.ps1')
+$required = @('SKILL.md','agents/openai.yaml','governance.json','evidence-contract.binding.json','scripts/Test-ESSkillEvidence.ps1')
 $resourceFailures = @()
 $contractFailures = @()
 foreach ($dir in $skillDirs) {
@@ -47,6 +50,13 @@ foreach ($dir in $skillDirs) {
     $ErrorActionPreference=$previousErrorAction
     if ($LASTEXITCODE -ne 0) { $contractFailures += $dir.Name }
 }
+
+$previousErrorAction=$ErrorActionPreference
+$ErrorActionPreference='Continue'
+& powershell -NoProfile -File $evidenceBindings -ProjectRoot $root -MaxSkills 128 -Quiet *> $null
+$evidenceBindingsExit=$LASTEXITCODE
+$ErrorActionPreference=$previousErrorAction
+if($evidenceBindingsExit -ne 0){$contractFailures += 'central-evidence-bindings'}
 
 $innerRelative = Join-Path 'ES/Output' 'SkillPortfolioInnerValidation.json'
 $previousErrorAction=$ErrorActionPreference
@@ -64,6 +74,7 @@ $innerResults = if ($inner) { @($inner.results) } else { @() }
 $blocked = @($innerResults | Where-Object { $_.status -eq 'blocked' })
 $failed = @($innerResults | Where-Object { $_.status -eq 'failed' })
 $notRun = @($innerResults | Where-Object { $_.status -eq 'not-run' })
+$review = @($innerResults | Where-Object { $_.status -eq 'review' })
 $skillNames=@($skillDirs|ForEach-Object Name)
 $staticReadyCount=0
 $evidencePendingCount=0
@@ -79,7 +90,10 @@ foreach($skillName in $skillNames){
     if(Test-Path -LiteralPath $govPath -PathType Leaf){try{$gov=Get-Content -Raw -Encoding UTF8 $govPath|ConvertFrom-Json;$runtime=@($gov.verificationProfiles.RuntimeAcceptance);if($runtime.Count -gt 0 -and [bool]$runtime[0].runtimeRequired){$runtimeRequiredCount++}}catch{}}
 }
 $runtimeNotRunCount=$runtimeRequiredCount
-$status = if ($innerExit -eq 0 -and $resourceFailures.Count -eq 0 -and $contractFailures.Count -eq 0) { 'passed' } else { 'blocked' }
+$hardFailureCount = $blocked.Count + $failed.Count + $notRun.Count + $resourceFailures.Count + $contractFailures.Count
+$decision = Resolve-ESPortfolioDecision -InnerResultAvailable ($null -ne $inner) -HardFailureCount $hardFailureCount -EvidencePendingCount $evidencePendingCount -ValidatorReviewCount $review.Count
+$status = [string]$decision.status
+$innerReportHash = if (Test-Path -LiteralPath $innerPath -PathType Leaf) { (Get-FileHash -LiteralPath $innerPath -Algorithm SHA256).Hash.ToLowerInvariant() } else { '' }
 $receipt = [pscustomobject][ordered]@{
     skillName = 'es-skill-validator'
     case = 'portfolio-gate'
@@ -89,18 +103,32 @@ $receipt = [pscustomobject][ordered]@{
     sourceRefs = @(
         '.agents/SKILL_CATALOG.yaml',
         '.agents/SKILL_RESOURCE_INDEX.yaml',
-        '.agents/skills/es-skill-validator/scripts/Invoke-ESSkillValidation.ps1',
-        '.agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1'
-    )
+                       '.agents/skills/es-skill-validator/scripts/Invoke-ESSkillValidation.ps1',
+                       '.agents/skills/es-skill-validator/scripts/Test-ESSkillPortfolio.ps1',
+                       '.agents/skills/es-skill-validator/scripts/ESPortfolioDecision.psm1',
+                       '.agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1'
+                       '.agents/skills/es-skill-governance/scripts/Test-ESEvidenceContractBindings.ps1'
+                   )
     timestampUtc = [DateTime]::UtcNow.ToString('o')
     catalogHash = (Get-FileHash -LiteralPath $catalog -Algorithm SHA256).Hash.ToLowerInvariant()
     resourceIndexHash = (Get-FileHash -LiteralPath (Join-Path $root '.agents/SKILL_RESOURCE_INDEX.yaml') -Algorithm SHA256).Hash.ToLowerInvariant()
     validatorHash = (Get-FileHash -LiteralPath $validator -Algorithm SHA256).Hash.ToLowerInvariant()
+    innerReportPath = $innerRelative.Replace('\','/')
+    innerReportHash = $innerReportHash
+    innerResultAvailable = ($null -ne $inner)
+    innerExitCode = $innerExit
     skillCount = $skillDirs.Count
     staticReadyCount = $staticReadyCount
     evidencePendingCount = $evidencePendingCount
     runtimeRequiredCount = $runtimeRequiredCount
     runtimeNotRunCount = $runtimeNotRunCount
+    validatorReviewCount = $review.Count
+    decisionStatus = [string]$decision.decisionStatus
+    effect = [string]$decision.effect
+    staticStatus = if ($status -eq 'blocked') { 'static-blocked' } elseif ($staticReadyCount -eq $skillDirs.Count) { 'static-passed' } else { 'static-partial' }
+    evidenceStatus = if ($evidencePendingCount -gt 0) { 'evidence-pending' } else { 'evidence-closed' }
+    runtimeStatus = if ($runtimeRequiredCount -gt 0) { 'runtime-not-run' } else { 'not-applicable' }
+    blockingLayer = [string]$decision.blockingLayer
     contractFailures = @($contractFailures)
     resourceFailures = @($resourceFailures)
     validatorFailures = @($failed | ForEach-Object { $_.skill + ':' + $_.profile })
@@ -108,12 +136,11 @@ $receipt = [pscustomobject][ordered]@{
     validatorNotRun = @($notRun | ForEach-Object { $_.skill + ':' + $_.profile })
     sourceRefHashes = [ordered]@{}
     portfolioHash = ''
-    result = if ($status -eq 'passed') { 'All Skill assets passed the portfolio gate.' } else { 'Portfolio gate blocked; resolve every failure and security review before acceptance.' }
+    result = if ($status -eq 'passed') { 'All Skill static assets passed the portfolio gate.' } elseif ($status -eq 'review') { 'Static assets have no hard failure; evidence review remains claim-limiting.' } else { 'Portfolio gate blocked by a scoped contract, resource, or validator failure.' }
 }
 $sourceRefs=@($receipt.sourceRefs)
 foreach($ref in $sourceRefs){$receipt.sourceRefHashes[$ref]=(Get-FileHash -LiteralPath (Join-Path $root $ref) -Algorithm SHA256).Hash.ToLowerInvariant()}
-$projection=($receipt.catalogHash+'|'+$receipt.resourceIndexHash+'|'+$receipt.validatorHash+'|'+($receipt.contractFailures -join ',')+'|'+($receipt.resourceFailures.skill -join ',')+'|'+($receipt.validatorFailures -join ',')+'|'+($receipt.validatorBlocked -join ',')+'|'+($receipt.validatorNotRun -join ',')+'|'+$receipt.status)
-$receipt.portfolioHash=([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($projection))|ForEach-Object ToString x2)-join ''
+$receipt.portfolioHash = Get-ESPortfolioProjectionHash -Receipt $receipt
 $report = $reportTarget.FullPath
 $parent = Split-Path -Parent $report
 if (-not (Test-Path -LiteralPath $parent -PathType Container)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }

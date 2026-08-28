@@ -37,6 +37,11 @@ param(
 
     [switch]$ForceNew,
 
+    # Disable Codex hooks for this launch only. The project hook configuration
+    # remains unchanged; this is intended for explicitly bounded initialization
+    # or restoration tasks that must not invoke hook delivery/closeout.
+    [switch]$SkipHooks,
+
     [switch]$AllSessions,
 
     [switch]$AllMatches,
@@ -150,13 +155,6 @@ $OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($f
 . (Join-Path $PSScriptRoot 'ESCodexSessionState.ps1')
 . (Join-Path $PSScriptRoot 'ESCodexLaunchReadiness.ps1')
 
-function Test-SessionHandoffIntent([string]$ModeValue, [string]$TaskKeyValue,
-    [string]$ResponsibilityKeyValue, [string]$PromptValue) {
-    if ($ModeValue -ne 'New') { return $false }
-    $text = @($TaskKeyValue, $ResponsibilityKeyValue, $PromptValue) -join ' '
-    return $text -match '(?i)handoff|handover|\u4ea4\u63a5|\u63a5\u624b|\u79fb\u4ea4'
-}
-
 function Assert-HandoffResponsibility([string]$ResponsibilityKeyValue, [string]$TabTitleValue,
     [object[]]$ResolvedHandoffFiles) {
     if ($ResponsibilityKeyValue -match '(?i)handoff|handover|\u4ea4\u63a5|\u63a5\u624b|\u79fb\u4ea4|resume|fork|\u6062\u590d|\u5206\u53c9|close|\u5173\u95ed|bootstrap|\u542f\u52a8') {
@@ -221,7 +219,50 @@ function New-TextFromCodePoints([int[]]$CodePoints) {
     return -join @($CodePoints | ForEach-Object { [char]$_ })
 }
 
-function Get-DefaultTabTitle([string]$Key, [string]$LaunchMode) {
+function Get-ResponsibilityTitleLabel([string]$Key, [string]$ContextText) {
+    $keyLower = ([string]$Key).ToLowerInvariant()
+    $labels = @()
+    $rules = @(
+        @{ pattern = 'session'; label = (New-TextFromCodePoints @(0x4F1A,0x8BDD)) },
+        @{ pattern = 'bootstrap'; label = (New-TextFromCodePoints @(0x5F15,0x5BFC)) },
+        @{ pattern = 'maintenance'; label = (New-TextFromCodePoints @(0x7EF4,0x62A4)) },
+        @{ pattern = 'editor'; label = (New-TextFromCodePoints @(0x7F16,0x8F91,0x5668)) },
+        @{ pattern = 'foundation|infrastructure'; label = (New-TextFromCodePoints @(0x57FA,0x7840,0x8BBE,0x65BD)) },
+        @{ pattern = 'architecture'; label = (New-TextFromCodePoints @(0x67B6,0x6784)) },
+        @{ pattern = 'governance'; label = (New-TextFromCodePoints @(0x6CBB,0x7406)) },
+        @{ pattern = 'protocol'; label = (New-TextFromCodePoints @(0x534F,0x8BAE)) },
+        @{ pattern = 'audit'; label = (New-TextFromCodePoints @(0x5BA1,0x8BA1)) },
+        @{ pattern = 'acceptance'; label = (New-TextFromCodePoints @(0x9A8C,0x6536)) },
+        @{ pattern = 'release'; label = (New-TextFromCodePoints @(0x53D1,0x5E03)) },
+        @{ pattern = 'compile'; label = (New-TextFromCodePoints @(0x7F16,0x8BD1)) },
+        @{ pattern = 'build'; label = (New-TextFromCodePoints @(0x6784,0x5EFA)) },
+        @{ pattern = 'runtime'; label = (New-TextFromCodePoints @(0x8FD0,0x884C,0x65F6)) },
+        @{ pattern = 'resource'; label = (New-TextFromCodePoints @(0x8D44,0x6E90)) },
+        @{ pattern = 'pipeline'; label = (New-TextFromCodePoints @(0x7BA1,0x7EBF)) },
+        @{ pattern = 'knowledge'; label = (New-TextFromCodePoints @(0x77E5,0x8BC6)) },
+        @{ pattern = 'interaction'; label = (New-TextFromCodePoints @(0x4EA4,0x4E92)) },
+        @{ pattern = 'input'; label = (New-TextFromCodePoints @(0x8F93,0x5165)) },
+        @{ pattern = 'ui'; label = 'UI' }, @{ pattern = 'prefab'; label = 'Prefab' },
+        @{ pattern = 'entity'; label = (New-TextFromCodePoints @(0x5B9E,0x4F53)) },
+        @{ pattern = 'weapon'; label = (New-TextFromCodePoints @(0x6B66,0x5668)) },
+        @{ pattern = 'automation'; label = (New-TextFromCodePoints @(0x81EA,0x52A8,0x5316)) },
+        @{ pattern = 'menu'; label = (New-TextFromCodePoints @(0x83DC,0x5355)) }
+    )
+    foreach ($rule in $rules) { if ($keyLower -match $rule.pattern -and $labels -notcontains $rule.label) { $labels += [string]$rule.label } }
+    if ($labels.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($ContextText)) {
+        $contextMatch = [regex]::Match([string]$ContextText, '[\p{IsCJKUnifiedIdeographs}]{2,16}')
+        if ($contextMatch.Success -and $contextMatch.Value -match (New-TextFromCodePoints @(0x7A97,0x53E3)) + '|' + (New-TextFromCodePoints @(0x4F1A,0x8BDD)) + '|' + (New-TextFromCodePoints @(0x4EA4,0x4E92)) + '|' + (New-TextFromCodePoints @(0x8D44,0x6E90)) + '|' + (New-TextFromCodePoints @(0x7F16,0x8F91)) + '|' + (New-TextFromCodePoints @(0x9A8C,0x6536)) + '|' + (New-TextFromCodePoints @(0x6D4B,0x8BD5)) + '|' + (New-TextFromCodePoints @(0x7F16,0x8BD1)) + '|' + (New-TextFromCodePoints @(0x804C,0x8D23))) { $labels += $contextMatch.Value }
+        if ($labels.Count -eq 0) {
+            foreach ($hint in @((New-TextFromCodePoints @(0x97F3,0x9891)),(New-TextFromCodePoints @(0x76F8,0x673A)),(New-TextFromCodePoints @(0x6218,0x6597)),(New-TextFromCodePoints @(0x5B58,0x6863)),(New-TextFromCodePoints @(0x7F51,0x7EDC)),(New-TextFromCodePoints @(0x7A97,0x53E3)),(New-TextFromCodePoints @(0x4F1A,0x8BDD)),(New-TextFromCodePoints @(0x4EA4,0x63A5)),(New-TextFromCodePoints @(0x9A8C,0x6536)),(New-TextFromCodePoints @(0x8D44,0x6E90)),(New-TextFromCodePoints @(0x5B9E,0x4F53)),(New-TextFromCodePoints @(0x8F93,0x5165)),'UI')) { if ([string]$ContextText -like ('*' + $hint + '*')) { $labels += $hint } }
+        }
+    }
+    if ($labels.Count -gt 0) { return ($labels -join '') }
+    $fallback = (([string]$Key) -replace '^[eE][sS][-_.]?', '') -replace '[-_.:]+', ' '
+    if ([string]::IsNullOrWhiteSpace($fallback)) { return (New-TextFromCodePoints @(0x804C,0x8D23)) }
+    return (New-TextFromCodePoints @(0x804C,0x8D23,0x00B7)) + $fallback.Trim()
+}
+
+function Get-DefaultTabTitle([string]$Key, [string]$LaunchMode, [string]$ContextText = '') {
     $middleDot = [string][char]0x00B7
     switch ($Key.ToLowerInvariant()) {
         'release-acceptance' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5DE5, 0x7A0B, 0x9A8C, 0x6536)) }
@@ -230,6 +271,9 @@ function Get-DefaultTabTitle([string]$Key, [string]$LaunchMode) {
         'aitest-implementation' { return 'ES' + $middleDot + 'AITest' }
         'resource-pipeline' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x8D44, 0x6E90, 0x7BA1, 0x7EBF)) }
         'graph-audit' { return 'ES' + $middleDot + 'Graph' + (New-TextFromCodePoints @(0x5BA1, 0x8BA1)) }
+    }
+    if ($Key -and $Key -ne 'default') {
+        return 'ES' + $middleDot + (Get-ResponsibilityTitleLabel -Key $Key -ContextText $ContextText)
     }
     switch ($LaunchMode) {
         'Resume' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x6062, 0x590D)) }
@@ -462,9 +506,6 @@ else {
 
 if ($HandoffMode -and $Mode -notin @('Validate', 'New')) {
     throw 'HandoffMode is valid only for Validate or New.'
-}
-if ((Test-SessionHandoffIntent $Mode $TaskKey $ResponsibilityKey $TaskPrompt) -and -not $HandoffMode) {
-    throw 'Handoff intent detected. Call Complete-ESCodexHandoff.ps1 so timeline coverage, private snapshots, and the handoff receipt cannot be bypassed.'
 }
 if ($Mode -eq 'New' -and $HandoffPath.Count -gt 0 -and -not $HandoffMode) {
     throw 'HandoffPath on a New session requires Complete-ESCodexHandoff.ps1; direct handoff delivery is prohibited.'
@@ -898,7 +939,7 @@ if ([string]::IsNullOrWhiteSpace($effectiveTabTitle) -and $null -ne $restoredEnt
     $effectiveTabTitle = [string]$restoredEntry.tabTitle
 }
 if ([string]::IsNullOrWhiteSpace($effectiveTabTitle)) {
-    $effectiveTabTitle = Get-DefaultTabTitle $effectiveResponsibilityKey $Mode
+    $effectiveTabTitle = Get-DefaultTabTitle -Key $effectiveResponsibilityKey -LaunchMode $Mode -ContextText ($TaskPrompt + ' ' + $effectiveTaskKey)
 }
 $effectiveTabTitle = Get-SafeTabTitle $effectiveTabTitle
 $effectiveWindowName = Get-SafeWindowName $TerminalWindowName
@@ -962,6 +1003,7 @@ $result = [ordered]@{
     startupFailureReason = ''
     dryRun = [bool]$DryRun
     codexArguments = @()
+    skipHooks = [bool]$SkipHooks
     hookConfigPath = if ($hookConfigPresent) { $hookConfigPath } else { '' }
     hookConfigPresent = $hookConfigPresent
     hookTrustVerified = $false
@@ -997,6 +1039,10 @@ if ($Mode -ne 'Validate') {
                 $previewArguments.Add($previewPrompt)
             }
         }
+    }
+    if ($SkipHooks) {
+        $previewArguments.Insert(0, 'hooks')
+        $previewArguments.Insert(0, '--disable')
     }
     $result.codexArguments = @($previewArguments)
 }
@@ -1127,7 +1173,7 @@ try {
     }
     $result.envelopePath = $envelopePath
 
-    $initialPrompt = 'Run the ES launch-envelope validator at ' + $envelopeValidatorPath + ' against ' + $envelopePath + ' with LaunchToken ' + $launchToken + ' before using any handoff. A first-acceptance non-zero result is a hard context-drift failure; report it instead of silently switching context. This is a one-time acceptance gate, not a continuous runtime lease. After successful acceptance, later envelope loss does not stop the current conversation; continue only from already accepted transcript/context and never substitute another handoff source or claim fresh artifact verification. Consume only envelope.handoffFiles absolutePath values, which are private per-launch snapshots; never substitute their mutable sourceAbsolutePath values. Project Skills are rooted at ' + $projectSkillsRoot + '; for any handoff or Codex session operation, read ' + $sessionBootstrapSkillPath + ' before claiming no matching Skill exists, and do not treat global skill directories as authoritative for project Skill absence. Then read the immutable envelope, AIWarnings README, CurrentStatus, RuleIndex, and matched task rules; inspect branch, HEAD, and worktree read-only; report initialization and execute envelope.taskPrompt in Chinese. Do not write history, audit state, Git, release, or delete without current explicit authorization. Launch token ' + $launchToken + '.'
+    $initialPrompt = 'Run the ES launch-envelope validator at ' + $envelopeValidatorPath + ' against ' + $envelopePath + ' with LaunchToken ' + $launchToken + ' before using any handoff. A first-acceptance non-zero result is a hard context-drift failure; report it instead of silently switching context. This is a one-time acceptance gate, not a continuous runtime lease. After successful acceptance, later envelope loss does not stop the current conversation; continue only from already accepted transcript/context and never substitute another handoff source or claim fresh artifact verification. Consume only envelope.handoffFiles absolutePath values, which are private per-launch snapshots; never substitute their mutable sourceAbsolutePath values. Project Skills are rooted at ' + $projectSkillsRoot + '; for any handoff or Codex session operation, read ' + $sessionBootstrapSkillPath + ' before claiming no matching Skill exists, and do not treat global skill directories as authoritative for project Skill absence. Then read the project AGENTS.md first, followed by ES/AISpace/README.md for AI-content placement, the immutable envelope, AIWarnings README, CurrentStatus, RuleIndex, and matched task rules; do not claim a project concept is absent before checking AGENTS.md and its referenced authoritative README. Inspect branch, HEAD, and worktree read-only; report initialization and execute envelope.taskPrompt in Chinese. Before concluding that Unity is unavailable, inspect currently running Unity/UnityHub processes (including their executable paths, command lines, and window titles) and match the project path; an installed-path/PATH lookup alone is insufficient. Do not write history, audit state, Git, release, or delete without current explicit authorization. Launch token ' + $launchToken + '.'
 
     $codexArguments = [Collections.Generic.List[string]]::new()
     switch ($Mode) {
@@ -1156,6 +1202,10 @@ try {
                 $codexArguments.Add($initialPrompt)
             }
         }
+    }
+    if ($SkipHooks) {
+        $codexArguments.Insert(0, 'hooks')
+        $codexArguments.Insert(0, '--disable')
     }
     $result.codexArguments = @($codexArguments)
 

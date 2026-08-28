@@ -27,17 +27,26 @@ function Get-ESCodexLaunchReceiptPath([string]$ReceiptRoot, [string]$LaunchToken
 
 function Find-ESCodexLaunchHistorySessionId([string]$HistoryPath, [string]$LaunchToken, [long]$StartedAtUnix) {
     if ([string]::IsNullOrWhiteSpace($HistoryPath) -or -not (Test-Path -LiteralPath $HistoryPath -PathType Leaf)) { return '' }
-    foreach ($line in (Get-Content -LiteralPath $HistoryPath -Tail 5000 -Encoding UTF8)) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
         try {
-            $row = $line | ConvertFrom-Json
-            if ([string]$row.text -like ('*' + $LaunchToken + '*') -and [long]$row.ts -ge $StartedAtUnix) {
-                return [string]$row.session_id
+            foreach ($line in (Get-Content -LiteralPath $HistoryPath -Tail 5000 -Encoding UTF8 -ErrorAction Stop)) {
+                try {
+                    $row = $line | ConvertFrom-Json
+                    if ([string]$row.text -like ('*' + $LaunchToken + '*') -and [long]$row.ts -ge $StartedAtUnix) {
+                        return [string]$row.session_id
+                    }
+                }
+                catch {
+                    # History is append-only and may contain unrelated/non-JSON lines.
+                    Write-Verbose ("Ignoring malformed Codex history line while resolving launch session: " + $_.Exception.Message)
+                }
             }
         }
         catch {
-            # History is append-only and may contain unrelated/non-JSON lines.
-            # Ignore that line deliberately, while preserving a diagnosable signal.
-            Write-Verbose ("Ignoring malformed Codex history line while resolving launch session: " + $_.Exception.Message)
+            # A concurrent Codex writer can briefly lock the global history file.
+            # Session-id discovery is observational only; never block a New launch on it.
+            Write-Verbose ("Codex history unavailable during launch observation (attempt $attempt): " + $_.Exception.Message)
+            if ($attempt -lt 3) { Start-Sleep -Milliseconds 120 }
         }
     }
     return ''

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es.ai-abc.external-research-provenance.v1",
+  "authority": "navigation-only",
+  "purpose": "Record user-provided primary-source pointers for later ABCC detail comparison without making external claims current.",
+  "captureStatus": "external-source-not-bound",
+  "retrievalAuthorized": false,
+  "retrievedUtc": null,
+  "sourceNote": "URLs were transcribed from the user-provided image on 2026-08-28. No network retrieval or content verification was performed in this task. A later comparison must record the final URL, product/version, retrieval time, quoted contract context, and content hash in a project-local snapshot before treating it as durable external evidence.",
+  "sources": [
+    {
+      "mechanismId": "swe-agent-aci",
+      "name": "SWE-agent ACI",
+      "abccCapability": "bounded-tool-action",
+      "officialUrls": ["https://github.com/SWE-agent/SWE-agent/blob/main/docs/background/aci.md"],
+      "comparisonFocus": ["bounded tool surface", "search/read/edit limits", "lint and empty-output feedback"],
+      "verificationState": "deferred"
+    },
+    {
+      "mechanismId": "reflexion",
+      "name": "Reflexion",
+      "abccCapability": "failure-recovery",
+      "officialUrls": ["https://github.com/noahshinn/reflexion"],
+      "paperUrls": ["https://arxiv.org/abs/2303.11366"],
+      "comparisonFocus": ["external feedback", "failure cause", "reflection", "scenario memory", "verifier gate"],
+      "verificationState": "deferred"
+    },
+    {
+      "mechanismId": "tree-of-thoughts",
+      "name": "Tree of Thoughts",
+      "abccCapability": "branch-evaluation",
+      "officialUrls": ["https://github.com/princeton-nlp/tree-of-thought-llm"],
+      "paperUrls": ["https://arxiv.org/abs/2305.10601"],
+      "comparisonFocus": ["intermediate states", "branch generation", "self-evaluation", "pruning", "backtracking"],
+      "verificationState": "deferred"
+    },
+    {
+      "mechanismId": "petri",
+      "name": "Petri",
+      "abccCapability": "state-transition-guard",
+      "officialUrls": ["https://alignment.anthropic.com/2025/petri/"],
+      "comparisonFocus": ["parallel audit agents", "reversible environment", "independent judge", "evidence-first interpretation"],
+      "verificationState": "deferred"
+    },
+    {
+      "mechanismId": "envtrustbench",
+      "name": "EnvTrustBench",
+      "abccCapability": "environment-trust-gate",
+      "paperUrls": ["https://arxiv.org/abs/2605.08828"],
+      "comparisonFocus": ["environment identity", "false surface state", "hidden negative cases", "trust decision"],
+      "verificationState": "deferred"
+    },
+    {
+      "mechanismId": "auditbench",
+      "name": "AuditBench",
+      "abccCapability": "audit-evidence-chain",
+      "officialUrls": ["https://alignment.anthropic.com/2026/auditbench/"],
+      "paperUrls": ["https://arxiv.org/abs/2602.22755"],
+      "comparisonFocus": ["tool evidence", "decision change measurement", "tool-to-agent gap", "evidence citation"],
+      "verificationState": "deferred"
+    }
+  ],
+  "comparisonProtocol": {
+    "owner": "es-ai-abc-core",
+    "mismatchAction": "replan-and-record-field-level-difference",
+    "externalSourceRule": "An external URL is not a project SourceRef until a bounded local snapshot is authorized and hashed.",
+    "esAuthorityRule": "Current ES source, P0 rules and fresh receipts remain authoritative for ES behavior and permissions."
+  }
+}

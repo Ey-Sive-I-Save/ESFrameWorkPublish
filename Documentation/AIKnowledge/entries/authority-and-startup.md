@@ -6,11 +6,11 @@
 `EvidenceLevel`: `S1`
 `Authority`: `AIWarnings`
 `RouteKeys`: `startup`, `authority`, `aiwarnings`, `context`
-`ContentHash`: `a73113da4bd34dce0126e74f659fcc6c4d61f9cbfd6dfab25d69970ab575dabe`
+`ContentHash`: `0ce4f11a706d36e1ec80acfffb93d036016f43ac616830e8b33f897d9e2370c2`
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md` (`04af5af87127d069f4a5d2914ee12ce885043b804bd4d6050a3ec342721ca66b`)
+- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md` (`0181a3285041d4221e0eb35a682bfc6de39b7f854b99312e157dd1e4c99c5c5b`)
 - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md` (`89c647f286f3ff648cc7c3fd7dd0646e1f36c5ded4963b9a5a598d7611ba0a59`)
 
 `EvidenceRefs`: 当前 Codex launch-envelope/AIWarnings start chain 的只读初始化事实；AIBrain 启动器尚无运行回执。

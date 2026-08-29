@@ -4,9 +4,9 @@
 `Authority`: `Current project source + governed UI authoring contracts + derived visual-system decisions + official source snapshot`
 `RouteKeys`: `ui-automation`, `visual-qa`, `ui-visual-design`, `visual-design`, `design-token`, `color-role`, `typography-role`, `spacing-token`, `visual-hierarchy`, `information-density`, `rarity-visual`, `ui-material`
 `HashSchema`: `v2`
-`ContentHash`: `bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089`
-`SourceSetHash`: `bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089`
-`EntryBodyHash`: `5d9360db8472fb07b89adcfcaaefb24fe591fa40a2618e68240357ffe78839ac`
+`ContentHash`: `08ad3c814b81543da06277ccbcbbd3553727e18e2dec4deb91e40fc207c8c2d1`
+`SourceSetHash`: `08ad3c814b81543da06277ccbcbbd3553727e18e2dec4deb91e40fc207c8c2d1`
+`EntryBodyHash`: `16ed9f38231281342d40c5ad357a06923c6b7ab4eca43bdfe629568151c58e78`
 `EvidenceLevel`: `S0`
 `StaleWhen`: ScreenSpec v3 Token schema、Validator、Adapter、Materializer、字体/素材治理、视觉证据合同、官方来源锁或任一 SourceRef 哈希变化。
 
@@ -17,9 +17,10 @@
 Validator、Adapter、Materializer 与包版本事实可按 SourceRefs 做静态复核。
 
 当前 ScreenSpec v3 模板只提供 `surface`、`text`、`accent` 三个示例值。它们不是经过验收的
-品牌 Token 系统。Adapter 只是原样传递 `tokens`；Validator 不验证 Token role；Materializer
-的 `UiTokens`/`ParseToken` 只识别现有扁平字段和少量颜色名。因此本条目的语义命名空间是
-决策词汇，不是已实现 schema。没有消费者时，不能把 DTCG Token 文件直接引入 Unity Runtime。
+品牌 Token 系统。Adapter 原样传递 `tokens`；Validator 已检查基础语义角色、对比度、消费者、
+状态 Token 绑定与间距尺度，但 Materializer 的 `UiTokens`/`ParseToken` 仍只识别现有扁平字段和
+少量颜色名。因此这不是完整品牌 Design System。没有消费者时，不能把 DTCG Token 文件直接
+引入 Unity Runtime。
 
 本条目不拥有 Canvas/Prefab/Input/Resource 生命周期、品牌色、字体许可证、稀有度业务词表或
 Runtime Window。WCAG 与 DTCG 官方资料只提供外部校准，不证明目标 Unity 画面已测量或通过。
@@ -181,12 +182,26 @@ Apply the reusable rules in `.agents/skills/es-ui-prefab-authoring/references/ui
 - `UI-FB-004`: static completion and non-empty PNGs cannot become visual acceptance.
 - `UI-FB-005`: every review finding must change a spec/registry/validator/materializer field and
   name the evidence that will falsify the fix.
+- `UI-FB-010`: visual hierarchy requires profile-specific content counts and required-zone
+  coverage, not merely a non-empty component tree.
+- `UI-FB-011`: every declared color/state/spacing token needs a concrete consumer and an
+  executable state effect before the design contract can pass.
+- `UI-FB-012`: ranked visual bands must cover every required component and contain the primary
+  action in the strongest declared action band.
+- `UI-FB-013`: each profile needs an explicit focus order beginning at the primary action, while
+  loading and disabled states must reject duplicate activation.
+- `UI-FB-014`: each state has a profile-relative affected-component budget so a local state cannot
+  silently recolor or hide most of the screen.
+- `UI-FB-015`: key component `anchorMin`, `anchorMax` and `pivot` values must match the
+  Materializer's final Unity RectTransform projection.
 
 `advancedComposition` now provides a static decision contract for one primary action, focal or
 intentional no-focal treatment, focal crop/focal-point/safe-crop linkage to AssetManifest, key
-alignment/clearance, post-layout action-density constraints and responsive semantic equivalence.
-It prevents these decisions from being omitted; it does not evaluate visual taste or replace Unity
-pixel evidence.
+alignment/clearance, post-layout action-density constraints, responsive semantic equivalence,
+ranked hierarchy coverage, focus order, state impact scope and key RectTransform anchors. Screen
+bounds use top-left coordinates; final Unity anchors use bottom-left coordinates, while the
+explicit authored Unity pivot is preserved. These contracts prevent decisions from being omitted;
+they do not evaluate visual taste or replace Unity pixel evidence.
 
 These rules are derived from project evidence, not proof that the current materializer satisfies
 them. A future batch must report the changed rule ID and the artifact field changed because of it.
@@ -215,15 +230,15 @@ them. A future batch must report the changed rule ID and the artifact field chan
 - `.agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json` (`c90228507834858d10720385a17e03996aed2392b2cad35d63b3449d0c8c93bb`)
 - `.agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md` (`744e99b7f133a90b8ee6ff11208717511f37a352a37c9f25d7ddb5c9fc220f6b`)
 - `.agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md` (`85579b0750d426fc9f615b60d488ff90626956a6f68784ff232175fba5e5c248`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`b191bf200879dab3a7edd0b173d1065d59d7c0e2fc0b5cd5160285219ae3d136`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`c29986030b842af905536e699778ad7a5a267e415f8842b74ae42a7c80ed4739`)
 - `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`28e29084d48d737a09eb281c2b26ee599d38c9e92a7d6ef081cbb59beea34668`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`2e82399e64ed5833891b1d4237791f4552306354c6a2acfd5e496e0d856207cd`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`342d371c49d4cfc31cc85c5fda216a52560363b313842a637e6422364d9bd795`)
 - `Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs` (`5653c9b8c5fe381a8f65412236adb3616e7460ece82c99efb76e47fbec91a4cc`)
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md` (`8e1fe9d3736ad07de9ae953dd628d3f512dc94713ea07a9aee32208570746aa4`)
-- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`34b980e70b2aa519f3adb0429e4584e06a8fefbdc770e201edbe2266d20b10f3`)
+- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`b3010e989e3460643e72f442f339e73e89586f4840ce16ab1baf07ccd3aa4423`)
 - `Packages/manifest.json` (`d447378a6e35e070c3fa8df645a5829a703eb4b488f8ae8132cd894ab19d016d`)
 - `Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md` (`d29ff698cd8fc3b0a3e014efe1780ef4a141e620b05cd3bf22be9d72ab3548de`)
-- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`3e197021939577729a0c23a3f632046271385d02d7336fdcc0f2b0d50e4226d1`)
+- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`c694ed9fa2a38cd1d207068c254bf548010c48e5ee6bc6bf1bfb05ac63858875`)
 
 ## Evidence boundary
 

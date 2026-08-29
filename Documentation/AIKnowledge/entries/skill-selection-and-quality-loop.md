@@ -6,11 +6,11 @@
 `EvidenceLevel`: `S1`
 `Authority`: `Derived`
 `RouteKeys`: `skill`, `routing`, `validation`, `iteration`
-`ContentHash`: `0d76a288c1a87585f1006c6522957375807af48a66ae1cda8e8e04345b5ecf0d`
+`ContentHash`: `da1e43dd413cb3ed6ae30845229339b59d5b9cf58452526edcd44b2245487b06`
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`025244bd6a0ec254e8cde057bf7c782dd6e6cbc96b29fb2514de3bed172bc6fb`)
+- `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166`)
 - `.agents/skills/es-generate-agent-artifacts/SKILL.md` (`b2c08931566c9cdd9b6ad5f8cea2dda0be00cb2358468ee8dac841fb5469c60e`)
 
 `EvidenceRefs`: 三个候选 Skill 的 `quick_validate.py` 结构验证输出；未执行代表任务、非触发任务和失败注入。

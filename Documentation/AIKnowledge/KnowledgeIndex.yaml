@@ -115,17 +115,37 @@ entries:
     evidenceLevel: S2
     contentHash: 2d43c9c5d24990cda2f1b052949e21fda3f9823da7903ca95b54eee20bc3e78b
     staleWhen: 受管 AIKnowledge 更新命令、Knowledge Creator/Validator 合同、refresh-plan/stable-refresh 脚本或外部并发、替换、持久化参考的适用语义变化
+  - knowledgeId: es.knowledge.freshness.v1
+    file: entries/ai-knowledge-freshness.md
+    topic: AIWarnings / AIKnowledge 日粒度新鲜度筛查
+    routeKeys: [knowledge, freshness, last-modified, stale, source-ref, content-hash, aiwarnings, screening]
+    relatedSkills: [es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/AIKnowledgeFreshnessContract.md
+      - Documentation/AIKnowledge/AIKnowledgeFreshness.json
+      - Documentation/AIKnowledge/entries/ai-knowledge-freshness.md
+      - .agents/skills/es-ai-knowledge-curation/scripts/Update-ESAIKnowledgeFreshness.ps1
+      - .agents/skills/es-ai-knowledge-curation/scripts/Test-ESAIKnowledgeFreshness.ps1
+      - .agents/skills/es-knowledge-validator/SKILL.md
+      - .agents/skills/es-knowledge-validator/references/knowledge-validation-contract.md
+    authority: AIKnowledge freshness contract and deterministic local scripts
+    evidenceLevel: S1
+    hashSchema: v2
+    sourceSetHash: aa8715bc60cf3a29a3ca52810e560b94dcae979c6fd848aa3d4b060eb541ff93
+    entryBodyHash: 568c4ef348100f651f8aaab29dfc5507159c9170e003e1ed5d60315ad1bf59e4
+    contentHash: aa8715bc60cf3a29a3ca52810e560b94dcae979c6fd848aa3d4b060eb541ff93
+    staleWhen: 新鲜度合同、快照 schema、刷新/筛查脚本、KnowledgeIndex、AIWarnings Start 链或任一 SourceRef 哈希变化
   - knowledgeId: es.aibrain.authority-startup.v1
     file: entries/authority-and-startup.md
     topic: 启动入口与权威分层
     routeKeys: [startup, authority, aiwarnings, context]
-    relatedSkills: [es-skill-governance, es-skill-creator]
+    relatedSkills: [es-skill-governance, es-skill-creator, es-ai-space-organization]
     requiredReads:
       - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
       - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
     authority: AIWarnings
     evidenceLevel: S1
-    contentHash: a73113da4bd34dce0126e74f659fcc6c4d61f9cbfd6dfab25d69970ab575dabe
+    contentHash: 0ce4f11a706d36e1ec80acfffb93d036016f43ac616830e8b33f897d9e2370c2
     staleWhen: 启动链、会话合同或 AIWarnings 入口语义变化
   - knowledgeId: es.skill.selection-quality.v1
     file: entries/skill-selection-and-quality-loop.md
@@ -137,7 +157,7 @@ entries:
       - .agents/skills/es-generate-agent-artifacts/SKILL.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 0d76a288c1a87585f1006c6522957375807af48a66ae1cda8e8e04345b5ecf0d
+    contentHash: da1e43dd413cb3ed6ae30845229339b59d5b9cf58452526edcd44b2245487b06
     staleWhen: Skill 目录合同、候选生成合同或验证器变化
   - knowledgeId: es.feishu.adapter-boundary.v1
     file: entries/feishu-adapter-boundary.md
@@ -213,7 +233,7 @@ entries:
     file: entries/function-area-routing.md
     topic: 治理与规划功能区
     routeKeys: [aibrain, governance, planning, authority, skill-performance, execution-cost, fast-path, deep-path, cache, analysis, design, root-cause, review, risk, change-budget, rollback, migration, compatibility]
-    relatedSkills: [es-skill-governance, es-use-ai-command, es-change-risk-register, es-migration-planning, es-adversarial-review, es-first-principles-analysis]
+    relatedSkills: [es-skill-governance, es-use-ai-command, es-change-risk-register, es-migration-planning, es-open-source-migration, es-adversarial-review, es-first-principles-analysis, es-ai-space-organization]
     requiredReads:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
@@ -359,7 +379,7 @@ entries:
       - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
     authority: AIWarnings
     evidenceLevel: S1
-    contentHash: 06de948b50e15383eb320676d35d33b1ac3a7bd80e36502a2175b4e596a26b35
+    contentHash: 11a3ec99b3c56f4877ca94570f2af098c9f4bb4b29a5308ec42d10abc98330dc
     staleWhen: 任一 AIWarnings Start SourceRef、RuleIndex 或领域目录边界变化
   - knowledgeId: es.aiwarnings.domain-inventory.v1
     file: entries/aiwarnings-domain-inventory.md
@@ -373,7 +393,7 @@ entries:
       - .agents/skills/es-ai-knowledge-curation/scripts/Build-ESAIWarningsInventory.ps1
     authority: Derived
     evidenceLevel: S1
-    contentHash: acb2c9b728e28722ad67aeb3c80b3d999da9d3099cd0f85b56a7ebc67b80a4f8
+    contentHash: f08f240b46113264bf769e2da384d9b0ba4d9921507326fb0e9735965ffc9a02
     staleWhen: AIWarnings 文件数量、目录边界、SourceRef 哈希或 RuleIndex 变化
   - knowledgeId: es.project.gamecore-identity-registration.v1
     file: entries/gamecore-identity-registration.md
@@ -418,8 +438,35 @@ entries:
       - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
     authority: Source + AIWarnings
     evidenceLevel: S1
-    contentHash: c013219b943891e78db1dd9facf44a03a3cf3aabb5d8f8880fde3a96367514bb
+    contentHash: f76cd45cf7f816f6406d99ed1208aab43c914facfe74d93c7bfbd74806482e64
     staleWhen: PlanHash、TaskContract、Worker、Bridge、Graph 或 RunRecord 合同变化
+  - knowledgeId: es.research.agent-mechanism-replication.v1
+    file: entries/agent-mechanism-replication.md
+    topic: 公开 Agent 机制复刻的 ES 适配、证据门控与发现合同
+    routeKeys: [agent-mechanism-replication, analysis, design, es-adaptation, evidence-set, external-authority, failure-surface, knowledge-output, route-plan, route-probe, route-stage, root-cause, source-ref, source-scope, static-replay, task-context-runtime, receipt, cas, stale, closed-loop]
+    relatedSkills: [es-agent-mechanism-replication, es-first-principles-analysis, es-adversarial-review, es-aibrain-route-authoring, es-knowledge-creator, es-knowledge-validator, es-ai-knowledge-curation]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/agent-mechanism-replication.md
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - Documentation/AIKnowledge/entries/task-context-runtime.md
+      - Documentation/AIKnowledge/entries/automation-aibrain-graph.md
+      - Documentation/AIKnowledge/entries/knowledge-routing-quality.md
+      - ES/Automation/Contracts/es-task-context-runtime-v1.schema.json
+      - ES/Automation/Contracts/es-route-plan-v1.schema.json
+      - ES/Automation/Contracts/es-route-stage.registry.json
+      - .agents/skills/es-first-principles-analysis/SKILL.md
+      - .agents/skills/es-aibrain-route-authoring/SKILL.md
+      - .agents/skills/es-knowledge-creator/SKILL.md
+      - .agents/skills/es-knowledge-validator/SKILL.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
+    authority: Current ES contracts and project Skills; external calibration is bound through the project-local source lock
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: d2204a9cf5e8df8798e1c79a4cf949394e1ef1f1eff3f105edd1e4a8087ce2db
+    sourceSetHash: d2204a9cf5e8df8798e1c79a4cf949394e1ef1f1eff3f105edd1e4a8087ce2db
+    entryBodyHash: a00e7ead0d9e217f72097892cefa187b00f470163bde366ee22338ce65a5ed77
+    staleWhen: TaskContextRuntime、RoutePlan、RouteStage、Evidence/Verifier/Evaluator、AIBrain 选择算法、KnowledgeIndex、RouteProbeRegistry、Project Skill 资源或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.editor-workbench-authoring.v1
     file: entries/editor-workbench-authoring.md
     topic: Editor Workbench、草稿事务与正式资产边界
@@ -489,7 +536,7 @@ entries:
       - Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs
     authority: Source + Skill contract + Unity evidence
     evidenceLevel: S2
-    contentHash: 961b5be9ece1f541575199a017ef67fc08f04cc6da4704d5ef4ece37676e9577
+    contentHash: 1b812437c4164b3f4b5549ab0a332180018bdbe7abc3b2f24324d05038b67f84
     staleWhen: ScreenSpec schema、组件注册表、Materializer、Prefab/Fixture 产物或视觉证据合同变化
   - knowledgeId: es.project.game-ui-open-source-automation-patterns.v1
     file: entries/game-ui-open-source-automation-patterns.md
@@ -510,7 +557,7 @@ entries:
     hashSchema: v2
     contentHash: de8d60942db8904aa5a970720e73c13136604fc9109e85ef4bb99b7b8b95bfb0
     sourceSetHash: de8d60942db8904aa5a970720e73c13136604fc9109e85ef4bb99b7b8b95bfb0
-    entryBodyHash: 3309e28abae39e1bc4223cdb34b60bfe9106429f59f22007592a88e462ff5577
+    entryBodyHash: 2e433a99b6ca844cbd62eb478e8dcba065f207bed2c07a3ef9272c7a2d414d57
     staleWhen: 固定开源仓库 commit、raw 文件哈希、许可证、UI IR/flow 协议、当前 ES ScreenSpec/AssetManifest/BehaviorSpec/Materializer 合同或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-normalized-adapter-layer.v1
     file: entries/game-ui-normalized-adapter-layer.md
@@ -544,6 +591,7 @@ entries:
       - .agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md
       - .agents/skills/es-ui-intent-authoring/references/player-intent-registry.json
       - .agents/skills/es-ui-intent-authoring/scripts/validate_intent_spec.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
     authority: Governed UI intent Skill + IntentSpec contract + player-intent registry + validator source
     evidenceLevel: S1
     hashSchema: v2
@@ -606,9 +654,9 @@ entries:
     authority: Current project source + governed UI authoring contracts + derived visual-system decisions + official source snapshot
     evidenceLevel: S0
     hashSchema: v2
-    contentHash: bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089
-    sourceSetHash: bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089
-    entryBodyHash: 5d9360db8472fb07b89adcfcaaefb24fe591fa40a2618e68240357ffe78839ac
+    contentHash: 08ad3c814b81543da06277ccbcbbd3553727e18e2dec4deb91e40fc207c8c2d1
+    sourceSetHash: 08ad3c814b81543da06277ccbcbbd3553727e18e2dec4deb91e40fc207c8c2d1
+    entryBodyHash: 16ed9f38231281342d40c5ad357a06923c6b7ab4eca43bdfe629568151c58e78
     staleWhen: ScreenSpec v3 Token schema、Validator、Adapter、Materializer、字体/素材治理、视觉证据合同、官方来源锁或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-capability-readiness.v1
     file: entries/game-ui-capability-readiness.md
@@ -644,9 +692,9 @@ entries:
     authority: Current ES source/contracts + Unity 2022.3 package facts + bounded external source snapshots
     evidenceLevel: S0
     hashSchema: v2
-    contentHash: 46fa4a23dff6f56fab8e5eaca3a5ae3abab39796ad292e8223a5403d0dabda5e
-    sourceSetHash: 46fa4a23dff6f56fab8e5eaca3a5ae3abab39796ad292e8223a5403d0dabda5e
-    entryBodyHash: 2be9ecdc77297c3be0191ced5e052504960d0c66103fa595f944694010bc22dc
+    contentHash: fa7cac663483ee71f542de2c5c8f931ad4fadb38eed090628d704325929bb972
+    sourceSetHash: fa7cac663483ee71f542de2c5c8f931ad4fadb38eed090628d704325929bb972
+    entryBodyHash: 73183e3f121a14bfb2176215445b3b18243974a5da457f4aca0e32d62a9dc90d
     staleWhen: ScreenSpec schema、Validator、Adapter、Materializer、组件/素材注册、Unity/UGUI/Input System/TMP 版本、视觉证据合同、外部来源快照或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-request-intent-contract.v1
     file: entries/game-ui-request-intent-contract.md
@@ -687,7 +735,7 @@ entries:
     hashSchema: v2
     contentHash: c607207e65f8f322e63cb2e0526c1a97190f1c1cd1cfd75461568a0458b59afa
     sourceSetHash: c607207e65f8f322e63cb2e0526c1a97190f1c1cd1cfd75461568a0458b59afa
-    entryBodyHash: 0000000000000000000000000000000000000000000000000000000000000000
+    entryBodyHash: 71f93274531ce40e87c78e609404cff7f8457983e7f2c5b7f3771b82c5942481
     staleWhen: pinned repository/model source hash、参考图测量器、ScreenSpec/LayoutPlan/Materializer 合同或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-reference-design-evidence.v1
     file: entries/game-ui-reference-design-evidence.md
@@ -732,12 +780,12 @@ entries:
     hashSchema: v2
     contentHash: 58e08515b70bb85d851cd9c3d8b6431ea9c8ad56b4a7a7734669c1a6e33c1004
     sourceSetHash: 58e08515b70bb85d851cd9c3d8b6431ea9c8ad56b4a7a7734669c1a6e33c1004
-    entryBodyHash: 682ce7a02d577f0b490f9989bf862eca2e002145763ccea5d50a886951ff8ee4
+    entryBodyHash: 5785c8af3988b9bb47da420dc6f45254552a62384e41145bdb89c7a0686c2c59
     staleWhen: ScreenSpec assets schema、Registry、Validator、任一 Adapter、Materializer/resolver、Unity Image/SpriteAtlas 版本、资源发布方案、官方来源锁或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-ai-workflow-divergence-and-quality-gates.v1
     file: entries/game-ui-ai-workflow-divergence-and-quality-gates.md
     topic: Unity 游戏 UI AI 工作流分歧、真实贴图、多分辨率、配色和字体质量门
-    routeKeys: [ui-automation, ui-workflow, ui-layout, responsive, ui-asset-manifest, asset-provenance, ui-visual-design, design-token, typography-role, font-fallback, ui-visual-evaluation, design-to-unity]
+    routeKeys: [ui-automation, ui-workflow, ui-layout, responsive, ui-asset-manifest, asset-provenance, ui-visual-evaluation, design-to-unity]
     relatedSkills: [es-ui-prefab-authoring, es-knowledge-creator, es-knowledge-validator]
     requiredReads:
       - Documentation/AIKnowledge/entries/game-ui-ai-workflow-divergence-and-quality-gates.md
@@ -762,7 +810,7 @@ entries:
     hashSchema: v2
     contentHash: 1e00de96de85c990840af38562c0b4fe3375f68d36699cc65f3a63e985493baf
     sourceSetHash: 1e00de96de85c990840af38562c0b4fe3375f68d36699cc65f3a63e985493baf
-    entryBodyHash: 22dc7e0b4aa2767473997bbb791d0c79d2e370396fdddbd6ee2cf0ced277077e
+    entryBodyHash: 09f16733ee537e8688345f41372e6169390686a145ba9e263d926ce071d3ada8
     staleWhen: Unity/UGUI/TMP/Input System version, ScreenSpec/Validator/Adapter/Materializer schema, AssetManifest/Token/Font contract, pinned external source hash, or visual evidence contract changes.
   - knowledgeId: es.project.game-ui-behavior-focus-navigation.v1
     file: entries/game-ui-behavior-focus-navigation.md
@@ -1207,7 +1255,7 @@ entries:
     requiredReads: [Documentation/AIKnowledge/Editor/project-screen-spec-materializer/visual-evidence-boundary.md]
     authority: AIWarnings P0 + current Materializer source + governed evidence contract
     evidenceLevel: S1
-    contentHash: 4a6fc8d225bb99e2545008e3a9367a47ec420932134a8f8e87a016aea3501fdc
+    contentHash: a6e23bf7e1045397613e77ea6ffdb3cadf561e81bcafe082187ff96bb7adf9ce
     staleWhen: Unity、Materializer 捕获、证据等级、UI 作者工作流或任一 SourceRef 哈希变化
   - knowledgeId: es.project.stable-graph-v2.v1
     file: Editor/project-stable-graph-v2/stable-graph-v2-authoring.md
@@ -1415,3 +1463,1885 @@ entries:
     evidenceLevel: S1
     contentHash: ac4e7a3732cb184e0d2841ce0f43a88ca420a44f997531555246004278e79371
     staleWhen: 评价 Profile、下一步行为树、收尾合同、AGENTS 门禁或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarnings.agent-skills-aicommands-boundary.v1
+    file: entries/agent-skills-aicommands-boundary.md
+    topic: Agent Skills、AICommands 与 AIWarnings 的职责边界、保真迁移和证据边界
+    routeKeys: [aiwarnings, architecture, skill, aicommand, knowledge, routing, evidence-boundary, permission-boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-creator, es-knowledge-validator, es-aibrain-route-authoring, es-skill-governance, es-migration-planning]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/agent-skills-aicommands-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
+      - Assets/Plugins/ES/AICommands/README.md
+      - .agents/README.md
+      - .agents/skills/es-aiwarning-authoring/scripts/Test-ESAIWarningRoute.ps1
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - .agents/SKILL_ROUTE_ALIASES.zh-CN.json
+    authority: Source + AIWarnings
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: f242a6f714cd9ff7daaaab2d3d0fbb8049fff63b3c2444de8db06db5790ccb9c
+    sourceSetHash: f242a6f714cd9ff7daaaab2d3d0fbb8049fff63b3c2444de8db06db5790ccb9c
+    entryBodyHash: d878ab1c245529623e997108ac3342d079d3971f07681c7292bd94b43430b815
+    staleWhen: 任一 SourceRef 哈希、AIWarnings Start 链、目标 Warning、AICommand/Skill 治理合同、Registry/Catalog、AIBrain 路由或 KnowledgeIndex 绑定变化
+  - knowledgeId: es.aiwarning.p0.stable-key-catalog-runtimekey.v1
+    file: entries/aiwarning-p0-stable-key-catalog-runtimekey.md
+    topic: P0 稳定身份、Catalog 烘焙与 RuntimeKey 进程边界
+    routeKeys: [aiwarnings, p0, stable-key, catalog, runtime-key, schema-hash]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-stable-key-catalog-runtimekey.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current stable identity and Catalog contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 5b0b8a79c9c7f58e9072eea8f243e504fe743b5cd1eed053647897eed56d8e7d
+    sourceSetHash: 5b0b8a79c9c7f58e9072eea8f243e504fe743b5cd1eed053647897eed56d8e7d
+    entryBodyHash: f68ac85f6df66d472cccab4dd5826d3f7ffe9729e96fc4753c3590f18aecbcdf
+    staleWhen: Catalog/Schema、RuntimeKey 生命周期、Key 迁移、AI 内容协议或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.gamecore-runtimedata-retention-transaction.v1
+    file: entries/aiwarning-p0-gamecore-runtimedata-retention-transaction.md
+    topic: P0 GameCore RuntimeData 稳定驻留与事务注入
+    routeKeys: [aiwarnings, p0, gamecore, runtime-data, retained, transaction, ready, runtime-key]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-gamecore-runtimedata-retention-transaction.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
+    authority: AIWarnings + current GameCore RuntimeData/Table contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 8a124f561a00d905e0664bc7c2fc4683bf3993d180ed2ad84c711c80b0d0afaa
+    sourceSetHash: 8a124f561a00d905e0664bc7c2fc4683bf3993d180ed2ad84c711c80b0d0afaa
+    entryBodyHash: 256572274f4df1da15031293716eb1a44eb6e9838fc124198a9f91cad7e9cb94
+    staleWhen: RuntimeData/Table/InjectWith*、Ready/RuntimeKey、载荷释放、根 SO 注入或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.asset-pipeline-four-stage-boundary.v1
+    file: entries/aiwarning-p0-asset-pipeline-four-stage-boundary.md
+    topic: P0 资源工具链四阶段隔离与发布边界
+    routeKeys: [aiwarnings, p0, assets, resource-pipeline, bake, plan, build, publish, staging]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-asset-pipeline-four-stage-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源工具链_四阶段严格隔离_AI协作警告.md
+    authority: AIWarnings + current resource pipeline contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: bfd171c931abdb32682fc704cdc94e8c221b0a879d61df066c22e794bde51d89
+    sourceSetHash: bfd171c931abdb32682fc704cdc94e8c221b0a879d61df066c22e794bde51d89
+    entryBodyHash: 7791a75d66774b726b6053208e40106fdec74491dfd5ae173bca05bc698924de
+    staleWhen: 阶段 API、产物 Schema、菜单入口、Provider 状态、发布协议或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.internal-prefix-new-member-boundary.v1
+    file: entries/aiwarning-p0-internal-prefix-new-member-boundary.md
+    topic: P0 Internal_ 前缀与 new 成员隐藏边界
+    routeKeys: [aiwarnings, p0, architecture, csharp, internal-prefix, member-hiding, api-boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-internal-prefix-new-member-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_代码结构规范_Internal前缀与new成员隐藏边界_AI协作警告.md
+    authority: AIWarnings + current C# and API boundary contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 99e46775ff4ebac7b9fb3d444dbd82701ee36cc467f2d713b62f37be5bb7712b
+    sourceSetHash: 99e46775ff4ebac7b9fb3d444dbd82701ee36cc467f2d713b62f37be5bb7712b
+    entryBodyHash: 9ae9a0d140e13ba75f95e346fecdeb2917e7c9df83f86e0345040a7d453179f0
+    staleWhen: 继承/API 合同、程序集依赖、序列化/AOT、调用链或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.config-dual-key-inspector-layer.v1
+    file: entries/aiwarning-p0-config-dual-key-inspector-layer.md
+    topic: P0 配置双键与 Inspector 分层边界
+    routeKeys: [aiwarnings, p0, identity, config-key, enum-key, string-key, inspector, runtime-key]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-config-dual-key-inspector-layer.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_配置双键与Inspector分层_AI协作警告.md
+    authority: AIWarnings + current ConfigKey and RuntimeKey contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 0622f9e35e9447f77e18ee956a78b656f38ea6b8a832709018b4f64a893b047e
+    sourceSetHash: 0622f9e35e9447f77e18ee956a78b656f38ea6b8a832709018b4f64a893b047e
+    entryBodyHash: 7e25e35dd75136487d229153dea096c2b5b2a0c091ee3807640ab849f0c6276a
+    staleWhen: ConfigKey/RuntimeKey、Inspector 分类、热路径规则或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.runtime-hot-container-steady-gc.v1
+    file: entries/aiwarning-p0-runtime-hot-container-steady-gc.md
+    topic: P0 热路径容器预热与稳态 GC 边界
+    routeKeys: [runtime-hot-container, container-warmup, steady-state-gc, aiwarnings, p0, performance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-runtime-hot-container-steady-gc.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md
+    authority: AIWarnings + current hot-path and profiler contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: e904cb0d62ebf706d06ffcbc2667ce03e761f7eb7d5a2656fbb1ccadbd6296b3
+    sourceSetHash: e904cb0d62ebf706d06ffcbc2667ce03e761f7eb7d5a2656fbb1ccadbd6296b3
+    entryBodyHash: d584a5065b4a8b253b2f179c26828d98b429c7cf90df078dae23712d7097dd56
+    staleWhen: 热路径消费者、容量/工作区策略、Profiler 证据、平台后端或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.editor-assembly-stream-initialization.v1
+    file: entries/aiwarning-p0-editor-assembly-stream-initialization.md
+    topic: P0 编辑器 AssemblyStream 初始化与生命周期边界
+    routeKeys: [aiwarnings, p0, editor, initialization, assembly-stream, domain-reload, delay-call]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-editor-assembly-stream-initialization.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md
+    authority: AIWarnings + current Editor AssemblyStream contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: ca4fc46db910f3f8717bc6c7567af3443d6db41d8b78e83cc48ccc90dc74a6f1
+    sourceSetHash: ca4fc46db910f3f8717bc6c7567af3443d6db41d8b78e83cc48ccc90dc74a6f1
+    entryBodyHash: a367f6152cb3955aa25aec8ce4b7f39fef9a850a1d1b9c4e99aca97aa28c4d2a
+    staleWhen: AssemblyStream、EditorInvoker/Register、域重载、ESSO 预加载或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.editor-delivery-next-step-discoverability.v1
+    file: entries/aiwarning-p0-editor-delivery-next-step-discoverability.md
+    topic: P0 编辑器交付体验与下一步可发现性
+    routeKeys: [aiwarnings, p0, editor, delivery, discoverability, next-step, recovery]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-editor-delivery-next-step-discoverability.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_P0_编辑器交付体验与下一步可发现性_AI协作警告.md
+    authority: AIWarnings + current Editor/UI delivery contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: ed295037c2083fae5eb691bb88e5eac8463713d196e06ab6950e784b68541a03
+    sourceSetHash: ed295037c2083fae5eb691bb88e5eac8463713d196e06ab6950e784b68541a03
+    entryBodyHash: 8e0eb90bebde860c5e5ae251755ba43f4b351936e12c724e32f5d8a0c16ccc3d
+    staleWhen: UI 入口、产物路径策略、交互状态、恢复协议或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.active-request-arbitration.v1
+    file: entries/aiwarning-p0-active-request-arbitration.md
+    topic: P0 ES 活跃请求仲裁协议与跨领域安全边界
+    routeKeys: [aiwarnings, p0, arbitration, active-request, lease, generation, commit, executor]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-active-request-arbitration.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ES活跃请求仲裁协议_跨领域安全标准_AI协作警告.md
+    authority: AIWarnings + current arbitration and domain contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 70f6e15968688196a95b307a7872c1f4f05a5fbe0d4f7795306825cae55f6085
+    sourceSetHash: 70f6e15968688196a95b307a7872c1f4f05a5fbe0d4f7795306825cae55f6085
+    entryBodyHash: f565667f5245b2f414cdf110e5f13fe06af5f937b17b24ea8a81b1672cdfa7d8
+    staleWhen: Lease/Generation/Commit、领域仲裁、Camera 投影或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.assembly-stream-editor-registration-only.v1
+    file: entries/aiwarning-p0-assembly-stream-editor-registration-only.md
+    topic: P0 AssemblyStream Editor 注册与禁止全量扫盘
+    routeKeys: [aiwarnings, p0, editor, assembly-stream, metadata-registration, no-full-scan, runtime-boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-assembly-stream-editor-registration-only.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md
+    authority: AIWarnings + current AssemblyStream and editor scan contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 4964fb79325b460260e258dda2b565667a2906c6811098735ae71d811b95ff7c
+    sourceSetHash: 4964fb79325b460260e258dda2b565667a2906c6811098735ae71d811b95ff7c
+    entryBodyHash: 0373cba2ac1fd5dac5a1e4f108b01349f5b69b3ab0299416e7cfe28ab5d9978a
+    staleWhen: AssemblyStream 注册器、编辑器索引、资源扫描 API、Runtime 流或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.editor-generated-artifact-quick-open.v1
+    file: entries/aiwarning-editor-generated-artifact-quick-open.md
+    topic: 编辑器生成产物快速打开与路径安全
+    routeKeys: [aiwarnings, editor, delivery, artifact, quick-open, path-safety, recovery]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-generated-artifact-quick-open.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/生成产物快速打开入口_AI协作警告.md
+    authority: AIWarnings + current artifact delivery and path policy
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: a009664fe9780ed1ddd791c60ee04374dffa1755ef01509cab9de6d72e95c040
+    sourceSetHash: a009664fe9780ed1ddd791c60ee04374dffa1755ef01509cab9de6d72e95c040
+    entryBodyHash: feb148adbfdc49ac2c7ecf6fe6c65f74c78f2561c40a4ae22e9004aa5fefbc13
+    staleWhen: 产物交付入口、路径策略、宿主能力或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p2.ui-icon-atlas-routing.v1
+    file: entries/aiwarning-p2-ui-icon-atlas-routing.md
+    topic: P2 UI 图标 SpriteAtlas 与运行时动态图集分流
+    routeKeys: [aiwarnings, p2, ui, icon, sprite-atlas, dynamic-atlas, resource-routing]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p2-ui-icon-atlas-routing.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/UI与图集（UIAtlas）/P2_UI图标_SpriteAtlas与运行时动态图集分流_AI协作警告.md
+    authority: AIWarnings + current UI and resource routing contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 22698141e680f829ce5f5f6c20a14933781afeb8f8d823f3bcbfd4266fab0e3a
+    sourceSetHash: 22698141e680f829ce5f5f6c20a14933781afeb8f8d823f3bcbfd4266fab0e3a
+    entryBodyHash: bcc5f522fa40537afb4acabe4d6f44fa38ce44c97c09f4ef92bf71bbad7a3763
+    staleWhen: IconKey、SpriteAtlas、ESDynamicAtlasGraphic、资源构建或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.runtime.vehicle-motion-boundary.v1
+    file: entries/aiwarning-runtime-vehicle-motion-boundary.md
+    topic: 载具运动与骑乘职责边界
+    routeKeys: [aiwarnings, runtime, vehicle, mount, motion]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-vehicle-motion-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Entity运动（EntityMotion）/载具运动与骑乘职责_VehicleMotion_AI协作警告.md
+    authority: AIWarnings + current vehicle motion contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 98f96a5d90c1611a07a105a61f69fc79c35224a28f6b46755146624e0d8e7246
+    sourceSetHash: 98f96a5d90c1611a07a105a61f69fc79c35224a28f6b46755146624e0d8e7246
+    entryBodyHash: b3a25fafb31b6aad7e21984248ea220a1810036616db0feeb64b058c42a6a49f
+    staleWhen: Controller、Mountable、Rigidbody/KCC 或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.runtime.pool-prewarm-space-0gc.v1
+    file: entries/aiwarning-runtime-pool-prewarm-space-0gc.md
+    topic: 对象池预热、Space 与 0GC 边界
+    routeKeys: [aiwarnings, runtime, pool, prewarm, space, gc]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-pool-prewarm-space-0gc.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/对象池预热_Space与0GC_AI协作警告.md
+    authority: AIWarnings + current pool prewarm contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 43e91d81795e3b73f1e5b54cfbb3dc81c59bc3e2a099520285d1be5072189815
+    sourceSetHash: 43e91d81795e3b73f1e5b54cfbb3dc81c59bc3e2a099520285d1be5072189815
+    entryBodyHash: 131d140fa2c05c810446e9df989de0e2637feaeab07259095abbf43937189d09
+    staleWhen: 对象池模块、PrefabPrewarmData 或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.runtime.escommand-player-runner-boundary.v1
+    file: entries/aiwarning-runtime-escommand-player-runner-boundary.md
+    topic: ESCommand 运行时 Player/Runner 边界
+    routeKeys: [aiwarnings, runtime, escommand, player, runner]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-escommand-player-runner-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/ESCommand运行时_PlayerRunner执行帧与服务边界_AI协作警告.md
+    authority: AIWarnings + current ESCommand runtime contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 75192bbf4179819d18135d552bc6ef0ba0cbebb5995ca1447bb2cebaeaa59b57
+    sourceSetHash: 75192bbf4179819d18135d552bc6ef0ba0cbebb5995ca1447bb2cebaeaa59b57
+    entryBodyHash: 2cf50139578e0c1c9dcd40cfef5f990f9772dd76f31776f79fcefa930bb73723
+    staleWhen: ESCommandPlayer/Runner、Playable 或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.runtime.operation-default-no-stop.v1
+    file: entries/aiwarning-runtime-operation-default-no-stop.md
+    topic: Operation 默认无 Stop 与 Pack 所有权边界
+    routeKeys: [aiwarnings, runtime, operation, stop, ownership]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-operation-default-no-stop.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/Operation默认无Stop_AI协作警告.md
+    authority: AIWarnings + current Operation/Skill runtime contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: d3b7e096c420265d746e70b8f4a4207a77c0e810ebb950bf789946c43bbf20ca
+    sourceSetHash: d3b7e096c420265d746e70b8f4a4207a77c0e810ebb950bf789946c43bbf20ca
+    entryBodyHash: 239ac308b89865c85ec7033038f5be33d6bdd3fb7f0f69ce88426b8d441346b3
+    staleWhen: Operation/Clip/Pack 所有权实现或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.editor.es-advanced-dialog-input-boundary.v1
+    file: entries/aiwarning-editor-es-advanced-dialog-input-boundary.md
+    topic: ESAdvancedDialog 通用编辑器输入边界
+    routeKeys: [aiwarnings, editor, esadvanceddialog, input, authorization]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-es-advanced-dialog-input-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAdvancedDialog通用编辑器输入边界_AI协作警告.md
+    authority: AIWarnings + current ESAdvancedDialog editor contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: eca732c5c2e932adba3b7b0d2db255a6d16e34b757549e7c90c55b51d1b3e64b
+    sourceSetHash: eca732c5c2e932adba3b7b0d2db255a6d16e34b757549e7c90c55b51d1b3e64b
+    entryBodyHash: 971ee751aa126b28f27cdb99fc1f5277864a7008d95587bf2694053d9b47d342
+    staleWhen: ESAdvancedDialog 实现或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.hotpath-missing-dependency-null-check.v1
+    file: entries/aiwarning-p0-hotpath-missing-dependency-null-check.md
+    topic: 核心热路径缺失依赖与判空边界
+    routeKeys: [aiwarnings, p0, runtime-performance, hotpath, dependency, null-check]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-hotpath-missing-dependency-null-check.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md
+    authority: AIWarnings + current runtime contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 8137f49c8fa013e09b65a452d0303a7648a640fdee14e0940b93f3b10922399e
+    sourceSetHash: 8137f49c8fa013e09b65a452d0303a7648a640fdee14e0940b93f3b10922399e
+    entryBodyHash: 677a70c716e2375718dac0ef3d5657d2bfe4e9e79604aca8ccfbad1980a5647c
+    staleWhen: 核心依赖初始化、预热、配置验证或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.validation.resourceplan-extension-boundary.v1
+    file: entries/aiwarning-validation-resourceplan-extension-boundary.md
+    topic: ResourcePlan 扩展协议边界
+    routeKeys: [aiwarnings, validation, resourceplan, extension, bake, publish, runtime]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-validation-resourceplan-extension-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/ResourcePlan扩展协议_强制约束.md
+    authority: AIWarnings + current ResourcePlan contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: f493c50981135ec6ec50f77880a679738f97a4591777a6926cb49d3ae2dc6c0d
+    sourceSetHash: f493c50981135ec6ec50f77880a679738f97a4591777a6926cb49d3ae2dc6c0d
+    entryBodyHash: dc018260ef03709c1dbb5e1e4344890aee2e1d3a17ed5c48d3a448bd37a28ba7
+    staleWhen: ResourcePlan 扩展接口、Bake/Publish/Runtime 生命周期或任一 SourceRef 变化
+  - knowledgeId: es.aiwarning.validation.scene-guide-diagnostics.v1
+    file: entries/aiwarning-validation-scene-guide-diagnostics.md
+    topic: 测试场景导视与诊断复用
+    routeKeys: [aiwarnings, validation, scene, guide, diagnostics, playmode]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-validation-scene-guide-diagnostics.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md
+    authority: AIWarnings + current ESSceneValidationGuide contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 76e46bb219a724f9514fc39bcf249940684252c80c149f69304d0e359a9d2407
+    sourceSetHash: 76e46bb219a724f9514fc39bcf249940684252c80c149f69304d0e359a9d2407
+    entryBodyHash: db36864a68c3dc99097762dc59be6cbd6244d044bdfcbe71614f0147b10e294a
+    staleWhen: ESSceneValidationGuide、场景接入、输入绑定或任一 SourceRef 变化
+  - knowledgeId: es.aiwarning.editor.composite-shader-urp-boundary.v1
+    file: entries/aiwarning-editor-composite-shader-urp-boundary.md
+    topic: ES Composite Shader URP 与材质检查器边界
+    routeKeys: [aiwarnings, editor, shader, urp, material, inspector, variant]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-composite-shader-urp-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ESCompositeShader_URP职责与材质检查器验收边界_AI协作警告.md
+    authority: AIWarnings + current URP Shader/ShaderGUI contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 11d3389ddeb771ab77e198036165e096f20edb90a4d9c125cbdf8b60149faac6
+    sourceSetHash: 11d3389ddeb771ab77e198036165e096f20edb90a4d9c125cbdf8b60149faac6
+    entryBodyHash: 0fbd67e661abe407f232e1b8f6c54bc26e7f6681b90ccef6c0b9642210e99dc8
+    staleWhen: URP Shader、ShaderGUI、材质预设、Variant 或任一 SourceRef 变化
+  - knowledgeId: es.aiwarning.editor.propertytree-multitarget-boundary.v1
+    file: entries/aiwarning-editor-propertytree-multitarget-boundary.md
+    topic: ES 编辑器 PropertyTree 多目标与迁移边界
+    routeKeys: [aiwarnings, editor, propertytree, serialize-reference, multitarget, undo]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-propertytree-multitarget-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ES编辑器绘制与序列化套件_PropertyTree多目标与迁移边界_AI协作警告.md
+    authority: AIWarnings + current PropertyTree/serialization contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 0c12b4baf0f1096d104baa89c091f6766676372d472e37a4ed7919414d7332f2
+    sourceSetHash: 0c12b4baf0f1096d104baa89c091f6766676372d472e37a4ed7919414d7332f2
+    entryBodyHash: e29ffd00cfcf10f9f00ce358668d08212010ea50a43248a6412d735cc800fe07
+    staleWhen: PropertyTree、Drawer、类型目录、序列化迁移或任一 SourceRef 变化
+  - knowledgeId: es.aiwarning.runtime.physics-query-boundary.v1
+    file: entries/aiwarning-runtime-physics-query-boundary.md
+    topic: 物理查询架构边界
+    routeKeys: [aiwarnings, runtime, physics, query, collision]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-physics-query-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/物理架构_简单起步_AI协作警告.md
+    authority: AIWarnings + current physics query contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: baff509239fd8cfd897b4672c4cb2b3674f755d743ac820fc28640f237682fd5
+    sourceSetHash: baff509239fd8cfd897b4672c4cb2b3674f755d743ac820fc28640f237682fd5
+    entryBodyHash: 52f218a8749d051e82867fb7d97b6ec56e6de2eca8a43d2b3ea2c264d6fe865b
+    staleWhen: PhysicsQueryModule、查询 API 或任一 SourceRef 哈希变化
+  - $141369bcaa9d15ae524a7e0a752274314fdffaed939af0cb92e145ebb0fa61f6c
+  - knowledgeId: es.aiwarning.p0.utf8-encoding-boundary.v1
+    file: entries/aiwarning-p0-utf8-encoding-boundary.md
+    topic: P0 UTF-8 唯一编码、文本完整性与保真迁移
+    routeKeys: [aiwarnings, p0, utf8, encoding, text-integrity, evidence-boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-utf8-encoding-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - .agents/skills/es-utf8-guard/SKILL.md
+    authority: AIWarnings + project UTF-8 validation rules
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 32d3d54dbb3b4bf9c65dcfe6ac461b834027f76170bef39e9640110f951f9b4e
+    sourceSetHash: 32d3d54dbb3b4bf9c65dcfe6ac461b834027f76170bef39e9640110f951f9b4e
+    entryBodyHash: 70065395ec2454f4e3a84a66079ccac3e2f50bc68a08000009bde888d13d6690
+    staleWhen: 原 Warning、Start 链、es-utf8-guard Skill/验证器或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.primetween-dotween-migration.v1
+    file: entries/aiwarning-p0-primetween-dotween-migration.md
+    topic: P0 PrimeTween/DOTween 迁移、Tween 生命周期与依赖清理边界
+    routeKeys: [aiwarnings, p0, primetween, dotween, tween-lifecycle, runtime-performance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-primetween-dotween-migration.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current PrimeTween/DOTween migration evidence
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 4270bdfb55ddf117d380a13c18d43d7d9d91290a2d1f497637ef4a0919211f5f
+    sourceSetHash: 4270bdfb55ddf117d380a13c18d43d7d9d91290a2d1f497637ef4a0919211f5f
+    entryBodyHash: 78ebaab310e611f3dacb3f26b4af271f64421a955fe56595f73ab7dbafc95645
+    staleWhen: PrimeTween/DOTween 版本、调用约束、对象池生命周期、依赖配置、测试回执或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.projectile-weapon-hotpath.v1
+    file: entries/aiwarning-p0-projectile-weapon-hotpath.md
+    topic: P0 Projectile/Weapon 热路径冻结、预热、容量和稳态 GC 门禁
+    routeKeys: [aiwarnings, p0, projectile-hotpath, weapon-fire-hotpath, hitscan, beam, steady-gc]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-projectile-weapon-hotpath.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current Projectile/Weapon hot-path contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: ea427fae64a1a072b45b317810ac5062d3987e46e20923abf8f4e3c452bf9830
+    sourceSetHash: ea427fae64a1a072b45b317810ac5062d3987e46e20923abf8f4e3c452bf9830
+    entryBodyHash: 11797d7d45d31cbac8f930245eb9b6baa491695ca78a477c629e960836007318
+    staleWhen: 热路径入口、Prepare/Running 生命周期、容量/Lease 规则、静态门禁或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.playable-loop-runtime-evidence.v1
+    file: entries/aiwarning-p0-playable-loop-runtime-evidence.md
+    topic: P0 实际可玩闭环、玩家主链与运行证据边界
+    routeKeys: [aiwarnings, p0, playable-loop, runtime-evidence, playmode, profiler]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-playable-loop-runtime-evidence.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current runtime evidence and maturity contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 5ced6b5736a30803fe3a8c6ff1a1cab97636243e7c9b120e34a27031fc7dfe1e
+    sourceSetHash: 5ced6b5736a30803fe3a8c6ff1a1cab97636243e7c9b120e34a27031fc7dfe1e
+    entryBodyHash: 5c84072ab8d923770c109ce17982db5bba950ca02b1eeb4cc63e90df6a1a710a
+    staleWhen: 运行闭环、测试场景、证据等级、成熟度或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.il2cpp-toolchain-detection.v1
+    file: entries/aiwarning-p0-il2cpp-toolchain-detection.md
+    topic: P0 IL2CPP/Visual Studio 工具链 Unity 可检测性与 HybridCLR 验收边界
+    routeKeys: [aiwarnings, p0, il2cpp, visual-studio, vswhere, hybridclr]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-il2cpp-toolchain-detection.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current Unity/Visual Studio/HybridCLR contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: e44f7aac6cae35276642e69c4d765a689aa376b8b8b51fd4a95ac6eceebfefab
+    sourceSetHash: e44f7aac6cae35276642e69c4d765a689aa376b8b8b51fd4a95ac6eceebfefab
+    entryBodyHash: d532fd891d9dc3ce757a8536522feb705c1f23c4915e3b7e32d895c32b0aa66b
+    staleWhen: Unity/VS/MSVC/SDK 版本、vswhere 检测、HybridCLR 构建流程或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.protocol-metadata-layering.v1
+    file: entries/aiwarning-p0-protocol-metadata-layering.md
+    topic: P0 公共协议、Attribute 元数据分层与程序集边界
+    routeKeys: [aiwarnings, p0, public-protocol, metadata, stand-boundary, assembly-dependency]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-protocol-metadata-layering.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current assembly and directory contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: e2f332beae997875299d1240016a527adedc8c7b18239d451909968269c8034f
+    sourceSetHash: e2f332beae997875299d1240016a527adedc8c7b18239d451909968269c8034f
+    entryBodyHash: 96d6003d52dee61e6fb20b40503e4a8cb52b7e39709dfa1799d3e76e93be2983
+    staleWhen: 目录归属、程序集依赖、协议定义、Attribute 边界或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.content-registration-transaction.v1
+    file: entries/aiwarning-p0-content-registration-transaction.md
+    topic: P0 内容注册唯一入口、事务 CAS、GameCore 分流与 MCP 证据边界
+    routeKeys: [aiwarnings, p0, content-registration, transaction, gamecore, mcp-evidence]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-content-registration-transaction.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current content registration and MCP contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 3c9709e53c057acb5d3cfee3d16c61c4a45af2756a11493e58511536093864cb
+    sourceSetHash: 3c9709e53c057acb5d3cfee3d16c61c4a45af2756a11493e58511536093864cb
+    entryBodyHash: 72a789a024f76c11ebbcadd0512d6adbab9dbf1aaf6ff0f918f829781115df7a
+    staleWhen: 注册 API、提交合同、GameCore 分流、Bake 阶段、MCP 证据或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.esdialog-cross-host-contract.v1
+    file: entries/aiwarning-p0-esdialog-cross-host-contract.md
+    topic: P0 ESDialog 跨宿主唯一合同、Presenter 注册与 Host 路由边界
+    routeKeys: [aiwarnings, p0, esdialog, cross-host, presenter, host-routing]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-esdialog-cross-host-contract.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current ESDialog and Presenter contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: d181dde185416d2d51fbcf7d84e00bc6a1f7070f42c175735dd37f94edc970f8
+    sourceSetHash: d181dde185416d2d51fbcf7d84e00bc6a1f7070f42c175735dd37f94edc970f8
+    entryBodyHash: b815e941ffded8c7daf5d7fcf52b3f06cca61eff2ab7a4b608260bb4ef7e47b5
+    staleWhen: ESDialog 合同、Presenter 注册/Lease、Host 路由、能力门禁或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.combatmodule-weapon-definition.v1
+    file: entries/aiwarning-p0-combatmodule-weapon-definition.md
+    topic: P0 CombatModule 武器定义所有权、Stable Key 解析与验收门禁
+    routeKeys: [aiwarnings, p0, combatmodule, weapon-definition, weapon-key, acceptance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-combatmodule-weapon-definition.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current WeaponDefinition and Weapon Key contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 7f410a2f7bb2f62f0e268fc58ae6f51e6ca9cf0cf22be1b08e2d2036419a37a5
+    sourceSetHash: 7f410a2f7bb2f62f0e268fc58ae6f51e6ca9cf0cf22be1b08e2d2036419a37a5
+    entryBodyHash: 426a2476a435fab59c1214a025d5e054471ad1d2d8e3025c7f4c54ebe42831a7
+    staleWhen: Warning、Weapon Schema、Weapon Key 解析、注入验证或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.p0.ai-delivery-contract.v1
+    file: entries/aiwarning-p0-ai-delivery-contract.md
+    topic: P0 AI交付证据等级、责任披露与完成声明边界
+    routeKeys: [aiwarnings, p0, delivery-evidence, acceptance, disclosure]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-ai-delivery-contract.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current delivery evidence contract
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 1563a304e0aa5f8c0d1c29efda58831d0e14909a4d4de09a43870e200e5d498e
+    sourceSetHash: 1563a304e0aa5f8c0d1c29efda58831d0e14909a4d4de09a43870e200e5d498e
+    entryBodyHash: a6439b7a279ea2c846bec30c9d3f5a79c302cc84cb63452eba0439c661030809
+    staleWhen: Warning、证据等级、交付状态、验证合同或任一 SourceRef 哈希变化
+  - knowledgeId: es.architecture.ai-abc-core.v1
+    file: entries/ai-abc-core.md
+    topic: ES AI ABC 适配核心（ABCC）与 ABCD 能力平权（Agent–Behavior–Collaborator）
+    routeKeys: [ai-abc, abc-core, semantic-adapter, analysis, design, evidence, closed-loop, route-stage, static-replay, knowledge]
+    relatedSkills: [es-ai-abc-core, es-aibrain-route-authoring, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/ai-abc-core.md
+      - .agents/skills/es-ai-abc-core/SKILL.md
+      - .agents/skills/es-ai-abc-core/governance.json
+      - ES/Automation/Contracts/es-ai-abc-interface-v1.schema.json
+      - ES/Automation/Contracts/es-ai-abc-core-v1.json
+      - Documentation/AIKnowledge/entries/ai-abc-naming.md
+      - ES/Automation/Contracts/es-ai-abc-mode.registry.json
+      - ES/Automation/Contracts/es-route-stage.registry.json
+      - Documentation/AIKnowledge/ExternalSources/ai-abc-open-source-provenance.v1.json
+    authority: ABCC contract files + current ES governance; research Skill is provenance only
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 5d769f2c1ce483035b677fddaf0aec48b47afdc6fc48f3c3c129b1d5cf42d7dc
+    sourceSetHash: 5d769f2c1ce483035b677fddaf0aec48b47afdc6fc48f3c3c129b1d5cf42d7dc
+    entryBodyHash: 65f306fee9f011ddd42a08f20ac96a77c7b4169240ba45e45376fd7ce42cdc8c
+    staleWhen: ABCC interface/core contract、Mode registry、RouteStage、AIBrain 路由、Skill、别名或任一 SourceRef 哈希变化
+  - knowledgeId: es.architecture.ai-abc-naming.v1
+    file: entries/ai-abc-naming.md
+    topic: ES AI ABC 命名权威（ABCD / ABCC / ABCP）
+    routeKeys: [ai-abc, abc-naming, abc-core, abc-part, knowledge, routing, evidence]
+    relatedSkills: [es-ai-abc-core, es-aibrain-route-authoring, es-knowledge-creator, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/ai-abc-naming.md
+      - ES/Automation/Contracts/es-ai-abc-mode.registry.json
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - .agents/skills/es-ai-abc-core/SKILL.md
+      - .agents/skills/es-knowledge-creator/SKILL.md
+    authority: ABC mode registry namingAuthority + current ES naming P0
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: d4963ea63a1ae4f8e9caf33dc8583304e568b64907c9e63f9e998cb9d0c6231e
+    sourceSetHash: d4963ea63a1ae4f8e9caf33dc8583304e568b64907c9e63f9e998cb9d0c6231e
+    entryBodyHash: 9e9f78a3a85efc0e9ebe7c99d17ec4f0ad0f60516898a4f19ef6f181a153ec52
+    staleWhen: namingAuthority、ABC 模式注册表、高频命名 P0、ABCC/ABCP 合同、KnowledgeIndex、AIBrain 路由或任一 SourceRef 哈希变化
+  - knowledgeId: es.weapon.ai-abc-part.v1
+    file: entries/weapon-abc-part.md
+    topic: 武器 ABC 部件（ABCP）与 ABCC 绑定（Agent–Behavior–Collaborator）
+    routeKeys: [ai-abc, abc-part, weapon, weapon-definition, prefab, input, evidence, route-stage, static-replay, knowledge]
+    relatedSkills: [es-weapon-abc-part, es-ai-abc-core, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/weapon-abc-part.md
+      - .agents/skills/es-weapon-abc-part/SKILL.md
+      - .agents/skills/es-weapon-abc-part/governance.json
+      - ES/Automation/Contracts/es-ai-abc-part-v1.schema.json
+      - ES/Automation/Contracts/es-ai-abc-weapon-part.v1.json
+      - ES/Automation/Contracts/es-ai-abc-core-v1.json
+      - Documentation/AIKnowledge/entries/ai-abc-naming.md
+      - ES/Automation/Contracts/es-ai-abc-mode.registry.json
+      - ES/Automation/Contracts/es-route-stage.registry.json
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_CombatModule武器定义迁移边界与验收门禁_AI协作警告.md
+    authority: Weapon ABCP contract + ABCC Core contract + current weapon P0
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 9c780327bdad50e67d57981cbd8503be703b66298dcac26272245bfe63bc9850
+    sourceSetHash: 9c780327bdad50e67d57981cbd8503be703b66298dcac26272245bfe63bc9850
+    entryBodyHash: ac302d24c1f20add590100ab0a9b42dcc65c6259ab48960126ebf658d9661151
+    staleWhen: ABCC/ABCP contract、武器定义归属、RouteStage、AIBrain 路由、Skill、别名或任一 SourceRef 哈希变化
+  - knowledgeId: es.aiwarning.runtime.interactable-ownership-lifecycle-boundary.v1
+    file: entries/aiwarning-runtime-interactable-ownership-lifecycle-boundary.md
+    topic: ES Interactable 占用与生命周期边界
+    routeKeys: [aiwarnings, runtime, interaction, interactable, ownership, lifecycle]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-interactable-ownership-lifecycle-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/输入与交互（InputInteraction）/交互运行时_Interactable占用生命周期与结束原因_AI协作警告.md
+    authority: AIWarnings + current interaction lifecycle contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 88dff8031363934ace57566d5a219a0a078c7c69788857b986003cfd0d78ba89
+    sourceSetHash: 88dff8031363934ace57566d5a219a0a078c7c69788857b986003cfd0d78ba89
+    entryBodyHash: 2151f557baa78cd94de9edf7bb21e3490802c95be100ebe76332479a3f53a5fe
+    staleWhen: 交互占用、结束原因、State/IK/SupportFlag 清理或 Tag Zone 实现变化
+  - knowledgeId: es.aiwarning.arch.context-ownership-lifecycle-boundary.v1
+    file: entries/aiwarning-architecture-context-ownership-lifecycle-boundary.md
+    topic: ES Contextitecture 所有权与生命周期边界
+    routeKeys: [aiwarnings, architecture, context, ownership, lifecycle, type-boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-context-ownership-lifecycle-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/Contextitecture上下文系统_所有权生命周期与类型边界_AI协作警告.md
+    authority: AIWarnings + current Runtime/Context contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 7049ef0e65c842fd832ae99c8fca6d44bbcc8e0ad731b1828821111c8442f41a
+    sourceSetHash: 7049ef0e65c842fd832ae99c8fca6d44bbcc8e0ad731b1828821111c8442f41a
+    entryBodyHash: 2e71d1e5b277b95fdfa5ed2987b0e99f3765145150840f7fd7597191424e9e6e
+    staleWhen: ContextPool、值池、Link 通道、清理或跨线程约束变化
+  - knowledgeId: es.aiwarning.runtime.attribute-valuechange-boundary.v1
+    file: entries/aiwarning-runtime-attribute-valuechange-boundary.md
+    topic: ES 属性数值与 ValueChange 边界
+    routeKeys: [aiwarnings, runtime, attribute, valuechange, effect-lease, performance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-attribute-valuechange-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/属性数值与ValueChange边界_AI协作警告.md
+    authority: AIWarnings + current Attribute/Effect contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 19196671fe607cce01b0fff96550a3711236ad09828d9d3a19d52b1163666857
+    sourceSetHash: 19196671fe607cce01b0fff96550a3711236ad09828d9d3a19d52b1163666857
+    entryBodyHash: 44a9555ef35ae2cd1c3726f7f6af4276a69270e7383a7773e5c0b509fad1116d
+    staleWhen: 属性 Schema、Bake/Catalog、ValueChange、EffectLease 或热路径实现变化
+  - knowledgeId: es.aiwarning.runtime.buff-passive-lifecycle-boundary.v1
+    file: entries/aiwarning-runtime-buff-passive-lifecycle-boundary.md
+    topic: ES Buff 被动持续机制边界
+    routeKeys: [aiwarnings, runtime, buff, passive, lifecycle, effect]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-buff-passive-lifecycle-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/Buff职责边界_被动持续机制_AI协作警告.md
+    authority: AIWarnings + current Buff/Op contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 8ed88c5d1ddc42f1d10bd3e2ae1dc7b363e90e53fd82984d9571626c5e9c49ae
+    sourceSetHash: 8ed88c5d1ddc42f1d10bd3e2ae1dc7b363e90e53fd82984d9571626c5e9c49ae
+    entryBodyHash: 8dd7146825f528eeb06f44b19532d26fd7d943a1a19e88bb5433931fa9ff9abd
+    staleWhen: Buff 生命周期、Op 编排、BuffLogicRuntime 或效果归还实现变化
+  - knowledgeId: es.aiwarning.editor.memory-leak-lifecycle-boundary.v1
+    file: entries/aiwarning-editor-memory-leak-lifecycle-boundary.md
+    topic: ES 编辑器内存泄露与生命周期边界
+    routeKeys: [aiwarnings, editor, lifecycle, memory, dispose, domain-reload]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-memory-leak-lifecycle-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/内存泄露与编辑器生命周期_AI协作警告.md
+    authority: AIWarnings + current Editor/Preview lifecycle contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 39281aff3a8db46481322cfbe245b32985b98fac86f2250ce39e9c9ad006e557
+    sourceSetHash: 39281aff3a8db46481322cfbe245b32985b98fac86f2250ce39e9c9ad006e557
+    entryBodyHash: 0f64ff428e82fb9a0cfc7a415ecfe51186d4497a649c73c7631f448fc7508842
+    staleWhen: 预览生命周期底层、EditorInvoker、资源释放实现或任一 SourceRef 变化
+  - knowledgeId: es.aiwarning.editor.third-party-package-menu-patch-boundary.v1
+    file: entries/aiwarning-editor-third-party-package-menu-patch-boundary.md
+    topic: ES 第三方编辑器包嵌入与菜单补丁边界
+    routeKeys: [aiwarnings, editor, package, menu, patch, rollback]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-third-party-package-menu-patch-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/第三方编辑器包嵌入与菜单补丁_AI协作警告.md
+    authority: AIWarnings + current Packages/Editor contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 03cca5801526d6b6e6f28ac769f647089ee787546b98c7365917d6f956c7c81a
+    sourceSetHash: 03cca5801526d6b6e6f28ac769f647089ee787546b98c7365917d6f956c7c81a
+    entryBodyHash: cf134bf30b2594bc2410039673e210deff66a27339c75d8859f321a0880e763f
+    staleWhen: 嵌入包快照、manifest/package.json、菜单补丁、门禁脚本或 Unity 版本变化
+  - knowledgeId: es.aiwarning.editor.anonymous-event-assembly-stream-boundary.v1
+    file: entries/aiwarning-editor-anonymous-event-assembly-stream-boundary.md
+    topic: ES 编辑器匿名事件与程序集流稳定性
+    routeKeys: [aiwarnings, editor, anonymous-function, event, assembly-stream, reload-domain]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-anonymous-event-assembly-stream-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/程序集与稳定性（AssemblyStability）/编辑器匿名函数与程序集流稳定性_AI协作警告.md
+    authority: AIWarnings + current Editor/AssemblyStream contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 25624c3f87fda22acb212731ce219d1f967eefe39cb02207d69e0ef88eb0f482
+    sourceSetHash: 25624c3f87fda22acb212731ce219d1f967eefe39cb02207d69e0ef88eb0f482
+    entryBodyHash: 23bc4bdeaf8f01cf5dd31e4661f8977367ddfe92b05a67b7e433f45dd558524c
+    staleWhen: Editor 事件注册、窗口清理、ReloadDomain 或程序集扫描实现变化
+  - knowledgeId: es.aiwarning.arch.character-prefab-datainfo-boundary.v1
+    file: entries/aiwarning-architecture-character-prefab-datainfo-boundary.md
+    topic: ES 角色 Prefab 与 DataInfo 入口边界
+    routeKeys: [aiwarnings, architecture, entity, prefab, datainfo, identity]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-character-prefab-datainfo-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色Prefab职责与DataInfo入口_AI协作警告.md
+    authority: AIWarnings + current Entity/Prefab contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 1f42a1d6c161353b8b99febe74f5ce771e47845b2eb3e94e4ed46f9889bc41bd
+    sourceSetHash: 1f42a1d6c161353b8b99febe74f5ce771e47845b2eb3e94e4ed46f9889bc41bd
+    entryBodyHash: 1015344cc9057c323bf5565d6803880780de105949758a618576d839f1902746
+    staleWhen: Entity 绑定、角色 Profile/Variant、挂点映射、FinalIK 或装备域实现变化
+  - knowledgeId: es.aiwarning.arch.automation-center-worker-governance.v1
+    file: entries/aiwarning-architecture-automation-center-worker-governance.md
+    topic: ESAutomationCenter 与受管 Worker 治理边界
+    routeKeys: [aiwarnings, architecture, automation, worker, task-contract, release-gate]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-automation-center-worker-governance.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md
+    authority: AIWarnings + current Automation/AI Bridge contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 58eae1adc97b80415c016c7a649512f68fd1fdbf08125e36a63931f91894f3de
+    sourceSetHash: 58eae1adc97b80415c016c7a649512f68fd1fdbf08125e36a63931f91894f3de
+    entryBodyHash: 71e5f3a225713eebcc256f02d31d020e36704798ea4cbcc9dbf79d8c66b5cd78
+    staleWhen: AutomationCenter、TaskContract、PathPolicy、ProcessRunner、AI Bridge 或 ReleaseGate 实现变化
+  - knowledgeId: es.aiwarning.runtime.op-targetpack-item-pooling.v1
+    file: entries/aiwarning-runtime-op-targetpack-item-pooling.md
+    topic: Op TargetPack Item 目标整合与池化重设边界
+    routeKeys: [aiwarnings, runtime, item, shot, pool, target-pack]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-op-targetpack-item-pooling.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/Operation/Targets/ESRuntimeTargetPack.cs
+    authority: AIWarnings + current TargetPack/Operation source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 28ec0723f18a03bcf46de38dba604a120c98802ac660c13d87bd8ad88d78232c
+    sourceSetHash: 28ec0723f18a03bcf46de38dba604a120c98802ac660c13d87bd8ad88d78232c
+    entryBodyHash: 230f7364ef11843e5717faa07522b97eb23a4027a63026da1fec146baab5ffb1
+    staleWhen: TargetPack 字段、Item 表达式、目标 Operation、池化租约或容量策略变化
+  - knowledgeId: es.aiwarning.runtime.shot-motion-responsibility.v1
+    file: entries/aiwarning-runtime-shot-motion-responsibility.md
+    topic: Shot 必中与 Item 运动职责边界
+    routeKeys: [aiwarnings, runtime, item, shot, motion, must-hit]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-shot-motion-responsibility.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionSolver.cs
+    authority: AIWarnings + current Shot/Item source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: c2becd3de7838b548678ffc606aae37732b7aab860af1b3875ea189b904aa11b
+    sourceSetHash: c2becd3de7838b548678ffc606aae37732b7aab860af1b3875ea189b904aa11b
+    entryBodyHash: a371854a27c88f51546c42fc861a3a587015e01c42e58fbb4b74b17f18c03d1a
+    staleWhen: ShotMotion、ItemDataInfo、碰撞查询、Tick 策略、Operation 或配置合同变化
+  - knowledgeId: es.aiwarning.arch.gamecore-editor-globaldata-aicommands.v1
+    file: entries/aiwarning-architecture-gamecore-editor-globaldata-aicommands.md
+    topic: GameCoreEditorGlobalData 与 AICommands 协作边界
+    routeKeys: [aiwarnings, architecture, gamecore, aicommand, catalog]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-gamecore-editor-globaldata-aicommands.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/Data/Normal/GameCoreEditorGlobalData.cs
+      - Assets/Scripts/ESLogic/Editor/GameCoreEditorGlobalDataMenu.cs
+    authority: AIWarnings + current GameCore editor source/asset
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 52aa7e95e9bcd2f5ed77fa2c60f3f5ddcbf3500b29f88666d13cab1fb7b657f9
+    sourceSetHash: 52aa7e95e9bcd2f5ed77fa2c60f3f5ddcbf3500b29f88666d13cab1fb7b657f9
+    entryBodyHash: b55ac48ec1a718bd4a24a0dab675d555f05a5ab1caafaecdd79d9a2dd7a3f9a9
+    staleWhen: GameCoreEditorGlobalData、菜单、Catalog/Bake、AICommands 或稳定身份合同变化
+  - knowledgeId: es.aiwarning.editor.menu-architecture-root-boundary.v1
+    file: entries/aiwarning-editor-menu-architecture-root-boundary.md
+    topic: ES Unity 菜单架构与入口边界
+    routeKeys: [aiwarnings, editor, menu, architecture, validation]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-menu-architecture-root-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - ES/Tools/Validation/Test-ESMenuArchitecture.ps1
+      - Assets/Plugins/ES/Editor/Installer/MenuItemPathDefine.cs
+    authority: AIWarnings + current menu validation source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 3a7b8a3c3303c2a8fae9e6453c06f7abfa0d0fa654ae6bd0dcb6a10e370b548f
+    sourceSetHash: 3a7b8a3c3303c2a8fae9e6453c06f7abfa0d0fa654ae6bd0dcb6a10e370b548f
+    entryBodyHash: 122fb78bc359c7dddd7fc9d5c2d35b3eb1a7724f6edfe7f380d8d016bdce3fd3
+    staleWhen: 菜单路径常量、六域分类、兼容程序集边界、扫描门禁或 Unity 菜单合同变化
+  - knowledgeId: es.aiwarning.editor.asset-package-preview-export-boundary.v1
+    file: entries/aiwarning-editor-asset-package-preview-export-boundary.md
+    topic: AssetPackage 预览与导出边界
+    routeKeys: [aiwarnings, editor, asset-package, preview, export]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-asset-package-preview-export-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/ESAssetPackageBakeWindow.cs
+      - Assets/Scripts/ESLogic/Runtime/EditorPreview/ESEditorPreviewCore.cs
+      - ES/Tools/Validation/Test-ESMenuArchitecture.ps1
+    authority: AIWarnings + current AssetPackage editor/preview source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: d8249e6fbbd460e5597925d94cdbaf14906111faee06b2741cc2610e504a831b
+    sourceSetHash: d8249e6fbbd460e5597925d94cdbaf14906111faee06b2741cc2610e504a831b
+    entryBodyHash: 97f30c78c9ec283a2816f9405e2a2b82dc4d494c1694e1feaae2b48e10a987f9
+    staleWhen: AssetPackage 数据/窗口、PreviewWorkflow、导出事务、缓存策略或回退合同变化
+  - knowledgeId: es.aiwarning.editor.ugc-workbench-draft-commit-boundary.v1
+    file: entries/aiwarning-editor-ugc-workbench-draft-commit-boundary.md
+    topic: UGC 工作台 Draft 与提交边界
+    routeKeys: [aiwarnings, editor, ugc, workbench, draft, commit]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-ugc-workbench-draft-commit-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchWindowBase.cs
+      - Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs
+      - Assets/Scripts/ESLogic/Editor/World/ESWorldEditSession.cs
+    authority: AIWarnings + current Workbench/World editor source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: caf28d59daeb17fa3840a964b1f91bc806aba3e306f31739f3eaffd5841aa1ab
+    sourceSetHash: caf28d59daeb17fa3840a964b1f91bc806aba3e306f31739f3eaffd5841aa1ab
+    entryBodyHash: 478f5c07459f79d81172a5a19e4afd8fdb4470b2253533aea4237140df59c00c
+    staleWhen: Workbench Host、Contribution、Draft/Commit、Undo/Redo、拖放事件或 World 作者合同变化
+  - knowledgeId: es.aiwarning.editor.preview-lifecycle-boundary.v1
+    file: entries/aiwarning-editor-preview-lifecycle-boundary.md
+    topic: 编辑器预览生命周期边界
+    routeKeys: [aiwarnings, editor, preview, lifecycle, reload]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-preview-lifecycle-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/EditorPreview/ESEditorPreviewCore.cs
+      - Assets/Scripts/ESLogic/Runtime/EditorPreview/ESEditorPreviewUtility.cs
+      - Assets/Scripts/ESLogic/Runtime/EditorPreview/ESEditorPreviewResourceScope.cs
+    authority: AIWarnings + current EditorPreview source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 551bc2c2855171422c2c6c235d4861537f18146b99d125f54c6afa3505504938
+    sourceSetHash: 551bc2c2855171422c2c6c235d4861537f18146b99d125f54c6afa3505504938
+    entryBodyHash: 2fa7dbeff6624d5554b9e7c469760d1af8e970243245d083585f961f741c6c35
+    staleWhen: PreviewCore、ResourceScope、全局生命周期钩子、缓存路径或 Editor asmdef 边界变化
+  - knowledgeId: es.aiwarning.editor.window-shell-migration-boundary.v1
+    file: entries/aiwarning-editor-window-shell-migration-boundary.md
+    topic: 编辑器窗口外壳迁移边界
+    routeKeys: [aiwarnings, editor, window, menutree, singlepage, odin]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-window-shell-migration-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/-ESMenuTreeWindow.cs
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESIndependentInspectorWindow.cs
+      - Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackTemporaryInspectorWindow.cs
+    authority: AIWarnings + current editor window shell source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 47a3004d7f40cf4e6e41d1a5ff0b3e0151c22eeb574bce22f1cb7df98e79b47d
+    sourceSetHash: 47a3004d7f40cf4e6e41d1a5ff0b3e0151c22eeb574bce22f1cb7df98e79b47d
+    entryBodyHash: 0c094663a10c12d08e6eb2e7c6342829be37155024de42afd3c260bae2840ea8
+    staleWhen: MenuTree/SinglePage/Odin 外壳、页面上下文、Presentation 或窗口程序集边界变化
+  - knowledgeId: es.aiwarning.runtime.audio-playback-resource-boundary.v1
+    file: entries/aiwarning-runtime-audio-playback-resource-boundary.md
+    topic: 音频播放与资源边界
+    routeKeys: [aiwarnings, runtime, audio, voice, resource]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-audio-playback-resource-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESAudioModule.cs
+      - Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESAudioCueInfo.cs
+      - Assets/Scripts/ESLogic/Runtime/Operation/Operations/10_Audio/OpAudio.cs
+    authority: AIWarnings + current audio runtime source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 20fb1032eee77580d90bc9a83273aa5f6a4587b289df4340438b44d84d7347e0
+    sourceSetHash: 20fb1032eee77580d90bc9a83273aa5f6a4587b289df4340438b44d84d7347e0
+    entryBodyHash: dd422a8f232cd6d4feba145081df27d5acfc604897bf42b00d7e00abebf94e52
+    staleWhen: AudioModule、Cue 身份、Voice/Provider 生命周期、资源 Scope 或预算合同变化
+  - knowledgeId: es.aiwarning.arch.ai-content-identity-gamecorekey-migration.v1
+    file: entries/aiwarning-architecture-ai-content-identity-gamecorekey-migration.md
+    topic: AI 内容身份与 GameCoreKey 迁移边界
+    routeKeys: [aiwarnings, architecture, identity, gamecore, configkey, migration]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-ai-content-identity-gamecorekey-migration.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/1_Design/ConfigKey/ESConfigKey.cs
+      - Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ActionTemplateDataInfo.cs
+      - Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Action/ESActionConfigKeyData.cs
+      - Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Action/ESSkillTrackConfigKeyData.cs
+      - Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/SkillDefinitionDataInfo.cs
+    authority: AIWarnings + current ConfigKey/RuntimeData source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 32d6d0657eed8d7f9492ef516bfa4e49fd1fd8b1e254d89e26f1794f56dec3ed
+    sourceSetHash: 32d6d0657eed8d7f9492ef516bfa4e49fd1fd8b1e254d89e26f1794f56dec3ed
+    entryBodyHash: 5ef778dda7e550ee831c427e8001cf9139c1868251f619507f77c750f9c76b33
+    staleWhen: ConfigKey/Catalog/RuntimeData/Provider、Action/Skill/Weapon 身份合同或迁移格式变化
+  - knowledgeId: es.aiwarning.validation.ai-collaboration-commercial-acceptance.v1
+    file: entries/aiwarning-validation-ai-collaboration-commercial-acceptance.md
+    topic: AI 协作历程与模块审计商业可行性验收
+    routeKeys: [aiwarnings, validation, collaboration, audit, commercial]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-validation-ai-collaboration-commercial-acceptance.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: AIWarnings + current governance contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: fd1cecfdd45f0abf797ba9c9c55cfafbdb333e4f5f151d0d2f1f0b35d7e17147
+    sourceSetHash: fd1cecfdd45f0abf797ba9c9c55cfafbdb333e4f5f151d0d2f1f0b35d7e17147
+    entryBodyHash: 351cb33eb5f2a57cfb0044a2353fea61cd7116203bb03b0155f45e894bdb5ca3
+    staleWhen: 历程/审计合同、恢复格式、权限边界、验收用例或交接协议变化
+  - knowledgeId: es.aiwarning.runtime.vfx.production-runtime-boundary.v1
+    file: entries/aiwarning-runtime-vfx-production-runtime-boundary.md
+    topic: VFX 运行时与制作边界
+    routeKeys: [aiwarnings, runtime, vfx, particle, preview, resource]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-runtime-vfx-production-runtime-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESVfxInfo.cs
+      - Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ESVfxGroup.cs
+      - Assets/Scripts/ESLogic/Data/GameCoreConfigKey/VFX/ESVfxConfigKeyData.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESVfxModule.cs
+    authority: AIWarnings + current VFX runtime/editor source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: d2bc65da0d38c72f3947697af5344090f953a8e842949942b1d69d37df2100a8
+    sourceSetHash: d2bc65da0d38c72f3947697af5344090f953a8e842949942b1d69d37df2100a8
+    entryBodyHash: 84fa5244fb54ca55cb5f6a62970ef47b13f96c2a436c7f0085168f644b280998
+    staleWhen: ESVfx contracts、module backend、Unity VFX package、resource/pool lifecycle 或 acceptance evidence changes
+  - knowledgeId: es.aiwarning.arch.player-entity-model-rebuild.v1
+    file: entries/aiwarning-architecture-player-entity-model-rebuild.md
+    topic: 玩家对象模型重构边界
+    routeKeys: [aiwarnings, architecture, entity, player, domain, input, equipment, kcc]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-player-entity-model-rebuild.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs
+    authority: AIWarnings + current Entity/Domain/Module source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 64a12239fc871912e2df1d921c7a203d42d77f1b42e3b1e01ff109830387e611
+    sourceSetHash: 64a12239fc871912e2df1d921c7a203d42d77f1b42e3b1e01ff109830387e611
+    entryBodyHash: 939066566d80661e5f59d27d62ad4f110f021c99d17c6884a0154ab78262497e
+    staleWhen: Entity 五域、输入链、ESGameManager 入口、KCC/模块表或相关 SourceRef 变化
+  - knowledgeId: es.aiwarning.arch.entity-plugin-dependency-boundary.v1
+    file: entries/aiwarning-architecture-entity-plugin-dependency-boundary.md
+    topic: Entity 插件依赖与适配层边界
+    routeKeys: [aiwarnings, architecture, entity, dependency, asmdef, runtime, editor, adapter]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-entity-plugin-dependency-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Packages/manifest.json
+      - Assets/Scripts/ESLogic/ES_Logic.asmdef
+      - Assets/Plugins/ES/1_Design/ES_Design.asmdef
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+    authority: AIWarnings + Packages/asmdef/current Entity source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 9ada7729fd0f24393a6e6f43cbec67da0c34d8265d0f0a8189eaf10de2f83703
+    sourceSetHash: 9ada7729fd0f24393a6e6f43cbec67da0c34d8265d0f0a8189eaf10de2f83703
+    entryBodyHash: 0a729a136070437395b6b65a87e34babd45cb7ff131382f5c57068d8a26fb61e
+    staleWhen: Packages/manifest、asmdef、Entity 五域或第三方插件引用变化
+  - knowledgeId: es.aiwarning.arch.module-maturity-incomplete-governance.v1
+    file: entries/aiwarning-architecture-module-maturity-incomplete-governance.md
+    topic: 模块成熟度与未完成实现治理
+    routeKeys: [aiwarnings, architecture, module, maturity, evidence, blocked, lifecycle]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-module-lifecycle, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-architecture-module-maturity-incomplete-governance.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md
+      - .agents/skills/es-module-lifecycle/SKILL.md
+    authority: AIWarnings + module status source + evidence contracts
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: ae9065aec1523a15ec252454a96e716d2395d92250936662b50aa944de4b6487
+    sourceSetHash: ae9065aec1523a15ec252454a96e716d2395d92250936662b50aa944de4b6487
+    entryBodyHash: e708e0ded1a9aa53abfcf3367b79a1dbc9adae6793fe5cff29a39d3f357a91f3
+    staleWhen: 模块状态入口、证据等级、成熟度合同或续接协议变化
+  - knowledgeId: es.aiwarning.p0.info-group-pack-boundary.v1
+    file: entries/aiwarning-p0-info-group-pack-boundary.md
+    topic: P0 Info、Group 与 Pack 边界
+    routeKeys: [aiwarnings, p0, gamecore, info, group, pack, configkey, content]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-info-group-pack-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/0-SoDataInfo.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/1-SoDataGroup.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/2-SoDataPack.cs
+    authority: AIWarnings + SoDataInfo/Group/Pack source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: ecd331f3f13765368a5112251ebf755534034f4b8201b7910e56a4788e0f9172
+    sourceSetHash: ecd331f3f13765368a5112251ebf755534034f4b8201b7910e56a4788e0f9172
+    entryBodyHash: 611d8e558d5c7b1f2e40938b3daac257291cea08055b2fbc5ce7da1e766ae502
+    staleWhen: SoDataInfo/Group/Pack、ConfigKey、Consumer 注入或内容迁移合同变化
+  - knowledgeId: es.aiwarning.p0.gamecore-root-so-injection-boundary.v1
+    file: entries/aiwarning-p0-gamecore-root-so-injection-boundary.md
+    topic: P0 GameCore 根 SO 注入边界
+    routeKeys: [aiwarnings, p0, gamecore, root-so, injection, key, dependency, resource-boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-gamecore-root-so-injection-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md
+      - Assets/Plugins/ES/0_Stand/_Res/Runtime/ESScriptableObjectClassification.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/1-SoDataGroup.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/2-SoDataPack.cs
+      - Assets/Plugins/ES/1_Design/ConfigKey/ESConfigKey.cs
+    authority: AIWarnings + current GameCore source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 1b4462f3f693ea32cde1e88a0872c51cb0cc7e8c172fa620bffc15dd7bae5256
+    sourceSetHash: 1b4462f3f693ea32cde1e88a0872c51cb0cc7e8c172fa620bffc15dd7bae5256
+    entryBodyHash: 9119bd42ceff7c8b91dd1c8de33dae451482e9b8e6b89095e0f0b59d2619f9c4
+    staleWhen: IGameCoreSO、GameCoreTable、ConfigKey、Consumer 收集、Group/Pack 注入或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.p0.naming-and-wrapper-boundary.v1
+    file: entries/aiwarning-p0-naming-and-wrapper-boundary.md
+    topic: P0 高频命名与无职责包装边界
+    routeKeys: [aiwarnings, p0, identity, naming, api, wrapper, scheduler, program, compiler, runtime]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-naming-and-wrapper-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md
+      - Assets/Plugins/ES/1_Design/Work/ESWorkScheduler.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_Law/INTER_IESMotionInfluenceReceiver.cs
+      - Assets/Plugins/ES/1_Design/Tests/EntityPrimaryAttackSelectorTests.cs
+      - Assets/Plugins/ES/1_Design/Tests/ESGenericLifePoolTests.cs
+    authority: AIWarnings + current naming/lifecycle source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: c0f454ef1779ee93a0bb8fd0d2ab477c57585da904ef0acd904349982334b07f
+    sourceSetHash: c0f454ef1779ee93a0bb8fd0d2ab477c57585da904ef0acd904349982334b07f
+    entryBodyHash: 6fa424a79d31e57c7f048e2585d39dbf88085e58dccab763ddb2c37631bd8596
+    staleWhen: 公共 API、Inspector/菜单命名合同、架构词职责、生命周期协议或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.p0.ai-collaboration-history-session-recovery.v1
+    file: entries/aiwarning-p0-ai-collaboration-history-session-recovery.md
+    topic: P0 AI 协作历程与本地 Session 兜底恢复
+    routeKeys: [aiwarnings, p0, codex, session, history, handoff, recovery, timeline, privacy]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-codex-session-bootstrap, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-ai-collaboration-history-session-recovery.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md
+      - .agents/skills/es-codex-session-bootstrap/SKILL.md
+      - ES/AI协作历程（Codex）/Tools/Find-CodexSession.ps1
+      - ES/AI协作历程（Codex）/Tools/Recover-CodexSessionHistory.ps1
+      - ES/AI协作历程（Codex）/Tools/Test-ESCodexTimelineCoverage.ps1
+    authority: AIWarnings + es-codex-session-bootstrap tools
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: c5958a60d2cd715f140c1c410de694bd014e409d9674d5e02653c4b29f47a25f
+    sourceSetHash: c5958a60d2cd715f140c1c410de694bd014e409d9674d5e02653c4b29f47a25f
+    entryBodyHash: b7d35664d710786951f66605c24030c0bf605c7dd5d00c6df23ee1a599feadcd
+    staleWhen: session bootstrap、handoff envelope、timeline coverage 工具、档案格式或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.p0.generic-container-serialization-boundary.v1
+    file: entries/aiwarning-p0-generic-container-serialization-boundary.md
+    topic: P0 长期序列化与成熟泛型容器边界
+    routeKeys: [aiwarnings, p0, identity, serialization, generic, container, unity, il2cpp, migration]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-generic-container-serialization-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_长期序列化与成熟核心泛型容器具体类型边界_AI协作警告.md
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/DictionatyPro/ESEnumStringMirrorMap.cs
+      - Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESEnumStringMirrorMapTests.cs
+    authority: AIWarnings + current generic-container source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: c8bd90155fbc6c85edcdc62da455528fbf717e6c0f67f81e9acef09ac77ac7e9
+    sourceSetHash: c8bd90155fbc6c85edcdc62da455528fbf717e6c0f67f81e9acef09ac77ac7e9
+    entryBodyHash: 58746c4546d5f37cde5ef469f9ae02cc65df2e3b61e7eef11036fcdc407f020e
+    staleWhen: Unity/Odin 序列化、ESEnumStringMirrorMap、领域具体类型、兼容阶段或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.entity-core-domain-ai-control-correction.v1
+    file: entries/aiwarning-entity-core-domain-ai-control-correction.md
+    topic: Entity CoreDomain 与 AI 控制边界纠偏
+    routeKeys: [aiwarnings, architecture, entity, core, domain, module, ai-control, control-request, facade]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-entity-core-domain-ai-control-correction.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/模型重构_今日修正_CoreDomain与AI域控制_AI协作警告.md
+      - Assets/Plugins/ES/1_Design/Core_Domain_Module/Core.cs
+      - Assets/Plugins/ES/1_Design/Core_Domain_Module/Domain.cs
+      - Assets/Plugins/ES/1_Design/Core_Domain_Module/Module.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/_EntityAIDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs
+    authority: AIWarnings + current Entity/Core source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: eded16b7c4951482416af99a02d7bf738d6f21996dd1f4f043f08f95b52d875b
+    sourceSetHash: eded16b7c4951482416af99a02d7bf738d6f21996dd1f4f043f08f95b52d875b
+    entryBodyHash: 033f18624520cf56ab609717c6849d8d25ae9e35d4075af217a2c864f20edce8
+    staleWhen: Core/Domain/Module 生命周期、EntityAIDomain、控制请求合同或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.general-architecture-cross-system-correction.v1
+    file: entries/aiwarning-general-architecture-cross-system-correction.md
+    topic: 通用架构跨系统纠偏
+    routeKeys: [aiwarnings, architecture, cross-system, domain, module, facade, runtime-state, hot-path, buff, input]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-general-architecture-cross-system-correction.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md
+      - Assets/Plugins/ES/1_Design/Core_Domain_Module/Core.cs
+      - Assets/Plugins/ES/1_Design/Core_Domain_Module/Domain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_Law/INTER_IESMotionInfluenceReceiver.cs
+    authority: AIWarnings + current cross-system source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 98a41d60faa73e4a27e7917250917b59ba7830f25a86c51b5339dc3ffbf2ab00
+    sourceSetHash: 98a41d60faa73e4a27e7917250917b59ba7830f25a86c51b5339dc3ffbf2ab00
+    entryBodyHash: e115471ccc250bdbea7111066e1885a6303c212bb81e6ae8cc678c40980bffaa
+    staleWhen: Core/Domain/Module、Entity、Input、Buff、State、Item、GameManager 或跨系统边界变化。
+  - knowledgeId: es.aiwarning.esgamemanager-savesystem-boundary.v1
+    file: entries/aiwarning-esgamemanager-savesystem-boundary.md
+    topic: ESGameManager 与 SaveSystem 架构边界
+    routeKeys: [aiwarnings, architecture, gamemanager, domain, save, load, module, inspector, command]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-esgamemanager-savesystem-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/GameManager与存档（GameManagerSave）/架构体系_ESGameManager_SaveSystem_AI协作警告.md
+      - Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/SaveSystem/ESGameSave.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/SaveSystem/ESGameSaveModule.cs
+      - Assets/Scripts/ESLogic/Runtime/Command/Components/ESCommandPlayer.cs
+    authority: AIWarnings + current GameManager/SaveSystem source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 13077ee77b9e0f25379f36a014b0508ee422b27d4fa8831e44036f9cec845cb0
+    sourceSetHash: 13077ee77b9e0f25379f36a014b0508ee422b27d4fa8831e44036f9cec845cb0
+    entryBodyHash: a75ff488b7fb41685b485d0b226382d97c2d59f580d61d7671f447bac68dd5fc
+    staleWhen: ESGameManager 三域、ESGameSave 门面、SaveSystem、模块 Drawer、Command 目录或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.so-table-tool-boundary.v1
+    file: entries/aiwarning-so-table-tool-boundary.md
+    topic: SO 表格工具边界与安全约束
+    routeKeys: [aiwarnings, editor, so-table, import, export, plan, batch, serialization, utf8]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-so-table-tool-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/SO表格（SOTable）/SO表格工具_AI协作说明.md
+      - Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/SoTable/EditorOnly/InfoType/ESSoTableDataRule.ExecutionCache.cs
+    authority: AIWarnings + current ESSoTableDataRule source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 17ed8c1ebc558ccfb52bec1d3f77ff9c6ecb40ff479a098fbfb04c129b8edddf
+    sourceSetHash: 17ed8c1ebc558ccfb52bec1d3f77ff9c6ecb40ff479a098fbfb04c129b8edddf
+    entryBodyHash: f6d2902add482588acaa11f8919b695e77c269c10cf335a4f2e752618e672304
+    staleWhen: ESSoTableDataRule、映射/批处理协议、Group/Info 同步、编辑器命名空间或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.esdeveloper-cockpit-architecture-contract.v1
+    file: entries/esdeveloper-cockpit-architecture-contract.md
+    topic: ES Developer Cockpit 架构合同
+    routeKeys: [aiwarnings, cockpit, architecture, runtime-editor-boundary, event, action, observation, evidence, reload]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/esdeveloper-cockpit-architecture-contract.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESDeveloperCockpit_ArchitectureContract.md
+    authority: AIWarnings + current Cockpit contract
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: bdd92f2eabe276a7d02b9046a27d4908b6b5e4b73221c252e7037048de7adfaf
+    sourceSetHash: bdd92f2eabe276a7d02b9046a27d4908b6b5e4b73221c252e7037048de7adfaf
+    entryBodyHash: e50bad0c7dbacb20c2a03a1410c4ea0e1a93f0ff3e92fda33d9fe51284f3f182
+    staleWhen: Cockpit ContractVersion、事件/Action Schema、Observation Run、Domain Reload 或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.p0.profile-assembly-feature-pool-boundary.v1
+    file: entries/aiwarning-profile-assembly-feature-pool-boundary.md
+    topic: P0 Profile 装配、Feature 目录与池化边界
+    routeKeys: [aiwarnings, p0, profile, assembly, feature, pool, extension, runtime-context, editor]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-profile-assembly-feature-pool-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_Profile装配权威_Feature目录与池化边界_AI协作警告.md
+      - Assets/Scripts/ESLogic/Runtime/Profile/Generic/ESGenericProfile.cs
+      - Assets/Scripts/ESLogic/Runtime/Profile/Generic/ESGenericProfileRuntimeContext.cs
+      - Assets/Scripts/ESLogic/Runtime/Life/ESGenericLife.cs
+      - Assets/Plugins/ES/1_Design/Tests/ESGenericLifePoolTests.cs
+    authority: AIWarnings + current Profile/Life source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: ddaa4c2929fda27a6348d54ab1357cbc6bc7826467af83a2e245ed3b226700aa
+    sourceSetHash: ddaa4c2929fda27a6348d54ab1357cbc6bc7826467af83a2e245ed3b226700aa
+    entryBodyHash: e7ba0663502156f6250e489bfc6dc0f3c26e69fcb09aeb2fde0724686262b978
+    staleWhen: Profile Header/Settings/Extension/RuntimeContext、ESGenericLife、Feature 目录或 SourceRef 哈希变化。
+  - knowledgeId: es.aiwarning.player-motion-runtime-boundary.v1
+    file: entries/aiwarning-player-motion-runtime-boundary.md
+    topic: 玩家运动、Item/Shot 与 KCC 运行时边界
+    routeKeys: [aiwarnings, runtime, entity-motion, player-motion, kcc, item, shot, vehicle, performance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-player-motion-runtime-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Entity运动（EntityMotion）/玩家运动_PlayerMotion_AI协作说明.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs
+      - Assets/Scripts/ESLogic/Runtime/Vehicle/VehicleController.cs
+    authority: AIWarnings + current Entity/Item/Vehicle source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 14dddeb115bd75f719364ee4bcea7542a991d4b44002ac41440e0cd8aaafafb1
+    sourceSetHash: 14dddeb115bd75f719364ee4bcea7542a991d4b44002ac41440e0cd8aaafafb1
+    entryBodyHash: 12936f7b67b8bab2f25043cb4b9a7b7581fa79517797f6fa944abc1d0d81e0c1
+    staleWhen: Entity KCC、Item/Shot、VehicleController、输入链、StateSupportFlags 或原 Warning SourceRef 变化。
+  - knowledgeId: es.aiwarning.entity-equipment-weapon-boundary.v1
+    file: entries/aiwarning-entity-equipment-weapon-boundary.md
+    topic: Entity 装备、Weapon 定义与装配事务边界
+    routeKeys: [aiwarnings, architecture, entity, equipment, inventory, weapon, attachment, combat, acceptance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-entity-equipment-weapon-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/装备定义与装配推进路线_AI协作说明.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentSlotModule.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityWeaponBinding.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityPrimaryAttackSelector.cs
+    authority: AIWarnings + current Equipment/Weapon source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: c5dc34d2bab1e3be86b346b12f3132478f56ffca24d4336ab280e6c60dab22ca
+    sourceSetHash: c5dc34d2bab1e3be86b346b12f3132478f56ffca24d4336ab280e6c60dab22ca
+    entryBodyHash: 41ad0a4d639922e42b65243c26d2be7756f693c271b4d883d0f3d2d774ef2885
+    staleWhen: Equipment Domain/Module、Weapon 定义投影、角色模板、Combat 入口或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.character-general-architecture-validation.v1
+    file: entries/aiwarning-character-general-architecture-validation.md
+    topic: 角色通用架构、控制权与 RPG 扩展边界
+    routeKeys: [aiwarnings, architecture, entity, character, control-authority, mmo, rpg, acceptance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-character-general-architecture-validation.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色通用架构验证_MMO开放世界角色切换剧情RPG战斗_AI协作说明.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterIdentity.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/_EntityAIDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs
+    authority: AIWarnings + current Entity/Identity/AIDomain source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 487e611de821b6cbba9b09b73af1a3745cc0d74785cbe36e62bd0e3724ea5e01
+    sourceSetHash: 487e611de821b6cbba9b09b73af1a3745cc0d74785cbe36e62bd0e3724ea5e01
+    entryBodyHash: 69ed1c79fc2ebd5f5e2e788bb83e7a9172677dd107bc7e17e11d7432f5c97652
+    staleWhen: Entity/Identity、AIDomain、RuntimeMode、Equipment/Combat 或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.state-ik-buff-boundary.v1
+    file: entries/aiwarning-state-ik-buff-boundary.md
+    topic: StateMachine、FinalIK 与 Buff 运行时边界
+    routeKeys: [aiwarnings, architecture, state-machine, final-ik, buff, performance, editor]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-state-ik-buff-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/状态机与IK（StateIK）/AI协作职责_状态机与IK上层_Buff边界说明.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/State/_EntityStateDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Buff/_EntityBuffDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs
+    authority: AIWarnings + current State/IK/Buff source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 032047e122d6d2f1b075009eec0624f59036c56265b84aba903e06d8243c2ee1
+    sourceSetHash: 032047e122d6d2f1b075009eec0624f59036c56265b84aba903e06d8243c2ee1
+    entryBodyHash: fd7f7204c2b875a283ad5f6ca755ec0f7828a4adfbd30203a314dc9b65caec23
+    staleWhen: State/IK/Buff 源码、Equipment 接线、Solver 或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.p0.codex-core-context.v1
+    file: entries/aiwarning-p0-codex-core-context.md
+    topic: Codex 核心上下文、State/IK、Tag、RuntimeKey 与 LOD 边界
+    routeKeys: [aiwarnings, p0, codex-context, statemachine, final-ik, gametag, runtimekey, lod, performance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-codex-core-context.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_Codex核心上下文总纲_状态机IK标签调度LOD_AI协作警告.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/State/_EntityStateDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Buff/_EntityBuffDomain.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+    authority: AIWarnings + current core protocol source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 5405e29b7288ae05974c903c724f871f833c54867d340bf87adf0f20b6f926f7
+    sourceSetHash: 5405e29b7288ae05974c903c724f871f833c54867d340bf87adf0f20b6f926f7
+    entryBodyHash: 44e5cfee8d3bafdb77a5e8783ad296f5e36a9055e68f4b13e2a6f6d85c63a0e0
+    staleWhen: State/IK/Tag/RuntimeKey/LOD 源码、核心协议或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.p0.runtime-assets-library-manifest.v1
+    file: entries/aiwarning-p0-runtime-assets-library-manifest.md
+    topic: Runtime 资源、Library/Manifest、Scope 与发布边界
+    routeKeys: [aiwarnings, p0, runtime-assets, library, manifest, asset-table, runtime-key, scope, release]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-p0-runtime-assets-library-manifest.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md
+      - Assets/Plugins/ES/0_Stand/_Res/Runtime/ESAssetScope.cs
+      - Assets/Plugins/ES/0_Stand/_Res/Runtime/ESRuntimeReleaseDownloader.cs
+      - Assets/Plugins/ES/0_Stand/_Res/Runtime/ESRuntimeAssetProviderFactory.cs
+      - Assets/Plugins/ES/Editor/ESResPipeline/ESAssetPipelineContracts.cs
+    authority: AIWarnings + current resource pipeline source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 35754ec45bbc72118a0267dc4f58444da2e863af214c0d88f428818649a5a32f
+    sourceSetHash: 35754ec45bbc72118a0267dc4f58444da2e863af214c0d88f428818649a5a32f
+    entryBodyHash: e3084309ef8719ffca36f20ff7a4669d26c31f0059ff932800667cfbc43944a1
+    staleWhen: 资源索引、Manifest/Table、Loader、Scope、Provider 或发布合同变化。
+  - knowledgeId: es.aiwarning.editor-extension-common-sense.v1
+    file: entries/aiwarning-editor-extension-common-sense.md
+    topic: Editor 扩展交互、生命周期与绘制边界
+    routeKeys: [aiwarnings, editor, editor-window, imgui, uitoolkit, inspector, preview, lifecycle, performance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-extension-common-sense.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md
+      - Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputActionDefineDrawer.cs
+      - Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteRegistry.cs
+    authority: AIWarnings + current Editor source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: dd58dcc012ceb29ed0f783c382f1294929eb7689deeeaa9992e2768c358c8bdc
+    sourceSetHash: dd58dcc012ceb29ed0f783c382f1294929eb7689deeeaa9992e2768c358c8bdc
+    entryBodyHash: a97ae4b4bae85dabf3c606a13a191542498a4bf2b498cc6a133628d5c03f8fa8
+    staleWhen: Editor UI 源码、Unity 事件行为、GUI 生命周期或 Knowledge SourceRefs 变化。
+  - knowledgeId: es.aiwarning.handover.runtimekey-input-legacy.v1
+    file: entries/aiwarning-handover-runtimekey-input-legacy.md
+    topic: 历史交接：RuntimeKey 与旧输入 SerializeReference
+    routeKeys: [aiwarnings, handover, historical, runtimekey, asset-pipeline, legacy-input]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-handover-runtimekey-input-legacy.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/资源加载底层_RuntimeKey稳定与旧输入坏引用_给其他AI阅读.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/_EntityAIDomain.cs
+    authority: AIWarnings historical handover + current resource/input source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 78f42301085e5447f8a496d8ddfad5bf552f1119c496aef34a4851bd2316ddf5
+    sourceSetHash: 78f42301085e5447f8a496d8ddfad5bf552f1119c496aef34a4851bd2316ddf5
+    entryBodyHash: d45cf2f91e7d493ff553190bb2f11a16af492804866e684f4be9c28afd59a53d
+    staleWhen: 历史记录解释、当前资源 P0 Warning 或输入/资源源码变化。
+  - knowledgeId: es.aiwarning.handover.ai-personas-top-level-boundary.v1
+    file: entries/aiwarning-handover-ai-personas-top-level-boundary.md
+    topic: 历史交接：AIPersonas 与 AI 顶级目录边界
+    routeKeys: [aiwarnings, handover, historical, aipersonas, aicommands, aitalk, boundary]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-handover-ai-personas-top-level-boundary.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/AIPersonas与AI顶级目录边界_AI协作警告.md
+    authority: AIWarnings historical handover + current AI directory source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 0d9397f51649588bdca2830c8b95a982da8a1de5f8385b96a0eb73b21b64a05d
+    sourceSetHash: 0d9397f51649588bdca2830c8b95a982da8a1de5f8385b96a0eb73b21b64a05d
+    entryBodyHash: b121682542b0945bb695d47d17f7d77eec2771354b218ece4987b0293aab9333
+    staleWhen: 四类 AI 目录结构、会话协议或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.handover.codex-project-model-editor.v1
+    file: entries/aiwarning-handover-codex-project-model-editor.md
+    topic: 历史交接：Codex 项目模型重构与编辑器稳定
+    routeKeys: [aiwarnings, handover, historical, entity-model, editor, preview, lifecycle, aicommands]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-handover-codex-project-model-editor.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/项目总交接（ProjectHandover）/Codex_当前项目总交接_模型重构与编辑器稳定_AI协作警告.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md
+      - Assets/Plugins/ES/Editor/EditorTools/ESWindowLauncher.cs
+    authority: AIWarnings project handover + current source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 768f15fd2b65b7eaab808441364d06cffd5f9b484b8ec195e54eda52cea5f17c
+    sourceSetHash: 768f15fd2b65b7eaab808441364d06cffd5f9b484b8ec195e54eda52cea5f17c
+    entryBodyHash: e984eb102af5313d7529122c173f5310917b1e40b17c19603d657c202a960ffd
+    staleWhen: 项目模型、编辑器预览底层、生命周期合同或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.retrospective.escmdagent-terminal.v1
+    file: entries/aiwarning-retrospective-escmdagent-terminal.md
+    topic: ESCmdAgent 失败复盘与 Unity AI 任务面板边界
+    routeKeys: [aiwarnings, retrospective, escmdagent, editor, terminal, ux, session]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-retrospective-escmdagent-terminal.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/失败复盘（Retrospectives）/ESCmdAgent_失败复盘与后续禁止事项_AI协作警告.md
+      - Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs
+      - Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs
+    authority: AIWarnings failure retrospective + current ESCmdAgent source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: b48476d4c0c72f07059cc261be4e0386d3b63e28e39259d0f257ae1d63d4f9c3
+    sourceSetHash: b48476d4c0c72f07059cc261be4e0386d3b63e28e39259d0f257ae1d63d4f9c3
+    entryBodyHash: 796365890e60196d6d99c89d7896f52ea447fb757d6c41551cda9f32b1c7ac1a
+    staleWhen: ESCmdAgent、CLI 会话协议、编辑器 UI 或 SourceRefs 变化。
+  - knowledgeId: es.aiwarning.proposal.resourceplan-scope-lifecycle.v1
+    file: entries/aiwarning-proposal-resourceplan-scope-lifecycle.md
+    topic: 提案：ResourcePlan 与 Scope 生命周期绑定验收
+    routeKeys: [aiwarnings, proposal, resourceplan, scope, lifecycle, release, acceptance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-proposal-resourceplan-scope-lifecycle.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/资源计划_Scope生命周期绑定_待验收提案.md
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESResourcePlanRuntimeService.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESResourcePlanRuntimeExtensions.cs
+      - Assets/Plugins/ES/1_Design/Link/Pool_Container/ActiveLinkList.cs
+    authority: AIWarnings proposal + current ResourcePlan source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: bb0173965c6c88e036b8544c4f53103e8efa0e20e4c3b9423e6038ef52f92f59
+    sourceSetHash: bb0173965c6c88e036b8544c4f53103e8efa0e20e4c3b9423e6038ef52f92f59
+    entryBodyHash: da47b1daab3628b07ee60966b6c636e77ea6de56527f2e87d85d9276d0c6050f
+    staleWhen: ResourcePlan/Scope/Provider 源码、生命周期合同或验收矩阵变化。
+  - knowledgeId: es.aiwarning.proposal.entity-intrinsic-tag-pooling.v1
+    file: entries/aiwarning-proposal-entity-intrinsic-tag-pooling.md
+    topic: 提案：Entity 固有 Tag、Prefab 入口与池化闭环验收
+    routeKeys: [aiwarnings, proposal, entity, tag, datainfo, prefab, pooling, snapshot, acceptance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-proposal-entity-intrinsic-tag-pooling.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/Entity固有Tag_DataInfo权威_Prefab入口与池化闭环_提案.md
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+      - Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterIdentity.cs
+      - Assets/Scripts/ESLogic/Runtime/Tag/ESTagCollection.cs
+      - Assets/Plugins/ES/1_Design/Tests/ESTagCatalogRuntimeTests.cs
+    authority: AIWarnings proposal + current Entity/Tag source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 4240f6f4bb8634d6809d8e095248e0286f69ba7e7c5f18d8959251827ed2770a
+    sourceSetHash: 4240f6f4bb8634d6809d8e095248e0286f69ba7e7c5f18d8959251827ed2770a
+    entryBodyHash: 8adfda81720ae36a500c32198a32118369d4eec1b2bd6b40e5379c84cc8fd676
+    staleWhen: Entity/Tag/DataInfo/Prefab/Pool 源码、快照合同或验收证据变化。
+  - knowledgeId: es.aiwarning.proposal.unitymcp-engineering-agent-roadmap.v1
+    file: entries/aiwarning-proposal-unitymcp-engineering-agent-roadmap.md
+    topic: 预备案提案：UnityMCP、AI 工程验收代理与自动化路线图
+    routeKeys: [aiwarnings, proposal, unitymcp, agent, validation, automation, evidence, release]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-proposal-unitymcp-engineering-agent-roadmap.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md
+      - Assets/Plugins/ES/AICommands/README.md
+      - .agents/skills/es-aiwarning-authoring/SKILL.md
+      - .agents/skills/es-aibrain-route-authoring/SKILL.md
+    authority: AIWarnings proposal + project governance route
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 89637ca312b129e40df43dc26516eb206c19e81a70da9e0be418a59d578c2b88
+    sourceSetHash: 89637ca312b129e40df43dc26516eb206c19e81a70da9e0be418a59d578c2b88
+    entryBodyHash: e198a0438ebbf16203d0e788b21a1fe106b404f06ede0fd723f84fea2a88246b
+    staleWhen: UnityMCP/AICommands/验收合同、CurrentStatus 或路线图发生变化。
+  - knowledgeId: es.aiwarning.proposal.audio-dual-backend-release-lifecycle.v1
+    file: entries/aiwarning-proposal-audio-dual-backend-release-lifecycle.md
+    topic: 提案：音频双后端与发布资源生命周期验收
+    routeKeys: [aiwarnings, proposal, audio, unity, fmod, resourceplan, release, payload, acceptance]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-proposal-audio-dual-backend-release-lifecycle.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/音频系统_双后端与发布资源生命周期_待验收提案.md
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESRuntimeDataAssetLoadingService.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataModule.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESResourcePlanRuntimeService.cs
+      - Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESResourcePlanInfo.cs
+      - Assets/Plugins/ES/0_Stand/_Res/Runtime/ESRuntimeReleaseDownloader.cs
+      - Assets/Scripts/ESLogic/Runtime/Skill/TrackItemAndClip/SkillTrack/SkillTrackItems/SkillTrackItem_Audio.cs
+      - Assets/Scripts/ESLogic/Runtime/Operation/Operations/10_Audio/OpAudio.cs
+    authority: AIWarnings proposal + current resource/release source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 73259c8888acab6981bc8c4310a4afc71f4c62595e5e49782cdcd16e28068758
+    sourceSetHash: 73259c8888acab6981bc8c4310a4afc71f4c62595e5e49782cdcd16e28068758
+    entryBodyHash: a76616db14c9bbd1fcad8cd06adbd0de36c11768860e5efa7dfa99664f522f1f
+    staleWhen: AudioModule、ResourcePlan、Provider、Release Payload 或后端验收合同变化。
+  - knowledgeId: es.aiwarning.editor.codex-tool-rewrite-context.v1
+    file: entries/aiwarning-editor-codex-tool-rewrite-context.md
+    topic: Codex 工具重写历史上下文
+    routeKeys: [aiwarnings, editor, simpletools, codex, runtimewatch, objectpool, validation, history]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-editor-codex-tool-rewrite-context.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/简单工具（SimpleTools）/Codex_工具重写_商业级验证协作上下文.md
+      - ProjectSettings/ProjectVersion.txt
+      - Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/MenuItemPathDefine.cs
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsWindow.cs
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_RuntimeWatch.cs
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs
+    authority: AIWarnings historical context + current SimpleTools source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 7ff71775887317e7ecec36fd76e2520f6bd1a7c1ee36e249b4986b9f508b9abe
+    sourceSetHash: 7ff71775887317e7ecec36fd76e2520f6bd1a7c1ee36e249b4986b9f508b9abe
+    entryBodyHash: 5a19aea4dc3c5e891422438887edbee01270def89a76cd3842ffe6a87ae2f9db
+    staleWhen: SimpleTools 源码、菜单/程序集边界、工具安全合同或验证证据变化。
+  - knowledgeId: es.aiwarning.start.readme.v1
+    file: entries/aiwarning-start-readme.md
+    topic: ES AIWarnings 启动入口与最小读取链
+    routeKeys: [aiwarnings, start, current-status, rule-index, p0, knowledge, skills, evidence]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-start-readme.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - Documentation/AIKnowledge/KnowledgeIndex.yaml
+      - Assets/Plugins/ES/AICommands/README.md
+    authority: AIWarnings startup route + AIBRAIN_ENTRY
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 33eec77f0d4ab0918885ecf27e91027edcc35e60a2a6f4b7d4d01405e995e4d7
+    sourceSetHash: 33eec77f0d4ab0918885ecf27e91027edcc35e60a2a6f4b7d4d01405e995e4d7
+    entryBodyHash: 9c1a88de0986fb6b225e13bef344c2cccdce471a384a47a8d755cb465afb1119
+    staleWhen: Start 链、AIBRAIN_ENTRY、RuleIndex 或 AIWarnings 路由协议变化。
+  - knowledgeId: es.aiwarning.rule-index.v1
+    file: entries/aiwarning-rule-index.md
+    topic: AIWarnings 规则索引路由合同
+    routeKeys: [aiwarnings, rule-index, p0, architecture, runtime, editor, validation, handover, skills]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-rule-index.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - Assets/Plugins/ES/AICommands/README.md
+    authority: AIWarnings routing index + CurrentStatus/RouteCatalog
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 4a2be6cf7db6d96da7962f4bee1cbc18bc0b3a29ea12b01b430d2544983abea3
+    sourceSetHash: 4a2be6cf7db6d96da7962f4bee1cbc18bc0b3a29ea12b01b430d2544983abea3
+    entryBodyHash: f783c373be39bc012db1d8cc99c536c065af0bed6eabc2b0a21f38844c1e59ec
+    staleWhen: AIWarnings 文件、RouteCatalog、P0/专项目录或 Skill 路由变化。
+  - knowledgeId: es.aiwarning.handover.snapshot.20260816.v1
+    file: entries/aiwarning-handover-snapshot-20260816.md
+    topic: 2026-08-16 AIWarnings 历史交接快照
+    routeKeys: [aiwarnings, handover, historical, editor, shader, graph, entity, resource, camera, evidence]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-utf8-guard, es-codex-session-bootstrap]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarning-handover-snapshot-20260816.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/2026-08-16_当前状态快照_活跃索引迁移前.md
+    authority: AIWarnings historical handover snapshot + current routing rules
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 1d0fdd9b3d73017d64baccc50d60e4a52464c1da245fc7c4428da2b5bc140a1e
+    sourceSetHash: 1d0fdd9b3d73017d64baccc50d60e4a52464c1da245fc7c4428da2b5bc140a1e
+    entryBodyHash: 308ab36bc47d26bdac2a1ecfe2c5c2f943ec5d59d403e1e421f869b10e1ac6e5
+    staleWhen: 当前源码、CurrentStatus、专项规则或后续验收证据变化。
+  - knowledgeId: es.aiwarnings.full-coverage.v1
+    file: entries/aiwarnings-full-coverage.md
+    topic: AIWarnings 全量迁移覆盖与整改需求聚合
+    routeKeys: [aiwarnings, migration, coverage, p0, architecture, runtime, editor, validation, handover, archive, knowledge, evidence, stale, authority]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-creator, es-knowledge-validator, es-aibrain-route-authoring, es-utf8-guard, es-worktree-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/aiwarnings-full-coverage.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json
+      - Documentation/AIKnowledge/AIWarningsGeneratedInventory.json
+      - Documentation/AIKnowledge/aiwarnings-migration-ledger.json
+    authority: AIWarnings + current project source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: c0d1c03a15b9ac32bb817613d682685cc1061b6ad4a26752d492d8c5b905782f
+    sourceSetHash: c0d1c03a15b9ac32bb817613d682685cc1061b6ad4a26752d492d8c5b905782f
+    entryBodyHash: 3698e916d94a986ea2f806e2add8028b2f82b72b6566f16e56769931d0e3ecce
+    staleWhen: 任一 AIWarnings Markdown、Start 链、RuleIndex、RouteCatalog、KnowledgeIndex、迁移验证脚本或 SourceRef 哈希变化
+  - knowledgeId: es.project.web-page-generation-advanced-capabilities.v1
+    file: entries/web-page-generation-advanced-capabilities.md
+    topic: WebPageStudio 静态/动态网页生成、高级主题与稳定性边界
+    routeKeys: [web-page-generation, webpagestudio, static-html-css, dynamic-backend-contract, responsive, theme, forced-colors, seo, microdata, pwa, localization, freshness, evidence-boundary]
+    relatedSkills: [es-open-source-migration, es-knowledge-creator, es-ai-knowledge-curation, es-knowledge-validator, es-automation-worker-authoring, es-utf8-guard]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md
+      - ES/AISpace/Public/WebPageStudio/README.md
+      - ES/AISpace/Public/WebPageStudio/ACCEPTANCE_MATRIX.md
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioStatic.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioBackendContract.ps1
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+    authority: Current WebPageStudio source, contracts, validators and acceptance matrix
+    evidenceLevel: S1
+    contentHash: 62343a8f2cf2bc2125a7a605d7adf0bba557458f6ad889fc3c59c58b4ed3b229
+    staleWhen: WebPageStudio generator, request/generation/backend schema, validator behavior, acceptance matrix, or any SourceRef hash changes
+  - knowledgeId: es.project.web-component-layout-route.v1
+    file: entries/web-component-layout-route.md
+    topic: Web 组件、布局与路由确定性生成
+    routeKeys: [web-component, web-layout, web-route, web-page-generation, responsive]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-component-layout-route.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+    authority: Current WebPageStudio Kernel and Quality contract
+    evidenceLevel: S1
+    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    staleWhen: Kernel schema, compiler, Quality validator, or Page IR changes
+  - knowledgeId: es.project.web-theme-design-tokens.v1
+    file: entries/web-theme-design-tokens.md
+    topic: Web 主题、强制配色与设计 Token
+    routeKeys: [web-theme, web-design-token, web-color, forced-colors, responsive]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-theme-design-tokens.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+    authority: Current WebPageStudio theme and accessibility validators
+    evidenceLevel: S1
+    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    staleWhen: Theme tokens, media rules, Accessibility, or Quality behavior changes
+  - knowledgeId: es.project.web-runtime-data-contract.v1
+    file: entries/web-runtime-data-contract.md
+    topic: Web 动态运行时与数据合同
+    routeKeys: [web-runtime, web-data, dynamic-backend-contract, web-security]
+    relatedSkills: [es-automation-worker-authoring, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-runtime-data-contract.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+    authority: Current Backend Contract and dynamic kernel boundary
+    evidenceLevel: S1
+    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    staleWhen: Backend schema, dynamic compiler, allowlist, or runtime policy changes
+  - knowledgeId: es.project.web-content-seo-discovery.v1
+    file: entries/web-content-seo-discovery.md
+    topic: Web 内容、SEO、结构化数据与站点发现
+    routeKeys: [web-content, web-seo, web-sitemap, web-localization, microdata]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-content-seo-discovery.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+    authority: Current WebPageStudio SEO output and Quality contract
+    evidenceLevel: S1
+    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    staleWhen: SEO output, locale bundles, Sitemap, or discovery validator changes
+  - knowledgeId: es.project.web-accessibility-performance-evidence.v1
+    file: entries/web-accessibility-performance-evidence.md
+    topic: Web 可访问性、性能与证据边界
+    routeKeys: [web-accessibility, web-performance, web-evidence, web-responsive]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator, es-observability-evidence]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-accessibility-performance-evidence.md
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioAccessibility.ps1
+    authority: Current Accessibility and Quality validators
+    evidenceLevel: S1
+    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    staleWhen: Accessibility, Quality, performance budget, or acceptance matrix changes
+  - knowledgeId: es.project.web-pwa-security-deployment.v1
+    file: entries/web-pwa-security-deployment.md
+    topic: Web PWA、离线、安全与部署边界
+    routeKeys: [web-pwa, web-offline, web-security, web-deployment, csp]
+    relatedSkills: [es-security-input-audit, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-pwa-security-deployment.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+    authority: Current WebPageStudio output and security boundary
+    evidenceLevel: S1
+    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    staleWhen: Manifest, offline package, CSP, deployment contract, or security validator changes

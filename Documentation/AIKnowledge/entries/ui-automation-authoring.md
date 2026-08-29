@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.ui-automation-authoring.v1`  
 `Authority`: `Source + Skill contract + Unity evidence`  
 `RouteKeys`: `ui-automation`, `screen-spec-v3`, `ui-prefab`, `ui-fixture-scene`, `ui-layout`, `responsive`, `visual-qa`, `asset-fallback`
-`ContentHash`: `961b5be9ece1f541575199a017ef67fc08f04cc6da4704d5ef4ece37676e9577`
+`ContentHash`: `1b812437c4164b3f4b5549ab0a332180018bdbe7abc3b2f24324d05038b67f84`
 ## Scope
 
 本条目负责从视觉需求到 ScreenSpec v3 候选、组件注册、UI Materializer、UI Prefab/Fixture、响应式布局与视觉证据门禁。它不负责运行时 Window/Presenter、背包、战斗、经济、导航或输入领域逻辑；不负责非 UI Scene Builder、通用 Prefab Override 或场景备份；不负责发布验收结论。
@@ -38,8 +38,8 @@
 | Reference/design evidence | Visual Brief；Python/C# Adapter 无损保留设计证据、需求合同与状态合同 | `es.project.game-ui-reference-design-evidence.v1` | 零哈希/空路径 `complete` 无效；输入审查不替代输出视觉证据 |
 | ScreenSpec/component tree | Registry、Validator、Python/C# Adapter | `es.editor.project-screen-spec-materializer.screen-spec-components.v1` | 当前 Validator 覆盖不是全字段/全树语义证明 |
 | AssetManifest | Validator + 项目内 resolver 检查 source、槽引用、路径、GUID、哈希与 provenance；高保真焦点主体还必须由 `focalAssetPolicies` 显式绑定其 crop/focal-point/safe-crop 决策 | `es.project.game-ui-asset-manifest.v1` | resolver 身份回执与静态 crop 对齐不等于导入、商业授权、实际裁切或视觉验收；缺源时仍使用白图 placeholder |
-| LayoutPlan | Canvas/RectTransform/LayoutGroup 与 Adapter 布局投影；严格 Validator 校验 edge/center/stretch 几何、profile 内 layer/siblingOrder、主动作色彩及 `safeArea: ignore` 的受限背景例外；每个状态强制 `preserveBounds`，不能产生第二套状态几何；Resolver 在布局组真实静态矩形上检查交互目标尺寸和组内最小间距 | `es.unity.ui-canvas-layout.v1`、`es.unity.ui-layout-clipping.v1` | 安全区、长内容、交互密度和多 profile 仍需当前 Unity/GPU 证据 |
-| BehaviorSpec/focus/navigation | Validator 检查 intent、目标尺寸、双向状态绑定和每个目标的 `effects`；Python/C# Adapter 保留 interaction/stateVariants，Fixture 只在 `stateSemantics.affectedComponentIds` 内执行显式效果；Validator、Resolver 与 Materializer 都拒绝 state variant/effect 借 bounds、anchor、pivot、layout、size 或 safe area 改几何 | `es.project.game-ui-behavior-focus-navigation.v1` | 当前不证明 EventSystem、InputAction、焦点图、业务动作或真实状态 reducer 可用 |
+| LayoutPlan | Canvas/RectTransform/LayoutGroup 与 Adapter 布局投影；严格 Validator 校验 edge/center/stretch 几何、profile 内 layer/siblingOrder、主动作色彩及 `safeArea: ignore` 的受限背景例外；`anchorContract` 把关键组件的 top-left bounds 确定性投影为 Unity bottom-left `anchorMin/anchorMax`，并保留显式 Unity pivot，布局组管理的子节点不得冒充 authored final anchors；每个状态强制 `preserveBounds`，不能产生第二套状态几何；Resolver 在布局组真实静态矩形上检查交互目标尺寸和组内最小间距；快照门禁还检查父 LayoutGroup 与子 ContentSizeFitter 的单轴所有权、Mask/RectMask2D 可见交集、CanvasGroup 链和同父层不透明 raycast 遮挡 | `es.unity.ui-canvas-layout.v1`、`es.unity.ui-layout-clipping.v1`、`es.unity.ui-interaction-rendering.v1` | 静态投影不证明 Unity Layout rebuild；非矩形 Mask 像素、真实 EventSystem 命中、安全区、长内容、交互密度和多 profile 仍需当前 Unity/GPU 证据 |
+| BehaviorSpec/focus/navigation | Validator 检查 intent、目标尺寸、双向状态绑定和每个目标的 `effects`；`interactionContract` 要求每个 profile 的完整 focus order 从主动作开始，disabled/loading 主动作显式 `interactable: false`；`stateImpactPolicy` 逐 profile 限制状态影响比例；Python/C# Adapter 保留 interaction/stateVariants，Fixture 只在 `stateSemantics.affectedComponentIds` 内执行显式效果；Validator、Resolver 与 Materializer 都拒绝 state variant/effect 借 bounds、anchor、pivot、layout、size 或 safe area 改几何 | `es.project.game-ui-behavior-focus-navigation.v1` | 当前不证明 EventSystem、InputAction、焦点遍历执行、业务动作或真实状态 reducer 可用 |
 | Fixture Driver | Materializer 可驱动固定视觉 state | `es.editor.project-screen-spec-materializer.prefab-fixture-structure.v1` | Fixture state 不拥有真实业务或输入状态 |
 | Materializer | C# Adapter 与 `ESUIGameScreenMaterializer` | `es.editor.project-screen-spec-materializer.prefab-fixture-structure.v1` | 静态源码不证明 Prefab/Scene 保存、幂等或 rollback |
 | Output visual evidence | editor/ui/scene 快照与 GPU PNG 合同 | `es.editor.project-screen-spec-materializer.visual-evidence.v1` | 文件/退出码不等于非空像素或视觉通过 |
@@ -54,7 +54,8 @@
 3. 选择已注册 recipe、组件集合和布局策略，记录输入、优先级及冲突裁决。无注册能力时停止，不得用临时层级冒充正式组件。
 4. 先生成并验证候选 ScreenSpec v3、AssetManifest、LayoutPlan、BehaviorSpec 及 profile/state 矩阵；候选不授予 Unity 写权限。
 5. 当前用户明确要求写 Prefab/Scene 或运行 Materializer 时可在其范围实施；AI 自主运行时保持候选。只有选用受管通道才要求匹配 AICommand、AIBrain 计划与 TaskContract，通道不可用不得把用户请求降为 `Deferred`。
-6. 只有结构快照与当前 GPU 截图同时覆盖所需 profile/state，capture 的像素完整性可复算且可绑定当前输入，才能声明受限的像素检查通过。每个 editor/UI 结构快照对必须具有同一非空 root、Canvas metadata、profile viewport 与唯一的 root-local path set；UI screen 尺寸、每个元素的 boolean active 及 editor `screenRect` 对 UI `screenX/Y/Width/Height` 必须逐项相等（0.01 像素容差），否则先以 `snapshot-*` 阻断，不能进入 PNG 检查。非 default 状态声明视觉变化时还必须相对 default 产生最小像素差，且至少 80% 的差异像素必须落在 default editor snapshot 中 `affectedComponentIds` 的唯一 profile-local `screenRect` 并集（优先 active；`visible: true` 可使用唯一 default-hidden 节点；含四像素描边/阴影容差）。每条 effects 还必须由 UI snapshot 的目标能力与实际 `active/interactable/alpha/RGBA/outline/wrap/text` 值逐字段证实；`graphicAlpha` 使用后代 Graphic 的共同 alpha 和每节点 trace，颜色/outline 只接受直接 Graphic，文本/换行只在共同值及每个后代 TMP_Text trace 都收敛时接受，且 trace 路径唯一并属于目标组件树。这些事实仍不能替代构图、品牌或商业视觉验收。
+6. 只有结构快照与当前 GPU 截图同时覆盖所需 profile/state，capture 的像素完整性可复算且可绑定当前输入，才能声明受限的像素检查通过。每个 editor/UI 结构快照对必须具有同一非空 root、Canvas metadata、profile viewport 与唯一的 root-local path set；UI screen 尺寸、每个元素的 boolean `active`、`parentPath`、`siblingIndex`、`anchorMin`、`anchorMax`、`pivot` 及 editor `screenRect` 对 UI `screenX/Y/Width/Height` 必须逐项相等（矩形容差 0.01 像素，锚点/pivot 容差 0.0001）。每个 non-root `parentPath` 必须解析至该快照的 semantic path set，且同 parent 下的 `siblingIndex` 必须唯一。每个节点的 `layoutGroup`/`contentSizeFitter` 启用状态和轴控制也必须逐项相等，且父 LayoutGroup 与子 ContentSizeFitter 不得同时控制同一 width/height 轴。每个 runtime rect 必须位于 profile viewport 内，active Button 的 `interactionTarget` 必须由实际 runtime 宽高满足；不以父级 containment 阻断 tooltip、overlay 或刻意裁切的效果层。否则先以 `snapshot-*` 阻断，不能进入 PNG 检查。非 default 状态声明视觉变化时还必须相对 default 产生最小像素差，且至少 80% 的差异像素必须落在 default editor snapshot 中 `affectedComponentIds` 的唯一 profile-local `screenRect` 并集（优先 active；`visible: true` 可使用唯一 default-hidden 节点；含四像素描边/阴影容差）。每条 effects 还必须由 UI snapshot 的目标能力与实际 `active/interactable/alpha/RGBA/outline/wrap/text` 值逐字段证实；`graphicAlpha` 使用后代 Graphic 的共同 alpha 和每节点 trace，颜色/outline 只接受直接 Graphic，文本/换行只在共同值及每个后代 TMP_Text trace 都收敛时接受，且 trace 路径唯一并属于目标组件树。这些事实仍不能替代构图、品牌或商业视觉验收。
+7. 对 active 且 interactable 的 Button，`visibility` 必须精确重放所有启用 RectMask2D 的矩形交集和可见比例；其 `inputReachability` 必须重放 CanvasGroup 的 interactable/blocksRaycasts/alpha 链，并且没有同父级、后 sibling、不透明且 raycast-enabled 的覆盖 Graphic。可见目标尺寸不足、CanvasGroup 阻断或覆盖 Graphic 均为 `UI-FB-009`。非矩形 `Mask` 仅记录为不确定性，不能从快照提升为真实点击通过。
 
 ## Registry boundary
 
@@ -93,7 +94,7 @@ materializer implementation in the same change.
 
 - 开始前：读取 AIWarnings Start、CurrentStatus、RuleIndex、requiredReads；校验 SourceRefs/ContentHash；确定 screen family、Owner、正式输出路径与上下文预算。
 - 实施中：验证 ScreenSpec schema、稳定组件 ID、素材 provenance、profile/state、safe area、最小尺寸、状态变体与 `affectedComponentIds` 的双向绑定、每个目标的可执行 `effects`、fixture 文本绑定及其 profile 行数/动作净空，以及所有状态 `preserveBounds` 和零 state-local geometry；取消和幂等；任何 Unity 写入必须走受权入口。
-- 高保真静态门：要求 `advancedComposition` 明确单一主操作、焦点主体或无焦点理由、关键对齐/净空、profile 语义等价、焦点资源的 crop/focal/safe-crop/source-aspect 策略和 post-layout 交互密度；Resolver 先基于最终矩形输出 `focalCropFeasibility` 并拒绝不可能的保护区，`focal-cover` 物化再用 `ESUIFocalCropRawImage` 依据实际 Sprite UV 校验源宽高比、按 focal point 选择 UV，可能时平移裁切窗口以包含安全区，并把实际 UV/安全区结果写回两类快照。子项属于 LayoutGroup 时不能把 authored bounds 当最终几何，必须回到 Resolver/Unity 证据。
+- 高保真静态门：要求 `advancedComposition` 明确单一主操作、焦点主体或无焦点理由、关键对齐/净空、profile 语义等价、焦点资源的 crop/focal/safe-crop/source-aspect 策略和 post-layout 交互密度；还必须声明覆盖必需组件的递增视觉 band、逐 profile focus order、disabled/loading 输入策略、逐 profile 状态影响比例以及关键组件的最终 Unity RectTransform anchor/pivot 投影。Resolver 先基于最终矩形输出 `focalCropFeasibility` 并拒绝不可能的保护区，`focal-cover` 物化再用 `ESUIFocalCropRawImage` 依据实际 Sprite UV 校验源宽高比、按 focal point 选择 UV，可能时平移裁切窗口以包含安全区，并把实际 UV/安全区结果写回两类快照。子项属于 LayoutGroup 时不能把 authored bounds 或 anchor contract 当最终几何，必须回到 Resolver/Unity 证据。
 - 完成后：核对正式 Prefab/Fixture 路径、结构快照、GPU PNG、输入哈希、失败项和恢复结果。
 - 不可跳过：未覆盖的 profile/state、空白截图、无效 anchor、safe-area 溢出、必需素材缺失均阻止视觉通过。
 - 禁止：反射私有字段、直接修改生成结果绕过 Materializer、把文件/按钮/测试源码存在写成执行成功。
@@ -111,14 +112,26 @@ changed ScreenSpec/registry/validator/materializer fields, expected visual effec
 checks. Missing feedback metadata is `feedback-not-incorporated`; missing Unity/GPU evidence remains
 `runtime-not-run` or `visualAcceptance: not-claimed`.
 
+The v21 completeness rules are also mandatory. `UI-FB-010` requires deterministic profile-level
+component/text/interaction counts, required component types and zone coverage. `UI-FB-011`
+requires every declared visual/state/spacing token to have a concrete consumer and executable
+effect. These rules are binding requirements, not visual-acceptance claims.
+
+The v21 advanced rules are also mandatory. `UI-FB-012` binds ranked visual bands and primary-action
+membership; `UI-FB-013` binds per-profile focus order plus disabled/loading input effects;
+`UI-FB-014` caps state impact per active profile; and `UI-FB-015` binds key component anchors to
+the Materializer's RectTransform projection. They prevent silent omission but still require Unity
+snapshot and GPU evidence before any runtime or visual claim.
+
 ## SourceRefs
 
-- `.agents/skills/es-ui-prefab-authoring/SKILL.md` (`1be1c47841585b77c436c577b10c67c800c6d36c622acddefd1d21018445e169`)
-- `.agents/skills/es-ui-prefab-authoring/governance.json` (`9aa4d91989aac6d900a214fa02485d2f8d07fc5669081836d0a4f5485f55b5ba`)
+- `.agents/skills/es-ui-prefab-authoring/SKILL.md` (`d19f224ad40646a2820019a16b42ea0ecc0c35d2ae97d753f79afe8be42ebfd1`)
+- `.agents/skills/es-ui-prefab-authoring/governance.json` (`a6168ba42dccdc45cef6ea8005e06cead4dbc0855e6e988769a36b18b0296526`)
 - `.agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json` (`e67d3ba3bb5af3f93a2071de611bcd98d7ea35e48d6fd2b6f343490271548f09`)
-- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`61ae4309d70ee9f9db5b4f237b9052160afa8bfc5752bcdd9227690737317a53`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py` (`7a09dd4b1b6f14baf33b98b01176c936385b9e465a57fd96105ed27ea5af4714`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`ca8239c82a680a6112f7aa0e9ac2bd905b5e3f22fed98bfc2437ba2c8a93a311`)
+- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`6d65cb5664ce212b503b6939722939bd91d76798f4d63b1c01129983f9836984`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py` (`993c478c06f5109d8d48e5216f94f939070b0ca07d35a9bf54d943f8204c01a7`)
+- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`c694ed9fa2a38cd1d207068c254bf548010c48e5ee6bc6bf1bfb05ac63858875`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`342d371c49d4cfc31cc85c5fda216a52560363b313842a637e6422364d9bd795`)
 - `Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs` (`5653c9b8c5fe381a8f65412236adb3616e7460ece82c99efb76e47fbec91a4cc`)
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md` (`8e1fe9d3736ad07de9ae953dd628d3f512dc94713ea07a9aee32208570746aa4`)
 

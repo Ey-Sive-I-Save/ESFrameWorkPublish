@@ -72,6 +72,17 @@ AIKnowledge 条目只能引用权威内容，不能把摘要伪装成权威内�
 
 AIWarnings 规模化采集使用 `AIWarningsDomainInventory.yaml`（稳定、可审阅的目录统计）和 `AIWarningsGeneratedInventory.json`（脚本按当前文件哈希生成的详细清单）。生成脚本为 `.agents/skills/es-ai-knowledge-curation/scripts/Build-ESAIWarningsInventory.ps1`；它只读取 AIWarnings，写入目标文件时使用 UTF-8 无 BOM，并以目录/文件哈希漂移作为 stale 信号。
 
+## 日粒度新鲜度筛查
+
+AIWarnings 与 AIKnowledge 的受管文件由 `AIKnowledgeFreshness.json` 做集中式快照，记录内容哈希变化观察日（`lastModifiedDate`，精确到日），不伪造语义审查时间。默认规则是 `ageDays > 7` 标记 `stale`；当前文件哈希与快照不一致标记 `drift`，必须先刷新并重新核对来源。`generatedAtUtc` 只表示生成时间，不参与新鲜度判断。
+
+```powershell
+.agents/skills/es-ai-knowledge-curation/scripts/Update-ESAIKnowledgeFreshness.ps1 -ProjectRoot . -AsOfDate 2026-08-27
+.agents/skills/es-ai-knowledge-curation/scripts/Test-ESAIKnowledgeFreshness.ps1 -ProjectRoot . -AsOfDate 2026-08-27
+```
+
+具体字段、范围、初始化估计和非声明见 `AIKnowledgeFreshnessContract.md`。筛查结果只决定优先回读范围，不替代 `StaleWhen`、SourceRef/ContentHash、AIWarnings P0 或 Runtime/Release 验收。
+
 ## 详细源码知识包
 
 AIWarnings 只负责给出风险、禁止事项和路由提示。下列条目从提示回到当前源码、测试定义和配置实现，记录真实数据流、所有权、生命周期、失败模式、验证入口与尚未取得的证据：
@@ -103,6 +114,8 @@ Documentation/AIKnowledge/
 ├── KnowledgeIndex.yaml
 ├── AIWarningsDomainInventory.yaml
 ├── AIWarningsGeneratedInventory.json
+├── AIKnowledgeFreshness.json
+├── AIKnowledgeFreshnessContract.md
 └── entries/
     ├── aibrain-orchestration.md
     ├── authority-and-startup.md

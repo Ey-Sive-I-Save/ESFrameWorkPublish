@@ -26,6 +26,29 @@
 6. 没有匹配条目时，读取 AIWarnings Start 链、RuleIndex 与当前源码，并把“缺少 Knowledge 路由”作为待补知识，而不是自行发明项目约定。
 7. 只读过本页不等于读过知识库；只有完成路由选择和 `requiredReads` 后，才能声称已加载本任务的项目知识。
 
+## GraphView 与 AI 协作内核边界
+
+当前 `ESGraphViewV2` / `AISkill Graph` 是 GraphView 上的作者、烘焙和固定流程执行工具，不是已经验证的真实 AI 协作工作流内核。它可以表达稳定的 AISkill 输入、Task、Skill Call、Branch、ForEach、Approval、FanOut、Join、输出和验证关系，但其编辑效率、动态任务拆解能力、并行调度性能、跨 Agent 上下文隔离与执行准确性尚未完成独立验证。
+
+因此，在多子 Agent 机制研究和方案设计阶段，禁止把 GraphView 的节点存在、FanOut/Join 拓扑或静态 Bake 结果描述为真实并行 Agent 能力，也不得以 GraphView 作为外部 Agent 机制的唯一复刻载体。动态协作应优先沿用 AIBrain、TaskContextRuntime、TaskFocusContext、AutomationCenter 和受管 TaskContract 的现有协作流；GraphView 只作为可选的固定 AISkill 工作流作者/验证/可视化投影。只有在性能、准确性、上下文隔离和运行时证据分别通过后，才可讨论把某类协作流程固化接入 AISkill Graph。
+
+## 子 Agent 并行方案冻结（v1）
+
+本版本冻结的子 Agent 机制是“父子任务投影/适配器”，不是新增的第五套 Agent 生命周期、身份系统或授权内核。动态并行的唯一执行链为：`AIBrain → GoalRevision/RoutePlan → TaskFocusContext → TaskContextRuntime → AutomationCenter/TaskContract → EvidenceSet/Receipt → ParentAggregator → completionDecision`。
+
+冻结的职责边界如下：
+
+- `CollaborationPlan` 只表达父任务的拆解、依赖、并发预算和聚合策略，复用 `GoalRevision` 与 `RoutePlan`，不拥有任务生命周期、权限或执行权。
+- `ChildTaskRegistry` 只作为 TaskContext 管理的父子索引，不建立第二个状态机；子任务的状态、CAS、RunId 和幂等语义仍由现有 TaskContext/Automation 权威负责。
+- `Lease/CAS` 只用于短期 Worker 认领和过时保护；租约不拥有业务完成权。租约过期、取消后或 CAS 过时的迟到结果必须隔离，不能回写父任务。
+- `TaskFocusContext` 只描述本次 Agent 的关注范围、允许读取范围、禁止扩展范围及其版本/回执引用，不拥有 Goal、RoutePlan 或 Knowledge 内容权威，也不复制完整内容。TaskContext 只冻结 `focusContextId`、`focusRevision`、`focusProposalHash`、`focusReceiptHash` 和必要的 `focusScopeHash`。
+- `ResultEnvelope` 只提交结构化输出、Evidence 引用、哈希、尝试号和错误状态，不得自报 `Accepted` 或直接把结果写成 `Completed`。
+- `ParentAggregator` 只按确定性排序和显式策略聚合子结果；冲突、过时、重复、部分失败和未验证结果不得使用 last-write-wins，最终完成仍由 `completionDecision` 决定。
+
+冻结的最低竞态语义：相同幂等指纹返回原结果；相同 key 但输入/上下文/计划哈希不同则拒绝；CAS 过时必须重读当前状态；迟到和取消后的结果保留为隔离证据；父任务取消级联请求子任务取消，但子任务终态 Receipt 不可变。
+
+冻结的实现顺序：先修正 TaskFocus 的自动确认与真实确认模式，并完成 Focus 身份到 TaskContext 的只读绑定；再定义 Parent/Child、Lease/CAS、ResultEnvelope 和 Aggregator 的静态合同与竞态回放；最后才允许选择单一外部机制做隔离 PoC。GraphView 在本版本中只能作为固定流程作者/验证/可视化投影，不能作为动态子 Agent 调度器或并行能力证据。
+
 ## Two-phase execution and capability drift
 
 `planTask` returns an immutable `planHash`. External `runTask` must submit it as `approvedPlanHash`; the coordinator compares the current bindings and rejects stale plans, `NeedsReview` Skills, or Skills without `authorized-only` runtime eligibility before issuing an invocation-bound authorization. Policy v5 stores grants in schema 3 under a permanent cross-process lock and atomically persists `Active / Exhausted / Expired` state. The authorization expires after 15 minutes; a trusted in-process host that binds the full request and current user-instruction SHA-256 may receive at most 20 uses for an L1 local plan, L1/L2 `candidate-only` plans receive at most 5, and L3 or other plans 1. Every reusable use requires a fresh non-empty `idempotencyKey`. External Bridge JSON cannot self-assert `userDirected`. The user-enabled local Bridge remains `ManagedAIBrain`, and only the exact `ui.materialize-screen` + `es.ui.materialize-screen@1` + `L2` + `scoped-write` + `MaterializeUI` combination receives an internally request-bound UI runtime exception; all other `not-proven` Skills remain blocked.
@@ -70,10 +93,14 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 |---|---|---|
 | 治理、规划与 Skill 执行成本 | `aibrain, governance, planning, authority, skill-performance, execution-cost, fast-path, deep-path, cache` | `es-skill-governance`, `es-use-ai-command` |
 | 分析、审查、迁移与变更风险 | `analysis, design, root-cause, review, risk, change-budget, rollback, migration, compatibility` | `es-first-principles-analysis`, `es-adversarial-review`, `es-change-risk-register`, `es-migration-planning` |
+| 公开 Agent 机制复刻与 ES 适配 | `agent-mechanism-replication, research-to-contract, es-adaptation, failure-surface, external-authority` | `es-agent-mechanism-replication`, `es-first-principles-analysis`, `es-adversarial-review`, `es-aibrain-route-authoring`, `es-knowledge-creator`, `es-knowledge-validator` |
+| ES AI ABC 语义适配核心（ABCC） | `ai-abc, abc-core, semantic-adapter, evidence, closed-loop, route-stage` | `es-ai-abc-core`, `es-aibrain-route-authoring`, `es-knowledge-creator`, `es-knowledge-validator` |
+| 武器 ABC 部件（ABCP） | `ai-abc, abc-part, weapon, weapon-definition, prefab, input, evidence` | `es-weapon-abc-part`, `es-ai-abc-core`, `es-knowledge-creator`, `es-knowledge-validator` |
 | AIBrain 编排与 Automation 任务路由 | `orchestration, task-routing, automation, task-contract, worker, automation-run-record, agent-execution-graph, aicommand, mcp` | `es-aibrain-route-authoring`, `es-use-ai-command`, `es-automation-worker-authoring`, `es-aicommand-contract-authoring` |
 | 任务与上下文平台生命周期 | `task-context-runtime, task-lifecycle, context-lifecycle, goal-revision, route-plan, completion-decision, delivery-acceptance, evidence-set, evidence-verifier, source-scope, receipt, cas, reopen` | `es-task-context-runtime`, `es-aibrain-route-authoring`, `es-task-read-snapshot`, `es-observability-evidence` |
 | AI 用户交互与任务收尾治理 | `interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, numeric-selection, next-step-dispatch, goal-drift, handover, closeout, evaluation, dialogue-quality` | `es-ai-interaction-governance`, `es-codex-session-bootstrap`, `es-skill-session-refresh` |
 | ES AI 协作菜单与制作/迭代引导 | `menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination` | `es-ai-collaboration-menu` |
+| AI 生成内容空间与 Local/Public 放置治理 | `governance, ai-space, folder-organization, file-placement, local-public, generated-content, stale` | `es-ai-space-organization` |
 | Skill 验证与质量门禁 | `skill, validation, security, catalog, evidence, evidence-pending, portfolio, static-replay, deep-replay, deterministic, static-boundary, external-side-effect, blocking-layer` | `es-skill-validator`, `es-skill-creator`, `es-static-deep-replay` |
 | 商业一致性与交付证据 | `commercial-coherence, delivery-tracking, evidence-receipt, report-hash, source-freshness, plan-hash, static-review, runtime-not-run` | `es-skill-governance`, `es-knowledge-validator`, `es-release-acceptance` |
 | 工作树与编码 | `worktree, utf8, validation` | `es-worktree-audit`, `es-utf8-guard` |

@@ -4,7 +4,7 @@
 `Authority`: `Source + AIWarnings`  
 `RouteKeys`: `automation`, `aibrain`, `task-contract`, `worker`, `automation-run-record`, `agent-execution-graph`, `skill`, `aicommand`, `mcp`
 `RequiredReads`: `ESAutomationCenter与受管Worker治理`, `AgentSkills与AICommands协作边界`
-`ContentHash`: `c013219b943891e78db1dd9facf44a03a3cf3aabb5d8f8880fde3a96367514bb`
+`ContentHash`: `f76cd45cf7f816f6406d99ed1208aab43c914facfe74d93c7bfbd74806482e64`
 
 ## Scope
 
@@ -98,7 +98,7 @@ Graph 是受管工作流的确定性表示，不是用户授权来源；在该�
 ## SourceRefs
 
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md` (`a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306`)
-- `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`025244bd6a0ec254e8cde057bf7c782dd6e6cbc96b29fb2514de3bed172bc6fb`)
+- `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`6fc627e16930d541b1275bb5d687e1fdad8d96b751616002dbf2fbdbfa38fbc3`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationFacade.cs` (`e61a58d14237555a09207cf3e3c596b48e0ee2de6188d10584b950c62606d4d2`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`edc33e609c4fefd2dbaf832043dade36e7ca07beedab1db09703947fa7cb9a19`)

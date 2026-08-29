@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.editor.project-screen-spec-materializer.visual-evidence.v1`
 `Authority`: `AIWarnings P0 + current Materializer source + governed evidence contract`
 `RouteKeys`: `ui-automation`, `visual-qa`, `visual-evidence`, `fixture`, `gpu-capture`, `snapshot`, `runtime-evidence`, `evidence-boundary`
-`ContentHash`: `4a6fc8d225bb99e2545008e3a9367a47ec420932134a8f8e87a016aea3501fdc`
+`ContentHash`: `a6e23bf7e1045397613e77ea6ffdb3cadf561e81bcafe082187ff96bb7adf9ce`
 `EvidenceLevel`: `S1`
 `RuntimeEvidence`: `runtime-not-run`
 
@@ -50,7 +50,7 @@
 ## Decision rules
 
 1. 只做源码、合同或 SourceRef 检查时可以继续 Static 判断，但结论必须固定为 `runtime-not-run`。
-2. spec hash、Unity 版本、runId、sceneGeneration、profile/state 矩阵不完整或互相不一致时，停止接受整组证据。每个 editor/UI 对还必须声明同一非空 `rootPath`、相同 Canvas metadata、与 ScreenSpec profile 精确一致的 viewport，以及 UI 的 `screenWidth/screenHeight`；路径集合必须唯一、完全相同且都在 root 下。每个共享元素的 boolean `active` 与 editor `screenRect` 对 UI `screenX/Y/Width/Height`（0.01 像素容差）都必须一致，缺失、非有限、负尺寸或跨 root 路径均以 `snapshot-*` 几何问题阻断。它防止两份各自“看似完整”的 JSON 报告不同层级或不同布局，仍不能证明 Unity 实机执行或最终 UGUI 布局重建。
+2. spec hash、Unity 版本、runId、sceneGeneration、profile/state 矩阵不完整或互相不一致时，停止接受整组证据。每个 editor/UI 对还必须声明同一非空 `rootPath`、相同 Canvas metadata、与 ScreenSpec profile 精确一致的 viewport，以及 UI 的 `screenWidth/screenHeight`；路径集合必须唯一、完全相同且都在 root 下。每个共享元素的 boolean `active`、`parentPath`、`siblingIndex`、`anchorMin`、`anchorMax`、`pivot` 与 editor `screenRect` 对 UI `screenX/Y/Width/Height`（矩形容差 0.01 像素，锚点/pivot 容差 0.0001）都必须一致；non-root parent 必须能解析至 semantic path set，同 parent sibling index 必须唯一。runtime rect 必须完整位于 profile viewport 内；active Button 有 `interactionTarget` 时，实际 runtime 矩形必须达到声明的目标宽高。不要把 parent containment 作为通用条件，tooltip、overlay 和刻意裁切效果可以越出父级但不得越出 profile viewport。缺失、非有限、负尺寸或跨 root 路径均以 `snapshot-*` 几何问题阻断。它防止两份各自“看似完整”的 JSON 报告不同层级或不同布局，仍不能证明 Unity 实机执行或最终 UGUI 布局重建。
 3. GPU PNG 必须经 `validate_ui_gpu_evidence.py` 对照同一 profile/state 的 editor 与 ui 快照验证 capture 元数据、SHA-256、字节数、尺寸、alpha 覆盖、采样色桶、边缘变化和 RGBA 极值；任何不一致、透明、纯色或零边缘帧都阻断像素完整性结论。
 4. 若非 default `stateSemantics` 声明了 `visualChanges` 或可渲染效果（visible、graphicAlpha、graphicColor、outline、wrapText、text），必须与同 profile 的 default PNG 比较；相同或低于最小像素差阈值时以 `state-pixel-undifferentiated` 阻断。仅 `interactable` 等行为效果不触发像素差要求。校验器还从 default editor snapshot 的 `path`/`screenRect` 解析 `affectedComponentIds`：优先唯一 active 节点；对于 `visible: true` 的状态允许唯一 default-hidden 节点的已序列化矩形；多候选即为歧义。它以四像素描边/阴影容差建立区域并要求至少 80% 的差异像素落在该并集；缺失、歧义或无效矩形为 `state-locality-*`，主要变化发生在其他区域为 `state-pixel-outside-affected-components`。UI snapshot 还必须逐字段重放 effects：`interactable` 需 `hasButton`，`graphicColor`/`outline` 需直接 `hasGraphic`，`graphicAlpha` 需 `hasDescendantGraphic`，共同 `descendantGraphicAlpha` 及每个 `descendantGraphicAlphas[].alpha` 都相符，文本/换行需 `hasText` 且共同值和每个 `descendantTextStates[]` 都相符；每个 trace 路径必须唯一且属于目标组件树，不能借用其他组件值。不符时以 `state-effect-evidence-*` 或 `state-effect-snapshot-mismatch` 阻断。这只证明粗粒度语义区域相关性和序列化效果，不证明组件渲染、视觉设计或商业质量正确。
 5. 这些检查只可进入 `S3-visual` 的像素完整性子结论，不能成为构图、品牌还原、可访问性、可用性或商业视觉验收。`-nographics`、文件存在、文件长度大于零、单色像素或日志写出成功同样不能替代后续人工或独立视觉审查。
@@ -159,9 +159,9 @@ PNG 路径、占位资源与未验证项。源码存在、生成入口返回、P
 ## SourceRefs
 
 - `ProjectSettings/ProjectVersion.txt` (`a1141b79efc22ad583133c02da76d77a863533680c77dcd2178d1b8413645a08`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`ca8239c82a680a6112f7aa0e9ac2bd905b5e3f22fed98bfc2437ba2c8a93a311`)
-- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`61ae4309d70ee9f9db5b4f237b9052160afa8bfc5752bcdd9227690737317a53`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py` (`7a09dd4b1b6f14baf33b98b01176c936385b9e465a57fd96105ed27ea5af4714`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`f375809e85d0d8391940b777de84d8d0e0a3ffbc36b0c178a430ba6da28918b4`)
+- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`21c6e8faafa3f1784f9b63a6453bcca7d5ca9177ed846cc168c30236505cc4fc`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py` (`7fdb5629d768f53ede92c5233a8c7f0b4f4347d9a610dba1e971b18c868ab560`)
 - `.agents/skills/es-ui-prefab-authoring/scripts/validate_ui_gpu_evidence.py` (`46a26450e3d51bc5f972de7a96aa2600235d64623c89a46b34ae8f35b768c462`)
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md` (`8e1fe9d3736ad07de9ae953dd628d3f512dc94713ea07a9aee32208570746aa4`)
 - `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md` (`d8404c32f25ea889401f0f8c63a969d8fb7e377533200d0d92a8b269d43c2629`)

@@ -1,0 +1,2508 @@
+{
+    "schemaVersion":  1,
+    "snapshotKind":  "esframework-ai-freshness",
+    "asOfDate":  "2026-08-28",
+    "generatedOnDate":  "2026-08-28",
+    "policy":  {
+                   "precision":  "date",
+                   "timezone":  "UTC",
+                   "staleAfterDays":  7,
+                   "stalePredicate":  "ageDays \u003e staleAfterDays",
+                   "hashAlgorithm":  "SHA-256",
+                   "hashBasis":  "raw-file-bytes"
+               },
+    "scope":  {
+                  "roots":  [
+                                "Assets/Plugins/ES/AIWarnings/**/*.md",
+                                "Documentation/AIKnowledge/entries/**/*.md"
+                            ],
+                  "fixedFiles":  [
+                                     "Documentation/AIKnowledge/README.md",
+                                     "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+                                     "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+                                     "Documentation/AIKnowledge/AIWarningsDomainInventory.yaml",
+                                     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json"
+                                 ],
+                  "excludedGeneratedFiles":  [
+                                                 "Documentation/AIKnowledge/AIWarningsGeneratedInventory.json"
+                                             ]
+              },
+    "summary":  {
+                    "total":  247,
+                    "current":  245,
+                    "stale":  2,
+                    "drift":  0
+                },
+    "items":  [
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p2-ui-icon-atlas-routing.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3535,
+                      "contentHash":  "6c77de2099dcf7f008a34200e66f8315d23182cc95ab45b106c5d8794d16e872",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-utf8-encoding-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  7548,
+                      "contentHash":  "d085a31576931abefaa81b7b4a72d904a98e283bede6b1ba1d8fa67d6d3fc077",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-stable-key-catalog-runtimekey.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4655,
+                      "contentHash":  "e20e01b2e9e5caaac34a4b251538df128bd1fe9edd97518c01eaf1068638ffe3",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-player-motion-runtime-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4234,
+                      "contentHash":  "b9982523823a99bbd8918bc2eb438720eda18a299d03c51330da1cf9b5742e61",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-proposal-entity-intrinsic-tag-pooling.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3689,
+                      "contentHash":  "9a623e2a49a8e80aa3250ea593f6901a01fdafbe3441964d899fe705888fc68c",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-proposal-audio-dual-backend-release-lifecycle.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5248,
+                      "contentHash":  "5163312a2b562fb86be2ce0844ca9ef086d1549d2a2a78dc7c2c64d039a3597b",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-profile-assembly-feature-pool-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4681,
+                      "contentHash":  "61fbe989a7c8923c495ab903f855036d4c3b5b03ceafa7eabedaf32b95e6cba5",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-runtime-hot-container-steady-gc.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5994,
+                      "contentHash":  "6d7109bb911c8575252169d8bb2cf294caf7cb60b45e492eb83c892ea943cd7b",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-playable-loop-runtime-evidence.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4386,
+                      "contentHash":  "f22610e172d5f726df94a8b904a13b20d890ee77e7394b5cbde351d576869525",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-naming-and-wrapper-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5463,
+                      "contentHash":  "f623142d299cb83270c56ec2dfb155cc4d78f3bffd4df584680e61f6ecb6921e",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-internal-prefix-new-member-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4925,
+                      "contentHash":  "362891cec4c8c7c67ad9ed9ce651712e78fc74c016439475b70f26e075af4411",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-primetween-dotween-migration.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5432,
+                      "contentHash":  "a5260f06f487e33545d5697576d7b08b7a9935347c2ac2dbffac96115c5192e3",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-runtime-assets-library-manifest.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4364,
+                      "contentHash":  "5ac055a50100490c743c2e32a2be9545aea56445bf476abad6863e0f3f759bdb",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-protocol-metadata-layering.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4239,
+                      "contentHash":  "7750ae83d1c71d16f0f61304133899ff9a6567d07d1954a3f760c47a64a47037",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-projectile-weapon-hotpath.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4654,
+                      "contentHash":  "db6b2c55a82068206f024a5b4822c9baf650bbd7d0ac46095f116598230eab11",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-op-targetpack-item-pooling.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  7958,
+                      "contentHash":  "1e9d8a8aa885816811e232d1b9d84de5f3544e5d2935665ed7add80e4f6736de",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-operation-default-no-stop.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4584,
+                      "contentHash":  "1d724a1d5b4cec9ab9c8fc1878c02173a22ca1902c96a8102ad6e54a56582cd8",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-interactable-ownership-lifecycle-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4996,
+                      "contentHash":  "e77f1a81322ae77a615311022cba0dc198025d4d2d1fc9251e42dcc95e1f3ee1",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-physics-query-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4328,
+                      "contentHash":  "aefe54f54e71737acc81794fea716404349dbb2606342027ae8a19cebe55c57b",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-vehicle-motion-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4166,
+                      "contentHash":  "8839a3f2180009818c2042a6e68ccb4286e11ebed310e724e880e7c47e4b62fa",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-shot-motion-responsibility.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4739,
+                      "contentHash":  "4b5af4f9f8a45f687aeec3a4f0659bb7b8a0536eb44c4c03d7d8dea1310837f8",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-pool-prewarm-space-0gc.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4097,
+                      "contentHash":  "5a862142fa6379d4e5bfc7a8e7d479835670a7475c330eb075f3ba342cc19ae1",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-escommand-player-runner-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4816,
+                      "contentHash":  "a822b751107097f91534170db9bc60d55922d04ee125944337f505c72d48c506",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-retrospective-escmdagent-terminal.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3130,
+                      "contentHash":  "93fdf512609a80456cc728f949e29cfa3f104bc2fe1dcbcf6f2a16874e73f30f",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-proposal-unitymcp-engineering-agent-roadmap.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4052,
+                      "contentHash":  "a1069707850c328ff51a85774ebb4d8f4f8885bf79fccc6e27b0c0f8e65270fa",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-proposal-resourceplan-scope-lifecycle.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3557,
+                      "contentHash":  "022f15a829be8f023b77c0e404466a3c438468d8dd4dc4cfb36eb2452cda7186",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-rule-index.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4245,
+                      "contentHash":  "d4d1c31e25cd3313bcea03f8f56dfadb54f8654e7aad57c67388de130090acd9",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-buff-passive-lifecycle-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4574,
+                      "contentHash":  "41dafeb5aa3d58587bd1d43935f35b128d4f2eb8767278126459a34155e1e393",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-audio-playback-resource-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3448,
+                      "contentHash":  "712afb190ebb549b7f59c6ce5eee62b6dc98ac76346030e763d34236fc081296",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-attribute-valuechange-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4685,
+                      "contentHash":  "a5370dc3a546dde46c1f7f5b57d74fd0dfbbcdfe3ae50e1abee1e0d81092d36a",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-info-group-pack-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2916,
+                      "contentHash":  "b87d1953820ee53b06e152b1e553c0d4428da5deddfd26e3f385797c175fc24a",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-handover-codex-project-model-editor.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3697,
+                      "contentHash":  "2680865372493032223570750906e2b674b1338fa04483a9a6d9b5b3d13ce0a3",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-handover-ai-personas-top-level-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2722,
+                      "contentHash":  "f2154d7b0705f2f9741e474b420b2bd1854a3badb641feccc670a50c5aaaa855",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-general-architecture-cross-system-correction.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4644,
+                      "contentHash":  "68f2b257251cc0cdeec79f7a946c2cc04c87580c91783e112fce9988bd9a44e5",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-handover-runtimekey-input-legacy.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3680,
+                      "contentHash":  "74ffac5a5b4e744f6663af270cdaf2bfb216f7acc8c05d9e33aed2c80c48d537",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-ai-collaboration-history-session-recovery.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4836,
+                      "contentHash":  "8d1752ec2258a1797b1b7c6695203b5953125df00187574cd21999979343ba80",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-active-request-arbitration.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5916,
+                      "contentHash":  "c8397e63639d74457fd8c6b26e244bd263673adb2f212825af1f9a62a174b48e",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-handover-snapshot-20260816.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3479,
+                      "contentHash":  "8358aa8e5620c18b73c420931b4e1a15cc42e4047dbf309d55b6ac5e19bb9a39",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-esgamemanager-savesystem-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4786,
+                      "contentHash":  "0093b5d6063e7c0dd56d170f53a392861af7d71fcbdc5c6fc9d4a9eba4379d54",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-third-party-package-menu-patch-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4555,
+                      "contentHash":  "9a8e40b6491f260e6cd52f8883709055d90bf62f78808e8dbb3961ce32731eff",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-propertytree-multitarget-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4659,
+                      "contentHash":  "dbca3c8bb4edc803e7db91fef83334b738e09a65487a7eed9f805ba6ef4d9ebf",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-preview-lifecycle-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3313,
+                      "contentHash":  "567a17e6830700a27a9f5de29afbb1432a36ce31b9ae66006f825e7e11c33657",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-ugc-workbench-draft-commit-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3961,
+                      "contentHash":  "cb8604013ef15abf3dfe46d45a16ba0f3ab34a26d6119603d826b7cb9d77032c",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-entity-equipment-weapon-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5271,
+                      "contentHash":  "9f53d75f8cbdddb25492fbc445eef086c7355d7c2bf3f54c72eb01b52d2ccedf",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-entity-core-domain-ai-control-correction.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4437,
+                      "contentHash":  "c2d78b537ab3be7b3f0b2303b019e215fe82d245c386cc7fd41c789c5ae01c17",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-window-shell-migration-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3087,
+                      "contentHash":  "22e135302d1fa6890ca078366034c22126e00d38004b96670fcc6089d45c75b0",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-gamecore-root-so-injection-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4893,
+                      "contentHash":  "9f15f3ff7e9ff32b484cdc00bf1d14bbd15196ef52b5e27bc52c599e75d3b0c7",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-esdialog-cross-host-contract.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4919,
+                      "contentHash":  "13f245449d67e38bb76c2f1deb183f9f8159f8969f831a9f15a1418a7d119c1b",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-editor-delivery-next-step-discoverability.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4976,
+                      "contentHash":  "62e3d5c83e74165768ba410c4ea75dac57e4e7e7eb9daa3f7ba0db95e2434d55",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-gamecore-runtimedata-retention-transaction.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4928,
+                      "contentHash":  "e449463482415cbdf2ffe6633b1c3ff404f18c3ba1f0084e251bcc89ed162f79",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-il2cpp-toolchain-detection.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4511,
+                      "contentHash":  "5dd486660d1a2c27946f7af4a3207fb54b04dda67a825f8669cff451ade57897",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-hotpath-missing-dependency-null-check.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4060,
+                      "contentHash":  "1b85aaf258a81d583095aed842681a774b031d3307d6f5c0b70c80b1fabb160f",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-generic-container-serialization-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4284,
+                      "contentHash":  "dd48caa6faab87f13251f4a15d86e2867c86e2c2f000764ffdc94677af28fd73",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-editor-assembly-stream-initialization.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5377,
+                      "contentHash":  "3dac5577a6c7defa17905f2946b67f179e44a41527455d1a19c33b561899bf9d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-asset-pipeline-four-stage-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4636,
+                      "contentHash":  "84ea56c10177fc3b95a2b3a0e403bba6934d4381b962e59585e5cf626e0a829a",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-assembly-stream-editor-registration-only.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5348,
+                      "contentHash":  "264de1db1220b437ce61876f6ff056f214b067038b3ba00fadbe08f561062d3b",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-ai-delivery-contract.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5341,
+                      "contentHash":  "64a747eaa161ef72e82f7d654c83e3cc6c097152b6623036f8a6c20c4fa19304",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-codex-core-context.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4561,
+                      "contentHash":  "58e10a246e985ff9fbf76c08a1fa435420259d22d0cbb818e1569598f1820dd1",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-content-registration-transaction.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5139,
+                      "contentHash":  "8762bc022fb72705840b4813e57f26d289a71c6d48c058b5b2fba48f4ee49b44",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-config-dual-key-inspector-layer.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4273,
+                      "contentHash":  "682eb86bec562602ddcdc650374e93181176a9e5d856022758c5b2f7bba335dd",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-p0-combatmodule-weapon-definition.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6434,
+                      "contentHash":  "afc537585fe0a47d0added217be852334e1d5203f0d9602697c876559cd61de1",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-runtime-vfx-production-runtime-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3723,
+                      "contentHash":  "1b4692e049a20d5d906cb8065cb184bd819478631bfba741ef88a2b083ec7627",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/pool-operation-skill-lifecycle.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5980,
+                      "contentHash":  "9ee56fe61f743e1e40038bc5a1b927fd2befe1673d123e80cd0ad1651cd01130",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/knowledge-routing-quality.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  17926,
+                      "contentHash":  "67910e60302a46ab9baeb7622e802a5d69c6d2b591287811b90a3a7dfd70e7dd",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/knowledge-maintenance-transaction.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  21156,
+                      "contentHash":  "947b74ab759fa3a1af9ec633bf49e5d1cec8dc321dda2ac75ef71d900c9eafea",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/resource-pipeline-runtime.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  8024,
+                      "contentHash":  "75d10298ffb5518f23353d9fed016fb643322da928c599c1f854153b11ea5593",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/shader-atlas-rendering.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3492,
+                      "contentHash":  "5bf31a482817f104bcf49095d8a12ab4bcb6a3e6d988fb3c24404af12f653fac",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/scene-release-evidence.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6110,
+                      "contentHash":  "0b4630dde67a51c646e21afdf2c7b52c6d18d400123415a89eaf88e050457225",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/runtime-ui-window-current-state.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4010,
+                      "contentHash":  "b070e480776f9208d08c232b1ee6be2d6432cf0bc8aa319dd6e7869dba18de45",
+                      "lastModifiedDate":  "2026-08-24",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  4,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-visual-design-system.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  19879,
+                      "contentHash":  "e6b1ede92447bee5d7d866eb640e3185ae4cdb2848b6e43936282b4bd203eda1",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-player-intent-spec.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  10782,
+                      "contentHash":  "fac0122be5a293d1ff7b898bc7405af57ce2bc052ae642ed70aa4a15226d2243",
+                      "lastModifiedDate":  "2026-08-24",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  4,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-open-source-automation-patterns.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  14194,
+                      "contentHash":  "6c8a48f8c928652651e52509983a6eb9753320934f272796ea64550044cf78d4",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-normalized-adapter-layer.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  8791,
+                      "contentHash":  "e32fa6c7b9d91d8f72d11175474b8295e1ee009792f9515180f090d4940f5e89",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-reference-design-evidence.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  8452,
+                      "contentHash":  "30812a40e9cf0ca57e658c73c0c76a08f8eb33a5d19e5386008c973a3e263531",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-text-localization-resilience.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  11068,
+                      "contentHash":  "938445024c59adc69bfefdeffca970f0236be2365df821dee13ce863211f3b11",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-screen-family-decisions.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  17047,
+                      "contentHash":  "5a87b064eb718f4584bd89a8418dc0acbbd0cff6195372d58f9285a2b376c254",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-request-intent-contract.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5338,
+                      "contentHash":  "c8b4a76b3e0c714c3508587fea5a451655b904ce3dbe1a115a4ba2ba1b2b94e3",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  20841,
+                      "contentHash":  "b3010e989e3460643e72f442f339e73e89586f4840ce16ab1baf07ccd3aa4423",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/task-read-snapshot-infrastructure.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4744,
+                      "contentHash":  "1779157dd559df0c3785532ff3b0dc94bcafc34caea123a6105158f5ff74847f",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/task-context-runtime.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  7643,
+                      "contentHash":  "2e0301238582c84f31d04d1b1e2e44612a326be37719de14f925c777623f9554",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/vehicle-mount-motion.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4966,
+                      "contentHash":  "a280dc511eaad6d4441e9edbf93f9b92372fd9dcf6a2ee0fb06c7f4300ad9fae",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/README.md",
+                      "kind":  "KnowledgeGovernance",
+                      "bytes":  7107,
+                      "contentHash":  "cad0601de945374689dbcbceb88f180042f00317373d985e00f8953f116e1bfc",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+                      "kind":  "KnowledgeIndex",
+                      "bytes":  251625,
+                      "contentHash":  "e120642f11d918eb1a8f370ced3aec43b5934f205f2d1c9e829c1f74642a3fcf",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/weapon-abc-part.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3552,
+                      "contentHash":  "7b10ee8aaf6dcf77166841af4b2d470eb466a77842958dc5832cf33fe356ab0d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/task-attention-context-es-integration-plan.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  18372,
+                      "contentHash":  "2d566a5a373c3ae5a3f138c421617ee1b5e8446d1d0e3e05c0583bc593dd6947",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/skill-resource-index.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4490,
+                      "contentHash":  "86048ceb7d61802faaba703caefc1fec8cef358c578ff984cf463229864f8e77",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/skill-governance-creator.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  7956,
+                      "contentHash":  "143be711ee364e46c9cef0053ac52c1d13eb8117d242c7cc0365c609fdaea258",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/shot-performance-evidence.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4379,
+                      "contentHash":  "00313aa3447095c96cbce455ef50073c601797084733b4f011b2e0e8f464683e",
+                      "lastModifiedDate":  "2026-08-21",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  7,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/skill-selection-and-quality-loop.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2486,
+                      "contentHash":  "35128b6ab8ab6fa4a01dd5ba2a927657d0a4074d430b0cd7aaeb94e6c91face9",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/story-world-runtime-authoring.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5664,
+                      "contentHash":  "2708adff73b2173acdc45f470e865a325b12d0f44ae5091bb8ee4f6b32da7542",
+                      "lastModifiedDate":  "2026-08-24",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  4,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/state-buff-tag-value-arbitration.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6219,
+                      "contentHash":  "c9155f2a8c2d381fb6b53bb77573d84ddb9a7a26898a4ac91af7ce9cebfe2505",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/skill-session-refresh.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3064,
+                      "contentHash":  "b5a4774ef6f3142768cf91ce3fdc5f9d4e2339f5c9f523785a3630f4a5aa4759",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-capability-readiness.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  25874,
+                      "contentHash":  "295a2e90adae61757ef096f4e349b74aba3ff969fe650527291a68e4e909c6eb",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/authority-and-startup.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3305,
+                      "contentHash":  "4287e68803ef84b5cae8fc09e0177dd39a7f8f74d1475c76182b2e671a7249e8",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/audio-vfx-runtime.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4217,
+                      "contentHash":  "97f0dc31c95a22a1ab6eee42bf060c206a7c7953cf7a26816997d2fd9dc28d18",
+                      "lastModifiedDate":  "2026-08-24",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  4,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-validation-scene-guide-diagnostics.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4411,
+                      "contentHash":  "e6eda9032cc31f91c4d1d7e99a1bb3ea0193bf0e55814086c6464afc220860f2",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/automation-aibrain-graph.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  10573,
+                      "contentHash":  "7793f71f8f8af05b9b484bd08cf7ecd5741b76b0c3740688c51405498a05473e",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/editor-availability-validation.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  8291,
+                      "contentHash":  "5dfc7d3989fd92e181abd7fe0a7a40bec74aa3c8ea09372b7530bc508cc77c99",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/context-interaction-runtime.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4609,
+                      "contentHash":  "92793f11b6733a520fe31c97e1412b7fad230b2699c50641628bf077c330d603",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/automation-governance-contracts.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2993,
+                      "contentHash":  "518069dd52edb3f33fbe2f5ddc148434e5122dca07f7ece2000e562cf9398647",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-validation-resourceplan-extension-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4691,
+                      "contentHash":  "dcf6e4bd1e00b7280a05f7865b6a06bf5279e964919cd0da9cf253462004ccec",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarnings-full-coverage.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  27515,
+                      "contentHash":  "0ee2252e0d42f2923d6b7fcc5cfaff5527e328962d358b7a1e551f993d099562",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarnings-domain-map.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3459,
+                      "contentHash":  "ef1d4be66fdf57fc9799a48c2c6e5e7ef8110db86ef0f8c5eb974f3f1ae7419a",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarnings-domain-inventory.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  1751,
+                      "contentHash":  "e3139f248e2b05539c53e10283334df95c8c88cc00960e29848af1d04014c792",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-so-table-tool-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3767,
+                      "contentHash":  "09c47bba20e9b6b358d0ed6d096b22427f40c756342e55e643ac29234582555c",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-validation-ai-collaboration-commercial-acceptance.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  8034,
+                      "contentHash":  "bec17a258d922b8d614581c9c5ae482b810e353d6edb759bb3d48e1e7c6b5e62",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-state-ik-buff-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3904,
+                      "contentHash":  "a7f1e55241f01fc71666b76d8de54429cac5da800fc70f1c3daa420e95abeead",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-start-readme.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4605,
+                      "contentHash":  "538a879a28eeff9ad33cdf10575f80f827684ca9aa1e3bf5dacb98012625b3de",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/gamecore-identity-registration.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6897,
+                      "contentHash":  "56311155ed68c08b07b01e621a5a6a1d3a8d4eadb29a63bd5e83e40a78bff7f8",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/function-area-routing.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4830,
+                      "contentHash":  "bb10ef9f17de5a582995212564b1ed107de665416a7f976cbec6ff59569504be",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/feishu-task-lifecycle.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3598,
+                      "contentHash":  "f6e55c5f54235614e85105b7c9af64d73b7c618b78434ffc2330a1124cac97fc",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-manager-save-transaction.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5057,
+                      "contentHash":  "0c2edc1a2760995912ab9e034c8a8b6d212196e41ffc5d42ade5ce5a75a335a8",
+                      "lastModifiedDate":  "2026-08-24",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  4,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-behavior-focus-navigation.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  9044,
+                      "contentHash":  "68a02db420f87d097bc632b5c2e3e479628eccc62f83c678741d51937f2682e6",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-asset-manifest.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  9368,
+                      "contentHash":  "5d15a454a86ca4580d06a206da32cbc62860a429e6f1b738ebc7f8f7dee6f670",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/game-ui-ai-workflow-divergence-and-quality-gates.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  16931,
+                      "contentHash":  "65f41e81176b21ea4ca2d9ca60fcf841a55d48f6857bbfca94786bbcee31929b",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/feishu-identity-messaging.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4220,
+                      "contentHash":  "e076d808a371e567daccfb5886a3ed6ea7fbb5351c254b35141986969daf7a4d",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/editor-stable-selection-scene-identity.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3235,
+                      "contentHash":  "bfdaee03a8cbf9ec7f9b82e584582454b8e36351e165e559f868e34be1c2cd7b",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/editor-preview-lifecycle.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3359,
+                      "contentHash":  "e4bc3cfe115f6d0ac8a8857642623061cb7c608d82ea2b83c38401f4475ed357",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/editor-event-ownership.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2891,
+                      "contentHash":  "d50ce065a7a017fafbfda7e45f9f2027eb61a5c5609252016b7a11ae6c983953",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/editor-workbench-authoring.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2791,
+                      "contentHash":  "247e352ab0397b3a38fabc83eb3448de5bb4e9f4984703f68177d4169f3e0bad",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/feishu-adapter-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3932,
+                      "contentHash":  "876f60b74bbd0a4af513117857e23e3c2a61a3e48d4111b1147d9a6efe01047a",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/esdeveloper-cockpit-architecture-contract.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3422,
+                      "contentHash":  "d1f305ce23213890b9d38e889b4570a3fb2fce134a160495191d2172fc3ce378",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/entity-input-command-runtime.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6254,
+                      "contentHash":  "6e79078709f154be1c81f7ba304343beb959194d9fe7a76313776d317705bf29",
+                      "lastModifiedDate":  "2026-08-21",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  7,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-menu-architecture-root-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3572,
+                      "contentHash":  "584f0eb69cc0f0a2ffe4c57aa9ae795c1ca125a0be093fb3f0e301a757c22717",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/GameManager与存档（GameManagerSave）/架构体系_ESGameManager_SaveSystem_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2238,
+                      "contentHash":  "5985dece2a14e5c9c6fe9ce66e42a01f43da242b1a70654c7d428b2f4ff69554",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/装备定义与装配推进路线_AI协作说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2907,
+                      "contentHash":  "91a80a2cd812798de343698ccf54e9b8c36049d2ad60897632893eebe0529121",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/玩家对象模型重构_AI协作说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1905,
+                      "contentHash":  "4398333388e4f0dff371e014b5f2227126fe3fd2993d3b135da1e20baa76f1de",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  3579,
+                      "contentHash":  "842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2198,
+                      "contentHash":  "6f7998bac62c988384030ea434dc1166d0b5fa11c05f880baf6705321ea27485",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAdvancedDialog通用编辑器输入边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1105,
+                      "contentHash":  "cb8da4bd465c56291bd88c6ec5477a3252666f7bd0b3bbd219a7326b161d1935",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AI自动化内容身份与GameCoreKey迁移_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1794,
+                      "contentHash":  "efad4b628b85820da047b070b6ac9d5f5c6a8c2c9140b7ebd0674e2fc52ab8f5",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/模型重构_今日修正_CoreDomain与AI域控制_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1803,
+                      "contentHash":  "4d167fd7670ba3cb848fb70dcd27dc3b373538d02fd639a32714afbd246426a2",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/Buff职责边界_被动持续机制_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1759,
+                      "contentHash":  "2baf4921b912a745ad9ff70bc7fdc7632139658bacbb5022c3634a553c0c0a31",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2468,
+                      "contentHash":  "92894b62cf1af0cc26e7ee7d2de31bfd88ad88377b64499f759f721f27621d85",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_公共协议与元数据声明分层_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2139,
+                      "contentHash":  "02eeab93dcac836e2ef0aca604f2f561f8e96976dc3be3c216c45cab88dc3c1d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/属性数值与ValueChange边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2051,
+                      "contentHash":  "5ced4eac1aae28b177afad9ff378042d524126de7ba5ee148f66f12b92b6ded5",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/模型重构_插件依赖边界_AI协作说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1800,
+                      "contentHash":  "a97ad637f95a0af8565a43aa54df53d55cd07616db61b31c40366be31515f6e1",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色通用架构验证_MMO开放世界角色切换剧情RPG战斗_AI协作说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2799,
+                      "contentHash":  "0e8fac01764793306187df82ed6ca6a18e6c8ebbbd6a7bd55ba8dde2c06d98be",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色Prefab职责与DataInfo入口_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2055,
+                      "contentHash":  "4e1a75e52b673a57f10f8a53c2b566c44e60246b9f5bcb03cc8e9bf05d9bb306",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Entity运动（EntityMotion）/载具运动与骑乘职责_VehicleMotion_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1225,
+                      "contentHash":  "95f6f749012c7cbc73f4475cd94f5d3748b5deba0eef5602fa468b0d3c307ca7",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Entity运动（EntityMotion）/玩家运动_PlayerMotion_AI协作说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2812,
+                      "contentHash":  "723540e47e96cd52678ed7949887e79adae5820fcf328d9f1e83215cb8f903c4",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/状态机与IK（StateIK）/AI协作职责_状态机与IK上层_Buff边界说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2566,
+                      "contentHash":  "c86832d48e0eefbbeed6cba0fe85ff607cd861e4b3fa1ee05c5ae312ad1ee3fc",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/OpTargetPack_Item整合与池化重设_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1421,
+                      "contentHash":  "50e7e43b3a08f39c38fae5a011cd7f798324a376e2cffac0902ef698341ced5e",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/UI与图集（UIAtlas）/P2_UI图标_SpriteAtlas与运行时动态图集分流_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  754,
+                      "contentHash":  "9215f8a2f89b0bcb8e9acda6c03e8a53d13f58a39d7e2c42f80d89cce9859196",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/运动职责_Shot必中与Item运动_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1596,
+                      "contentHash":  "983548866f65055b193d3d22cc26e6030489762e547c4a448d4650cd904c3947",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/物理架构_简单起步_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1008,
+                      "contentHash":  "1ea45196d6a575cede11bd1f30737f4d1f53112cba03852055fffb306e83aeb9",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/音频（Audio）/音频播放与资源边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1713,
+                      "contentHash":  "9a208ede3cd065ab6d014d79dfaf1950c4cf745e306e9f734f3e7b2259ccb712",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1975,
+                      "contentHash":  "b9289ed941f167c16441a89fead23dab77c79e7fd1737c21141f28859b9d8d91",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2122,
+                      "contentHash":  "a7fba2b0d2acc0990c6e2c74dd1d3f3a4a1f88df2537c5e0e0e1d1c47d3aae3a",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESDeveloperCockpit_ArchitectureContract.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1841,
+                      "contentHash":  "90a6a6d3cc442dd7c288d1c8a70ecd1d3f05cc66d9e0813ffe27bec0fe1f248f",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/输入与交互（InputInteraction）/交互运行时_Interactable占用生命周期与结束原因_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2012,
+                      "contentHash":  "3ef8e2244e8dc1301d31c6ee19e246bb272474304e76c556e0308f62c930ace2",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2067,
+                      "contentHash":  "cd4c04a5bb3cd6e6852f3f0d706fce06bed579e6203ce9cd78d39d1cf79e860d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/Contextitecture上下文系统_所有权生命周期与类型边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2060,
+                      "contentHash":  "e230624a6d6ef6f9c646eb105f051ed9dd416232b1aadac23aa2bb15be10a2e9",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/输入与交互（InputInteraction）/输入与交互入口_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1866,
+                      "contentHash":  "0a85740e13e2c3f50324ce36c17146861ecf9ed70978687e78c64d9d3085b984",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_代码结构规范_Internal前缀与new成员隐藏边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2215,
+                      "contentHash":  "bbfdf40d223c489ecd39235f65496bcac71b69e89969fc3a4c9ffcaf1b26fb48",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编码与文本（Encoding）/项目最高警告_P0_UTF8唯一编码_禁止AI默认代码页覆写与机械转码_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1743,
+                      "contentHash":  "2ce3e5d9368f286204014c308d3890b7a0705f8efeae04f070658d710dc3a9e0",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2406,
+                      "contentHash":  "b7c986c498ce3f25a03afdd3c5dbd684e5913382f45d49012d3eae5195ccad28",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_P0_编辑器交付体验与下一步可发现性_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2569,
+                      "contentHash":  "7d08260bc02b1839a812196e0f108fb13476dcd3d2b03f2b4f7b5972d52d623f",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/构建与IL2CPP（BuildIL2CPP）/项目最高警告_IL2CPP工具链注册_禁止以编译器文件存在代替Unity可检测_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2048,
+                      "contentHash":  "b2e6c750f781806c676b62922b7ba351e4efe1e83e03888535e62344ec68b4fc",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_稳定Key_Catalog烘焙与RuntimeKey进程边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2566,
+                      "contentHash":  "47ceca5ccf3d9dd967c6668c052fd09059f3f76d82bf65f013463b372d54b5a2",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_统一内容注册唯一入口与事务边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2463,
+                      "contentHash":  "93365ba8696696d492931a3376b3aee5877e27b93b48bf4ea8944ab9343ca9eb",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2264,
+                      "contentHash":  "40d6e8f476a7a9246af75b35f48573c2769d8ad5b4a699305f605b3abf93905a",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2719,
+                      "contentHash":  "1ff7130253a32b13220afde5099c89060c255f8181670065902fcdeb99a44478",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2490,
+                      "contentHash":  "896e981dfc0aebdee7de5907b59cceb9d233c3f7ba443599fd904a4b72e822b8",
+                      "lastModifiedDate":  "2026-08-16",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  12,
+                      "status":  "stale"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                      "kind":  "AIWarning",
+                      "bytes":  3041,
+                      "contentHash":  "c1fc2f3dd03713d0bedf4c12c4e95190613033af55cc28eb79b075976501c31b",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json",
+                      "kind":  "AIWarningsRouteCatalog",
+                      "bytes":  4957,
+                      "contentHash":  "f340924035d800f3b485a75f868ed9184bbe00634cb624e2d09f986536ae12d3",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                      "kind":  "AIWarning",
+                      "bytes":  3100,
+                      "contentHash":  "2aa56abe81352fd79ad59b1364ffa7381d70b26674a1676b8439173a515d9b6c",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_P0_Info必须对应Group_Pack非默认聚合_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1756,
+                      "contentHash":  "18c53d9c66bf892b1dcad0a8c7d24268fe6461224ab0ac6218322559ebdf2ba4",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2114,
+                      "contentHash":  "156190de624ca1df4cdbdbebc41076ecef47b0cc8da7f83f0624537db7c588a7",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2695,
+                      "contentHash":  "af48ba0543b77cfcd97bd9515576f06d7e09c41038bf5094f18c1ca167e0bcd6",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2343,
+                      "contentHash":  "d6fd3966b7a74d7683509b3a9519278253941913c5ad3665d77ff1e25575f46d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_Codex核心上下文总纲_状态机IK标签调度LOD_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2311,
+                      "contentHash":  "01f6ed792f732746ece9d853fda41c131ea289d3a8c114daa445a30ab2427d65",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2337,
+                      "contentHash":  "6ee72697e24d9dc57a3e6bc8c644f72e9b26b979d4a32ef47bbc7c49a895615d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_CombatModule武器定义迁移边界与验收门禁_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1898,
+                      "contentHash":  "85dffa1ae38dbfbc0d11ddd53744e229e5cd9e1421bcf7fd5fa6cc199edc105b",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_Profile装配权威_Feature目录与池化边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2308,
+                      "contentHash":  "965fd0a20b81b7f06bcfb4c0cebca6454197d27aceae8246848eebf9df561ce8",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ES活跃请求仲裁协议_跨领域安全标准_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2498,
+                      "contentHash":  "16daf5464a5c30913b6ceeefd224c7b01d1d0403bf5fe662d588d287e7ae032d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ESDialog跨宿主唯一合同与Presenter注册边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2033,
+                      "contentHash":  "7af8d226be1e85ae8d00f557ff146883e0f228d2051560064e21c103648c844b",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源工具链_四阶段严格隔离_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2442,
+                      "contentHash":  "3ef18687efa69035b1952318581c0f4b4df7c08ac1f69bae8f32c2f3a0107251",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2370,
+                      "contentHash":  "a6e1424e0d2f4ece7c51869f7cf8e41c5d6e5e9ef5f37a26ccdf258229c0de42",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_配置双键与Inspector分层_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2136,
+                      "contentHash":  "de5f1baf93a2c98a186d2c323846bc9d1b2028e5cb5d09511b554343dfe81dd8",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_长期序列化与成熟核心泛型容器具体类型边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2184,
+                      "contentHash":  "4be8a11146dcaf71a308f98e5ac946e9f068d8898ab586b42dbf9e4bec35732d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/PrimeTween_DOTween_迁移_P0_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1609,
+                      "contentHash":  "ae47d72f6cbd36fb956b1e1a1fbcf610732b1675179c5c52671c7f748ddcda4a",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1239,
+                      "contentHash":  "ee23d930bb006f56c6c6517072e556f2f9942368bd5dd8e235c65bb00d390b9a",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2485,
+                      "contentHash":  "2e9933512b183976b29b712ab0aeb885a17c8b5b14f79417aac380781ae92edc",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_ProjectileWeapon热路径冻结合同_初始化预热与无分配门禁_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2418,
+                      "contentHash":  "38751e2e809d1e885ad2d8d0ffae04b4dc63c155d4c4cfb29044ee927c44d330",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1768,
+                      "contentHash":  "ea2de85ef1f62d2d43d1910711e449919ebe5ad2d6681ebd72133a72f4427581",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/ai-collaboration-menu.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6311,
+                      "contentHash":  "f9f3aa46175ebc3da70e718b6d2e35e251b11b536287303b6289d7f513d379bf",
+                      "lastModifiedDate":  "2026-08-26",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  2,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aibrain-orchestration.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  8215,
+                      "contentHash":  "abd03418815ad84bb54a0d0f3fa518473394e59fdb72729bbe88036a1cd95ca3",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/ai-abc-naming.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  6587,
+                      "contentHash":  "aa20138dd8c2191d5befe684706906eccc69fd5caba910049782cc339aa04a1d",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/ai-interaction-governance.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2739,
+                      "contentHash":  "56cb5b4cd9f573c19db8e2e3ffde86a4aefc23eb567eb86815af9019d76ccdc2",
+                      "lastModifiedDate":  "2026-08-25",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  3,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-automation-center-worker-governance.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5029,
+                      "contentHash":  "46f7511c1837b555afdb027ce948a1f8145bc9fe4daf99d907933514e00085a3",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-ai-content-identity-gamecorekey-migration.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3337,
+                      "contentHash":  "ecbc639cb7839110b2e30051fe514d705685dded8c893685562ad1844c871389",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/ai-knowledge-freshness.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2940,
+                      "contentHash":  "f67140996eb203d11773ddbef6de1ee0fec2c91e906e90c34abfbf1619615087",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/ai-abc-core.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3341,
+                      "contentHash":  "08b6f48ba96edad4cb5c2a40924e06da078bb10cf68ab74c71b9cd7ac3ae0e81",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/资源计划_Scope生命周期绑定_待验收提案.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1499,
+                      "contentHash":  "26b9879ca154921479a2e6f6574a932f8b6beef4d519c567efc59c7e5d50257f",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/音频系统_双后端与发布资源生命周期_待验收提案.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1615,
+                      "contentHash":  "68aaf9f2d9318bd72fe7ae93b50afda43e308c1835ed06be1e9b9626177ea0a4",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1589,
+                      "contentHash":  "368b625bad7e7dee513f5fedcc1eac22c8bc9b389f953d32492a45b47ad609cb",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+                      "kind":  "KnowledgeGovernance",
+                      "bytes":  21314,
+                      "contentHash":  "8e3f621daa078c047311f28dede7e839aae4fd34d3062a259561604fdbd2f2f4",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/agent-skills-aicommands-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  28363,
+                      "contentHash":  "4516108d3060c7b0113e07bc35f295086c361394eca4493c147a48e018ff1316",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/agent-mechanism-replication.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  14766,
+                      "contentHash":  "4db591e67ed63dcbb7163136fa5a66d2345f63b84e4d08aaa13cefe49d275cb2",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/AIWarningsDomainInventory.yaml",
+                      "kind":  "KnowledgeGovernance",
+                      "bytes":  1646,
+                      "contentHash":  "58b51a023cb972d03a77a4bf624b262ac050e9ce1b2bbe93e3b741587277ab67",
+                      "lastModifiedDate":  "2026-08-20",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  8,
+                      "status":  "stale"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-composite-shader-urp-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4633,
+                      "contentHash":  "7b363f55d2b4736f67f76dfb33904d2098321a6c1c2c556d2ce99a1f04d07cf4",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-codex-tool-rewrite-context.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4283,
+                      "contentHash":  "8b99697fcd8991c1b65c1d1816a77cee32a2bc59b28dca49c0d669f31ef42af7",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-asset-package-preview-export-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3872,
+                      "contentHash":  "08ca4b74d79b875b6206bd47a24708f9f53a2ca383c0a3e3300a628e3de0fdec",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-es-advanced-dialog-input-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4171,
+                      "contentHash":  "8b385dbc9fd15affff8b4a1048ef353517902493a760c3fefbb229860279fbbd",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-memory-leak-lifecycle-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5792,
+                      "contentHash":  "f09e0b115895476bd64f5598451a3f1daf0144c79e5a3842171284c7d2604caf",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-generated-artifact-quick-open.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4562,
+                      "contentHash":  "d0974439929983de5d59ec6c70de528b1fe5c047be11bcd864f1e5cd240f3697",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-extension-common-sense.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  3555,
+                      "contentHash":  "88f5497634c11c06091e4aa805cce13f5ed838c84bfb970b170ccce4683b080d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-editor-anonymous-event-assembly-stream-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4617,
+                      "contentHash":  "f3c50094c879111af762e94dbb84ec01163f79801aa6b38297aa4e8bbdded18b",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-entity-plugin-dependency-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2885,
+                      "contentHash":  "3025008302845264319e5d234b9b37a5f574705166a32993c4e1cf6dd0001885",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-context-ownership-lifecycle-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5189,
+                      "contentHash":  "099e2c0f11d4816645c22ec4b328d65d101a0550c1ff1f6074cf3912b55d431d",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-character-prefab-datainfo-boundary.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  5055,
+                      "contentHash":  "59b8667d843db5981526dc520f3af4c050cdfeac5696c6d38d3beeac2472d92b",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-gamecore-editor-globaldata-aicommands.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4982,
+                      "contentHash":  "0a335da054e2ab52af6df3b8db89b696c59550e7dec54b8827c90364bde30f09",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-character-general-architecture-validation.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  4355,
+                      "contentHash":  "0e596770123663237a35201e6d3fa5f491453dcd1725180c2b26a4905a3c14cd",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-player-entity-model-rebuild.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2999,
+                      "contentHash":  "19da2d64e43077818719957f41c32db39759591a40c60df8e72d5f53913c3143",
+                      "lastModifiedDate":  "2026-08-27",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  1,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Documentation/AIKnowledge/entries/aiwarning-architecture-module-maturity-incomplete-governance.md",
+                      "kind":  "KnowledgeEntry",
+                      "bytes":  2901,
+                      "contentHash":  "452e94cec5f7bad3616376dd93b889ee277d9fa20598b5f609310bb9cff8183b",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/Entity固有Tag_DataInfo权威_Prefab入口与池化闭环_提案.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1599,
+                      "contentHash":  "bf8d9667929ce892e31f82f4cccfcd69f418199f6e0db505313ba360ae163ee4",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器窗口迁移_ESMenuTreeWindowAB适配_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1755,
+                      "contentHash":  "7278694b4f706ea2bd82c92fc30c0eb9d5db445a35e06784b8961bea7591a488",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/UGC工作台_UI Toolkit作者底座与草稿提交边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2336,
+                      "contentHash":  "5a102b615d65c97d036d8e837a6778a3f61fee73b1b0a50d390db9d303442e52",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/P2_编辑器菜单根必须使用【ES】_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1776,
+                      "contentHash":  "f31ed883e4cdf3e30fb3f375b322e9b6814e83ccdbfee1d8d58e2f379a818dc7",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2229,
+                      "contentHash":  "f8b5dd538e5747a9fe5914fa30df168801db051911082dbfc397ddf767a439ce",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/程序集与稳定性（AssemblyStability）/编辑器匿名函数与程序集流稳定性_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1735,
+                      "contentHash":  "551f6b031775e20b222fe1fd50373a87d6d716ee43aa8494845a49ab5fe05c0a",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/生成产物快速打开入口_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  884,
+                      "contentHash":  "d480f3019fe6944fadc580adfa0c79cb9dfbbf26d5e798aecbd8c2a639682140",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/第三方编辑器包嵌入与菜单补丁_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2044,
+                      "contentHash":  "f0103c753440abc81acf3d722d5f2f5e9772faa555dbd578292a5359f0495fae",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  16566,
+                      "contentHash":  "4a1bde6f96bad3461178fc0385d3e4b26eb7184ea7efc92de3879abb9f042d44",
+                      "lastModifiedDate":  "2026-08-23",
+                      "dateSource":  "filesystem-bootstrap",
+                      "ageDays":  5,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/Operation默认无Stop_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1084,
+                      "contentHash":  "e831fd0ac59c1840b958dd1a5345beb60f45ffa8e2f83adc2391f64c8a49882f",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/ESCommand运行时_PlayerRunner执行帧与服务边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1104,
+                      "contentHash":  "2d81b217e424c9170625025664ee00db2716a8b2071133cdc3dc0e6f4f21f960",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/对象池预热_Space与0GC_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  991,
+                      "contentHash":  "8c2c59d6d08a738eae2e073c4668f9946214fb0a77470d224ce611a1b52c348c",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）/VFX运行时与制作边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2279,
+                      "contentHash":  "a6531ed0d60c4e137dad6c18db4481ee50d6f771b9649a5932b61fae887a1118",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ES编辑器绘制与序列化套件_PropertyTree多目标与迁移边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1293,
+                      "contentHash":  "63d3c0c60146e0f89ad75347907c9e30adc6dfe13f0767add81f4dff1449c8d1",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ESCompositeShader_URP职责与材质检查器验收边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1213,
+                      "contentHash":  "ee28160bdcf928982f5a743ee9e670c529942f6eb819296bec6eecef2668d004",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/SO表格（SOTable）/SO表格工具_AI协作说明.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1668,
+                      "contentHash":  "65430c28c5a7b968abe4b5bf16aa538f2e13991231831bd86f0ac5aaef2a8129",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/2026-08-16_当前状态快照_活跃索引迁移前.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2004,
+                      "contentHash":  "3c5ae1c332ea7bcd148f4eb65cc033a97408304938f23072dfc725929f31c755",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/资源计划验收（ResourcePlanAcceptance）/资源计划_Scope生命周期绑定_商业项目验收标准.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1809,
+                      "contentHash":  "27962ad8eb6b2674e1b759448708afc316b913fcf20945b80a83fc44111b5acf",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1734,
+                      "contentHash":  "55533cb848d5153ef9a62c9e63f6c7fbfcae24544685c79f2b65471ba53c7556",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/AIPersonas与AI顶级目录边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1459,
+                      "contentHash":  "f366285980c1fcbd1e1c282cec96dc2b75d07b940ac9faad1e022b4f46937abb",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/项目总交接（ProjectHandover）/Codex_当前项目总交接_模型重构与编辑器稳定_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1678,
+                      "contentHash":  "3e8beeaf530b5ca541491f37a35bab85f991b3fa3e0efd9a6c8212dc1f8671d1",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/失败复盘（Retrospectives）/ESCmdAgent_失败复盘与后续禁止事项_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1630,
+                      "contentHash":  "1c4e98300cab7531038f48e062dc3b1f1973aaa8f3144a4167f18bf2a63cbe41",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/资源加载底层_RuntimeKey稳定与旧输入坏引用_给其他AI阅读.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1688,
+                      "contentHash":  "b41596dc1a7df77ca7a384a0937f3d8389022b7757202e60a50a6ea9e3420d14",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1233,
+                      "contentHash":  "a55d464d511718c8e7f3024e75fbd14d34037ae9a6d9a35423ca0f61a6845e8e",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/内存泄露与编辑器生命周期_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2074,
+                      "contentHash":  "8b867e93038fcf467efdf81f6803487e2e20ae4e23082c725ca2e195b9b7c95e",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/编辑器预览系统生命周期_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1633,
+                      "contentHash":  "da41da7f309bdc11783f6febe99ae824cfb7858ebcb09f12ea797e3b5a9bddfc",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/简单工具（SimpleTools）/Codex_工具重写_商业级验证协作上下文.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2410,
+                      "contentHash":  "255af45a5c8a7275636c6e273b253328859b7e63b1b1cdcbe22c44cae9a4b84f",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/专业工作台（Workbench）/专业工作台与World作者工具_贡献注册与正式资产边界_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  2188,
+                      "contentHash":  "d2b7808cec44ced0c899fe393e5f283a3e2063d01098447811bff1689a868b2d",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/ResourcePlan扩展协议_强制约束.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1296,
+                      "contentHash":  "8a1d85e8542b86e9b99608084e7ffcff7b335180431bc34edd04b809900112de",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/AI协作治理验收（AICollaborationAcceptance）/AI协作历程与模块审计_商业可行性验收标准.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1677,
+                      "contentHash":  "cac7f1746d29499373d6d715689ffbcc484b9313685ba2de61370c8f3d970558",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/资产包分离（AssetPackage）/资产包分离窗口_预览与导出链路_AI协作警告.md",
+                      "kind":  "AIWarning",
+                      "bytes":  1879,
+                      "contentHash":  "ff0539d8769216b873190dfbba402e5a933524fb0d355969a65178f656e3d9aa",
+                      "lastModifiedDate":  "2026-08-28",
+                      "dateSource":  "hash-change-observed",
+                      "ageDays":  0,
+                      "status":  "current"
+                  }
+              ]
+}

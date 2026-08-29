@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/agent-mechanism/source-lock/v1",
+  "recordType": "AgentMechanismExternalSourceLock",
+  "sourceLockId": "amsl-7ea64ef06f7f4a49a43a68192b7b9dfa",
+  "authority": "external-design-input",
+  "trustBoundary": "untrusted-until-es-validated",
+  "captureStatus": "commit-and-content-hash-bound",
+  "retrievalAuthorized": true,
+  "capturedUtc": "2026-08-28T20:21:00.8864034Z",
+  "sources": [
+    {
+      "sourceId": "swe-agent-aci",
+      "sourceType": "repository",
+      "name": "SWE-agent Agent-Computer Interface",
+      "canonicalUrl": "https://github.com/SWE-agent/SWE-agent",
+      "repository": "SWE-agent/SWE-agent",
+      "commitSha": "3ea751c087f32b16e039a2233dd6eefecef325d5",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "documentation", "path": "docs/background/aci.md", "url": "https://raw.githubusercontent.com/SWE-agent/SWE-agent/3ea751c087f32b16e039a2233dd6eefecef325d5/docs/background/aci.md", "sha256": "da4bb0d50896036acc50f621d22c3b4b0cdf025e1e0801b6d17adbbe17c51c36", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "sweagent/tools/tools.py", "url": "https://raw.githubusercontent.com/SWE-agent/SWE-agent/3ea751c087f32b16e039a2233dd6eefecef325d5/sweagent/tools/tools.py", "sha256": "6a5b9ca0b4b7bbc60364fb832a478fad7c7c41a0d91cb0718c9ad523120e9a70", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["bounded command surface", "command parser and blocklist", "lint-before-commit", "explicit empty-output observation", "per-command and total timeout"],
+      "esAdoptions": ["RouteStage operation allowlist", "pre-commit verifier", "structured observation receipt", "bounded attempt budget"]
+    },
+    {
+      "sourceId": "reflexion",
+      "sourceType": "repository",
+      "name": "Reflexion",
+      "canonicalUrl": "https://github.com/noahshinn/reflexion",
+      "repository": "noahshinn/reflexion",
+      "commitSha": "218cf0ef1df84b05ce379dd4a8e47f17766733a0",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "documentation", "path": "README.md", "url": "https://raw.githubusercontent.com/noahshinn/reflexion/218cf0ef1df84b05ce379dd4a8e47f17766733a0/README.md", "sha256": "5209db116381e7c067dd0ee4085da26b7d00fd19cbe66b6367051a2f95ef9024", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "alfworld_runs/generate_reflections.py", "url": "https://raw.githubusercontent.com/noahshinn/reflexion/218cf0ef1df84b05ce379dd4a8e47f17766733a0/alfworld_runs/generate_reflections.py", "sha256": "d7fbe4af7ff21ce9bc73ad2bcf16bf265682d1fb3554dc62985f3ada09997ef7", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["failure-conditioned reflection", "bounded episodic memory", "environment-specific corrective plan"],
+      "esAdoptions": ["Finding-conditioned learning candidate", "bounded memory references", "verification-required correction"]
+    },
+    {
+      "sourceId": "tree-of-thoughts",
+      "sourceType": "repository",
+      "name": "Tree of Thoughts",
+      "canonicalUrl": "https://github.com/princeton-nlp/tree-of-thought-llm",
+      "repository": "princeton-nlp/tree-of-thought-llm",
+      "commitSha": "8050e67d0e3a0fddc424d7fa5801538722a4c4cc",
+      "branchAtCapture": "master",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "src/tot/methods/bfs.py", "url": "https://raw.githubusercontent.com/princeton-nlp/tree-of-thought-llm/8050e67d0e3a0fddc424d7fa5801538722a4c4cc/src/tot/methods/bfs.py", "sha256": "1fea761421857120e14e003c07411b5943fb5a87bf4b743691cf55f5e2d9a7b9", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "src/tot/tasks/base.py", "url": "https://raw.githubusercontent.com/princeton-nlp/tree-of-thought-llm/8050e67d0e3a0fddc424d7fa5801538722a4c4cc/src/tot/tasks/base.py", "sha256": "bf78ad98b1a99d5d3be6711147384d630593b88ca4608152cd00648b582e2ba8", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["generate-evaluate-select loop", "duplicate candidate suppression", "value and vote evaluators", "bounded beam selection", "step trace"],
+      "esAdoptions": ["candidate lineage", "auditor-defined value vector", "bounded branch fanout", "replayable selection trace"]
+    },
+    {
+      "sourceId": "petri",
+      "sourceType": "repository",
+      "name": "Inspect Petri",
+      "canonicalUrl": "https://github.com/meridianlabs-ai/inspect_petri",
+      "repository": "meridianlabs-ai/inspect_petri",
+      "commitSha": "5ee0081f4715f4e231e0cbfc4b1bae52bf742928",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "src/inspect_petri/_auditor/auditor.py", "url": "https://raw.githubusercontent.com/meridianlabs-ai/inspect_petri/5ee0081f4715f4e231e0cbfc4b1bae52bf742928/src/inspect_petri/_auditor/auditor.py", "sha256": "343ad0d142f3524c3ac008eafd9f8cce0da89111ed83038c6e6e4eaed73304da", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "src/inspect_petri/_judge/branches.py", "url": "https://raw.githubusercontent.com/meridianlabs-ai/inspect_petri/5ee0081f4715f4e231e0cbfc4b1bae52bf742928/src/inspect_petri/_judge/branches.py", "sha256": "dcb663f5f9802117da4e4b673768240ee2fe1e2c02e54deb3c65f26122a9a243", "hashMode": "raw-bytes" },
+        { "kind": "article", "path": null, "url": "https://alignment.anthropic.com/2025/petri/", "sha256": "5e9038060a323630662ac54874d5f39916c55604a1538a5b3564fe331808d391", "hashMode": "utf8-decoded-body" }
+      ],
+      "designMechanisms": ["separate auditor and target", "rollback branch tree", "surviving branch plus full transcript", "independent judge rendering", "message-id deduplication"],
+      "esAdoptions": ["auditor-verifier-authorizer separation", "branch lineage and rollback anchors", "complete audit trace", "independent adjudication receipt"]
+    },
+    {
+      "sourceId": "envtrustbench",
+      "sourceType": "paper",
+      "name": "EnvTrustBench",
+      "canonicalUrl": "https://arxiv.org/abs/2605.08828",
+      "repository": null,
+      "commitSha": null,
+      "branchAtCapture": null,
+      "licenseSpdx": "ARXIV-METADATA",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "paper-metadata", "path": null, "url": "https://export.arxiv.org/api/query?id_list=2605.08828", "sha256": "e2f6e3c3a57b193eb07d5fb54b6a69c339300d234406d94323c4bf1a157ef2fc", "hashMode": "utf8-decoded-body" }
+      ],
+      "designMechanisms": ["environment evidence provenance", "freshness and authority resolution", "generated deceptive workspaces", "action-observation trajectory", "external validation oracle"],
+      "esAdoptions": ["environment oracle", "source freshness gate", "false-surface negative fixtures", "decision-evidence consistency audit"]
+    },
+    {
+      "sourceId": "auditbench",
+      "sourceType": "paper",
+      "name": "AuditBench",
+      "canonicalUrl": "https://arxiv.org/abs/2602.22755",
+      "repository": null,
+      "commitSha": null,
+      "branchAtCapture": null,
+      "licenseSpdx": "ARXIV-METADATA",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "paper-metadata", "path": null, "url": "https://export.arxiv.org/api/query?id_list=2602.22755", "sha256": "8f60bdf67080784b84690bbda4d52f851645ef7e1a407cb721298421fdb89a9e", "hashMode": "utf8-decoded-body" },
+        { "kind": "article", "path": null, "url": "https://alignment.anthropic.com/2026/auditbench/", "sha256": "55a66800cb123594859d1ba506ca7c6f30bafe9201f7a86d65663318299c4aab", "hashMode": "utf8-decoded-body" }
+      ],
+      "designMechanisms": ["hidden behavior fixtures", "configurable audit tools", "tool-to-agent gap measurement", "diverse auxiliary probes", "iterative quantitative audit"],
+      "esAdoptions": ["hidden negative cases", "standalone-tool versus integrated-agent comparison", "audit probe diversity", "end-to-end behavior oracle"]
+    },
+    {
+      "sourceId": "langgraph",
+      "sourceType": "repository",
+      "name": "LangGraph",
+      "canonicalUrl": "https://github.com/langchain-ai/langgraph",
+      "repository": "langchain-ai/langgraph",
+      "commitSha": "11ee185999b86bfea2d8c0e69cef9a5e37acf686",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "libs/checkpoint/langgraph/checkpoint/base/__init__.py", "url": "https://raw.githubusercontent.com/langchain-ai/langgraph/11ee185999b86bfea2d8c0e69cef9a5e37acf686/libs/checkpoint/langgraph/checkpoint/base/__init__.py", "sha256": "d29511015e2801630f6580353c107104d4ecc86e4bd14e15cd54e2b861a48e26", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "libs/langgraph/langgraph/pregel/_loop.py", "url": "https://raw.githubusercontent.com/langchain-ai/langgraph/11ee185999b86bfea2d8c0e69cef9a5e37acf686/libs/langgraph/langgraph/pregel/_loop.py", "sha256": "33150cf70fc08fd01affeae0345aa20569d2705704e3d209733d9c7b43dd5c0a", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["thread-scoped checkpoints", "channel versions and versions-seen", "pending writes", "interrupt and replay identity", "writes durable before checkpoint"],
+      "esAdoptions": ["Task-scoped event identity", "write-ahead event ordering", "checkpoint lineage", "interrupt recovery and idempotent replay"]
+    },
+    {
+      "sourceId": "autogen-magentic-one",
+      "sourceType": "repository",
+      "name": "AutoGen AgentChat and Magentic-One",
+      "canonicalUrl": "https://github.com/microsoft/autogen",
+      "repository": "microsoft/autogen",
+      "commitSha": "027ecf0a379bcc1d09956d46d12d44a3ad9cee14",
+      "branchAtCapture": "main",
+      "licenseSpdx": "CC-BY-4.0",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "python/packages/autogen-agentchat/src/autogen_agentchat/conditions/_terminations.py", "url": "https://raw.githubusercontent.com/microsoft/autogen/027ecf0a379bcc1d09956d46d12d44a3ad9cee14/python/packages/autogen-agentchat/src/autogen_agentchat/conditions/_terminations.py", "sha256": "cd9c0da75906da1728432fc96ae0566591dfb180524d3fb585bfdb8ff0260f5d", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "python/packages/autogen-agentchat/src/autogen_agentchat/teams/_group_chat/_magentic_one/_magentic_one_orchestrator.py", "url": "https://raw.githubusercontent.com/microsoft/autogen/027ecf0a379bcc1d09956d46d12d44a3ad9cee14/python/packages/autogen-agentchat/src/autogen_agentchat/teams/_group_chat/_magentic_one/_magentic_one_orchestrator.py", "sha256": "9c0f815cc8b65ada85d54bf314c7f8869559a35477325bbd0d0577e80d4bda3f", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["typed composable termination", "message-token-time budgets", "progress ledger", "stall detection", "outer-loop replan", "save-load state"],
+      "esAdoptions": ["machine termination predicates", "separate hard budgets and convergence", "stall-triggered replan", "replayable progress ledger"]
+    },
+    {
+      "sourceId": "dspy-gepa",
+      "sourceType": "repository",
+      "name": "DSPy GEPA and Evaluate",
+      "canonicalUrl": "https://github.com/stanfordnlp/dspy",
+      "repository": "stanfordnlp/dspy",
+      "commitSha": "3f06959ebbb80fb0bda001e1f802d70c2d5be7f7",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "dspy/teleprompt/gepa/gepa.py", "url": "https://raw.githubusercontent.com/stanfordnlp/dspy/3f06959ebbb80fb0bda001e1f802d70c2d5be7f7/dspy/teleprompt/gepa/gepa.py", "sha256": "93362fde29b07c2be9a541ecca41d0472ef97aafd525ff797f6cab59cdc43fe3", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "dspy/evaluate/evaluate.py", "url": "https://raw.githubusercontent.com/stanfordnlp/dspy/3f06959ebbb80fb0bda001e1f802d70c2d5be7f7/dspy/evaluate/evaluate.py", "sha256": "311a988e5684fbcd0302b5a990b67c3205d18d3138a8a4c5a280fe5d0a1f60fa", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["candidate lineage", "per-instance validation scores", "Pareto frontier", "metric-call budget", "seeded reproducibility", "text feedback separated from score"],
+      "esAdoptions": ["policy candidate lineage", "train-validation-holdout separation", "multi-objective no-regression selection", "evaluation budget receipt"]
+    },
+    {
+      "sourceId": "inspect-ai",
+      "sourceType": "repository",
+      "name": "Inspect AI",
+      "canonicalUrl": "https://github.com/UKGovernmentBEIS/inspect_ai",
+      "repository": "UKGovernmentBEIS/inspect_ai",
+      "commitSha": "78c6a7e42b1198c3e67fa6777bb7202cf447239f",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "src/inspect_ai/solver/_fork.py", "url": "https://raw.githubusercontent.com/UKGovernmentBEIS/inspect_ai/78c6a7e42b1198c3e67fa6777bb7202cf447239f/src/inspect_ai/solver/_fork.py", "sha256": "6a3d42627d4eba0004a2b2382992cceb396117183b32aacd620516e242330ac0", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "src/inspect_ai/log/_recover/_reconstruct.py", "url": "https://raw.githubusercontent.com/UKGovernmentBEIS/inspect_ai/78c6a7e42b1198c3e67fa6777bb7202cf447239f/src/inspect_ai/log/_recover/_reconstruct.py", "sha256": "80ce38e0b06d21ce9afdb472dcdc9847aea9da494926058f11257a1f3527cb7e", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "src/inspect_ai/scorer/_scorer.py", "url": "https://raw.githubusercontent.com/UKGovernmentBEIS/inspect_ai/78c6a7e42b1198c3e67fa6777bb7202cf447239f/src/inspect_ai/scorer/_scorer.py", "sha256": "9eaa55d224808bf75c51fc9479709e63edca4a845ee28f854f572996a3ceaf11", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["deep-copy branch state", "independent branch store and transcript", "event validation during crash recovery", "registered scorer identity", "target separated from state"],
+      "esAdoptions": ["immutable branch snapshot", "branch-local event stream", "recovery reconstruction validation", "registered evaluator definitions"]
+    },
+    {
+      "sourceId": "graph-of-thoughts",
+      "sourceType": "repository",
+      "name": "Graph of Thoughts",
+      "canonicalUrl": "https://github.com/spcl/graph-of-thoughts",
+      "repository": "spcl/graph-of-thoughts",
+      "commitSha": "3d9d9dbd8937d47a4441f681b8b40e3c5b054f16",
+      "branchAtCapture": "main",
+      "licenseSpdx": "NOASSERTION",
+      "reusePolicy": "reference-only-license-unverified",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "graph_of_thoughts/controller/controller.py", "url": "https://raw.githubusercontent.com/spcl/graph-of-thoughts/3d9d9dbd8937d47a4441f681b8b40e3c5b054f16/graph_of_thoughts/controller/controller.py", "sha256": "09439582951eca87fee6598d808a8d660b44572e8347671be91178f377228814", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "graph_of_thoughts/operations/operations.py", "url": "https://raw.githubusercontent.com/spcl/graph-of-thoughts/3d9d9dbd8937d47a4441f681b8b40e3c5b054f16/graph_of_thoughts/operations/operations.py", "sha256": "fc784f32f0860e9ebb8b84c3a8bac4457b6b5a9d65cf10589e4adccaeff9de66", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["typed operation DAG", "predecessor readiness", "generate-score-validate-improve-aggregate-prune", "serializable operation results"],
+      "esAdoptions": ["typed ABCD stage graph", "precondition tokens", "multi-parent aggregation", "operation-level receipts"]
+    },
+    {
+      "sourceId": "aflow",
+      "sourceType": "repository",
+      "name": "AFlow",
+      "canonicalUrl": "https://github.com/FoundationAgents/AFlow",
+      "repository": "FoundationAgents/AFlow",
+      "commitSha": "3f457218fc716093fe53f6df8a5d5e6379d66346",
+      "branchAtCapture": "main",
+      "licenseSpdx": "MIT",
+      "reusePolicy": "mechanism-reference-only",
+      "verificationState": "verified",
+      "contentRefs": [
+        { "kind": "source-file", "path": "scripts/optimizer.py", "url": "https://raw.githubusercontent.com/FoundationAgents/AFlow/3f457218fc716093fe53f6df8a5d5e6379d66346/scripts/optimizer.py", "sha256": "26cc9ac8f99177ed670c75fd6a265294c1dbaf1518e41f383eaf1d980b3968e5", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "scripts/optimizer_utils/experience_utils.py", "url": "https://raw.githubusercontent.com/FoundationAgents/AFlow/3f457218fc716093fe53f6df8a5d5e6379d66346/scripts/optimizer_utils/experience_utils.py", "sha256": "b0fc7e5a93bb92efb154f241d7eb819bdf70fd1cf7754b3d849593eafd7daf9f", "hashMode": "raw-bytes" },
+        { "kind": "source-file", "path": "scripts/optimizer_utils/convergence_utils.py", "url": "https://raw.githubusercontent.com/FoundationAgents/AFlow/3f457218fc716093fe53f6df8a5d5e6379d66346/scripts/optimizer_utils/convergence_utils.py", "sha256": "92ee8974198cdafb43e695500c668373de7c222f1d7501e8b737b15504247661", "hashMode": "raw-bytes" }
+      ],
+      "designMechanisms": ["bounded workflow optimization rounds", "evaluated experience ledger", "top-round sampling", "validation reruns", "statistical convergence window"],
+      "esAdoptions": ["bounded adaptive rounds", "experience only after verification", "baseline and candidate score history", "convergence stop separate from completion"]
+    }
+  ],
+  "adoptionRules": {
+    "copyPolicy": "reference-design-mechanisms; do not copy implementation code",
+    "authorityPolicy": "external sources never override ES source, P0 rules, user authority, or TaskContextRuntime",
+    "verificationPolicy": "every adopted mechanism requires an ES contract, negative cases, and fresh receipts",
+    "driftPolicy": "commit or content mismatch invalidates only the affected external design claim"
+  },
+  "nonClaims": [
+    "external source verification does not prove ES implementation correctness",
+    "repository popularity does not grant authority",
+    "paper or source metadata does not prove Unity, Worker, host, or release behavior",
+    "no external implementation code is copied by this source lock"
+  ],
+  "sourceSetHash": "38fc87f19101cd134ac773280334e60087623b201e447c90f055668888ed29f3"
+}

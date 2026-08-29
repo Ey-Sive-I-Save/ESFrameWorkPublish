@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-08-20T18:14:43.3850620Z",
+    "generatedAtUtc":  "2026-08-28T01:38:31.4741619Z",
     "sourceRoot":  "Assets/Plugins/ES/AIWarnings",
     "domains":  [
                     {
@@ -10,8 +10,8 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
-                                          "bytes":  12398,
-                                          "sha256":  "b59233c67b4e86f2c85b96e975af76f633a1a4b0dbe6e6796ca8ef26df826863"
+                                          "bytes":  3041,
+                                          "sha256":  "c1fc2f3dd03713d0bedf4c12c4e95190613033af55cc28eb79b075976501c31b"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
@@ -20,11 +20,11 @@
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
-                                          "bytes":  27999,
-                                          "sha256":  "db61388fcbd17da30314461d5736d2bb4592a7afec226359cf8f8e6fab9bf978"
+                                          "bytes":  3100,
+                                          "sha256":  "2aa56abe81352fd79ad59b1364ffa7381d70b26674a1676b8439173a515d9b6c"
                                       }
                                   ],
-                        "sha256":  "28acb3b519b6832f49e41e12fd4b72ebbf1122079112430a21ed7b40de7ff604"
+                        "sha256":  "214d316808cb2324acaa6f7647ae15e7e13096e2b4df95b9f46e402b62052250"
                     },
                     {
                         "domain":  "10_P0最高约束（P0Guardrails）",
@@ -33,151 +33,151 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md",
-                                          "bytes":  8662,
-                                          "sha256":  "974957efac661db1bbbb7c578f5b4aa49c9a389a1e5a483ffd83ea766a436381"
+                                          "bytes":  2695,
+                                          "sha256":  "af48ba0543b77cfcd97bd9515576f06d7e09c41038bf5094f18c1ca167e0bcd6"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md",
-                                          "bytes":  14840,
-                                          "sha256":  "acbf57fd6fc98bcf797d066a346c745a3af3b2d8eec76f5ee7b07f88577d97e6"
+                                          "bytes":  2114,
+                                          "sha256":  "156190de624ca1df4cdbdbebc41076ecef47b0cc8da7f83f0624537db7c588a7"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_P0_Info必须对应Group_Pack非默认聚合_AI协作警告.md",
-                                          "bytes":  11517,
-                                          "sha256":  "39aa99c781fa08197c4c219c5d7d6310756fd1bf5a4f555691417728c1a90f2f"
+                                          "bytes":  1756,
+                                          "sha256":  "18c53d9c66bf892b1dcad0a8c7d24268fe6461224ab0ac6218322559ebdf2ba4"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md",
-                                          "bytes":  5374,
-                                          "sha256":  "b25a7f0aa36852bfd4096033de5aca12e12cec730e0437873eeb673da68434df"
+                                          "bytes":  2719,
+                                          "sha256":  "1ff7130253a32b13220afde5099c89060c255f8181670065902fcdeb99a44478"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_P0_编辑器交付体验与下一步可发现性_AI协作警告.md",
-                                          "bytes":  8795,
-                                          "sha256":  "a8f5938cafe174b2a9052136decb4e660100b3e04819f48da5749bc4cd72bcbe"
+                                          "bytes":  2569,
+                                          "sha256":  "7d08260bc02b1839a812196e0f108fb13476dcd3d2b03f2b4f7b5972d52d623f"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md",
-                                          "bytes":  5607,
-                                          "sha256":  "63054f018470f0c3a07ae63b78879cb6c24c39bcc982689890a7cab7990e9af5"
+                                          "bytes":  2406,
+                                          "sha256":  "b7c986c498ce3f25a03afdd3c5dbd684e5913382f45d49012d3eae5195ccad28"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编码与文本（Encoding）/项目最高警告_P0_UTF8唯一编码_禁止AI默认代码页覆写与机械转码_AI协作警告.md",
-                                          "bytes":  3870,
-                                          "sha256":  "81969fa8ebb72586dc30d79ea6f20182cf31b801af930ad97ef355b2d3fc57eb"
+                                          "bytes":  1743,
+                                          "sha256":  "2ce3e5d9368f286204014c308d3890b7a0705f8efeae04f070658d710dc3a9e0"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/构建与IL2CPP（BuildIL2CPP）/项目最高警告_IL2CPP工具链注册_禁止以编译器文件存在代替Unity可检测_AI协作警告.md",
-                                          "bytes":  3786,
-                                          "sha256":  "0b68750f825af7bf02cb55905043deba58abaa79aecef5751f760425f7d85fd5"
+                                          "bytes":  2048,
+                                          "sha256":  "b2e6c750f781806c676b62922b7ba351e4efe1e83e03888535e62344ec68b4fc"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md",
-                                          "bytes":  17059,
-                                          "sha256":  "ffd47f75089d13023597277357ce63bcd6c05b6e97d2683a7a5e64e33e234649"
+                                          "bytes":  2264,
+                                          "sha256":  "40d6e8f476a7a9246af75b35f48573c2769d8ad5b4a699305f605b3abf93905a"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_统一内容注册唯一入口与事务边界_AI协作警告.md",
-                                          "bytes":  5371,
-                                          "sha256":  "341c140c6745bacedaae0a0efb5d15e7b3e6f577ddcf13d7420c11c92ab071f7"
+                                          "bytes":  2463,
+                                          "sha256":  "93365ba8696696d492931a3376b3aee5877e27b93b48bf4ea8944ab9343ca9eb"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_稳定Key_Catalog烘焙与RuntimeKey进程边界_AI协作警告.md",
-                                          "bytes":  7819,
-                                          "sha256":  "c6960fac99de98e02d304bca863a312314f065268f54f961f35cf61f68a847c7"
+                                          "bytes":  2566,
+                                          "sha256":  "47ceca5ccf3d9dd967c6668c052fd09059f3f76d82bf65f013463b372d54b5a2"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_长期序列化与成熟核心泛型容器具体类型边界_AI协作警告.md",
-                                          "bytes":  14167,
-                                          "sha256":  "5267abce63efb471c694e42d8ec084b36b66e21987b523ff5e009238d4a5446c"
+                                          "bytes":  2184,
+                                          "sha256":  "4be8a11146dcaf71a308f98e5ac946e9f068d8898ab586b42dbf9e4bec35732d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_配置双键与Inspector分层_AI协作警告.md",
-                                          "bytes":  3287,
-                                          "sha256":  "4bad90b1d4ae5f12b9de612c47457887dbea27565e0feb18610807e415fed3d5"
+                                          "bytes":  2136,
+                                          "sha256":  "de5f1baf93a2c98a186d2c323846bc9d1b2028e5cb5d09511b554343dfe81dd8"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md",
-                                          "bytes":  6864,
-                                          "sha256":  "d8404c32f25ea889401f0f8c63a969d8fb7e377533200d0d92a8b269d43c2629"
+                                          "bytes":  2370,
+                                          "sha256":  "a6e1424e0d2f4ece7c51869f7cf8e41c5d6e5e9ef5f37a26ccdf258229c0de42"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/PrimeTween_DOTween_迁移_P0_AI协作警告.md",
-                                          "bytes":  2412,
-                                          "sha256":  "265e5544fb5e810c84fe93b8d707edc5ff455691235bfa64b5a31d66e6e38f94"
+                                          "bytes":  1609,
+                                          "sha256":  "ae47d72f6cbd36fb956b1e1a1fbcf610732b1675179c5c52671c7f748ddcda4a"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_ProjectileWeapon热路径冻结合同_初始化预热与无分配门禁_AI协作警告.md",
-                                          "bytes":  5505,
-                                          "sha256":  "b8083b6db57ddfea9cf597183d87213e18abc63a1aaffacef1f91edea2a929ce"
+                                          "bytes":  2418,
+                                          "sha256":  "38751e2e809d1e885ad2d8d0ffae04b4dc63c155d4c4cfb29044ee927c44d330"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md",
-                                          "bytes":  10830,
-                                          "sha256":  "2f5cbca2bf00645da654a88262a228e60999e0a7af44cc35d7a8a7b8267f7665"
+                                          "bytes":  2485,
+                                          "sha256":  "2e9933512b183976b29b712ab0aeb885a17c8b5b14f79417aac380781ae92edc"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md",
-                                          "bytes":  2107,
-                                          "sha256":  "02ba0a6d00e9a15ac0d6d4aec2c4689d5652ad284f169742b8c904e1c552440b"
+                                          "bytes":  1239,
+                                          "sha256":  "ee23d930bb006f56c6c6517072e556f2f9942368bd5dd8e235c65bb00d390b9a"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源工具链_四阶段严格隔离_AI协作警告.md",
-                                          "bytes":  4652,
-                                          "sha256":  "98e2336f8e9197051c93eaa3fe774f087463089cc931ffc85f459516e6d48563"
+                                          "bytes":  2442,
+                                          "sha256":  "3ef18687efa69035b1952318581c0f4b4df7c08ac1f69bae8f32c2f3a0107251"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md",
-                                          "bytes":  39709,
-                                          "sha256":  "dec94e56d35c545c6c0c0676af5e3919b58a2ee84a249db69966f7f8935fc1ce"
+                                          "bytes":  2337,
+                                          "sha256":  "6ee72697e24d9dc57a3e6bc8c644f72e9b26b979d4a32ef47bbc7c49a895615d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_Codex核心上下文总纲_状态机IK标签调度LOD_AI协作警告.md",
-                                          "bytes":  18098,
-                                          "sha256":  "ab9dd8f419d3a37e79540f64add66b1b09af4f9bc7b6acfce8b8a946830542e2"
+                                          "bytes":  2311,
+                                          "sha256":  "01f6ed792f732746ece9d853fda41c131ea289d3a8c114daa445a30ab2427d65"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md",
-                                          "bytes":  12638,
-                                          "sha256":  "87f2289a4a7d597433a5593b54451738efb30adbe4bd0dcc53ef3fbd9c7498a0"
+                                          "bytes":  2343,
+                                          "sha256":  "d6fd3966b7a74d7683509b3a9519278253941913c5ad3665d77ff1e25575f46d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_CombatModule武器定义迁移边界与验收门禁_AI协作警告.md",
-                                          "bytes":  3061,
-                                          "sha256":  "820edef738b959bff11b5460244995a7cff2041f0b2fa6f776027f816b39933e"
+                                          "bytes":  1898,
+                                          "sha256":  "85dffa1ae38dbfbc0d11ddd53744e229e5cd9e1421bcf7fd5fa6cc199edc105b"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ESDialog跨宿主唯一合同与Presenter注册边界_AI协作警告.md",
-                                          "bytes":  3929,
-                                          "sha256":  "585ebdee9a2a91f24a84f88dcbbc5795fafbd1a373933c68c00490c01ccc40b1"
+                                          "bytes":  2033,
+                                          "sha256":  "7af8d226be1e85ae8d00f557ff146883e0f228d2051560064e21c103648c844b"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ES活跃请求仲裁协议_跨领域安全标准_AI协作警告.md",
-                                          "bytes":  9398,
-                                          "sha256":  "064642f794962c253c2504ae6516586d3232ce0002cdebf849433e6d0ba354ef"
+                                          "bytes":  2498,
+                                          "sha256":  "16daf5464a5c30913b6ceeefd224c7b01d1d0403bf5fe662d588d287e7ae032d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_Profile装配权威_Feature目录与池化边界_AI协作警告.md",
-                                          "bytes":  17870,
-                                          "sha256":  "343c9380166d5410a8876c024b71b35debaa6e527330fe56e6165d6245b2f291"
+                                          "bytes":  2308,
+                                          "sha256":  "965fd0a20b81b7f06bcfb4c0cebca6454197d27aceae8246848eebf9df561ce8"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_代码结构规范_Internal前缀与new成员隐藏边界_AI协作警告.md",
-                                          "bytes":  5951,
-                                          "sha256":  "f3b5f5e1b9a6362188cc8be95392f7d7b85819cec4a3df920f23a7cdb9a3ec21"
+                                          "bytes":  2215,
+                                          "sha256":  "bbfdf40d223c489ecd39235f65496bcac71b69e89969fc3a4c9ffcaf1b26fb48"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_公共协议与元数据声明分层_AI协作警告.md",
-                                          "bytes":  3251,
-                                          "sha256":  "670f5640ac43edcbd35e135e655b67221f62b481fadb1919f67dae2ba9acaeb8"
+                                          "bytes":  2139,
+                                          "sha256":  "02eeab93dcac836e2ef0aca604f2f561f8e96976dc3be3c216c45cab88dc3c1d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md",
-                                          "bytes":  6729,
-                                          "sha256":  "ef80427c19ab315e9d69ec810caaabb0164a7a2b93f6406d7ee4c5cdd8b7d740"
+                                          "bytes":  2468,
+                                          "sha256":  "92894b62cf1af0cc26e7ee7d2de31bfd88ad88377b64499f759f721f27621d85"
                                       }
                                   ],
-                        "sha256":  "ee8f217402a3e9d6a7a9a3680c09bb9d6eba0dca8c2b5c68ed22feb3907add3a"
+                        "sha256":  "1576bbf8b865f1aa0c4d6d03a60bdbdecb40f85b7f949acff03155264d9cfaf2"
                     },
                     {
                         "domain":  "20_架构现状（Architecture）",
@@ -186,116 +186,116 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/Buff职责边界_被动持续机制_AI协作警告.md",
-                                          "bytes":  3645,
-                                          "sha256":  "6f8518f81bb15330013bf7829237954c2f84f373523c3f149071f11052523f76"
+                                          "bytes":  1759,
+                                          "sha256":  "2baf4921b912a745ad9ff70bc7fdc7632139658bacbb5022c3634a553c0c0a31"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/属性数值与ValueChange边界_AI协作警告.md",
-                                          "bytes":  8788,
-                                          "sha256":  "8b4db36fcf4a870ec2b7a67eaff3aa90478b374f1d4fc019575406355fc4d505"
+                                          "bytes":  2051,
+                                          "sha256":  "5ced4eac1aae28b177afad9ff378042d524126de7ba5ee148f66f12b92b6ded5"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色Prefab职责与DataInfo入口_AI协作警告.md",
-                                          "bytes":  4903,
-                                          "sha256":  "3ffbcc8b1030f7c47e82eff496f0a22cc892d65d04e02e97ff1116a6aba31d83"
+                                          "bytes":  2055,
+                                          "sha256":  "4e1a75e52b673a57f10f8a53c2b566c44e60246b9f5bcb03cc8e9bf05d9bb306"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色通用架构验证_MMO开放世界角色切换剧情RPG战斗_AI协作说明.md",
-                                          "bytes":  18947,
-                                          "sha256":  "63dec1f8630de6ca192ca8bff72711b37a34565054674fd0010b520e00c4d6c2"
+                                          "bytes":  2799,
+                                          "sha256":  "0e8fac01764793306187df82ed6ca6a18e6c8ebbbd6a7bd55ba8dde2c06d98be"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/模型重构_插件依赖边界_AI协作说明.md",
-                                          "bytes":  11719,
-                                          "sha256":  "aeeb86ac450f0d36ff8862863412769c5c0cef873bff04173cb8d34085edf0af"
+                                          "bytes":  1800,
+                                          "sha256":  "a97ad637f95a0af8565a43aa54df53d55cd07616db61b31c40366be31515f6e1"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/模型重构_今日修正_CoreDomain与AI域控制_AI协作警告.md",
-                                          "bytes":  7227,
-                                          "sha256":  "c426de9838f6dfb35262a1385ecdd8a7b161e9a6dd9651ef50494f572095c336"
+                                          "bytes":  1803,
+                                          "sha256":  "4d167fd7670ba3cb848fb70dcd27dc3b373538d02fd639a32714afbd246426a2"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/玩家对象模型重构_AI协作说明.md",
-                                          "bytes":  7682,
-                                          "sha256":  "10636022ffff6f9bee73ccc7cd9377c8af61423cef71ff352de9009e1495f223"
+                                          "bytes":  1905,
+                                          "sha256":  "4398333388e4f0dff371e014b5f2227126fe3fd2993d3b135da1e20baa76f1de"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/装备定义与装配推进路线_AI协作说明.md",
-                                          "bytes":  23922,
-                                          "sha256":  "8e3d4e90eec8faeef5c54c05b5167aa6fc05b3c3b417afdd790f29c642393cf0"
+                                          "bytes":  2907,
+                                          "sha256":  "91a80a2cd812798de343698ccf54e9b8c36049d2ad60897632893eebe0529121"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/GameManager与存档（GameManagerSave）/架构体系_ESGameManager_SaveSystem_AI协作警告.md",
-                                          "bytes":  10451,
-                                          "sha256":  "910e8cd6a3af85ec96f3e38f796229047455aa22fb2e9660ffa97424cacf02d4"
+                                          "bytes":  2238,
+                                          "sha256":  "5985dece2a14e5c9c6fe9ce66e42a01f43da242b1a70654c7d428b2f4ff69554"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
-                                          "bytes":  11568,
-                                          "sha256":  "8213b590650bbca456ce77f2545419e695ae736d979cfc03de08d17728c01cdf"
+                                          "bytes":  3579,
+                                          "sha256":  "842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AI自动化内容身份与GameCoreKey迁移_AI协作警告.md",
-                                          "bytes":  6948,
-                                          "sha256":  "d194bb530eb817862c370ebc1ca6d44548f3f58991a644519fae1812b3b3f978"
+                                          "bytes":  1794,
+                                          "sha256":  "efad4b628b85820da047b070b6ac9d5f5c6a8c2c9140b7ebd0674e2fc52ab8f5"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAdvancedDialog通用编辑器输入边界_AI协作警告.md",
-                                          "bytes":  1983,
-                                          "sha256":  "322ac01c53b0eeb5d03962a0a8973c24880707bc2a9a81ca806bba378220033c"
+                                          "bytes":  1105,
+                                          "sha256":  "cb8da4bd465c56291bd88c6ec5477a3252666f7bd0b3bbd219a7326b161d1935"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
-                                          "bytes":  8113,
-                                          "sha256":  "a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306"
+                                          "bytes":  2198,
+                                          "sha256":  "6f7998bac62c988384030ea434dc1166d0b5fa11c05f880baf6705321ea27485"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESDeveloperCockpit_ArchitectureContract.md",
-                                          "bytes":  12926,
-                                          "sha256":  "ebd4175937d5f6f12b2bb1a042ed9e3e9d1f229dd53c45f994da3f79462128a6"
+                                          "bytes":  1841,
+                                          "sha256":  "90a6a6d3cc442dd7c288d1c8a70ecd1d3f05cc66d9e0813ffe27bec0fe1f248f"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md",
-                                          "bytes":  6298,
-                                          "sha256":  "e1c1014a48e4f743d39a62daa219a2dd8e169fe80f071ea459865e778597b6ce"
+                                          "bytes":  2122,
+                                          "sha256":  "a7fba2b0d2acc0990c6e2c74dd1d3f3a4a1f88df2537c5e0e0e1d1c47d3aae3a"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md",
-                                          "bytes":  11157,
-                                          "sha256":  "62e7023d3048cb790398233c31b91e9e35b174760c87940b3948e36a9f2efd71"
+                                          "bytes":  1975,
+                                          "sha256":  "b9289ed941f167c16441a89fead23dab77c79e7fd1737c21141f28859b9d8d91"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/输入与交互（InputInteraction）/交互运行时_Interactable占用生命周期与结束原因_AI协作警告.md",
-                                          "bytes":  3667,
-                                          "sha256":  "4a08dcbd6972f2aa451259b92723aaebd1bf461580eec5d92f30025630be46d9"
+                                          "bytes":  2012,
+                                          "sha256":  "3ef8e2244e8dc1301d31c6ee19e246bb272474304e76c556e0308f62c930ace2"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/输入与交互（InputInteraction）/输入与交互入口_AI协作警告.md",
-                                          "bytes":  7172,
-                                          "sha256":  "aee8ffd9518528479d662f1a27d1c3f47704417228e19589dc97e8d9c13f9da8"
+                                          "bytes":  1866,
+                                          "sha256":  "0a85740e13e2c3f50324ce36c17146861ecf9ed70978687e78c64d9d3085b984"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/Contextitecture上下文系统_所有权生命周期与类型边界_AI协作警告.md",
-                                          "bytes":  5148,
-                                          "sha256":  "ba38596bdf67ef81bb7179bb0f0345ef896a216e73d72e83e821df4e2dbc4f6e"
+                                          "bytes":  2060,
+                                          "sha256":  "e230624a6d6ef6f9c646eb105f051ed9dd416232b1aadac23aa2bb15be10a2e9"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md",
-                                          "bytes":  8805,
-                                          "sha256":  "04747ea4ea771707c1405bf77647b3b280891a197975963b89562966ad8a4227"
+                                          "bytes":  2067,
+                                          "sha256":  "cd4c04a5bb3cd6e6852f3f0d706fce06bed579e6203ce9cd78d39d1cf79e860d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/音频（Audio）/音频播放与资源边界_AI协作警告.md",
-                                          "bytes":  7075,
-                                          "sha256":  "4c4708f45e7e6c147c5bbd306c4f66604898f82c47edbad04c9d04e3984b80b0"
+                                          "bytes":  1713,
+                                          "sha256":  "9a208ede3cd065ab6d014d79dfaf1950c4cf745e306e9f734f3e7b2259ccb712"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/状态机与IK（StateIK）/AI协作职责_状态机与IK上层_Buff边界说明.md",
-                                          "bytes":  15364,
-                                          "sha256":  "7f4025ee3798befe53004e034542a74c61f1be1cbb8783a2548426268f7771be"
+                                          "bytes":  2566,
+                                          "sha256":  "c86832d48e0eefbbeed6cba0fe85ff607cd861e4b3fa1ee05c5ae312ad1ee3fc"
                                       }
                                   ],
-                        "sha256":  "64b09886de22f096593988ab16399138b53772d261c65452d424257d25a254f3"
+                        "sha256":  "a1ee1465df7b2568a12c44b104ec8b4b3ea7a663cc9241a18d8c31fd0f5b50c5"
                     },
                     {
                         "domain":  "30_运行时专项（RuntimeOperations）",
@@ -304,61 +304,61 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Entity运动（EntityMotion）/玩家运动_PlayerMotion_AI协作说明.md",
-                                          "bytes":  15350,
-                                          "sha256":  "5657d82f084de45029e861ae669eeea0c45c54f11a65c8c9cc00fb99f56c6b0d"
+                                          "bytes":  2812,
+                                          "sha256":  "723540e47e96cd52678ed7949887e79adae5820fcf328d9f1e83215cb8f903c4"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Entity运动（EntityMotion）/载具运动与骑乘职责_VehicleMotion_AI协作警告.md",
-                                          "bytes":  3753,
-                                          "sha256":  "67f5565428ff61c53d99890e1330e8d33598919089d09c1811634d2c3c05308b"
+                                          "bytes":  1225,
+                                          "sha256":  "95f6f749012c7cbc73f4475cd94f5d3748b5deba0eef5602fa468b0d3c307ca7"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/OpTargetPack_Item整合与池化重设_AI协作警告.md",
-                                          "bytes":  3041,
-                                          "sha256":  "99110b128954dbaf6c73125e76426290974777d90da6601e85561d0e1e2256de"
+                                          "bytes":  1421,
+                                          "sha256":  "50e7e43b3a08f39c38fae5a011cd7f798324a376e2cffac0902ef698341ced5e"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/物理架构_简单起步_AI协作警告.md",
-                                          "bytes":  2505,
-                                          "sha256":  "cc353b7cc11d1cfbead170eb8585e611c0f5cdd4ae3aa8cb0955920850f74a17"
+                                          "bytes":  1008,
+                                          "sha256":  "1ea45196d6a575cede11bd1f30737f4d1f53112cba03852055fffb306e83aeb9"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/运动职责_Shot必中与Item运动_AI协作警告.md",
-                                          "bytes":  5941,
-                                          "sha256":  "5cf969b8565bda238aada61c68fb0d0e7545a68bcb9dc341ebbe3587d1791f1b"
+                                          "bytes":  1596,
+                                          "sha256":  "983548866f65055b193d3d22cc26e6030489762e547c4a448d4650cd904c3947"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/UI与图集（UIAtlas）/P2_UI图标_SpriteAtlas与运行时动态图集分流_AI协作警告.md",
-                                          "bytes":  767,
-                                          "sha256":  "207f74a74d0f5e9cdcf91c5dd23d4f5afb9f40e3899938460a6c159666d4b5c5"
+                                          "bytes":  754,
+                                          "sha256":  "9215f8a2f89b0bcb8e9acda6c03e8a53d13f58a39d7e2c42f80d89cce9859196"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md",
-                                          "bytes":  6455,
-                                          "sha256":  "6beb3f9d18ebf505170695a06e52c0065a49c0fd7628a800853bc529f355a633"
+                                          "bytes":  1768,
+                                          "sha256":  "ea2de85ef1f62d2d43d1910711e449919ebe5ad2d6681ebd72133a72f4427581"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/对象池预热_Space与0GC_AI协作警告.md",
-                                          "bytes":  2773,
-                                          "sha256":  "f88f17a86b2703c968ba19aefafacfc36b79c26c0b20d567dd0e69d10b7c25a3"
+                                          "bytes":  991,
+                                          "sha256":  "8c2c59d6d08a738eae2e073c4668f9946214fb0a77470d224ce611a1b52c348c"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/ESCommand运行时_PlayerRunner执行帧与服务边界_AI协作警告.md",
-                                          "bytes":  4300,
-                                          "sha256":  "05d19860d7ab966b84b98e5c065404b8a6d62f8ebf05719ac18d8be450b53d18"
+                                          "bytes":  1104,
+                                          "sha256":  "2d81b217e424c9170625025664ee00db2716a8b2071133cdc3dc0e6f4f21f960"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/Operation默认无Stop_AI协作警告.md",
-                                          "bytes":  3219,
-                                          "sha256":  "77b7554f3ca549c265f0e8fdd86be2ef6315b4d53fe4d9469bd6355f144f8704"
+                                          "bytes":  1084,
+                                          "sha256":  "e831fd0ac59c1840b958dd1a5345beb60f45ffa8e2f83adc2391f64c8a49882f"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）/VFX运行时与制作边界_AI协作警告.md",
-                                          "bytes":  8506,
-                                          "sha256":  "eab9c66838d3b5ea9e8797f0ef231fde30d36c73ec52207ab42edc869387c543"
+                                          "bytes":  2279,
+                                          "sha256":  "a6531ed0d60c4e137dad6c18db4481ee50d6f771b9649a5932b61fae887a1118"
                                       }
                                   ],
-                        "sha256":  "4603039da45265374d781570b7a14bfdd29ebbf39967025ad6ae0177c68dec15"
+                        "sha256":  "0cd10fa4b489749d56f02ce90de1bc569bcf0199808a97f82c9377f336b3528d"
                     },
                     {
                         "domain":  "40_编辑器与工具（EditorTooling）",
@@ -367,86 +367,86 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/SO表格（SOTable）/SO表格工具_AI协作说明.md",
-                                          "bytes":  11768,
-                                          "sha256":  "213f7b612ceadb20b53b39ecea562fa00ea8fb249ff34232d43ee827ccb24007"
+                                          "bytes":  1668,
+                                          "sha256":  "65430c28c5a7b968abe4b5bf16aa538f2e13991231831bd86f0ac5aaef2a8129"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ESCompositeShader_URP职责与材质检查器验收边界_AI协作警告.md",
-                                          "bytes":  4739,
-                                          "sha256":  "743bd3b3b031ed527bbc6d76f04111bdf985cf423a2a092458385602b498863d"
+                                          "bytes":  1213,
+                                          "sha256":  "ee28160bdcf928982f5a743ee9e670c529942f6eb819296bec6eecef2668d004"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ES编辑器绘制与序列化套件_PropertyTree多目标与迁移边界_AI协作警告.md",
-                                          "bytes":  4344,
-                                          "sha256":  "4730985784a02bc0d8f5f5aa5b2752c9637c0cf5604d09c0db52b454793d95ce"
+                                          "bytes":  1293,
+                                          "sha256":  "63d3c0c60146e0f89ad75347907c9e30adc6dfe13f0767add81f4dff1449c8d1"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md",
-                                          "bytes":  16445,
-                                          "sha256":  "eae10c692c14c6f05b94406b15fb5a1fcd4359afcc46011a0a3d37c71e52be5c"
+                                          "bytes":  16566,
+                                          "sha256":  "4a1bde6f96bad3461178fc0385d3e4b26eb7184ea7efc92de3879abb9f042d44"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/P2_编辑器菜单根必须使用【ES】_AI协作警告.md",
-                                          "bytes":  8803,
-                                          "sha256":  "1b813362d62255a3ed7e8910ef7cf3c3b2fcf344dbc2ceccf753ad825d08fd9a"
+                                          "bytes":  1776,
+                                          "sha256":  "f31ed883e4cdf3e30fb3f375b322e9b6814e83ccdbfee1d8d58e2f379a818dc7"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/UGC工作台_UI Toolkit作者底座与草稿提交边界_AI协作警告.md",
-                                          "bytes":  11084,
-                                          "sha256":  "3ecdce71803c7acf2f6e513a46c14952ce70ddcd9d701138db3bb15e6da36328"
+                                          "bytes":  2336,
+                                          "sha256":  "5a102b615d65c97d036d8e837a6778a3f61fee73b1b0a50d390db9d303442e52"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器窗口迁移_ESMenuTreeWindowAB适配_AI协作警告.md",
-                                          "bytes":  8247,
-                                          "sha256":  "736c75cf3db3479f0cb898d20ce6bde2d67a219956558a78eeec16a154f84500"
+                                          "bytes":  1755,
+                                          "sha256":  "7278694b4f706ea2bd82c92fc30c0eb9d5db445a35e06784b8961bea7591a488"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md",
-                                          "bytes":  41861,
-                                          "sha256":  "c4331ed96d7b32907286cb553a443418e4388df838f0672cb1365971e20a5332"
+                                          "bytes":  2229,
+                                          "sha256":  "f8b5dd538e5747a9fe5914fa30df168801db051911082dbfc397ddf767a439ce"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/第三方编辑器包嵌入与菜单补丁_AI协作警告.md",
-                                          "bytes":  4541,
-                                          "sha256":  "5b992cef4884f73b1c9efa8e5b5ba377fa27e9501299b012f462afc666708a28"
+                                          "bytes":  2044,
+                                          "sha256":  "f0103c753440abc81acf3d722d5f2f5e9772faa555dbd578292a5359f0495fae"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/生成产物快速打开入口_AI协作警告.md",
-                                          "bytes":  1161,
-                                          "sha256":  "956af92e6fd746c5da99fc66e53f9681a8b061f6bacddb9bc559b84f31f9d20a"
+                                          "bytes":  884,
+                                          "sha256":  "d480f3019fe6944fadc580adfa0c79cb9dfbbf26d5e798aecbd8c2a639682140"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/程序集与稳定性（AssemblyStability）/编辑器匿名函数与程序集流稳定性_AI协作警告.md",
-                                          "bytes":  4072,
-                                          "sha256":  "f90c6fa4b8cb1146bff3fcd73d47b7980a37eb50f300e3c46de3c187fb487b0c"
+                                          "bytes":  1735,
+                                          "sha256":  "551f6b031775e20b222fe1fd50373a87d6d716ee43aa8494845a49ab5fe05c0a"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/简单工具（SimpleTools）/Codex_工具重写_商业级验证协作上下文.md",
-                                          "bytes":  50133,
-                                          "sha256":  "908b946a541199bb8a1409583dada5524408d35215ef6779728814c61b872628"
+                                          "bytes":  2410,
+                                          "sha256":  "255af45a5c8a7275636c6e273b253328859b7e63b1b1cdcbe22c44cae9a4b84f"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/编辑器预览系统生命周期_AI协作警告.md",
-                                          "bytes":  6575,
-                                          "sha256":  "f47b625e802478c67336fc12cfbd42fdb29e71832f7c5dc796343a36b4cf7d1c"
+                                          "bytes":  1633,
+                                          "sha256":  "da41da7f309bdc11783f6febe99ae824cfb7858ebcb09f12ea797e3b5a9bddfc"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/内存泄露与编辑器生命周期_AI协作警告.md",
-                                          "bytes":  4653,
-                                          "sha256":  "b2fdf355777d58b2037407ef9211925eec6c39632ff66e18053799f23033e866"
+                                          "bytes":  2074,
+                                          "sha256":  "8b867e93038fcf467efdf81f6803487e2e20ae4e23082c725ca2e195b9b7c95e"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/专业工作台（Workbench）/专业工作台与World作者工具_贡献注册与正式资产边界_AI协作警告.md",
-                                          "bytes":  6464,
-                                          "sha256":  "280bd60662735efdb854dd97fd14c77caea3ec781054daa0d2bff072999bae10"
+                                          "bytes":  2188,
+                                          "sha256":  "d2b7808cec44ced0c899fe393e5f283a3e2063d01098447811bff1689a868b2d"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/资产包分离（AssetPackage）/资产包分离窗口_预览与导出链路_AI协作警告.md",
-                                          "bytes":  11847,
-                                          "sha256":  "15274661d322c9e7f51990e76b8ee7fc9d9aa889242642f41fa74591a21bd3fd"
+                                          "bytes":  1879,
+                                          "sha256":  "ff0539d8769216b873190dfbba402e5a933524fb0d355969a65178f656e3d9aa"
                                       }
                                   ],
-                        "sha256":  "88de5f109ecd210c56170530070ad0031cfdeba78d6789aabe6319ec0885d219"
+                        "sha256":  "3cff3374e7f874d0b000bce9c346899d17485e6d43c76499c24fc80ccc20f568"
                     },
                     {
                         "domain":  "50_验证与发布（ValidationRelease）",
@@ -455,31 +455,31 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/AI协作治理验收（AICollaborationAcceptance）/AI协作历程与模块审计_商业可行性验收标准.md",
-                                          "bytes":  4295,
-                                          "sha256":  "f1a8b0037b0941c6a2837da94d20dacef03f50393f7866cdea9bc51e1ce6b2d0"
+                                          "bytes":  1677,
+                                          "sha256":  "cac7f1746d29499373d6d715689ffbcc484b9313685ba2de61370c8f3d970558"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/ResourcePlan扩展协议_强制约束.md",
-                                          "bytes":  3632,
-                                          "sha256":  "7b59846935b1fa2e76251fb843a2e4e29a3374178bc0079b34577e0ab13b8adf"
+                                          "bytes":  1296,
+                                          "sha256":  "8a1d85e8542b86e9b99608084e7ffcff7b335180431bc34edd04b809900112de"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md",
-                                          "bytes":  3130,
-                                          "sha256":  "ab0c4852c76d57c727405cc8a4da597bfeb38a77875ff0b5c23abb1df06b1e8e"
+                                          "bytes":  1233,
+                                          "sha256":  "a55d464d511718c8e7f3024e75fbd14d34037ae9a6d9a35423ca0f61a6845e8e"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md",
-                                          "bytes":  8779,
-                                          "sha256":  "3bb8490dfdf42399110309ada24f51926fdd6b6894a7373f0ef583ec90c52cbc"
+                                          "bytes":  1734,
+                                          "sha256":  "55533cb848d5153ef9a62c9e63f6c7fbfcae24544685c79f2b65471ba53c7556"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/资源计划验收（ResourcePlanAcceptance）/资源计划_Scope生命周期绑定_商业项目验收标准.md",
-                                          "bytes":  11092,
-                                          "sha256":  "6d46d8685a24964f6eec820aebb6fd59895a1a0bdbd283a5c811191fce727c1d"
+                                          "bytes":  1809,
+                                          "sha256":  "27962ad8eb6b2674e1b759448708afc316b913fcf20945b80a83fc44111b5acf"
                                       }
                                   ],
-                        "sha256":  "6ce916ec0c5714579c3ff9a7cd321590ed5d2918210a7d81d8bea1dfecdf7fe2"
+                        "sha256":  "c827c760b11859808169e3b3fd77ac80cc4123c3fd02546a64e237e65e88a1f9"
                     },
                     {
                         "domain":  "80_交接与复盘（Handover）",
@@ -488,31 +488,31 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/2026-08-16_当前状态快照_活跃索引迁移前.md",
-                                          "bytes":  34480,
-                                          "sha256":  "5a5947e52fa42588173a4e106232b7d139a0c5aada104eee71cea0150f91454f"
+                                          "bytes":  2004,
+                                          "sha256":  "3c5ae1c332ea7bcd148f4eb65cc033a97408304938f23072dfc725929f31c755"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/AIPersonas与AI顶级目录边界_AI协作警告.md",
-                                          "bytes":  3883,
-                                          "sha256":  "6775f983d40b20e30174a437af560f36345d11233d5c74420ca52fb6f1a67f59"
+                                          "bytes":  1459,
+                                          "sha256":  "f366285980c1fcbd1e1c282cec96dc2b75d07b940ac9faad1e022b4f46937abb"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/历史上下文（HistoricalContext）/资源加载底层_RuntimeKey稳定与旧输入坏引用_给其他AI阅读.md",
-                                          "bytes":  3922,
-                                          "sha256":  "e9f9801576d14955d9f20e1612fa4d630e89dc89073ba6aff8bec976cbee00c4"
+                                          "bytes":  1688,
+                                          "sha256":  "b41596dc1a7df77ca7a384a0937f3d8389022b7757202e60a50a6ea9e3420d14"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/失败复盘（Retrospectives）/ESCmdAgent_失败复盘与后续禁止事项_AI协作警告.md",
-                                          "bytes":  5670,
-                                          "sha256":  "62eaeb8bbdbfa31614074c284582466a6692b8c28ca33ee82e9f9c4e50d04142"
+                                          "bytes":  1630,
+                                          "sha256":  "1c4e98300cab7531038f48e062dc3b1f1973aaa8f3144a4167f18bf2a63cbe41"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/项目总交接（ProjectHandover）/Codex_当前项目总交接_模型重构与编辑器稳定_AI协作警告.md",
-                                          "bytes":  13357,
-                                          "sha256":  "5e54c49e6047c867d9249f62f9b2b09bc98a7392379870800d8e3317e0c9ddfe"
+                                          "bytes":  1678,
+                                          "sha256":  "3e8beeaf530b5ca541491f37a35bab85f991b3fa3e0efd9a6c8212dc1f8671d1"
                                       }
                                   ],
-                        "sha256":  "35a231121b5265fa97f4c9f452be140e11dd06a99fb42185ec49929a31718430"
+                        "sha256":  "f949d87d236193adc8f3e8a5e34c970c20ef98b5ea8a6f04cc43a9fcffdff659"
                     },
                     {
                         "domain":  "90_提案与废止（Archive）",
@@ -521,26 +521,26 @@
                         "files":  [
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/Entity固有Tag_DataInfo权威_Prefab入口与池化闭环_提案.md",
-                                          "bytes":  4960,
-                                          "sha256":  "d920c458d691264d4afbd597fa782d543094311dc0597969df94e7b5c7b7f570"
+                                          "bytes":  1599,
+                                          "sha256":  "bf8d9667929ce892e31f82f4cccfcd69f418199f6e0db505313ba360ae163ee4"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md",
-                                          "bytes":  6474,
-                                          "sha256":  "f43d39692d64ee2a7c066e9b58f232a4dee34489fdf778ba9f63eef07db5d7b3"
+                                          "bytes":  1589,
+                                          "sha256":  "368b625bad7e7dee513f5fedcc1eac22c8bc9b389f953d32492a45b47ad609cb"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/音频系统_双后端与发布资源生命周期_待验收提案.md",
-                                          "bytes":  31842,
-                                          "sha256":  "eabea4cb90bb0c3855ab71994c9a6da3f3c7063ea112b0c608ad8e037cbfd935"
+                                          "bytes":  1615,
+                                          "sha256":  "68aaf9f2d9318bd72fe7ae93b50afda43e308c1835ed06be1e9b9626177ea0a4"
                                       },
                                       {
                                           "path":  "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/资源计划_Scope生命周期绑定_待验收提案.md",
-                                          "bytes":  7682,
-                                          "sha256":  "19d014a7a896e8d28733395c22a1117a1a74d9fc9b4f638ba7035cb18f9aaeef"
+                                          "bytes":  1499,
+                                          "sha256":  "26b9879ca154921479a2e6f6574a932f8b6beef4d519c567efc59c7e5d50257f"
                                       }
                                   ],
-                        "sha256":  "0adbd3b9f97e38395e64a9fcc6941b533653c3b8ecf4b660e42c8f1cf202ec75"
+                        "sha256":  "6b8dc11bada601241eeb619536dd424cc9a6b4107039ecb1af5c60da91ce9a95"
                     }
                 ],
     "markdownFiles":  95,

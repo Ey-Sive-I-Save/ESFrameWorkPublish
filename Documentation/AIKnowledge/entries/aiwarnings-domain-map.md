@@ -5,11 +5,11 @@
 `KnowledgeId`: `es.aiwarnings.domain-map.v1`
 `Authority`: `AIWarnings`
 `RouteKeys`: `aiwarnings`, `p0`, `architecture`, `runtime`, `editor`, `validation`, `handover`, `archive`
-`ContentHash`: `06de948b50e15383eb320676d35d33b1ac3a7bd80e36502a2175b4e596a26b35`
+`ContentHash`: `11a3ec99b3c56f4877ca94570f2af098c9f4bb4b29a5308ec42d10abc98330dc`
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md` (`04af5af87127d069f4a5d2914ee12ce885043b804bd4d6050a3ec342721ca66b`)
+- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md` (`0181a3285041d4221e0eb35a682bfc6de39b7f854b99312e157dd1e4c99c5c5b`)
 - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md` (`896e981dfc0aebdee7de5907b59cceb9d233c3f7ba443599fd904a4b72e822b8`)
 - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md` (`89c647f286f3ff648cc7c3fd7dd0646e1f36c5ded4963b9a5a598d7611ba0a59`)
 

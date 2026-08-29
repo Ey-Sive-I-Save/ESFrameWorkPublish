@@ -6,7 +6,7 @@
 `HashSchema`: `v2`  
 `ContentHash`: `de8d60942db8904aa5a970720e73c13136604fc9109e85ef4bb99b7b8b95bfb0`  
 `SourceSetHash`: `de8d60942db8904aa5a970720e73c13136604fc9109e85ef4bb99b7b8b95bfb0`  
-`EntryBodyHash`: `3309e28abae39e1bc4223cdb34b60bfe9106429f59f22007592a88e462ff5577`
+`EntryBodyHash`: `2e433a99b6ca844cbd62eb478e8dcba065f207bed2c07a3ef9272c7a2d414d57`
 `EvidenceLevel`: `S0`  
 `StaleWhen`: 固定开源仓库 commit、raw 文件哈希、许可证、UI IR/flow 协议、当前 ES ScreenSpec/AssetManifest/BehaviorSpec/Materializer 合同或任一 SourceRef 哈希变化。
 

@@ -328,7 +328,10 @@
             ".agents/skills/es-ui-intent-authoring/SKILL.md",
             ".agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md",
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
-            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md"
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py",
+            ".agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md",
+            "Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs"
           ]
         }
       ],
@@ -359,6 +362,7 @@
             ".agents/skills/es-ui-prefab-authoring/SKILL.md",
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md",
             ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
             ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
             "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs"
@@ -429,9 +433,11 @@
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
             ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
             ".agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md",
+            ".agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md",
             ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
             ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
             "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs",
             "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
             "Packages/manifest.json"
           ]
@@ -481,9 +487,11 @@
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
             ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
             ".agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md",
+            ".agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md",
             ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
             ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
             "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs",
             "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
             "Packages/manifest.json"
           ]
@@ -960,6 +968,7 @@
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md",
             ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
             ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
             "Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs",
@@ -1067,7 +1076,10 @@
             ".agents/skills/es-ui-intent-authoring/SKILL.md",
             ".agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md",
             ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
-            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md"
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py",
+            ".agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md",
+            "Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs"
           ]
         },
         {
@@ -1208,6 +1220,38 @@
         }
       ],
       "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "agent-mechanism-replication-es-adaptation",
+      "domain": "agent-mechanism-replication",
+      "objective": "将公开 Agent 机制复刻为 ES TaskContext、EvidenceKernel、RoutePlan 和可发现 Knowledge 路由",
+      "explicitRouteKeys": ["agent-mechanism-replication", "analysis", "design", "es-adaptation", "evidence-set", "external-authority", "failure-surface", "knowledge-output", "route-plan", "route-probe", "route-stage", "root-cause", "source-ref", "source-scope", "static-replay", "task-context-runtime", "receipt", "cas", "stale", "closed-loop"],
+      "expectedRouteKeys": ["agent-mechanism-replication", "analysis", "design", "es-adaptation", "evidence-set", "external-authority", "failure-surface", "knowledge-output", "route-plan", "route-probe", "route-stage", "root-cause", "source-ref", "source-scope", "static-replay", "task-context-runtime", "receipt", "cas", "stale", "closed-loop"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.research.agent-mechanism-replication.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/agent-mechanism-replication.md",
+            "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+            "Documentation/AIKnowledge/entries/task-context-runtime.md",
+            "Documentation/AIKnowledge/entries/automation-aibrain-graph.md",
+            "Documentation/AIKnowledge/entries/knowledge-routing-quality.md",
+            "ES/Automation/Contracts/es-task-context-runtime-v1.schema.json",
+            "ES/Automation/Contracts/es-route-plan-v1.schema.json",
+            "ES/Automation/Contracts/es-route-stage.registry.json",
+            ".agents/skills/es-first-principles-analysis/SKILL.md",
+            ".agents/skills/es-aibrain-route-authoring/SKILL.md",
+            ".agents/skills/es-knowledge-creator/SKILL.md",
+            ".agents/skills/es-knowledge-validator/SKILL.md",
+            "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md",
+            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"],
       "zeroHitAllowed": false,
       "repeatCount": 3,
       "evidenceBoundary": "static-routing-only"

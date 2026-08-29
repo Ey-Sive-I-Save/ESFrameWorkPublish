@@ -6,7 +6,7 @@
 `HashSchema`: `v2`
 `ContentHash`: `c607207e65f8f322e63cb2e0526c1a97190f1c1cd1cfd75461568a0458b59afa`
 `SourceSetHash`: `c607207e65f8f322e63cb2e0526c1a97190f1c1cd1cfd75461568a0458b59afa`
-`EntryBodyHash`: `0000000000000000000000000000000000000000000000000000000000000000`
+`EntryBodyHash`: `71f93274531ce40e87c78e609404cff7f8457983e7f2c5b7f3771b82c5942481`
 `EvidenceLevel`: `S0`
 `StaleWhen`: pinned repository commit, model/API version, project reference-ingestion executor, ScreenSpec/LayoutPlan/Materializer contract or any SourceRef hash changes.
 
@@ -76,5 +76,3 @@ Fixture contract or source hash changes.
 - `Documentation/AIKnowledge/UI/game-ui-open-source-automation-source-snapshot.md` (`f276bff04711fab6e8d6713079c9854acfaad653e2f39ac5a5cae00cc1329344`)
 - `Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md` (`d29ff698cd8fc3b0a3e014efe1780ef4a141e620b05cd3bf22be9d72ab3548de`)
 - `Packages/manifest.json` (`d447378a6e35e070c3fa8df645a5829a703eb4b488f8ae8132cd894ab19d016d`)
-
-`EvidenceLevel`: `S0`

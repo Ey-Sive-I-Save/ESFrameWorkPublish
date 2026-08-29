@@ -187,7 +187,11 @@ namespace ES
 
             try
             {
-                renderContext = new ESEditorPreviewRenderContext(owner, ESEditorPreviewSceneMode.PreviewScene);
+                renderContext = new ESEditorPreviewRenderContext(
+                    owner,
+                    ESEditorPreviewSceneMode.PreviewScene,
+                    ESEditorPreviewUtility.DefaultPreviewLayer,
+                    ESEditorPreviewEnhancerSet.ParticleSimulation);
                 renderContext.Ensure();
                 if (renderContext.Camera != null)
                 {

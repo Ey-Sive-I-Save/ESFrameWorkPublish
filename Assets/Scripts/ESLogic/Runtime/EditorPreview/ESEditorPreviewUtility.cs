@@ -241,7 +241,7 @@ namespace ES
             }
         }
 
-        public static Texture2D RenderCameraSnapshot(Camera camera, RenderTexture renderTexture, int width, int height, string name)
+        public static Texture2D RenderCameraSnapshot(Camera camera, RenderTexture renderTexture, int width, int height, string name, bool linear = false)
         {
             if (camera == null || renderTexture == null)
                 return null;
@@ -256,7 +256,7 @@ namespace ES
                 camera.targetTexture = renderTexture;
                 camera.Render();
                 RenderTexture.active = renderTexture;
-                texture = new Texture2D(width, height)
+                texture = new Texture2D(width, height, TextureFormat.RGBA32, false, linear)
                 {
                     name = string.IsNullOrEmpty(name) ? "ES Editor Preview Snapshot" : name,
                     hideFlags = PreviewHideFlags,

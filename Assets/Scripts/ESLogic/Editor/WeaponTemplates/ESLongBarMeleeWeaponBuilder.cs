@@ -48,7 +48,7 @@ namespace ES
             EnsureFolder("Assets/ESNormalAssets/WeaponPrototypes");
             EnsureFolder("Assets/ESNormalAssets/Data/Group/Item");
 
-            Object infoAsset = AssetDatabase.LoadMainAssetAtPath(WeaponInfoPath);
+            UnityEngine.Object infoAsset = AssetDatabase.LoadMainAssetAtPath(WeaponInfoPath);
             if (infoAsset != null && !(infoAsset is ItemDataInfo))
                 throw new System.InvalidOperationException("大长条定义路径已被其他资产类型占用，拒绝覆盖：" + WeaponInfoPath);
 
@@ -56,7 +56,7 @@ namespace ES
             ValidateDefinitionOwnership(info);
             ValidateGroupOwnership(info);
 
-            Object prefabAsset = AssetDatabase.LoadMainAssetAtPath(WeaponPrefabPath);
+            UnityEngine.Object prefabAsset = AssetDatabase.LoadMainAssetAtPath(WeaponPrefabPath);
             if (prefabAsset != null && !(prefabAsset is GameObject))
                 throw new System.InvalidOperationException("大长条 Prefab 路径已被其他资产类型占用，拒绝覆盖：" + WeaponPrefabPath);
             if (info == null && prefabAsset != null)
@@ -90,7 +90,7 @@ namespace ES
             {
                 GameObject root = BuildWeaponRoot(info);
                 prefab = PrefabUtility.SaveAsPrefabAsset(root, WeaponPrefabPath);
-                Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(root);
                 if (prefab == null)
                     throw new System.InvalidOperationException("创建大长条 Prefab 失败：" + WeaponPrefabPath);
             }
@@ -147,7 +147,7 @@ namespace ES
 
         private static void ValidateGroupOwnership(ItemDataInfo info)
         {
-            Object groupAsset = AssetDatabase.LoadMainAssetAtPath(WeaponGroupPath);
+            UnityEngine.Object groupAsset = AssetDatabase.LoadMainAssetAtPath(WeaponGroupPath);
             if (groupAsset != null && !(groupAsset is ItemDataGroup))
                 throw new System.InvalidOperationException("大长条数据组路径已被其他资产类型占用，拒绝覆盖：" + WeaponGroupPath);
 
@@ -404,7 +404,7 @@ namespace ES
             }
             finally
             {
-                Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(root);
                 if (!AssetDatabase.DeleteAsset(rebuildPath)
                     && AssetDatabase.LoadMainAssetAtPath(rebuildPath) != null)
                 {
@@ -572,7 +572,7 @@ namespace ES
             blade.transform.localPosition = new Vector3(0f, 0f, 0.85f);
             blade.transform.localRotation = Quaternion.identity;
             blade.transform.localScale = new Vector3(0.16f, 0.16f, 1.7f);
-            Object.DestroyImmediate(blade.GetComponent<Collider>());
+            UnityEngine.Object.DestroyImmediate(blade.GetComponent<Collider>());
 
             // Weapon-local grip/aim references are presentation data; hand/holster roots
             // are resolved by EntityWeaponBinding from the owning Entity.

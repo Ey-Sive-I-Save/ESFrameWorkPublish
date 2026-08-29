@@ -39,6 +39,8 @@ namespace ES
     internal static class ESWorkbenchPersistentActivityStore
     {
         private const int MaximumRecords = 500;
+        private const long MaximumStoreBytes = 2L * 1024L * 1024L;
+        private const int MaximumFieldChars = 8192;
         private static readonly object Gate = new object();
         private static string StorePath => Path.Combine(
             Directory.GetCurrentDirectory(), "Library", "ESWorkbench", "activity-v1.json");
@@ -92,6 +94,11 @@ namespace ES
             bool replace)
         {
             if (string.IsNullOrWhiteSpace(recordId) || string.IsNullOrWhiteSpace(workbenchId)) return;
+            if (recordId.Length > MaximumFieldChars
+                || workbenchId.Length > MaximumFieldChars
+                || (status?.Length ?? 0) > MaximumFieldChars
+                || (message?.Length ?? 0) > MaximumFieldChars
+                || (artifactPath?.Length ?? 0) > MaximumFieldChars) return;
             lock (Gate)
             {
                 ESWorkbenchActivityRecordCollection collection = Read();
@@ -149,7 +156,9 @@ namespace ES
         {
             try
             {
-                if (!File.Exists(StorePath)) return new ESWorkbenchActivityRecordCollection();
+                if (!File.Exists(StorePath)
+                    || new FileInfo(StorePath).Length > MaximumStoreBytes)
+                    return new ESWorkbenchActivityRecordCollection();
                 string json = File.ReadAllText(StorePath, Encoding.UTF8);
                 ESWorkbenchActivityRecordCollection value =
                     JsonUtility.FromJson<ESWorkbenchActivityRecordCollection>(json);

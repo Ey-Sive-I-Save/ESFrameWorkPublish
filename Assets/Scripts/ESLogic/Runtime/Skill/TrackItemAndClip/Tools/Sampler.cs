@@ -1342,10 +1342,11 @@ namespace ES
         GameObject go = null;
         try
         {
-            go = new GameObject($"AudioPreview_{_clip.name}_{GetHashCode()}")
-            {
-                hideFlags = HideFlags.HideAndDontSave
-            };
+            go = ESEditorPreviewUtility.CreatePreviewGameObject(
+                $"AudioPreview_{_clip.name}_{GetHashCode()}");
+            if (!ESEditorPreviewUtility.TryMarkPreviewObject(
+                    go, nameof(AudioEditorSampler), "Track audio preview source.", out string markerStatus))
+                throw new InvalidOperationException("音频预览对象未能登记公共预览所有权：" + markerStatus);
             AudioSource source = go.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.clip = _clip;
@@ -1356,7 +1357,7 @@ namespace ES
         {
             if (go != null)
             {
-                try { UnityEngine.Object.DestroyImmediate(go); }
+                try { ESEditorPreviewUtility.DestroyObject(go); }
                 catch (Exception cleanupException) { Debug.LogException(cleanupException); }
             }
             throw;
@@ -1420,7 +1421,7 @@ namespace ES
             try
             {
                 if (source.gameObject != null)
-                    UnityEngine.Object.DestroyImmediate(source.gameObject);
+                    ESEditorPreviewUtility.DestroyObject(source.gameObject);
             }
             catch (Exception exception) { Debug.LogException(exception); }
         }

@@ -374,6 +374,8 @@ namespace ES
 
         private const int MaximumCaptureDimension = 8192;
         private const long MaximumCapturePixels = 64L * 1024L * 1024L;
+        private const long MaximumIndexBytes = 1L * 1024L * 1024L;
+        private const long MaximumManifestBytes = 8L * 1024L * 1024L;
         private static readonly string[] CommercialInteractionCheckIds =
         {
             "window-open-focus",
@@ -1249,14 +1251,23 @@ namespace ES
         private static ESWorkbenchVisualEvidenceIndex ReadIndex(string workbenchRoot)
         {
             string path = Path.Combine(workbenchRoot, "matrix-index-v3.json");
-            if (!File.Exists(path)) return new ESWorkbenchVisualEvidenceIndex();
-            ESWorkbenchVisualEvidenceIndex index =
-                JsonUtility.FromJson<ESWorkbenchVisualEvidenceIndex>(
-                    File.ReadAllText(path, Encoding.UTF8));
-            if (index == null || index.schemaVersion < 3)
+            try
+            {
+                if (!File.Exists(path) || new FileInfo(path).Length > MaximumIndexBytes)
+                    return new ESWorkbenchVisualEvidenceIndex();
+                ESWorkbenchVisualEvidenceIndex index =
+                    JsonUtility.FromJson<ESWorkbenchVisualEvidenceIndex>(
+                        File.ReadAllText(path, Encoding.UTF8));
+                if (index == null || index.schemaVersion < 3)
+                    return new ESWorkbenchVisualEvidenceIndex();
+                index.entries ??= new List<ESWorkbenchVisualEvidenceIndexEntry>();
+                return index;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("ES Workbench 视觉证据索引读取失败，已忽略损坏索引：" + exception.Message);
                 return new ESWorkbenchVisualEvidenceIndex();
-            index.entries ??= new List<ESWorkbenchVisualEvidenceIndexEntry>();
-            return index;
+            }
         }
 
         private static bool IsValidEntry(
@@ -1283,9 +1294,25 @@ namespace ES
             if (string.IsNullOrWhiteSpace(currentSourcePath)
                 || AssetDatabase.LoadMainAssetAtPath(currentSourcePath) == null) return false;
 
-            ESWorkbenchVisualEvidenceManifest manifest =
-                JsonUtility.FromJson<ESWorkbenchVisualEvidenceManifest>(
+            try
+            {
+                if (new FileInfo(entry.manifestPath).Length > MaximumManifestBytes) return false;
+            }
+            catch
+            {
+                return false;
+            }
+            ESWorkbenchVisualEvidenceManifest manifest;
+            try
+            {
+                manifest = JsonUtility.FromJson<ESWorkbenchVisualEvidenceManifest>(
                     File.ReadAllText(entry.manifestPath, Encoding.UTF8));
+            }
+            catch
+            {
+                return false;
+            }
+            if (manifest == null) return false;
             return HasCurrentArtifactIdentity(
                     manifest, expectedWorkbenchId, expectedSourceAssetGuid)
                 && manifest.scenarioMatch

@@ -23,6 +23,42 @@ namespace ES
         High
     }
 
+    /// <summary>
+    /// 可选预览增强器集合。底座生命周期始终启用；增强器按集合显式打开，
+    /// 低端路径可使用 LowEnd 而不会承担地面、标尺或粒子初始化成本。
+    /// </summary>
+    [Flags]
+    public enum ESEditorPreviewEnhancerSet
+    {
+        LowEnd = 0,
+        GroundPlane = 1 << 0,
+        ScaleReference = 1 << 1,
+        ParticleSimulation = 1 << 2,
+        HighQualityLighting = 1 << 3,
+        AudioSpatialization = 1 << 4,
+        PostProcessing = 1 << 5,
+        Full = GroundPlane | ScaleReference | ParticleSimulation
+            | HighQualityLighting | AudioSpatialization | PostProcessing
+    }
+
+    public static class ESEditorPreviewEnhancerBudgets
+    {
+        /// <summary>将渲染质量映射为增强器预算；Fast 不创建可选辅助资源。</summary>
+        public static ESEditorPreviewEnhancerSet ForQuality(ESEditorPreviewQuality quality)
+        {
+            switch (quality)
+            {
+                case ESEditorPreviewQuality.Fast:
+                    return ESEditorPreviewEnhancerSet.LowEnd;
+                case ESEditorPreviewQuality.Balanced:
+                    return ESEditorPreviewEnhancerSet.GroundPlane
+                        | ESEditorPreviewEnhancerSet.ScaleReference;
+                default:
+                    return ESEditorPreviewEnhancerSet.Full;
+            }
+        }
+    }
+
     public readonly struct ESEditorPreviewCameraPose
     {
         /// <summary>最终用于渲染的世界坐标中心。</summary>
@@ -878,6 +914,9 @@ namespace ES
         private const float CameraFarClip = 80f;
         private const float GroundSize = 25f;
         private const float GroundThickness = 0.02f;
+        private const int MaxRenderTextureDimension = 2048;
+        private const long PreviewRenderTextureBudgetBytes = 192L * 1024L * 1024L;
+        private const long GlobalPreviewRenderTextureBudgetBytes = 512L * 1024L * 1024L;
         private const int MaxCellProbeAttempts = 4096;
         private static readonly object AllocationLock = new object();
         private static readonly HashSet<Vector2Int> OccupiedCells = new HashSet<Vector2Int>();
@@ -887,6 +926,7 @@ namespace ES
         private readonly string owner;
         private readonly ESEditorPreviewSceneMode sceneMode;
         private readonly int previewLayer;
+        private ESEditorPreviewEnhancerSet enhancerSet;
         private readonly int allocationId;
         private readonly Vector2Int allocatedCell;
         private readonly Vector3 groupOrigin;
@@ -911,11 +951,13 @@ namespace ES
         private bool cellReleased;
 
         public Camera Camera { get; private set; }
+        public Scene PreviewScene => previewScene;
         public Vector3 GroupOrigin => groupOrigin;
         public bool IsScaleReferenceVisible => scaleReferenceObject != null && scaleReferenceObject.activeSelf;
         public bool IsReady => Camera != null && (sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid());
         public bool IsDisposed => disposed;
         public ESEditorPreviewSceneMode SceneMode => sceneMode;
+        public ESEditorPreviewEnhancerSet EnhancerSet => enhancerSet;
         public bool PreviewSceneIsValid => sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid();
         public int ActiveModelGroupCount => modelHandles.Count;
         public int ActiveTemporaryObjectCount => (cameraObject != null ? 1 : 0)
@@ -946,11 +988,13 @@ namespace ES
         public ESEditorPreviewRenderContext(
             string owner,
             ESEditorPreviewSceneMode sceneMode = ESEditorPreviewSceneMode.HiddenObjectsInActiveScene,
-            int previewLayer = ESEditorPreviewUtility.DefaultPreviewLayer)
+            int previewLayer = ESEditorPreviewUtility.DefaultPreviewLayer,
+            ESEditorPreviewEnhancerSet enhancerSet = ESEditorPreviewEnhancerSet.Full)
         {
             this.owner = string.IsNullOrWhiteSpace(owner) ? "EditorPreview" : owner;
             this.sceneMode = sceneMode;
             this.previewLayer = Mathf.Clamp(previewLayer, 0, 31);
+            this.enhancerSet = enhancerSet;
             allocationId = System.Threading.Interlocked.Increment(ref nextAllocationId);
             allocatedCell = AllocateCell(allocationId, out allocationReport);
             groupOrigin = new Vector3(allocatedCell.x * GroupSpacing, 0f, allocatedCell.y * GroupSpacing);
@@ -966,18 +1010,31 @@ namespace ES
             EnsurePreviewScene();
             EnsureCamera();
             EnsureLights();
-            EnsureGroundPlane();
+            if (HasEnhancer(ESEditorPreviewEnhancerSet.GroundPlane))
+                EnsureGroundPlane();
             LastStatus = "Preview render context ready.";
         }
 
-        public void PreparePreviewObject(GameObject obj, string note, bool samplingTarget)
+        /// <summary>
+        /// 在首次 Ensure 前选择增强器预算；一旦资源已创建便拒绝热切换，避免半套资源状态。
+        /// </summary>
+        public bool TryConfigureEnhancers(ESEditorPreviewEnhancerSet set)
+        {
+            ThrowIfDisposed();
+            if (IsReady)
+                return false;
+            enhancerSet = set;
+            return true;
+        }
+
+        public bool PreparePreviewObject(GameObject obj, string note, bool samplingTarget)
         {
             if (obj == null)
-                return;
+                return false;
             if (EditorUtility.IsPersistent(obj) || !ESEditorPreviewUtility.HasPreviewOwnershipFlags(obj))
             {
                 LastStatus = "Preview object rejected: object is not an owned temporary preview object.";
-                return;
+                return false;
             }
 
             Ensure();
@@ -985,7 +1042,7 @@ namespace ES
             HideFlags flags = samplingTarget ? ESEditorPreviewUtility.SamplingSafeHideFlags : ESEditorPreviewUtility.PreviewHideFlags;
             ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, flags);
             ESEditorPreviewUtility.SetLayerRecursive(obj.transform, previewLayer);
-            ESEditorPreviewUtility.TryMarkPreviewObject(obj, owner, note, out string markerStatus);
+            bool markerRegistered = ESEditorPreviewUtility.TryMarkPreviewObject(obj, owner, note, out string markerStatus);
             LastObjectFlowStatus =
                 "Object=" + obj.name
                 + ", HideFlags=" + flags
@@ -994,6 +1051,7 @@ namespace ES
                 + ", Move=" + moved
                 + ", Layer=" + previewLayer
                 + ", Marker=" + markerStatus;
+            return moved && markerRegistered;
         }
 
         /// <summary>PreviewLocal 是仅平移的米制空间：原点对应 GroupOrigin，轴向与 Unity 世界轴一致。</summary>
@@ -1042,6 +1100,8 @@ namespace ES
 
         public void SetScaleReferenceVisible(bool visible, float sizeMeters = 1f)
         {
+            if (!HasEnhancer(ESEditorPreviewEnhancerSet.ScaleReference))
+                return;
             if (!visible)
             {
                 if (scaleReferenceObject != null)
@@ -1157,7 +1217,8 @@ namespace ES
                     samplingTarget
                         ? ESEditorPreviewUtility.SamplingSafeHideFlags
                         : ESEditorPreviewUtility.PreviewHideFlags);
-                PreparePreviewObject(instance, "Preview model group.", samplingTarget);
+                if (!PreparePreviewObject(instance, "Preview model group.", samplingTarget))
+                    throw new InvalidOperationException("Preview model could not be moved into the Context scene.");
                 if (moveToGroupOrigin)
                     MoveToGroupOrigin(instance.transform);
 
@@ -1220,8 +1281,8 @@ namespace ES
                 return true;
 
             float scale = Mathf.Clamp(EditorGUIUtility.pixelsPerPoint * options.RenderScale, 0.5f, 4f);
-            int width = Mathf.Max(1, Mathf.CeilToInt(rect.width * scale));
-            int height = Mathf.Max(1, Mathf.CeilToInt(rect.height * scale));
+            int width = QuantizeRenderDimension(rect.width * scale);
+            int height = QuantizeRenderDimension(rect.height * scale);
             EnsureRenderTexture(width, height, options.Quality);
             if (renderTexture == null)
                 return false;
@@ -1265,8 +1326,8 @@ namespace ES
                 return true;
 
             float scale = Mathf.Clamp(EditorGUIUtility.pixelsPerPoint * options.RenderScale, 0.5f, 4f);
-            int width = Mathf.Max(1, Mathf.CeilToInt(rect.width * scale));
-            int height = Mathf.Max(1, Mathf.CeilToInt(rect.height * scale));
+            int width = QuantizeRenderDimension(rect.width * scale);
+            int height = QuantizeRenderDimension(rect.height * scale);
             EnsureRenderTexture(width, height, options.Quality);
             if (renderTexture == null)
                 return false;
@@ -1296,7 +1357,7 @@ namespace ES
             return true;
         }
 
-        public Texture2D Snapshot(int width, int height, ESEditorPreviewCameraPose pose, ESEditorPreviewQuality quality, string textureName)
+        public Texture2D Snapshot(int width, int height, ESEditorPreviewCameraPose pose, ESEditorPreviewQuality quality, string textureName, bool linear = false)
         {
             Ensure();
             if (Camera == null)
@@ -1306,7 +1367,7 @@ namespace ES
             height = Mathf.Clamp(height, 64, 2048);
             ApplyCameraPose(width / (float)Mathf.Max(1, height), pose, quality);
             EnsureRenderTexture(width, height, quality);
-            return ESEditorPreviewUtility.RenderCameraSnapshot(Camera, renderTexture, width, height, textureName);
+            return ESEditorPreviewUtility.RenderCameraSnapshot(Camera, renderTexture, width, height, textureName, linear);
         }
 
         public void Dispose()
@@ -1420,7 +1481,9 @@ namespace ES
             {
                 created = ESEditorPreviewUtility.CreatePreviewGameObject(owner + " Preview Camera", typeof(Camera));
                 MoveToContextScene(created);
-                ESEditorPreviewUtility.TryMarkPreviewObject(created, owner, "Preview camera.", out _);
+                if (!ESEditorPreviewUtility.TryMarkPreviewObject(
+                        created, owner, "Preview camera.", out string cameraMarkerStatus))
+                    throw new InvalidOperationException("Preview camera ownership registration failed: " + cameraMarkerStatus);
                 Camera camera = created.GetComponent<Camera>();
                 if (camera == null)
                     throw new InvalidOperationException("Preview camera component was not created.");
@@ -1463,7 +1526,9 @@ namespace ES
                 created = ESEditorPreviewUtility.CreatePreviewGameObject(name, typeof(Light));
                 MoveToContextScene(created);
                 ESEditorPreviewUtility.SetLayerRecursive(created.transform, previewLayer);
-                ESEditorPreviewUtility.TryMarkPreviewObject(created, owner, "Preview light.", out _);
+                if (!ESEditorPreviewUtility.TryMarkPreviewObject(
+                        created, owner, "Preview light.", out string lightMarkerStatus))
+                    throw new InvalidOperationException("Preview light ownership registration failed: " + lightMarkerStatus);
                 Light light = created.GetComponent<Light>();
                 if (light == null)
                     throw new InvalidOperationException("Preview light component was not created.");
@@ -1494,6 +1559,17 @@ namespace ES
                 SafeDestroyPreviewObject(ref groundPlaneObject);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 查询当前会话是否启用指定增强器。未启用的增强器只保留能力位，不会隐式分配资源；
+        /// 业务扩展器可据此决定是否注册粒子模拟、空间音频或后处理管线。
+        /// </summary>
+        public bool HasEnhancer(ESEditorPreviewEnhancerSet enhancer)
+        {
+            if (enhancer == ESEditorPreviewEnhancerSet.LowEnd)
+                return enhancerSet == ESEditorPreviewEnhancerSet.LowEnd;
+            return (enhancerSet & enhancer) == enhancer;
         }
 
         private void EnsureGroundPlaneCore()
@@ -1539,7 +1615,9 @@ namespace ES
                 renderer.sharedMaterial = groundPlaneMaterial;
             }
 
-            ESEditorPreviewUtility.TryMarkPreviewObject(groundPlaneObject, owner, "Preview ground plane.", out _);
+            if (!ESEditorPreviewUtility.TryMarkPreviewObject(
+                    groundPlaneObject, owner, "Preview ground plane.", out string groundMarkerStatus))
+                throw new InvalidOperationException("Preview ground ownership registration failed: " + groundMarkerStatus);
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
         }
 
@@ -1568,7 +1646,9 @@ namespace ES
             Collider collider = scaleReferenceObject.GetComponent<Collider>();
             if (collider != null)
                 ESEditorPreviewUtility.DestroyObject(collider);
-            PreparePreviewObject(scaleReferenceObject, "Optional one-meter scale reference.", samplingTarget: false);
+            if (!PreparePreviewObject(scaleReferenceObject,
+                    "Optional one-meter scale reference.", samplingTarget: false))
+                throw new InvalidOperationException("Scale reference could not be adopted by the preview context.");
 
             Renderer renderer = scaleReferenceObject.GetComponent<Renderer>();
             Shader shader = Shader.Find("Universal Render Pipeline/Unlit")
@@ -1638,13 +1718,16 @@ namespace ES
                 ? Mathf.Max(CameraFarClip, distance + pose.Radius * 2.5f)
                 : CameraFarClip;
             Camera.cullingMask = 1 << previewLayer;
-            Camera.allowHDR = quality == ESEditorPreviewQuality.High;
+            // 公共预览 RT 当前固定为 ARGB32；开启 HDR 只会增加管线成本，
+            // 却无法保留 HDR 精度，因而显式保持 LDR，避免高质量档出现隐性性能损耗。
+            Camera.allowHDR = false;
             Camera.allowMSAA = quality != ESEditorPreviewQuality.Fast;
             TrySetCameraScene(Camera, previewScene);
         }
 
         private void EnsureRenderTexture(int width, int height, ESEditorPreviewQuality quality)
         {
+            ApplyGlobalRenderTextureBudget(ref width, ref height, quality);
             if (renderTexture != null && renderTextureWidth == width && renderTextureHeight == height && renderTextureQuality == quality)
                 return;
 
@@ -1653,8 +1736,10 @@ namespace ES
                 width,
                 height,
                 24,
-                GetAntiAliasing(quality),
+                GetAntiAliasing(width, height, quality),
                 owner + " Preview RT");
+            if (replacement == null)
+                throw new InvalidOperationException("Preview RenderTexture creation returned null; existing target was retained.");
             renderTexture = replacement;
             renderTextureWidth = width;
             renderTextureHeight = height;
@@ -1665,6 +1750,36 @@ namespace ES
                 catch (Exception exception) { Debug.LogException(exception); }
             }
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+        }
+
+        private void ApplyGlobalRenderTextureBudget(ref int width, ref int height, ESEditorPreviewQuality quality)
+        {
+            width = Mathf.Clamp(width, 64, MaxRenderTextureDimension);
+            height = Mathf.Clamp(height, 64, MaxRenderTextureDimension);
+
+            ESEditorPreviewDiagnosticsSnapshot diagnostics = ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+            long otherBytes = Math.Max(0L, diagnostics.EstimatedRenderTextureBytes - EstimatedRenderTextureBytes);
+            long availableBytes = Math.Max(8L * 1024L * 1024L, GlobalPreviewRenderTextureBudgetBytes - otherBytes);
+            int samples = GetAntiAliasing(width, height, quality);
+            while ((long)width * height * (4L + 4L) * samples > availableBytes
+                && (width > 64 || height > 64))
+            {
+                width = Math.Max(64, width / 2);
+                height = Math.Max(64, height / 2);
+                samples = GetAntiAliasing(width, height, quality);
+            }
+
+            if ((long)width * height * (4L + 4L) * samples > availableBytes)
+                LastStatus = "Preview render context ready with global RT budget floor.";
+        }
+
+        private static int QuantizeRenderDimension(float pixels)
+        {
+            int raw = Mathf.Max(1, Mathf.CeilToInt(pixels));
+            // 轻微布局抖动不应触发 RenderTexture 反复释放/重建；8px 对 UI 预览不可见，
+            // 但能显著减少窗口拖拽和 DPI 变化时的 native allocation churn。
+            int quantized = Mathf.Max(8, ((raw + 7) / 8) * 8);
+            return Mathf.Min(MaxRenderTextureDimension, quantized);
         }
 
         private bool MoveToContextScene(GameObject obj)
@@ -1688,7 +1803,10 @@ namespace ES
             }
             catch
             {
-                return obj.scene.IsValid();
+                // PreviewScene 模式下，仍在活动场景的对象不能被视为迁移成功；
+                // 上层必须看到 false 并停止继续渲染，避免正式场景污染/假成功。
+                return sceneMode != ESEditorPreviewSceneMode.PreviewScene
+                    && obj.scene.IsValid();
             }
         }
 
@@ -1723,6 +1841,17 @@ namespace ES
                 default:
                     return 1;
             }
+        }
+
+        private static int GetAntiAliasing(int width, int height, ESEditorPreviewQuality quality)
+        {
+            int samples = GetAntiAliasing(quality);
+            while (samples > 1
+                   && (long)width * height * (4L + 4L) * samples > PreviewRenderTextureBudgetBytes)
+            {
+                samples >>= 1;
+            }
+            return Mathf.Max(1, samples);
         }
 
         private static bool IsFinite(Vector3 value)
@@ -1765,11 +1894,21 @@ namespace ES
                         report = "CellAlloc=hash-random, Attempt=" + attempt + ", Occupied=" + OccupiedCells.Count;
                         return candidate;
                     }
+
+                    // 哈希探测耗尽时仍必须登记一个唯一单元，不能回退到未登记的
+                    // (0,0)，否则极端多窗口/碰撞场景会让 Context 互相重叠。
+                    for (int offset = 1; ; offset++)
+                    {
+                        var fallback = new Vector2Int(offset, 0);
+                        if (OccupiedCells.Contains(fallback))
+                            continue;
+
+                        OccupiedCells.Add(fallback);
+                        report = "CellAlloc=deterministic-fallback, Occupied=" + OccupiedCells.Count;
+                        return fallback;
+                    }
                 }
             }
-
-            report = "CellAlloc=fallback-zero";
-            return Vector2Int.zero;
         }
 
         private static void ReleaseCell(Vector2Int cell)

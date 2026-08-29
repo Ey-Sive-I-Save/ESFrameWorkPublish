@@ -126,14 +126,17 @@ namespace ES
             string trackName,
             ESRuntimeTargetPack target,
             ESCameraViewDefinitionCatalog definitionCatalog,
-            ESCameraRigCatalog rigCatalog)
+            ESCameraRigCatalog rigCatalog,
+            ESEditorPreviewEnhancerSet enhancerSet = ESEditorPreviewEnhancerSet.HighQualityLighting)
         {
             this.target = target;
             int sessionId = ++nextSessionId;
             string owner = "ES Camera Track Preview " + sessionId;
             renderContext = new ESEditorPreviewRenderContext(
                 owner,
-                ESEditorPreviewSceneMode.HiddenObjectsInActiveScene);
+                ESEditorPreviewSceneMode.HiddenObjectsInActiveScene,
+                ESEditorPreviewUtility.DefaultPreviewLayer,
+                enhancerSet);
             try
             {
                 renderContext.Ensure();
@@ -147,8 +150,11 @@ namespace ES
 
                 // 预览只由 Sample() 显式 ManualUpdate，防止 Editor Update 与采样顺序争抢。
                 brain.enabled = false;
-                rigRootObject = new GameObject(string.IsNullOrWhiteSpace(trackName) ? "ES Camera Preview Rigs" : trackName + " Camera Preview Rigs");
-                rigRootObject.hideFlags = HideFlags.HideAndDontSave;
+                rigRootObject = ESEditorPreviewUtility.CreatePreviewGameObject(
+                    string.IsNullOrWhiteSpace(trackName) ? "ES Camera Preview Rigs" : trackName + " Camera Preview Rigs");
+                if (!ESEditorPreviewUtility.TryMarkPreviewObject(
+                        rigRootObject, owner, "Camera track preview rig root.", out string markerStatus))
+                    throw new InvalidOperationException("相机轨道预览根对象未能登记公共预览所有权：" + markerStatus);
                 rigRootObject.transform.SetParent(outputCamera.transform, false);
                 previewView = new ESCameraPreviewView(
                     new ESCameraViewId("EditorTrackPreview." + sessionId),

@@ -885,16 +885,23 @@ namespace ES
                 throw new InvalidOperationException(staticReport);
 
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(CompleteTemplatePath);
-            Scene previewScene = EditorSceneManager.NewPreviewScene();
+            var previewContext = new ESEditorPreviewRenderContext(
+                "ES Character Template SelfTest",
+                ESEditorPreviewSceneMode.PreviewScene,
+                ESEditorPreviewUtility.DefaultPreviewLayer,
+                ESEditorPreviewEnhancerSet.LowEnd);
             GameObject instance = null;
             StateMachine stateMachine = null;
             try
             {
+                previewContext.Ensure();
                 instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
                 if (instance == null)
                     throw new InvalidOperationException("运行态烟雾测试无法实例化完整角色模板。");
 
-                SceneManager.MoveGameObjectToScene(instance, previewScene);
+                instance.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                Require(previewContext.PreparePreviewObject(instance, "Character template self-test.", samplingTarget: false),
+                    "角色模板预览实例未能进入公共 PreviewScene");
                 Entity entity = instance.GetComponent<Entity>();
                 Require(entity != null, "缺少根 Entity");
                 entity._DoAwake();
@@ -984,8 +991,7 @@ namespace ES
             {
                 if (instance != null)
                     UnityEngine.Object.DestroyImmediate(instance);
-                if (previewScene.IsValid())
-                    EditorSceneManager.ClosePreviewScene(previewScene);
+                previewContext.Dispose();
             }
         }
 

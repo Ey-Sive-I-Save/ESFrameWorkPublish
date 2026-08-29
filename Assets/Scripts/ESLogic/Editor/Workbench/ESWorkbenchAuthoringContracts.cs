@@ -2150,18 +2150,22 @@ namespace ES
 
         public bool ToggleFavorite(string objectId)
         {
+            if (string.IsNullOrWhiteSpace(objectId))
+                return false;
             ESWorkbenchContentUsageRecord record = GetOrCreate(objectId);
             record.favorite = !record.favorite;
-            Save();
+            TrySave();
             return record.favorite;
         }
 
         public void RecordUse(string objectId)
         {
+            if (string.IsNullOrWhiteSpace(objectId))
+                return;
             ESWorkbenchContentUsageRecord record = GetOrCreate(objectId);
             record.lastUsedUtcTicks = DateTime.UtcNow.Ticks;
             if (record.useCount < int.MaxValue) record.useCount++;
-            Save();
+            TrySave();
         }
 
         internal IReadOnlyList<ESWorkbenchContentUsageRecord> Snapshot()
@@ -2228,6 +2232,21 @@ namespace ES
             foreach (ESWorkbenchContentUsageRecord entry in retained) records.Add(entry.objectId, entry);
             var document = new UsageDocument { entries = retained.ToList() };
             EditorPrefs.SetString(preferencesKey, JsonUtility.ToJson(document));
+        }
+
+        private void TrySave()
+        {
+            try
+            {
+                Save();
+            }
+            catch (Exception exception)
+            {
+                // Usage persistence is advisory telemetry; it must never turn a
+                // completed authoring/drop operation into a failed operation.
+                Debug.LogException(new InvalidOperationException(
+                    "ES 工作台内容使用记录保存失败，已保留本次内存状态。", exception));
+            }
         }
 
         private static string NormalizeObjectId(string objectId)

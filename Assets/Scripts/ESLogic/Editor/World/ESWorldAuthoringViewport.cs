@@ -361,7 +361,8 @@ namespace ES
             createdTerrain.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
             terrainObject = contentScope.RegisterGameObject(createdTerrain);
             terrainObject.name = "ES World Draft Terrain";
-            preview.PreparePreviewObject(terrainObject, "World draft terrain.", samplingTarget: false);
+            if (!preview.PreparePreviewObject(terrainObject, "World draft terrain.", samplingTarget: false))
+                throw new InvalidOperationException("世界草稿地形未能进入公共 PreviewScene。");
             terrainObject.transform.position = preview.GroupOrigin
                 + new Vector3(definition.worldMin.x, 0f, definition.worldMin.y);
             TrackPreviewObject(terrainObject, null);
@@ -438,7 +439,8 @@ namespace ES
                 renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
                 renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
                 renderer.allowOcclusionWhenDynamic = false;
-                preview.PreparePreviewObject(root, "World region terrain-conforming guide.", false);
+                if (!preview.PreparePreviewObject(root, "World region terrain-conforming guide.", false))
+                    throw new InvalidOperationException("世界区域导视未能进入公共 PreviewScene。");
                 root.transform.position = preview.GroupOrigin;
 
                 var visual = new RegionGuideVisual
@@ -2592,13 +2594,26 @@ namespace ES
             preview?.Dispose();
             preview = new ESEditorPreviewRenderContext(
                 "ES World Authoring Viewport",
-                ESEditorPreviewSceneMode.PreviewScene);
-            preview.Ensure();
-            if (preview.Camera != null)
+                ESEditorPreviewSceneMode.PreviewScene,
+                ESEditorPreviewUtility.DefaultPreviewLayer,
+                ESEditorPreviewEnhancerSet.GroundPlane
+                | ESEditorPreviewEnhancerSet.ScaleReference
+                | ESEditorPreviewEnhancerSet.HighQualityLighting);
+            try
             {
-                preview.Camera.fieldOfView = feel.VerticalFieldOfViewDegrees;
-                preview.Camera.nearClipPlane = 0.1f;
-                preview.Camera.backgroundColor = new Color(0.055f, 0.07f, 0.08f, 1f);
+                preview.Ensure();
+                if (preview.Camera != null)
+                {
+                    preview.Camera.fieldOfView = feel.VerticalFieldOfViewDegrees;
+                    preview.Camera.nearClipPlane = 0.1f;
+                    preview.Camera.backgroundColor = new Color(0.055f, 0.07f, 0.08f, 1f);
+                }
+            }
+            catch
+            {
+                preview.Dispose();
+                preview = null;
+                throw;
             }
         }
 

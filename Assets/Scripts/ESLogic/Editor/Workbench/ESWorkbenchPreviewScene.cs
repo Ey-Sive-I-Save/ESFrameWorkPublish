@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -18,26 +17,40 @@ namespace ES
     public sealed class ESWorkbenchPreviewScene : System.IDisposable
     {
         private readonly List<GameObject> instances = new List<GameObject>();
-        private Scene scene;
+        private readonly ESEditorPreviewRenderContext renderContext;
+        private bool disposed;
 
-        public bool IsOpen => scene.IsValid();
-        public Scene Scene => scene;
+        public ESWorkbenchPreviewScene(
+            ESEditorPreviewEnhancerSet enhancerSet = ESEditorPreviewEnhancerSet.GroundPlane
+                | ESEditorPreviewEnhancerSet.ScaleReference
+                | ESEditorPreviewEnhancerSet.HighQualityLighting)
+        {
+            renderContext = new ESEditorPreviewRenderContext(
+                "ES Workbench",
+                ESEditorPreviewSceneMode.PreviewScene,
+                ESEditorPreviewUtility.DefaultPreviewLayer,
+                enhancerSet);
+        }
+
+        public bool IsOpen => !disposed && renderContext.IsReady && renderContext.PreviewSceneIsValid;
+        public Scene Scene => renderContext.PreviewScene;
         public IReadOnlyList<GameObject> Instances => instances;
 
         public bool EnsureOpen(out string error)
         {
             error = string.Empty;
-            if (scene.IsValid()) return true;
+            if (disposed)
+            {
+                error = "PreviewScene 已释放，不能重新打开。";
+                return false;
+            }
             try
             {
-                scene = EditorSceneManager.NewPreviewScene();
-                if (scene.IsValid()) return true;
-                error = "PreviewScene 创建失败。";
-                return false;
+                renderContext.Ensure();
+                return IsOpen;
             }
             catch (System.Exception exception)
             {
-                scene = default(Scene);
                 error = "PreviewScene 创建异常：" + exception.Message;
                 return false;
             }
@@ -48,12 +61,17 @@ namespace ES
         {
             instance = null;
             stringKey = string.Empty;
+            if (disposed)
+            {
+                error = "PreviewScene 已释放，不能创建预览实例。";
+                return false;
+            }
             if (!IsSafeTransform(position, rotation, scale, out error))
                 return false;
             if (!ESWorkbenchContentRegistration.TryResolveRegisteredAsset(prefab, ESAssetReferKind.Prefab,
                     out ESAssetPage page, out error))
                 return false;
-            bool openedHere = !scene.IsValid();
+            bool openedHere = !IsOpen;
             if (!EnsureOpen(out error)) return false;
             if (!PrefabUtility.IsPartOfPrefabAsset(prefab))
             {
@@ -63,14 +81,24 @@ namespace ES
             }
             try
             {
-                instance = PrefabUtility.InstantiatePrefab(prefab, scene) as GameObject;
+                instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
                 if (instance == null)
                 {
                     error = "Prefab 预览实例创建失败。";
                     if (openedHere) Close();
                     return false;
                 }
+                if (!renderContext.PreviewSceneIsValid)
+                    throw new System.InvalidOperationException("公共 PreviewScene 创建后失效。");
+                // InstantiatePrefab(prefab) 使用当前活动场景；公共预览相机只渲染
+                // Context 自己的 PreviewScene，因此必须显式迁移，避免污染正式场景。
+                SceneManager.MoveGameObjectToScene(instance, renderContext.PreviewScene);
                 instance.name = prefab.name + " · ES 工作台预览";
+                instance.transform.SetPositionAndRotation(position, rotation);
+                instance.transform.localScale = scale;
+                instance.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                if (!renderContext.PreparePreviewObject(instance, "Workbench prefab preview.", samplingTarget: false))
+                    throw new System.InvalidOperationException("工作台预览实例未能进入公共 PreviewScene。");
                 instance.transform.SetPositionAndRotation(position, rotation);
                 instance.transform.localScale = scale;
                 stringKey = page.EffectiveStringKey;
@@ -90,7 +118,7 @@ namespace ES
 
         public bool Contains(GameObject instance)
         {
-            return instance != null && instances.Contains(instance);
+            return !disposed && IsOpen && instance != null && instances.Contains(instance);
         }
 
         public void ApplyTransform(GameObject instance, Vector3 position, Vector3 euler, Vector3 scale)
@@ -183,7 +211,7 @@ namespace ES
             bool sceneClosed = true;
             try
             {
-                if (scene.IsValid()) EditorSceneManager.ClosePreviewScene(scene);
+                renderContext.Dispose();
             }
             catch (System.Exception exception)
             {
@@ -193,7 +221,7 @@ namespace ES
             if (sceneClosed)
             {
                 instances.Clear();
-                scene = default(Scene);
+                // 公共 Context 保留失败后的 PreviewScene 关闭重试句柄。
             }
             else
             {
@@ -204,7 +232,10 @@ namespace ES
 
         public void Dispose()
         {
+            if (disposed) return;
             Close();
+            // 公共 Context 只有在所有资源和 PreviewScene 真实释放后才进入 disposed。
+            if (renderContext.IsDisposed) disposed = true;
         }
     }
 

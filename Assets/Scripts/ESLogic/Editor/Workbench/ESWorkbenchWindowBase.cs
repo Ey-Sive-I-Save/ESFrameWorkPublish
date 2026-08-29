@@ -730,6 +730,8 @@ namespace ES
 
         private void OnWorkbenchUndoRedo()
         {
+            if (!workbenchHostSessionActive)
+                return;
             ESWorkbench_SerializedAsset?.UpdateIfRequiredOrScript();
             ESWorkbench_OnUndoRedo();
             RefreshWorkbench(ESWorkbenchRefreshReason.UndoRedo);

@@ -87,6 +87,7 @@ namespace ES
         internal static bool IsExternalContentDragActive =>
             DragAndDrop.GetGenericData(DragSessionKey) != null;
         private const int MaximumThumbnailAttempts = 24;
+        private const int MaximumThumbnailCacheEntries = 2048;
         private const int GeneratedThumbnailWidth = 192;
         private const int GeneratedThumbnailHeight = 128;
         private const int MaximumGeneratedThumbnailCacheEntries = 256;
@@ -220,6 +221,7 @@ namespace ES
         private Label contentSummaryLabel;
         private Label objectEmptyLabel;
         private Label hierarchyEmptyLabel;
+        private Label contentCategoryEmptyLabel;
         private string categoryFilter = "全部";
         private string contentKindFilter = "all";
         private ESWorkbenchContentViewMode contentViewMode;
@@ -269,6 +271,8 @@ namespace ES
         private bool externalDragWatchdogRegistered;
         private double externalDragLastSignalTime;
         private const double ExternalDragWatchdogTimeoutSeconds = 1.5d;
+        private const int MaximumExternalDragBatchItems = 256;
+        private const int MaximumWorkbenchSearchCharacters = 512;
         private object externalPointerSessionToken;
         private ESWorkbenchBottomPanelDensity activeBottomPanelDensity = ESWorkbenchBottomPanelDensity.Normal;
         private float appliedBottomDrawerHeight;
@@ -626,6 +630,21 @@ namespace ES
             if (recoveryButton != null)
                 recoveryButton.style.display = type == MessageType.Error ? DisplayStyle.Flex : DisplayStyle.None;
             RecordActivity(statusLabel.text, type);
+        }
+
+        private void CopyToClipboard(string value, string successMessage)
+        {
+            if (disposed || string.IsNullOrEmpty(value))
+                return;
+            try
+            {
+                EditorGUIUtility.systemCopyBuffer = value;
+                SetStatus(successMessage, MessageType.Info);
+            }
+            catch (Exception exception)
+            {
+                SetStatus("复制失败：" + exception.Message, MessageType.Error);
+            }
         }
 
         private VisualElement BuildLeftPanel()
@@ -1736,10 +1755,13 @@ namespace ES
             contentCategoryList.style.flexGrow = 1f;
             contentCategoryList.selectionChanged += selection =>
             {
+                if (disposed) return;
                 ContentCategoryNode selected = selection.OfType<ContentCategoryNode>().FirstOrDefault();
                 if (selected != null) SetCategory(selected.path);
             };
             kindRail.Add(contentCategoryList);
+            contentCategoryEmptyLabel = CreateListEmptyLabel("没有业务分类", "注册内容贡献后将在这里显示分类。");
+            kindRail.Add(contentCategoryEmptyLabel);
             browser.Add(kindRail);
 
             VisualElement results = contentResults = new VisualElement { name = "ESWorkbenchContentResults" };
@@ -1807,6 +1829,7 @@ namespace ES
             objectList.style.flexGrow = 1f;
             objectList.selectionChanged += selection =>
             {
+                if (disposed) return;
                 actions.Selection.SelectMany(selection
                     .OfType<ESWorkbenchObjectDescriptor>()
                     .Select(value => GetEffectiveDescriptor(value).ToSelection()));
@@ -1947,6 +1970,7 @@ namespace ES
 
         private void SetContentScope(ESWorkbenchContentScope scope)
         {
+            if (disposed) return;
             if (contentScope == scope) return;
             contentScope = scope;
             layout.contentScope = scope;
@@ -1990,6 +2014,7 @@ namespace ES
 
         private void SetContentSortMode(ESWorkbenchContentSortMode mode)
         {
+            if (disposed) return;
             contentSortMode = mode;
             layout.contentSortMode = mode;
             if (sortMenu != null) sortMenu.text = ResolveContentSortName(mode);
@@ -2022,6 +2047,7 @@ namespace ES
 
         private void ApplyContentBrowserResponsive(float width)
         {
+            if (disposed) return;
             bool compact = width > 1f
                 && (width < 330f
                     || (contentViewMode == ESWorkbenchContentViewMode.Grid && width < 520f));
@@ -2042,6 +2068,7 @@ namespace ES
 
         private void ApplyContentVerticalResponsive(float height)
         {
+            if (disposed) return;
             bool compact = height > 1f
                 && (compactContentVertical ? height < 790f : height < 760f);
             bool changed = compactContentVertical != compact
@@ -2099,6 +2126,7 @@ namespace ES
 
         private void ApplyContentResultsResponsive(float width)
         {
+            if (disposed) return;
             bool compactViewSwitch = width > 1f && width < 205f;
             if (listModeButton != null)
                 listModeButton.style.display = compactViewSwitch ? DisplayStyle.None : DisplayStyle.Flex;
@@ -2272,6 +2300,46 @@ namespace ES
 
         private void BuildContentCategoryTree(IReadOnlyList<ESWorkbenchObjectDescriptor> source = null)
         {
+            ContentCategoryNode[] previousNodes = contentCategoryNodes.ToArray();
+            string previousFilter = categoryFilter;
+            string previousLayoutFilter = layout.activeContentCategory;
+            try
+            {
+                BuildContentCategoryTreeCore(source);
+            }
+            catch (Exception exception)
+            {
+                contentCategoryNodes.Clear();
+                contentCategoryNodes.AddRange(previousNodes);
+                categoryFilter = previousFilter;
+                layout.activeContentCategory = previousLayoutFilter;
+                Debug.LogException(new InvalidOperationException(
+                    "ES 工作台分类树重建失败，已恢复上一版节点。", exception));
+                try { contentCategoryList?.Rebuild(); }
+                catch (Exception rebuildException) { Debug.LogException(rebuildException); }
+                if (contentCategoryEmptyLabel != null)
+                    contentCategoryEmptyLabel.style.display = previousNodes.Length == 0
+                        ? DisplayStyle.Flex : DisplayStyle.None;
+                try
+                {
+                    int restoredIndex = contentCategoryNodes.FindIndex(value =>
+                        string.Equals(value.path, categoryFilter, StringComparison.Ordinal));
+                    if (restoredIndex >= 0)
+                        contentCategoryList?.SetSelectionWithoutNotify(new[] { restoredIndex });
+                }
+                catch (Exception selectionException)
+                {
+                    Debug.LogException(selectionException);
+                }
+                try { UpdateContentBreadcrumb(); }
+                catch (Exception breadcrumbException) { Debug.LogException(breadcrumbException); }
+                try { BuildCompactContentFilterMenu(); }
+                catch (Exception filterException) { Debug.LogException(filterException); }
+            }
+        }
+
+        private void BuildContentCategoryTreeCore(IReadOnlyList<ESWorkbenchObjectDescriptor> source = null)
+        {
             source ??= contentSourceSnapshot;
             IEnumerable<ESWorkbenchObjectDescriptor> filtered = source == null
                 ? Enumerable.Empty<ESWorkbenchObjectDescriptor>()
@@ -2400,6 +2468,7 @@ namespace ES
             hierarchyList.style.flexGrow = 1f;
             hierarchyList.selectionChanged += selection =>
             {
+                if (disposed) return;
                 actions.Selection.SelectMany(selection
                     .OfType<ESWorkbenchHierarchyDescriptor>()
                     .Select(value => value.ToSelection()));
@@ -3511,24 +3580,46 @@ namespace ES
             string key = item.BaseObjectId + "@" + item.Source.GetInstanceID();
             if (!thumbnailCache.TryGetValue(key, out ThumbnailEntry entry))
             {
+                TrimThumbnailCacheIfNeeded();
                 entry = new ThumbnailEntry { source = item.Source };
                 thumbnailCache.Add(key, entry);
             }
             if (entry.complete)
                 return entry.texture ?? entry.fallback ?? ResolveGeneratedContentThumbnail(item);
-            Texture preview = AssetPreview.GetAssetPreview(item.Source);
-            if (preview != null)
+            try
             {
-                entry.texture = preview;
-                entry.complete = true;
-                return preview;
+                Texture preview = AssetPreview.GetAssetPreview(item.Source);
+                if (preview != null)
+                {
+                    entry.texture = preview;
+                    entry.complete = true;
+                    return preview;
+                }
+                entry.fallback ??= AssetPreview.GetMiniThumbnail(item.Source);
+                if (!AssetPreview.IsLoadingAssetPreview(item.Source.GetInstanceID())
+                    && entry.attempts >= MaximumThumbnailAttempts)
+                    entry.complete = true;
+                else EnsureThumbnailRefreshScheduled();
             }
-            entry.fallback ??= AssetPreview.GetMiniThumbnail(item.Source);
-            if (!AssetPreview.IsLoadingAssetPreview(item.Source.GetInstanceID())
-                && entry.attempts >= MaximumThumbnailAttempts)
+            catch (Exception exception)
+            {
                 entry.complete = true;
-            else EnsureThumbnailRefreshScheduled();
+                Debug.LogException(new InvalidOperationException(
+                    "ES 工作台内容缩略图读取失败，已使用降级图标。", exception));
+            }
+            if (entry.complete)
+                return entry.fallback ?? ResolveGeneratedContentThumbnail(item);
             return entry.fallback ?? ResolveGeneratedContentThumbnail(item);
+        }
+
+        private void TrimThumbnailCacheIfNeeded()
+        {
+            if (thumbnailCache.Count < MaximumThumbnailCacheEntries) return;
+            string removable = thumbnailCache
+                .FirstOrDefault(pair => pair.Value == null || pair.Value.complete).Key;
+            if (string.IsNullOrEmpty(removable))
+                removable = thumbnailCache.Keys.FirstOrDefault();
+            if (!string.IsNullOrEmpty(removable)) thumbnailCache.Remove(removable);
         }
 
         private Texture2D ResolveGeneratedContentThumbnail(ESWorkbenchObjectDescriptor item)
@@ -3908,22 +3999,33 @@ namespace ES
             {
                 if (entry == null || entry.complete || entry.source == null) continue;
                 entry.attempts++;
-                Texture preview = AssetPreview.GetAssetPreview(entry.source);
-                if (preview != null)
+                try
                 {
-                    entry.texture = preview;
-                    entry.complete = true;
-                    changed = true;
+                    Texture preview = AssetPreview.GetAssetPreview(entry.source);
+                    if (preview != null)
+                    {
+                        entry.texture = preview;
+                        entry.complete = true;
+                        changed = true;
+                    }
+                    else if (entry.attempts >= MaximumThumbnailAttempts
+                        && !AssetPreview.IsLoadingAssetPreview(entry.source.GetInstanceID()))
+                        entry.complete = true;
+                    else pending = true;
                 }
-                else if (entry.attempts >= MaximumThumbnailAttempts
-                    && !AssetPreview.IsLoadingAssetPreview(entry.source.GetInstanceID()))
+                catch (Exception exception)
+                {
                     entry.complete = true;
-                else pending = true;
+                    Debug.LogException(new InvalidOperationException(
+                        "ES 工作台缩略图刷新失败，已停止该条目重试。", exception));
+                }
             }
             if (changed)
             {
-                objectList?.RefreshItems();
-                objectGridList?.RefreshItems();
+                try { objectList?.RefreshItems(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try { objectGridList?.RefreshItems(); }
+                catch (Exception exception) { Debug.LogException(exception); }
             }
             if (pending) return;
             thumbnailRefreshSchedule?.Pause();
@@ -3947,6 +4049,8 @@ namespace ES
 
         private void OnDragUpdated(DragUpdatedEvent evt)
         {
+            if (disposed)
+                return;
             NoteExternalDragSignal();
             ESWorkbenchObjectDescriptor item = ResolveDragItem();
             IReadOnlyList<ESWorkbenchObjectDescriptor> batch = ResolveDragBatch();
@@ -4012,22 +4116,30 @@ namespace ES
 
         private void OnDragExited(DragExitedEvent evt)
         {
+            if (disposed)
+                return;
             externalDragTransferInFlight = false;
             CancelWorkbenchDrag(true);
         }
 
         private void OnRootPointerCaptureOut(PointerCaptureOutEvent evt)
         {
+            if (disposed)
+                return;
             CancelWorkbenchDrag(true);
         }
 
         private void OnRootFocusOut(FocusOutEvent evt)
         {
+            if (disposed)
+                return;
             CancelWorkbenchDrag(true);
         }
 
         private void OnRootPointerCancel(PointerCancelEvent evt)
         {
+            if (disposed)
+                return;
             // 系统取消可能发生在内容卡片、视口或 pane handle 上；根级统一
             // 清理外部拖放和活动视口，避免局部回调漏掉 owner 或 drop 反馈。
             CancelWorkbenchDrag(true);
@@ -4036,6 +4148,8 @@ namespace ES
 
         private void OnRootDetachedFromPanel(DetachFromPanelEvent evt)
         {
+            if (disposed)
+                return;
             // Unity 关闭/重挂载窗口时不保证先发出 DragExited。Panel 脱离是宿主
             // 能观察到的最后生命周期边界，必须幂等释放外部拖放、边缘平移和
             // 当前视口的临时预览，避免旧 owner 阻塞下一次打开的工作台。
@@ -4048,6 +4162,8 @@ namespace ES
 
         private void OnDragPerform(DragPerformEvent evt)
         {
+            if (disposed)
+                return;
             NoteExternalDragSignal();
             ESWorkbenchObjectDescriptor item = ResolveDragItem();
             IReadOnlyList<ESWorkbenchObjectDescriptor> batch = ResolveDragBatch();
@@ -4258,7 +4374,7 @@ namespace ES
         private ESWorkbenchObjectDescriptor ResolveDragItem()
         {
             ESWorkbenchObjectDescriptor internalItem = DragAndDrop.GetGenericData(DragPayloadKey) as ESWorkbenchObjectDescriptor;
-            if (internalItem != null) return internalItem;
+            if (IsCurrentContentDescriptor(internalItem)) return internalItem;
             UnityEngine.Object[] references = DragAndDrop.objectReferences;
             if (references == null || references.Length == 0) return null;
             for (int i = 0; i < references.Length; i++)
@@ -4274,12 +4390,24 @@ namespace ES
         {
             IReadOnlyList<ESWorkbenchObjectDescriptor> internalBatch =
                 DragAndDrop.GetGenericData(BatchDragPayloadKey) as IReadOnlyList<ESWorkbenchObjectDescriptor>;
-            if (internalBatch != null && internalBatch.Count > 0) return internalBatch;
             externalDragBatch.Clear();
             externalDragIds.Clear();
+            if (internalBatch != null && internalBatch.Count > 0)
+            {
+                int count = Mathf.Min(internalBatch.Count, MaximumExternalDragBatchItems);
+                for (int i = 0; i < count; i++)
+                {
+                    ESWorkbenchObjectDescriptor item = internalBatch[i];
+                    if (IsCurrentContentDescriptor(item) && item.CanDrag
+                        && externalDragIds.Add(item.BaseObjectId))
+                        externalDragBatch.Add(item);
+                }
+                return externalDragBatch;
+            }
             UnityEngine.Object[] references = DragAndDrop.objectReferences;
             if (references == null || references.Length == 0) return externalDragBatch;
-            for (int i = 0; i < references.Length; i++)
+            int referenceCount = Mathf.Min(references.Length, MaximumExternalDragBatchItems);
+            for (int i = 0; i < referenceCount; i++)
             {
                 UnityEngine.Object reference = references[i];
                 if (reference != null
@@ -4288,6 +4416,13 @@ namespace ES
                     externalDragBatch.Add(item);
             }
             return externalDragBatch;
+        }
+
+        private bool IsCurrentContentDescriptor(ESWorkbenchObjectDescriptor item)
+        {
+            return item != null
+                && !string.IsNullOrWhiteSpace(item.BaseObjectId)
+                && contentSourceById.ContainsKey(item.BaseObjectId);
         }
 
         private void NoteExternalDragSignal()
@@ -4423,14 +4558,22 @@ namespace ES
             }
             double now = EditorApplication.timeSinceStartup;
             if (!dragEdgePanSession.TryAdvance(now, out float deltaTime)) return;
-            if (!dragEdgePanViewport.TryEdgePan(
-                    dragEdgePanSession.Pointer, deltaTime)) return;
-            UpdateViewportDropPreview(
-                dragEdgePanItem,
-                dragEdgePanBatch,
-                dragEdgePanMousePosition,
-                dragEdgePanAccepted,
-                dragEdgePanReason);
+            try
+            {
+                if (!dragEdgePanViewport.TryEdgePan(
+                        dragEdgePanSession.Pointer, deltaTime)) return;
+                UpdateViewportDropPreview(
+                    dragEdgePanItem,
+                    dragEdgePanBatch,
+                    dragEdgePanMousePosition,
+                    dragEdgePanAccepted,
+                    dragEdgePanReason);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("ES Workbench 拖拽边缘平移失败，已取消拖拽：" + exception.Message);
+                CancelWorkbenchDrag(true);
+            }
         }
 
         private void StopDragEdgePan()
@@ -4481,6 +4624,7 @@ namespace ES
 
         private void RebuildObjectList(bool refreshSource = true)
         {
+            if (disposed) return;
             IReadOnlyList<ESWorkbenchObjectDescriptor> resolvedSource = null;
             if (refreshSource)
             {
@@ -4497,7 +4641,6 @@ namespace ES
             }
             contentPointerGate.Reset();
             pointerCoordinator.ResetIfOwnerKind(ESWorkbenchPointerOwnerKind.Content);
-            visibleObjects.Clear();
             if (refreshSource)
             {
                 contentSourceSnapshot.Clear();
@@ -4533,22 +4676,36 @@ namespace ES
             }
             IReadOnlyList<ESWorkbenchObjectDescriptor> source = contentSourceSnapshot;
             string query = objectSearch?.value ?? string.Empty;
+            if (query.Length > MaximumWorkbenchSearchCharacters)
+                query = query.Substring(0, MaximumWorkbenchSearchCharacters);
+            var nextVisibleObjects = new List<ESWorkbenchObjectDescriptor>();
             if (source.Count > 0)
             {
-                IEnumerable<ESWorkbenchObjectDescriptor> filtered = source.Where(item => item != null
-                    && MatchesContentKind(item, contentKindFilter)
-                    && MatchesContentCategory(item, categoryFilter)
-                    && MatchesContentScope(item, contentScope, contentUsage)
-                    && (string.IsNullOrWhiteSpace(query)
-                        || item.DisplayName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                        || item.BaseObjectId.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                        || item.Category.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                        || item.ContentKindDisplayName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                        || item.Subtitle.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
-                filtered = OrderContent(filtered, contentSortMode, contentUsage);
-                if (contentScope == ESWorkbenchContentScope.Recommended) filtered = filtered.Take(24);
-                visibleObjects.AddRange(filtered);
+                try
+                {
+                    IEnumerable<ESWorkbenchObjectDescriptor> filtered = source.Where(item => item != null
+                        && MatchesContentKind(item, contentKindFilter)
+                        && MatchesContentCategory(item, categoryFilter)
+                        && MatchesContentScope(item, contentScope, contentUsage)
+                        && (string.IsNullOrWhiteSpace(query)
+                            || (item.DisplayName ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+                            || (item.BaseObjectId ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+                            || (item.Category ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+                            || (item.ContentKindDisplayName ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+                            || (item.Subtitle ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0));
+                    filtered = OrderContent(filtered, contentSortMode, contentUsage);
+                    if (contentScope == ESWorkbenchContentScope.Recommended) filtered = filtered.Take(24);
+                    nextVisibleObjects.AddRange(filtered);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ES 工作台对象排序/过滤失败，已保留当前可见列表。", exception));
+                    return;
+                }
             }
+            visibleObjects.Clear();
+            visibleObjects.AddRange(nextVisibleObjects);
             BuildContentKindTabs(source);
             BuildContentCategoryTree(source);
             BuildCompactContentFilterMenu();
@@ -4583,8 +4740,9 @@ namespace ES
         {
             if (item == null) return false;
             if (string.IsNullOrWhiteSpace(filter) || string.Equals(filter, "全部", StringComparison.Ordinal)) return true;
-            return string.Equals(item.Category, filter, StringComparison.Ordinal)
-                || item.Category.StartsWith(filter + "/", StringComparison.Ordinal);
+            string category = item.Category ?? string.Empty;
+            return string.Equals(category, filter, StringComparison.Ordinal)
+                || category.StartsWith(filter + "/", StringComparison.Ordinal);
         }
 
         private static bool MatchesContentScope(
@@ -4592,7 +4750,8 @@ namespace ES
             ESWorkbenchContentScope scope,
             ESWorkbenchContentUsageStore usage)
         {
-            if (item == null) return false;
+            if (item == null || usage == null || string.IsNullOrWhiteSpace(item.BaseObjectId))
+                return false;
             ESWorkbenchContentUsageRecord record = usage.Get(item.BaseObjectId);
             switch (scope)
             {
@@ -4642,8 +4801,8 @@ namespace ES
 
         private void BuildContentKindTabs(IReadOnlyList<ESWorkbenchObjectDescriptor> source)
         {
-            contentKindTabs.Clear();
-            contentKindTabs.Add(new ContentKindTabItem
+            var nextTabs = new List<ContentKindTabItem>();
+            nextTabs.Add(new ContentKindTabItem
             {
                 id = "all",
                 label = "全部",
@@ -4657,14 +4816,18 @@ namespace ES
                     .OrderBy(value => ResolveContentKindOrder(value.Key)))
                 {
                     ESWorkbenchObjectDescriptor sample = group.First();
-                    contentKindTabs.Add(new ContentKindTabItem
+                    nextTabs.Add(new ContentKindTabItem
                     {
                         id = group.Key.ToString(),
-                        label = sample.ContentKindDisplayName,
+                        label = string.IsNullOrWhiteSpace(sample.ContentKindDisplayName)
+                            ? group.Key.ToString()
+                            : sample.ContentKindDisplayName,
                         count = group.Count()
                     });
                 }
             }
+            contentKindTabs.Clear();
+            contentKindTabs.AddRange(nextTabs);
             if (!contentKindTabs.Exists(value => string.Equals(value.id, contentKindFilter, StringComparison.Ordinal)))
             {
                 contentKindFilter = "all";
@@ -4735,6 +4898,7 @@ namespace ES
 
         private void SetContentViewMode(ESWorkbenchContentViewMode mode)
         {
+            if (disposed) return;
             if (contentViewMode == mode) return;
             contentViewMode = mode;
             layout.contentViewMode = mode;
@@ -4769,6 +4933,8 @@ namespace ES
 
         private void SetContentKind(string id)
         {
+            if (disposed)
+                return;
             string next = string.IsNullOrWhiteSpace(id) ? "all" : id;
             if (string.Equals(contentKindFilter, next, StringComparison.Ordinal)) return;
             contentKindFilter = next;
@@ -4781,6 +4947,8 @@ namespace ES
 
         private void SetCategory(string category)
         {
+            if (disposed)
+                return;
             categoryFilter = string.IsNullOrWhiteSpace(category) ? "全部" : category;
             layout.activeContentCategory = categoryFilter;
             RebuildObjectList(refreshSource: false);
@@ -4789,14 +4957,28 @@ namespace ES
 
         private void RebuildHierarchyList()
         {
+            if (disposed)
+                return;
+            IReadOnlyList<ESWorkbenchHierarchyDescriptor> source;
+            try
+            {
+                source = getHierarchy?.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ES 工作台层级 Provider 刷新失败，已保留上一次有效列表。", exception));
+                return;
+            }
             visibleHierarchy.Clear();
             hierarchyById.Clear();
             hierarchyChildren.Clear();
-            IReadOnlyList<ESWorkbenchHierarchyDescriptor> source = getHierarchy?.Invoke();
             if (source != null)
             {
                 foreach (ESWorkbenchHierarchyDescriptor item in source.Where(value => value != null))
-                    if (!hierarchyById.ContainsKey(item.ItemId)) hierarchyById.Add(item.ItemId, item);
+                    if (!string.IsNullOrWhiteSpace(item.ItemId)
+                        && !hierarchyById.ContainsKey(item.ItemId))
+                        hierarchyById.Add(item.ItemId, item);
                 foreach (ESWorkbenchHierarchyDescriptor item in hierarchyById.Values)
                 {
                     string parentId = !string.IsNullOrEmpty(item.ParentId) && hierarchyById.ContainsKey(item.ParentId)
@@ -4853,12 +5035,14 @@ namespace ES
         {
             string query = hierarchySearch?.value;
             if (string.IsNullOrWhiteSpace(query)) return null;
+            if (query.Length > MaximumWorkbenchSearchCharacters)
+                query = query.Substring(0, MaximumWorkbenchSearchCharacters);
             var visible = new HashSet<string>(StringComparer.Ordinal);
             foreach (ESWorkbenchHierarchyDescriptor item in hierarchyById.Values)
             {
-                if (item.DisplayName.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0
-                    && item.ItemId.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0
-                    && item.Kind.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if ((item.DisplayName ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0
+                    && (item.ItemId ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0
+                    && (item.Kind ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 string current = item.ItemId;
                 var visited = new HashSet<string>(StringComparer.Ordinal);
                 while (!string.IsNullOrEmpty(current) && visited.Add(current)
@@ -4874,8 +5058,14 @@ namespace ES
 
         private static int CompareHierarchy(ESWorkbenchHierarchyDescriptor left, ESWorkbenchHierarchyDescriptor right)
         {
+            if (ReferenceEquals(left, right)) return 0;
+            if (left == null) return 1;
+            if (right == null) return -1;
             int order = left.Order.CompareTo(right.Order);
-            return order != 0 ? order : string.Compare(left.ItemId, right.ItemId, StringComparison.Ordinal);
+            return order != 0
+                ? order
+                : string.Compare(left.ItemId ?? string.Empty, right.ItemId ?? string.Empty,
+                    StringComparison.Ordinal);
         }
 
         private void AppendVisibleHierarchy(
@@ -4883,7 +5073,10 @@ namespace ES
             HashSet<string> path,
             HashSet<string> visibleFilter)
         {
-            if (item == null || (visibleFilter != null && !visibleFilter.Contains(item.ItemId)) || !path.Add(item.ItemId)) return;
+            if (item == null || string.IsNullOrWhiteSpace(item.ItemId)
+                || path == null
+                || (visibleFilter != null && !visibleFilter.Contains(item.ItemId))
+                || !path.Add(item.ItemId)) return;
             visibleHierarchy.Add(item);
             if (expandedHierarchyIds.Contains(item.ItemId)
                 && hierarchyChildren.TryGetValue(item.ItemId, out List<ESWorkbenchHierarchyDescriptor> children))
@@ -5018,7 +5211,7 @@ namespace ES
 
         private void ToggleHierarchyVisibility(string itemId)
         {
-            if (string.IsNullOrWhiteSpace(itemId)) return;
+            if (disposed || string.IsNullOrWhiteSpace(itemId)) return;
             if (!hiddenHierarchyIds.Add(itemId)) hiddenHierarchyIds.Remove(itemId);
             layout.hiddenHierarchyIds.Clear();
             layout.hiddenHierarchyIds.AddRange(hiddenHierarchyIds.OrderBy(value => value, StringComparer.Ordinal));
@@ -5029,7 +5222,7 @@ namespace ES
 
         private void ToggleHierarchyLock(string itemId)
         {
-            if (string.IsNullOrWhiteSpace(itemId)) return;
+            if (disposed || string.IsNullOrWhiteSpace(itemId)) return;
             if (!lockedHierarchyIds.Add(itemId)) lockedHierarchyIds.Remove(itemId);
             layout.lockedHierarchyIds.Clear();
             layout.lockedHierarchyIds.AddRange(lockedHierarchyIds.OrderBy(value => value, StringComparer.Ordinal));
@@ -5065,10 +5258,21 @@ namespace ES
 
         private IReadOnlyList<ESWorkbenchHierarchyDescriptor> GetVisibleViewportHierarchy()
         {
-            IReadOnlyList<ESWorkbenchHierarchyDescriptor> source = getHierarchy?.Invoke();
-            return source == null
-                ? Array.Empty<ESWorkbenchHierarchyDescriptor>()
-                : source.Where(item => item != null && IsHierarchyVisible(item.ItemId)).ToArray();
+            try
+            {
+                IReadOnlyList<ESWorkbenchHierarchyDescriptor> source = getHierarchy?.Invoke();
+                return source == null
+                    ? Array.Empty<ESWorkbenchHierarchyDescriptor>()
+                    : source.Where(item => item != null && IsHierarchyVisible(item.ItemId)).ToArray();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ES 工作台视口层级读取失败，已回退到最近有效快照。", exception));
+                return hierarchyById.Values
+                    .Where(item => item != null && IsHierarchyVisible(item.ItemId))
+                    .ToArray();
+            }
         }
 
         private int ResolveHierarchyDepth(ESWorkbenchHierarchyDescriptor item)
@@ -5087,6 +5291,8 @@ namespace ES
 
         private void ToggleHierarchy(string itemId)
         {
+            if (disposed)
+                return;
             if (!expandedHierarchyIds.Add(itemId)) expandedHierarchyIds.Remove(itemId);
             PersistExpandedHierarchy();
             RebuildHierarchyList();
@@ -5094,6 +5300,8 @@ namespace ES
 
         private void ExpandAllHierarchy()
         {
+            if (disposed)
+                return;
             expandedHierarchyIds.UnionWith(hierarchyById.Keys);
             PersistExpandedHierarchy();
             RebuildHierarchyList();
@@ -5101,6 +5309,8 @@ namespace ES
 
         private void CollapseHierarchy()
         {
+            if (disposed)
+                return;
             expandedHierarchyIds.Clear();
             PersistExpandedHierarchy();
             RebuildHierarchyList();
@@ -5366,6 +5576,7 @@ namespace ES
 
         private void OnSelectionSetChanged(IReadOnlyList<ESWorkbenchSelection> selections)
         {
+            if (disposed) return;
             ESWorkbenchSelection selection = selections?.FirstOrDefault()
                 ?? ESWorkbenchSelection.Empty;
             SynchronizeListSelection(selections);
@@ -6336,8 +6547,7 @@ namespace ES
             }));
             status.Add(CreateActionButton(null, "复制环境", "复制当前视觉验收环境信息", () =>
             {
-                EditorGUIUtility.systemCopyBuffer = current.Summary;
-                SetStatus("已复制当前视觉验收环境。", MessageType.Info);
+                CopyToClipboard(current.Summary, "已复制当前视觉验收环境。");
             }));
             Button captureButton = CreateActionButton(
                 EditorGUIUtility.IconContent("d_SceneViewCamera").image,
@@ -6395,7 +6605,7 @@ namespace ES
                     EditorGUIUtility.IconContent("Clipboard").image,
                     "复制",
                     "复制长中文压力样例路径",
-                    () => EditorGUIUtility.systemCopyBuffer = stressPath.text));
+                    () => CopyToClipboard(stressPath.text, "已复制长中文压力样例路径。")));
                 container.Add(stressSample);
             }
 
@@ -6624,23 +6834,40 @@ namespace ES
 
         private void ResolveVisualEvidenceSource(out string sourceAssetPath, out string sourceAssetGuid)
         {
-            UnityEngine.Object source = getAsset?.Invoke();
-            sourceAssetPath = source == null
-                ? string.Empty
-                : AssetDatabase.GetAssetPath(source).Replace('\\', '/');
-            sourceAssetGuid = string.IsNullOrWhiteSpace(sourceAssetPath)
-                ? string.Empty
-                : AssetDatabase.AssetPathToGUID(sourceAssetPath);
+            sourceAssetPath = string.Empty;
+            sourceAssetGuid = string.Empty;
+            try
+            {
+                UnityEngine.Object source = getAsset?.Invoke();
+                sourceAssetPath = source == null
+                    ? string.Empty
+                    : AssetDatabase.GetAssetPath(source).Replace('\\', '/');
+                sourceAssetGuid = string.IsNullOrWhiteSpace(sourceAssetPath)
+                    ? string.Empty
+                    : AssetDatabase.AssetPathToGUID(sourceAssetPath);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("ES Workbench 无法解析视觉证据 Source 资产，已安全阻断：" + exception.Message);
+            }
         }
 
         private void ScheduleVisualEvidenceCapture()
         {
-            if (disposed || root == null) return;
+            if (disposed || root == null || owner == null) return;
             SetStatus("正在等待当前工作台完成重绘，然后采集真实窗口。", MessageType.Info);
-            owner.Repaint();
+            try
+            {
+                owner.Repaint();
+            }
+            catch (Exception exception)
+            {
+                SetStatus("视觉证据采集已阻断：窗口重绘不可用（" + exception.Message + "）。", MessageType.Warning);
+                return;
+            }
             root.schedule.Execute(() =>
             {
-                if (disposed) return;
+                if (disposed || owner == null) return;
                 ResolveVisualEvidenceSource(out string sourceAssetPath, out string sourceAssetGuid);
                 if (string.IsNullOrWhiteSpace(sourceAssetPath)
                     || string.IsNullOrWhiteSpace(sourceAssetGuid))
@@ -6720,7 +6947,7 @@ namespace ES
             if (!string.IsNullOrWhiteSpace(scenarioId))
                 visualInteractionObservationsByScenario.Remove(scenarioId);
             SetStatus("已重置当前视觉场景的交互记录。", MessageType.Info);
-            root?.schedule.Execute(()
+            root?.schedule.Execute(() =>
             {
                 if (!disposed) RebuildBottomDrawer();
             });
@@ -6778,8 +7005,7 @@ namespace ES
             }));
             row.Add(CreateActionButton(null, "复制", "复制视觉证据清单绝对路径", () =>
             {
-                EditorGUIUtility.systemCopyBuffer = evidence.ManifestPath;
-                SetStatus("已复制视觉证据清单路径。", MessageType.Info);
+                CopyToClipboard(evidence.ManifestPath, "已复制视觉证据清单路径。");
             }));
             container.Add(row);
         }
@@ -7052,6 +7278,7 @@ namespace ES
 
         private void SynchronizeListSelection(IReadOnlyList<ESWorkbenchSelection> selections)
         {
+            if (disposed) return;
             var stableIds = new HashSet<string>(
                 (selections ?? Array.Empty<ESWorkbenchSelection>())
                     .Where(value => value != null && !value.IsEmpty)
@@ -7418,6 +7645,7 @@ namespace ES
         {
             if (disposed) return;
             disposed = true;
+            StopExternalDragWatchdog();
             StopDragEdgePan();
             actions.Selection.SetChanged -= OnSelectionSetChanged;
             actions.Tools.Changed -= OnToolChanged;
@@ -7498,6 +7726,7 @@ namespace ES
             new List<ESWorkbenchViewportStatusDescriptor>();
         private Vector3 pointerWorld;
         private bool pointerWorldValid;
+        private bool disposed;
 
         public ESWorkbenchCanvas2DViewport(
             ESWorkbenchViewportContext context,
@@ -8239,23 +8468,32 @@ namespace ES
 
         private void ApplyEdgePan()
         {
-            if (!moving || !edgePanSession.IsActive || !gestureSession.IsStarted
+            if (disposed || !moving || !edgePanSession.IsActive || !gestureSession.IsStarted
                 || !context.PointerCoordinator.Owns(
                     this, movePointerId, ESWorkbenchPointerOwnerKind.Viewport)) return;
             double now = EditorApplication.timeSinceStartup;
             if (!edgePanSession.TryAdvance(now, out float deltaTime)) return;
-            if (!edgePan.Evaluate(
-                    contentRect, edgePanSession.Pointer, deltaTime, out Vector2 delta)) return;
-            navigation.PanBy(delta);
-            navigation.ConstrainPan(contentRect, ResolveWorldBounds(), feel.CanvasOverscrollPixels);
-            UpdatePointerWorldStatus(edgePanSession.Pointer);
-            UpdateLabelPositions();
-            UpdateMovePreview(edgePanSession.Pointer, edgePanSession.LockDominantAxis);
-            MarkDirtyRepaint();
+            try
+            {
+                if (!edgePan.Evaluate(
+                        contentRect, edgePanSession.Pointer, deltaTime, out Vector2 delta)) return;
+                navigation.PanBy(delta);
+                navigation.ConstrainPan(contentRect, ResolveWorldBounds(), feel.CanvasOverscrollPixels);
+                UpdatePointerWorldStatus(edgePanSession.Pointer);
+                UpdateLabelPositions();
+                UpdateMovePreview(edgePanSession.Pointer, edgePanSession.LockDominantAxis);
+                MarkDirtyRepaint();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("ES Workbench 2D 视口边缘平移失败，已停止当前操作：" + exception.Message);
+                StopMoving();
+            }
         }
 
         public bool TryEdgePan(Vector2 localPosition, float deltaTime)
         {
+            if (disposed) return false;
             if (!edgePan.Evaluate(contentRect, localPosition, deltaTime, out Vector2 delta)) return false;
             navigation.PanBy(delta);
             navigation.ConstrainPan(contentRect, ResolveWorldBounds(), feel.CanvasOverscrollPixels);
@@ -8334,6 +8572,8 @@ namespace ES
 
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
             edgePanSchedule?.Pause();
             edgePanSchedule = null;
             CancelInteraction();
@@ -8379,6 +8619,7 @@ namespace ES
             new List<ESWorkbenchViewportStatusDescriptor>();
         private Vector3 pointerWorld;
         private bool pointerWorldValid;
+        private bool disposed;
 
         public ESWorkbenchPreview3DViewport(
             ESWorkbenchViewportContext context,
@@ -8608,12 +8849,25 @@ namespace ES
             preview?.Dispose();
             preview = new ESEditorPreviewRenderContext(
                 "ES Workbench 3D Viewport",
-                ESEditorPreviewSceneMode.PreviewScene);
-            preview.Ensure();
-            if (preview.Camera != null)
+                ESEditorPreviewSceneMode.PreviewScene,
+                ESEditorPreviewUtility.DefaultPreviewLayer,
+                ESEditorPreviewEnhancerSet.GroundPlane
+                | ESEditorPreviewEnhancerSet.ScaleReference
+                | ESEditorPreviewEnhancerSet.HighQualityLighting);
+            try
             {
-                preview.Camera.fieldOfView = feel.VerticalFieldOfViewDegrees;
-                preview.Camera.backgroundColor = new Color(0.045f, 0.052f, 0.058f, 1f);
+                preview.Ensure();
+                if (preview.Camera != null)
+                {
+                    preview.Camera.fieldOfView = feel.VerticalFieldOfViewDegrees;
+                    preview.Camera.backgroundColor = new Color(0.045f, 0.052f, 0.058f, 1f);
+                }
+            }
+            catch
+            {
+                preview.Dispose();
+                preview = null;
+                throw;
             }
             return true;
         }
@@ -9135,19 +9389,28 @@ namespace ES
 
         private void ApplyEdgePan()
         {
-            if (!moving || !edgePanSession.IsActive || !gestureSession.IsStarted) return;
+            if (disposed || !moving || !edgePanSession.IsActive || !gestureSession.IsStarted) return;
             double now = EditorApplication.timeSinceStartup;
             if (!edgePanSession.TryAdvance(now, out float deltaTime)) return;
-            if (!TryEdgePanRenderPosition(edgePanSession.Pointer, deltaTime)) return;
-            UpdateTransformPreview(
-                renderHost.contentRect,
-                edgePanSession.Pointer,
-                edgePanSession.LockDominantAxis);
-            renderHost.MarkDirtyRepaint();
+            try
+            {
+                if (!TryEdgePanRenderPosition(edgePanSession.Pointer, deltaTime)) return;
+                UpdateTransformPreview(
+                    renderHost.contentRect,
+                    edgePanSession.Pointer,
+                    edgePanSession.LockDominantAxis);
+                renderHost.MarkDirtyRepaint();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("ES Workbench 3D 视口边缘平移失败，已停止当前操作：" + exception.Message);
+                StopMoving();
+            }
         }
 
         public bool TryEdgePan(Vector2 localPosition, float deltaTime)
         {
+            if (disposed) return false;
             Vector2 renderPosition = renderHost.WorldToLocal(root.LocalToWorld(localPosition));
             return TryEdgePanRenderPosition(renderPosition, deltaTime);
         }
@@ -9203,6 +9466,8 @@ namespace ES
 
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
             hover.Clear();
             edgePanSchedule?.Pause();
             edgePanSchedule = null;
@@ -9367,10 +9632,25 @@ namespace ES
         private void CloseIfContextWasLost()
         {
             EditorApplication.delayCall -= CloseIfContextWasLost;
-            bool ownerContextLost = ownerWindow == null
-                || !ESWindowFoundation.IsBound(ownerWindow);
+            bool ownerContextLost = !IsOwnerContextValid();
             if (this != null && (!configured || ownerContextLost))
                 Close();
+        }
+
+        private bool IsOwnerContextValid()
+        {
+            if (ownerWindow == null)
+                return false;
+            try
+            {
+                return ESWindowFoundation.IsBound(ownerWindow);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ES Workbench Popup 宿主状态检查失败，按宿主失效处理。", exception));
+                return false;
+            }
         }
     }
 }

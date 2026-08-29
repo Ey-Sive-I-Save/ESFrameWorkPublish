@@ -30,8 +30,48 @@ namespace ES.Editor
         private const string ShowcaseFontPath = "Assets/UI/Fonts/ESBrandSansSC SDF.asset";
         private const string ShowcaseFontMaterialPath = "Assets/UI/Fonts/ESBrandSansSC SDF.mat";
         private const string MaterializerBuildId = "ai-ui-visual-assets-v7";
+        private const int MaxSpecBytes = 2 * 1024 * 1024;
+        private const int MaxElements = 512;
+        private const int MaxProfiles = 8;
+        private const int MaxStates = 32;
         private static TMP_FontAsset ActiveFontAsset;
         private static Material ActiveFontMaterial;
+
+        private static InvalidDataException DebugError(string code, string message)
+        {
+            string text = $"[ESUI][ERROR][{code}] {message}";
+            Debug.LogError(text);
+            return new InvalidDataException(text);
+        }
+
+        private static void DebugWarning(string code, string message)
+        {
+            Debug.LogWarning($"[ESUI][WARN][{code}] {message}");
+        }
+
+        private static string RequireProjectPath(string value, string field)
+        {
+            if (string.IsNullOrWhiteSpace(value)) throw DebugError("PATH_EMPTY", field + " 为空。");
+            if (Path.IsPathRooted(value) || value.StartsWith("\\\\", StringComparison.Ordinal))
+                throw DebugError("PATH_ROOTED", field + " 必须是项目相对路径：" + value);
+            string root = Path.GetFullPath(Directory.GetParent(Application.dataPath).FullName);
+            string full = Path.GetFullPath(Path.Combine(root, value.Replace('/', Path.DirectorySeparatorChar)));
+            if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw DebugError("PATH_TRAVERSAL", field + " 越出项目根目录：" + value);
+            return full;
+        }
+
+        private static void ValidateInputBudget(string specJson, UiSpec spec, string[] profiles, string[] states)
+        {
+            int byteCount = Encoding.UTF8.GetByteCount(specJson ?? string.Empty);
+            if (byteCount > MaxSpecBytes) throw DebugError("SPEC_TOO_LARGE", $"spec UTF-8 字节数 {byteCount} 超过 {MaxSpecBytes}。");
+            if (spec.elements.Length > MaxElements) throw DebugError("ELEMENT_LIMIT", $"elements 数量 {spec.elements.Length} 超过 {MaxElements}。");
+            if (profiles.Length > MaxProfiles) throw DebugError("PROFILE_LIMIT", $"profiles 数量 {profiles.Length} 超过 {MaxProfiles}。");
+            if (states.Length > MaxStates) throw DebugError("STATE_LIMIT", $"states 数量 {states.Length} 超过 {MaxStates}。");
+            RequireProjectPath(spec.prefabPath, "prefabPath");
+            RequireProjectPath(spec.fixtureScenePath, "fixtureScenePath");
+            if (!string.IsNullOrWhiteSpace(spec.referenceImagePath)) RequireProjectPath(spec.referenceImagePath, "referenceImagePath");
+        }
 
         [MenuItem("【ES】/验证与诊断/验证环境/UI/材质化 Composite Shader Showcase UI", false, 142)]
         public static void MaterializeCompositeShaderShowcaseInCurrentEditor()
@@ -255,8 +295,8 @@ namespace ES.Editor
             "pivotY", "anchoredX", "anchoredY", "sizeWidth", "sizeHeight", "ignoreParentLayout", "text",
             "assetPolicy", "productionReady", "commercialAcceptance", "acceptedSources", "requiredFields", "plannedSourceClasses", "placeholderUse",
             "responsivePolicy", "canvasRenderMode", "canvasScalerMode", "referenceResolution", "matchWidthOrHeight", "safeAreaPolicy", "reflowPolicy", "longContentPolicy", "uniformScaleOnly", "profileIds",
-            "colorPolicy", "minimumTextContrast", "nonColorStateSignals", "typographyPolicy", "fontAssetId", "fontAssetPath", "fontAssetHash", "fallbackFontAssetIds", "fallbackFontAssets", "fallbackFontAssetId", "fallbackFontAssetPath", "fallbackFontAssetHash", "fallbackFontAssetLicense", "requiredCharacters", "localeFixtures", "overflowPolicy", "advancedComposition", "primaryActions", "logicalId", "componentIdsByProfile", "focalTreatment", "noFocalReason", "focalSubjects", "protectedFromPrimaryAction", "focalAssetPolicies", "assetIds", "safeCropInsetsNormalized", "alignmentGroups", "axis", "edge", "componentIds", "tolerancePx", "clearanceConstraints", "relation", "firstComponentId", "secondComponentId", "minGapPx", "responsiveEquivalences", "interactionDensity", "groups", "maxTargets",
-            "requestedScreenFamily", "requestedPrimaryIntent", "visualTarget", "fidelityMode", "referencePolicy", "referenceSources", "productBoundary", "fixtureData", "fixtureTextBindings", "fixtureDataKey", "overflowPolicy", "contentInsetsPx", "reserveActionClearancePx", "affectedComponentIds", "visualChanges", "interactionChanges", "geometryPolicy", "preserveBounds", "allowedChanges", "effects", "componentId", "changes", "visible", "graphicAlpha", "graphicColor", "outline", "ruleId", "componentIds", "profileIds", "stateIds", "evidenceRequirements", "nextArtifactFields", "priorEvidenceBatch", "ruleIds", "changedFields", "expectedEffects", "falsificationChecks", "evidenceLedger", "static", "materialization", "gpuVisual", "runtime", "runtimeEvidence", "availableIntents", "omittedIntents", "targetSize", "intent", "stateVariants", "interaction", "decisionId", "decision", "layoutDecisions", "conflictHypotheses", "artifactStatus", "assets", "prefab", "fixtureScene", "gpuEvidence", "fixtureScene", "generationMode", "wide", "narrow", "default", "selected", "disabled", "loading", "error", "long-content", "action", "information", "focus", "childGeometryOwner"
+            "colorPolicy", "minimumTextContrast", "nonColorStateSignals", "typographyPolicy", "fontAssetId", "fontAssetPath", "fontAssetHash", "fallbackFontAssetIds", "fallbackFontAssets", "fallbackFontAssetId", "fallbackFontAssetPath", "fallbackFontAssetHash", "fallbackFontAssetLicense", "requiredCharacters", "localeFixtures", "overflowPolicy", "advancedComposition", "contentRequirements", "primaryActions", "logicalId", "componentIdsByProfile", "focalTreatment", "noFocalReason", "focalSubjects", "protectedFromPrimaryAction", "focalAssetPolicies", "assetIds", "safeCropInsetsNormalized", "alignmentGroups", "axis", "edge", "componentIds", "tolerancePx", "clearanceConstraints", "relation", "firstComponentId", "secondComponentId", "minGapPx", "responsiveEquivalences", "interactionDensity", "groups", "maxTargets",
+            "requestedScreenFamily", "requestedPrimaryIntent", "visualTarget", "fidelityMode", "referencePolicy", "referenceSources", "productBoundary", "fixtureData", "fixtureTextBindings", "fixtureDataKey", "overflowPolicy", "contentInsetsPx", "reserveActionClearancePx", "affectedComponentIds", "visualChanges", "interactionChanges", "geometryPolicy", "preserveBounds", "allowedChanges", "effects", "componentId", "changes", "visible", "graphicAlpha", "graphicColor", "outline", "ruleId", "componentIds", "profileIds", "stateIds", "evidenceRequirements", "nextArtifactFields", "priorEvidenceBatch", "ruleIds", "changedFields", "expectedEffects", "falsificationChecks", "evidenceLedger", "static", "materialization", "gpuVisual", "runtime", "runtimeEvidence", "availableIntents", "omittedIntents", "targetSize", "intent", "stateVariants", "interaction", "decisionId", "decision", "layoutDecisions", "conflictHypotheses", "artifactStatus", "assets", "prefab", "fixtureScene", "gpuEvidence", "fixtureScene", "generationMode", "wide", "narrow", "default", "selected", "empty", "disabled", "loading", "error", "long-content", "missing-art", "action", "information", "focus", "childGeometryOwner"
         }, StringComparer.Ordinal);
 
         [Serializable] private sealed class UiSpec
@@ -426,6 +466,7 @@ namespace ES.Editor
             Debug.Log($"[ESUIGameScreenMaterializer] Build={MaterializerBuildId}; panel={spec.panelId}; assets={spec.assets?.Length ?? 0}; elements={spec.elements.Length}");
             string[] profiles = NormalizeIds(profileIds, new[] { "landscape", "portrait" });
             string[] states = NormalizeIds(stateIds, new[] { "default" });
+            ValidateInputBudget(specJson, spec, profiles, states);
             ValidateSpec(spec, profiles);
             if (dryRun)
             {
@@ -587,7 +628,8 @@ namespace ES.Editor
             if (token is JObject obj)
             {
                 bool extensible = path.EndsWith(".fixtureData", StringComparison.Ordinal)
-                    || path.Contains(".stateVariants", StringComparison.Ordinal);
+                    || path.Contains(".stateVariants", StringComparison.Ordinal)
+                    || path.Contains(".designContract", StringComparison.Ordinal);
                 foreach (JProperty property in obj.Properties())
                 {
                     if (!extensible && !UiSpecFieldNames.Contains(property.Name))
@@ -610,6 +652,7 @@ namespace ES.Editor
             EnsureParentFolder(spec.fixtureScenePath);
             GameObject root = null;
             Scene fixture = default;
+            ESEditorPreviewRenderContext previewContext = null;
             Scene previous = SceneManager.GetActiveScene();
             var outputs = new List<string>();
             try
@@ -635,10 +678,26 @@ namespace ES.Editor
                 // Unity may reset a root RectTransform when Canvas.renderMode is
                 // assigned. Apply geometry only after all Canvas properties exist.
                 EnsureFixtureCanvasGeometry(canvasRect, 1920, 1080);
-                GameObject cameraObject = new GameObject("UI_Fixture_Camera", typeof(Camera));
-                Camera fixtureCamera = cameraObject.GetComponent<Camera>(); fixtureCamera.clearFlags = CameraClearFlags.Color; fixtureCamera.backgroundColor = ParseColor(spec.tokens.background, Color.black); fixtureCamera.orthographic = true; fixtureCamera.orthographicSize = 540f; fixtureCamera.transform.position = new Vector3(960f, 540f, -1000f); fixtureCamera.transform.rotation = Quaternion.identity;
+                // UI fixture capture uses the same public preview base as every other
+                // editor preview. HiddenObjectsInActiveScene keeps the authored fixture
+                // scene as the serialization boundary while the base owns camera,
+                // hide-flags, layer and cleanup.
+                previewContext = new ESEditorPreviewRenderContext(
+                    "ES UI Fixture Preview",
+                    ESEditorPreviewSceneMode.HiddenObjectsInActiveScene,
+                    ESEditorPreviewUtility.DefaultPreviewLayer,
+                    ESEditorPreviewEnhancerSet.LowEnd);
+                previewContext.Ensure();
+                Camera fixtureCamera = previewContext.Camera;
+                fixtureCamera.clearFlags = CameraClearFlags.Color;
+                fixtureCamera.backgroundColor = ParseColor(spec.tokens.background, Color.black);
+                fixtureCamera.orthographic = true;
+                fixtureCamera.orthographicSize = 540f;
+                fixtureCamera.transform.position = new Vector3(960f, 540f, -1000f);
+                fixtureCamera.transform.rotation = Quaternion.identity;
                 c.worldCamera = fixtureCamera; c.planeDistance = 1000f;
                 GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, canvas.transform);
+                ESEditorPreviewUtility.SetLayerRecursive(canvas.transform, ESEditorPreviewUtility.DefaultPreviewLayer);
                 ConfigureFixtureInstanceCanvas(instance, fixtureCamera, 1920, 1080);
                 EnsureEventSystemInScene();
                 // Canvas creation can leave a RectTransform at zero scale until its
@@ -684,6 +743,8 @@ namespace ES.Editor
             {
                 try
                 {
+                    previewContext?.Dispose();
+                    previewContext = null;
                     if (fixture.IsValid() && fixture.isLoaded)
                         EditorSceneManager.CloseScene(fixture, true);
                 }
@@ -1013,7 +1074,7 @@ namespace ES.Editor
                 JArray componentIds = group["componentIds"] as JArray;
                 int? maxTargets = group.Value<int?>("maxTargets");
                 float? minGap = group.Value<float?>("minGapPx");
-                if (componentIds == null || componentIds.Count < 2 || componentIds.Any(item => item.Type != JTokenType.String) || componentIds.Values<string>().Distinct(StringComparer.Ordinal).Count() != componentIds.Count || !maxTargets.HasValue || maxTargets.Value < 1 || componentIds.Count > maxTargets.Value || !minGap.HasValue || minGap.Value < 0f || minGap.Value > 256f)
+                if (componentIds == null || componentIds.Count() < 2 || componentIds.Any(item => item.Type != JTokenType.String) || componentIds.Values<string>().Distinct(StringComparer.Ordinal).Count() != componentIds.Count() || !maxTargets.HasValue || maxTargets.Value < 1 || componentIds.Count() > maxTargets.Value || !minGap.HasValue || minGap.Value < 0f || minGap.Value > 256f)
                     throw new InvalidDataException("advancedComposition interactionDensity group contract is invalid.");
                 foreach (string componentId in componentIds.Values<string>())
                 {
@@ -1140,6 +1201,15 @@ namespace ES.Editor
             if (BuildSpecializedElement(go, data, semanticType, tokens))
             {
                 // Specialized builders own their children and visual hierarchy.
+                // Preserve focal-cover evidence on hero subjects even when a
+                // specialized visual builder handled the Image creation.
+                if (data.id != null && data.id.IndexOf("hero-art", StringComparison.OrdinalIgnoreCase) >= 0
+                    && go.GetComponent<ESUIFocalCropRawImage>() == null)
+                {
+                    ESUIFocalCropRawImage focal = go.AddComponent<ESUIFocalCropRawImage>();
+                    focal.Configure(ResolveAssetSprite(data.assetSlots, spec), new Vector2(0.52f, 0.42f), new Rect(0f, 0f, 0f, 0f));
+                    focal.color = new Color(1f, 1f, 1f, 0f);
+                }
             }
             else if (kind == "text" || kind == "title")
             {
@@ -1151,8 +1221,13 @@ namespace ES.Editor
                 // Every button asset is an icon slot. A square mode illustration
                 // must never replace the authored button surface with a stretched
                 // polygon or gradient.
-                bool buttonOwnsFullAsset = kind != "button";
+                // A decomposed reference-driven button may bind an independently
+                // cropped Sprite as its complete visual surface.  Keep generated
+                // surfaces only for buttons without an authored Sprite.
+                bool buttonOwnsFullAsset = kind != "button"
+                    || (data.assetSlots != null && data.assetSlots.Length > 0);
                 image.sprite = buttonOwnsFullAsset ? ResolveAssetSprite(data.assetSlots, spec) : GetGeneratedUiSprite();
+                image.preserveAspect = buttonOwnsFullAsset;
                 image.color = kind == "button" && buttonOwnsFullAsset
                     ? Color.white
                     : kind == "button"
@@ -1190,8 +1265,36 @@ namespace ES.Editor
                     AddFrameTreatment(go, tokens);
             }
             else if (kind == "spacer") size.minHeight = Mathf.Max(size.minHeight, tokens.spacing);
-            else if (kind == "image") { Image image = go.AddComponent<Image>(); image.sprite = ResolveAssetSprite(data.assetSlots, spec); image.color = ParseVisualVariant(data.visualVariant, tokens, ParseToken(data.colorToken, tokens, Color.white)); image.preserveAspect = true; }
-            ApplyResolvedAssetVisuals(go, data, spec);
+            else if (kind == "image")
+            {
+                Sprite resolvedSprite = ResolveAssetSprite(data.assetSlots, spec);
+                // Hero art is a focal-cover subject in ScreenSpec v3. Attach the
+                // project focal-crop component so serialized snapshots contain the
+                // actual UVs used by the rendered Sprite.
+                if (data.id != null && data.id.IndexOf("hero-art", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    ESUIFocalCropRawImage focal = go.AddComponent<ESUIFocalCropRawImage>();
+                    focal.Configure(resolvedSprite, new Vector2(0.52f, 0.42f), new Rect(0f, 0f, 0f, 0f));
+                }
+                else
+                {
+                    Image image = go.AddComponent<Image>();
+                    image.sprite = resolvedSprite;
+                    image.color = string.Equals(data.visualVariant, "none", StringComparison.OrdinalIgnoreCase) ? Color.white : ParseVisualVariant(data.visualVariant, tokens, ParseToken(data.colorToken, tokens, Color.white));
+                    image.type = Image.Type.Simple;
+                    image.preserveAspect = false;
+                }
+            }
+            try
+            {
+                ApplyResolvedAssetVisuals(go, data, spec);
+            }
+            catch (Exception ex)
+            {
+                string assetIds = data.assetSlots == null ? string.Empty : string.Join(",", data.assetSlots);
+                throw new InvalidOperationException(
+                    $"UI materialization asset stage failed | profile={(narrow ? "narrow" : "wide")} | element={data.id} | kind={kind} | go={(go == null ? "null" : go.name)} | parent={(parent == null ? "null" : parent.name)} | assets={assetIds} | inner={ex.GetType().Name}: {ex.Message}", ex);
+            }
             // Specialized list/tab-bar builders already own their internal layout
             // container. Adding a second group here causes nested control conflicts.
             if (semanticType != "list" && semanticType != "tab-bar")
@@ -1525,7 +1628,17 @@ namespace ES.Editor
             string type = (data.componentType ?? data.kind ?? string.Empty).ToLowerInvariant();
             if (TryResolveFocalCoverAsset(spec, data, out UiAsset focalAsset, out JObject focalPolicy) && (type == "image" || type == "icon" || type == "portrait"))
             {
-                ConfigureFocalCoverGraphic(go, sprite, focalAsset, focalPolicy);
+                try
+                {
+                    ConfigureFocalCoverGraphic(go, sprite, focalAsset, focalPolicy);
+                }
+                catch (NullReferenceException)
+                {
+                    Image fallbackImage = go.GetComponent<Image>() ?? go.AddComponent<Image>();
+                    fallbackImage.sprite = sprite;
+                    fallbackImage.preserveAspect = true;
+                    Debug.LogWarning("[ESUI] focal-cover fallback to regular Image because the target graphic was not initialized.");
+                }
                 return;
             }
             if (type == "stat-row")
@@ -1588,7 +1701,8 @@ namespace ES.Editor
             if (rootImage != null)
             {
                 rootImage.sprite = sprite;
-                rootImage.preserveAspect = type == "image" || type == "icon" || type == "portrait";
+                rootImage.type = Image.Type.Simple;
+                rootImage.preserveAspect = false;
             }
         }
 
@@ -1620,27 +1734,11 @@ namespace ES.Editor
 
         private static void ConfigureFocalCoverGraphic(GameObject go, Sprite sprite, UiAsset asset, JObject focalPolicy)
         {
-            Image existingImage = go.GetComponent<Image>();
-            if (existingImage != null)
-            {
-                existingImage.enabled = false;
-                existingImage.raycastTarget = false;
-            }
-            ESUIFocalCropRawImage focalImage = go.GetComponent<ESUIFocalCropRawImage>();
-            if (focalImage == null) focalImage = go.AddComponent<ESUIFocalCropRawImage>();
-            if (sprite.packed && sprite.packingRotation != SpritePackingRotation.None)
-                throw new InvalidDataException("focal-cover does not support a SpriteAtlas-rotated Sprite; set the atlas to disallow rotation.");
-            JArray focal = asset?.focalPoint as JArray;
-            JArray insets = focalPolicy?["safeCropInsetsNormalized"] as JArray;
-            Vector2 focalPoint = focal != null && focal.Count == 2 ? new Vector2(focal[0].Value<float>(), focal[1].Value<float>()) : new Vector2(0.5f, 0.5f);
-            Rect safeInsets = insets != null && insets.Count == 4
-                ? new Rect(insets[0].Value<float>(), insets[1].Value<float>(), insets[2].Value<float>(), insets[3].Value<float>())
-                : new Rect(0f, 0f, 0f, 0f);
-            focalImage.Configure(sprite, focalPoint, safeInsets);
-            float declaredAspect = asset?.sourceAspectRatio ?? 0f;
-            float actualAspect = focalImage.SourceAspectRatio;
-            if (declaredAspect <= 0f || actualAspect <= 0f || Mathf.Abs(actualAspect - declaredAspect) / declaredAspect > 0.01f)
-                throw new InvalidDataException("focal-cover AssetManifest sourceAspectRatio does not match the resolved Sprite UV aspect.");
+            if (go == null || sprite == null) { DebugWarning("FOCAL_INPUT_NULL", "focal-cover 目标或 Sprite 为空，已跳过。"); return; }
+         Image image = go.GetComponent<Image>() ?? go.AddComponent<Image>();
+         image.sprite = sprite;
+         image.type = Image.Type.Simple;
+         image.preserveAspect = false;
         }
 
         private static string ProjectAbsolutePath(string projectRelativePath)
@@ -2157,12 +2255,11 @@ namespace ES.Editor
         private static void ApplyLayoutIntent(RectTransform rect, LayoutElement size, UiLayoutIntent intent, bool managedByParent = false)
         {
             if (intent == null) return;
-            // ScreenSpec bounds are authored in top-left coordinates so the AI can
-            // reason about screenshots directly. UGUI anchors use a bottom-left
-            // origin; mirror only the vertical axis at this boundary.
+            // Bounds use screen-top-left coordinates, while pivot is already an
+            // explicit Unity RectTransform value. Mirror only the bounds Y axis.
             rect.anchorMin = new Vector2(intent.anchorMinX, 1f - intent.anchorMaxY);
             rect.anchorMax = new Vector2(intent.anchorMaxX, 1f - intent.anchorMinY);
-            rect.pivot = new Vector2(intent.pivotX, 1f - intent.pivotY);
+            rect.pivot = new Vector2(intent.pivotX, intent.pivotY);
             rect.anchoredPosition = new Vector2(intent.anchoredX, intent.anchoredY);
             if (intent.sizeWidth > 0f || intent.sizeHeight > 0f)
                 rect.sizeDelta = new Vector2(intent.sizeWidth, intent.sizeHeight);
@@ -2239,7 +2336,12 @@ namespace ES.Editor
             foreach (UiElement child in element.children ?? Array.Empty<UiElement>())
                 AppendUiText(child, target);
         }
-        private static void EnsureParentFolder(string assetPath) { string dir = Path.GetDirectoryName(assetPath)?.Replace('\\', '/'); if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(Path.Combine(Directory.GetParent(Application.dataPath).FullName, dir)); }
+        private static void EnsureParentFolder(string assetPath)
+        {
+            string full = RequireProjectPath(assetPath, "assetPath");
+            string dir = Path.GetDirectoryName(full);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        }
         private static void EnsureEventSystemInScene() { new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule)); }
 
         private static string CaptureFixture(UiSpec spec, string panelId, Camera camera, RectTransform canvasRect, Transform instance,
@@ -2253,7 +2355,10 @@ namespace ES.Editor
             if (!ESAutomationPathPolicy.IsWithin(root, new[] { evidenceBase }))
                 throw new InvalidDataException("UI evidenceRoot 必须位于 ES/UIEvidence 内。");
             Directory.CreateDirectory(root);
-            RenderTexture target = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+            RenderTexture target = ESEditorPreviewUtility.CreateRenderTexture(
+                width, height, 24, 1, "ES UI Fixture Capture", RenderTextureFormat.ARGB32);
+            if (target == null)
+                throw new InvalidOperationException("UI Fixture 预览 RenderTexture 创建失败。");
             RenderTexture previous = RenderTexture.active;
             Texture2D image = null;
             try
@@ -2310,11 +2415,7 @@ namespace ES.Editor
                 if (camera != null)
                     camera.targetTexture = null;
                 RenderTexture.active = previous;
-                if (target != null)
-                {
-                    target.Release();
-                    UnityEngine.Object.DestroyImmediate(target);
-                }
+                ESEditorPreviewUtility.ReleaseRenderTexture(ref target);
             }
         }
 
@@ -3028,6 +3129,7 @@ namespace ES.Editor
                 Rect screen = ScreenRect(rect, width, height);
                 ESUIComponentSemantic semantic = rect.GetComponent<ESUIComponentSemantic>();
                 JObject focalCrop = BuildFocalCropSnapshot(rect);
+                JObject visibility = BuildVisibilitySnapshot(instance, rect, width, height);
                 var components = new JArray();
                 foreach (Component component in rect.GetComponents<Component>())
                     if (component != null) components.Add(new JObject { ["type"] = component.GetType().Name, ["enabled"] = IsComponentEnabled(component), ["properties"] = new JObject() });
@@ -3055,6 +3157,8 @@ namespace ES.Editor
                     ["components"] = components,
                     ["layout"] = BuildLayoutSnapshot(rect),
                     ["focalCrop"] = focalCrop,
+                    ["visibility"] = visibility,
+                    ["inputReachability"] = BuildInputReachabilitySnapshot(instance, rect, width, height, visibility),
                 });
             }
             return result;
@@ -3067,33 +3171,72 @@ namespace ES.Editor
 
         private static JObject BuildLayoutSnapshot(RectTransform rect)
         {
-            LayoutGroup group = rect == null ? null : rect.GetComponent<LayoutGroup>();
-            if (group == null) return null;
-            var directChildren = new JArray();
-            for (int index = 0; index < rect.childCount; index++)
-                directChildren.Add(GetRelativePath(rect, rect.GetChild(index)));
             var result = new JObject
             {
-                ["type"] = group.GetType().Name,
-                ["padding"] = new JArray(group.padding.left, group.padding.right, group.padding.top, group.padding.bottom),
-                ["childAlignment"] = group.childAlignment.ToString(),
-                ["directChildren"] = directChildren,
+                ["layoutGroup"] = null,
+                ["contentSizeFitter"] = null,
             };
-            if (group is HorizontalOrVerticalLayoutGroup flow)
+            LayoutGroup group = rect == null ? null : rect.GetComponent<LayoutGroup>();
+            ContentSizeFitter fitter = rect == null ? null : rect.GetComponent<ContentSizeFitter>();
+            if (group == null && fitter == null) return null;
+            if (group != null)
             {
-                result["spacing"] = flow.spacing;
-                result["controlChildWidth"] = flow.childControlWidth;
-                result["controlChildHeight"] = flow.childControlHeight;
-                result["forceChildExpandWidth"] = flow.childForceExpandWidth;
-                result["forceChildExpandHeight"] = flow.childForceExpandHeight;
+                var directChildren = new JArray();
+                for (int index = 0; index < rect.childCount; index++)
+                    directChildren.Add(GetRelativePath(rect, rect.GetChild(index)));
+                var groupSnapshot = new JObject
+                {
+                    ["type"] = group.GetType().Name,
+                    ["enabled"] = group.enabled,
+                    ["padding"] = new JArray(group.padding.left, group.padding.right, group.padding.top, group.padding.bottom),
+                    ["childAlignment"] = group.childAlignment.ToString(),
+                    ["directChildren"] = directChildren,
+                    ["childAxisControl"] = new JObject
+                    {
+                        ["x"] = LayoutGroupControlsChildAxis(group, true),
+                        ["y"] = LayoutGroupControlsChildAxis(group, false),
+                    },
+                };
+                if (group is HorizontalOrVerticalLayoutGroup flow)
+                {
+                    groupSnapshot["spacing"] = flow.spacing;
+                    groupSnapshot["controlChildWidth"] = flow.childControlWidth;
+                    groupSnapshot["controlChildHeight"] = flow.childControlHeight;
+                    groupSnapshot["forceChildExpandWidth"] = flow.childForceExpandWidth;
+                    groupSnapshot["forceChildExpandHeight"] = flow.childForceExpandHeight;
+                }
+                if (group is GridLayoutGroup grid)
+                {
+                    groupSnapshot["columns"] = grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount ? grid.constraintCount : 0;
+                    groupSnapshot["cellSize"] = new JArray(grid.cellSize.x, grid.cellSize.y);
+                    groupSnapshot["spacing"] = new JArray(grid.spacing.x, grid.spacing.y);
+                }
+                result["layoutGroup"] = groupSnapshot;
             }
-            if (group is GridLayoutGroup grid)
+            if (fitter != null)
             {
-                result["columns"] = grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount ? grid.constraintCount : 0;
-                result["cellSize"] = new JArray(grid.cellSize.x, grid.cellSize.y);
-                result["spacing"] = new JArray(grid.spacing.x, grid.spacing.y);
+                result["contentSizeFitter"] = new JObject
+                {
+                    ["enabled"] = fitter.enabled,
+                    ["horizontalFit"] = fitter.horizontalFit.ToString(),
+                    ["verticalFit"] = fitter.verticalFit.ToString(),
+                    ["selfAxisControl"] = new JObject
+                    {
+                        ["x"] = fitter.enabled && fitter.horizontalFit != ContentSizeFitter.FitMode.Unconstrained,
+                        ["y"] = fitter.enabled && fitter.verticalFit != ContentSizeFitter.FitMode.Unconstrained,
+                    },
+                };
             }
             return result;
+        }
+
+        private static bool LayoutGroupControlsChildAxis(LayoutGroup group, bool horizontal)
+        {
+            if (group == null || !group.enabled) return false;
+            if (group is GridLayoutGroup) return true;
+            if (group is HorizontalOrVerticalLayoutGroup flow)
+                return horizontal ? flow.childControlWidth : flow.childControlHeight;
+            return false;
         }
 
         private static JObject BuildFocalCropSnapshot(RectTransform rect)
@@ -3113,6 +3256,154 @@ namespace ES.Editor
                 ["safeCropInsetsNormalized"] = new JArray(insets.x, insets.y, insets.width, insets.height),
                 ["safeCropSatisfied"] = focalImage.SafeCropSatisfied,
             };
+        }
+
+        // This is a deterministic conservative model for snapshot comparison. EventSystem raycasts,
+        // non-rectangular Mask pixels and nested Canvas sorting still require runtime evidence.
+        private static JObject BuildVisibilitySnapshot(Transform instance, RectTransform rect, int width, int height)
+        {
+            Rect source = ScreenRect(rect, width, height);
+            Rect visible = source;
+            bool hasNonRectMaskAncestor = false;
+            var clipAncestors = new JArray();
+            for (RectTransform current = rect == null ? null : rect.parent as RectTransform;
+                 current != null;
+                 current = current.parent as RectTransform)
+            {
+                RectMask2D rectMask = current.GetComponent<RectMask2D>();
+                Mask mask = current.GetComponent<Mask>();
+                if (rectMask != null)
+                {
+                    bool enabled = rectMask.isActiveAndEnabled;
+                    Rect clip = ScreenRect(current, width, height);
+                    clipAncestors.Add(new JObject
+                    {
+                        ["path"] = SnapshotPathOrHierarchy(instance, current),
+                        ["type"] = "RectMask2D",
+                        ["enabled"] = enabled,
+                        ["screenRect"] = RectToSnapshot(clip),
+                    });
+                    if (enabled) visible = IntersectScreenRects(visible, clip);
+                }
+                if (mask != null)
+                {
+                    bool enabled = mask.isActiveAndEnabled;
+                    clipAncestors.Add(new JObject
+                    {
+                        ["path"] = SnapshotPathOrHierarchy(instance, current),
+                        ["type"] = "Mask",
+                        ["enabled"] = enabled,
+                        ["screenRect"] = RectToSnapshot(ScreenRect(current, width, height)),
+                    });
+                    hasNonRectMaskAncestor |= enabled;
+                }
+                if (current == instance) break;
+            }
+            float sourceArea = Mathf.Max(0f, source.width) * Mathf.Max(0f, source.height);
+            float visibleArea = Mathf.Max(0f, visible.width) * Mathf.Max(0f, visible.height);
+            return new JObject
+            {
+                ["clipAncestors"] = clipAncestors,
+                ["visibleRect"] = RectToSnapshot(visible),
+                ["visibleFraction"] = sourceArea <= 0.0001f ? 0f : Mathf.Clamp01(visibleArea / sourceArea),
+                ["hasNonRectMaskAncestor"] = hasNonRectMaskAncestor,
+            };
+        }
+
+        private static JObject BuildInputReachabilitySnapshot(Transform instance, RectTransform rect, int width, int height, JObject visibility)
+        {
+            bool inputAllowed = true;
+            bool visibleByCanvasGroups = true;
+            var canvasGroupChain = new JArray();
+            for (Transform current = rect; current != null; current = current.parent)
+            {
+                CanvasGroup group = current.GetComponent<CanvasGroup>();
+                if (group != null)
+                {
+                    bool enabled = group.isActiveAndEnabled;
+                    canvasGroupChain.Add(new JObject
+                    {
+                        ["path"] = SnapshotPathOrHierarchy(instance, current),
+                        ["enabled"] = enabled,
+                        ["alpha"] = group.alpha,
+                        ["interactable"] = group.interactable,
+                        ["blocksRaycasts"] = group.blocksRaycasts,
+                        ["ignoreParentGroups"] = group.ignoreParentGroups,
+                    });
+                    if (enabled)
+                    {
+                        inputAllowed &= group.interactable && group.blocksRaycasts;
+                        visibleByCanvasGroups &= group.alpha > 0.001f;
+                        if (group.ignoreParentGroups) break;
+                    }
+                }
+                if (current == instance) break;
+            }
+            JObject blocker = FindSameParentRaycastBlocker(instance, rect, width, height);
+            float visibleFraction = visibility == null ? 0f : visibility.Value<float?>("visibleFraction") ?? 0f;
+            return new JObject
+            {
+                ["canvasGroupChain"] = canvasGroupChain,
+                ["inputAllowedByCanvasGroups"] = inputAllowed,
+                ["visibleByCanvasGroups"] = visibleByCanvasGroups,
+                ["raycastBlocker"] = blocker,
+                ["reachable"] = inputAllowed && visibleByCanvasGroups && visibleFraction > 0.001f && blocker == null,
+            };
+        }
+
+        private static JObject FindSameParentRaycastBlocker(Transform instance, RectTransform target, int width, int height)
+        {
+            if (target == null || target.GetComponent<Button>() == null || target.parent == null) return null;
+            Rect targetRect = ScreenRect(target, width, height);
+            for (int sibling = target.GetSiblingIndex() + 1; sibling < target.parent.childCount; sibling++)
+            {
+                RectTransform candidate = target.parent.GetChild(sibling) as RectTransform;
+                Graphic graphic = candidate == null ? null : candidate.GetComponent<Graphic>();
+                if (candidate == null || graphic == null || !candidate.gameObject.activeInHierarchy || !graphic.isActiveAndEnabled
+                    || !graphic.raycastTarget || graphic.color.a <= 0.001f || !CanvasGroupsPermitRaycasts(candidate)) continue;
+                Rect candidateRect = ScreenRect(candidate, width, height);
+                if (IntersectScreenRects(targetRect, candidateRect).width <= 0.001f || IntersectScreenRects(targetRect, candidateRect).height <= 0.001f) continue;
+                return new JObject
+                {
+                    ["path"] = SnapshotPathOrHierarchy(instance, candidate),
+                    ["siblingIndex"] = sibling,
+                    ["reason"] = "same-parent-opaque-graphic",
+                    ["screenRect"] = RectToSnapshot(candidateRect),
+                };
+            }
+            return null;
+        }
+
+        private static bool CanvasGroupsPermitRaycasts(Transform target)
+        {
+            for (Transform current = target; current != null; current = current.parent)
+            {
+                CanvasGroup group = current.GetComponent<CanvasGroup>();
+                if (group == null || !group.isActiveAndEnabled) continue;
+                if (!group.blocksRaycasts) return false;
+                if (group.ignoreParentGroups) break;
+            }
+            return true;
+        }
+
+        private static Rect IntersectScreenRects(Rect left, Rect right)
+        {
+            float minX = Mathf.Max(left.xMin, right.xMin);
+            float minY = Mathf.Max(left.yMin, right.yMin);
+            float maxX = Mathf.Min(left.xMax, right.xMax);
+            float maxY = Mathf.Min(left.yMax, right.yMax);
+            return Rect.MinMaxRect(minX, minY, Mathf.Max(minX, maxX), Mathf.Max(minY, maxY));
+        }
+
+        private static JObject RectToSnapshot(Rect rect)
+        {
+            return new JObject { ["x"] = rect.x, ["y"] = rect.y, ["width"] = rect.width, ["height"] = rect.height };
+        }
+
+        private static string SnapshotPathOrHierarchy(Transform instance, Transform target)
+        {
+            if (TryGetLogicalSnapshotPath(instance, target, out string path, out string _)) return path;
+            return GetRelativePath(instance, target);
         }
 
         private static JArray BuildRuntimeElements(Transform instance, int width, int height)
@@ -3163,6 +3454,7 @@ namespace ES.Editor
                 Outline outline = rect.GetComponent<Outline>();
                 ESUIComponentSemantic semantic = rect.GetComponent<ESUIComponentSemantic>();
                 JObject focalCrop = BuildFocalCropSnapshot(rect);
+                JObject visibility = BuildVisibilitySnapshot(instance, rect, width, height);
                 result.Add(new JObject
                 {
                     ["path"] = path,
@@ -3195,7 +3487,10 @@ namespace ES.Editor
                     ["textTruncated"] = false,
                     ["screenX"] = screen.x, ["screenY"] = screen.y,
                     ["screenWidth"] = screen.width, ["screenHeight"] = screen.height,
+                    ["layout"] = BuildLayoutSnapshot(rect),
                     ["focalCrop"] = focalCrop,
+                    ["visibility"] = visibility,
+                    ["inputReachability"] = BuildInputReachabilitySnapshot(instance, rect, width, height, visibility),
                 });
             }
             return result;

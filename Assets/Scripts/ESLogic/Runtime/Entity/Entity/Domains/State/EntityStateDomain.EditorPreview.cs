@@ -391,7 +391,8 @@ namespace ES
             _previewRenderContext = new ESEditorPreviewRenderContext(
                 PreviewResourceOwner,
                 ESEditorPreviewSceneMode.HiddenObjectsInActiveScene,
-                PreviewRenderLayer);
+                PreviewRenderLayer,
+                ESEditorPreviewEnhancerSet.LowEnd);
             _previewModelHandle = _previewRenderContext.CreateModelGroup(
                 sourceEntity.gameObject,
                 $"{sourceEntity.name}{PreviewRootSuffix}",
@@ -400,17 +401,30 @@ namespace ES
                 disableRuntimeBehaviours: true);
             _previewRenderRoot = _previewModelHandle?.Instance;
             if (_previewRenderRoot == null)
+            {
+                DisposePreviewRender();
                 return;
+            }
 
             _previewRenderEntity = _previewRenderRoot.GetComponent<Entity>();
             if (_previewRenderEntity == null)
                 _previewRenderEntity = _previewRenderRoot.GetComponentInChildren<Entity>(true);
+            if (_previewRenderEntity == null)
+            {
+                DisposePreviewRender();
+                return;
+            }
 
             EnsurePreviewAnimatorEnabled(_previewRenderRoot);
             ApplyPreviewIdlePose(_previewRenderRoot);
             AlignPreviewRootToGround(_previewRenderRoot);
 
             _previewRenderPlayer = CreatePreviewSequencePlayer(_previewRenderEntity, _previewTrackContainer.Sequence, _previewTrackContainer.trackName);
+            if (_previewRenderPlayer == null)
+            {
+                DisposePreviewRender();
+                return;
+            }
             _previewRenderPlayer.StartAllSamplers();
             _previewTrackTime = Mathf.Clamp(startTime, 0f, Mathf.Max(0.01f, _previewRenderPlayer.Duration));
             _previewRenderCompleted = false;

@@ -17,6 +17,7 @@ description: >-
 - User authorization, Git/history, Runtime, external windows, network, release,
   deletion, and audit writes remain separate permissions.
 - Static evidence never proves Runtime or host-window behavior.
+- Session transitions and handoff boundaries must remain deterministic and replayable; static evidence does not prove external-window or Runtime behavior.
 - A launch envelope is a one-time acceptance gate. Consume only its immutable
   `handoffFiles.absolutePath`; never substitute `sourceAbsolutePath`.
 - Context is highest authority for receiving duties and tab titles. Combine

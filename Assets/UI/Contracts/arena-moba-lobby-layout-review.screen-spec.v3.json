@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 3,
+  "screenId": "arena-moba-lobby-layout-review",
+  "screenType": "navigation",
+  "template": "navigation",
+  "prefabPath": "Assets/UI/Prefabs/Generated/arena-moba-lobby-layout-review.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/arena-moba-lobby-layout-review.unity",
+  "tokens": {
+    "background": "#07111D",
+    "surface": "#102536",
+    "surfaceRaised": "#17354B",
+    "accent": "#42D6C5",
+    "accentWarm": "#F5B95B",
+    "onAccent": "#07111D",
+    "text": "#F4F8FA",
+    "mutedText": "#A9BBC4",
+    "danger": "#E86D76",
+    "onDanger": "#07111D",
+    "titleSize": 36,
+    "bodySize": 20,
+    "buttonSize": 22,
+    "spacing": 16,
+    "padding": 24
+  },
+  "qualityGates": {
+    "assetPolicy": {
+      "productionReady": false,
+      "commercialAcceptance": "deferred",
+      "acceptedSources": ["project-sprite", "ai-generated"],
+      "requiredFields": ["path", "hash", "provenance", "license", "importPolicy", "aspectPolicy", "focalPoint", "cropPolicy", "nineSlice", "atlasOwner", "resolutionSet"],
+      "plannedSourceClasses": ["generated-procedural", "generated-placeholder"],
+      "placeholderUse": "layout-only"
+    },
+    "responsivePolicy": {
+      "canvasRenderMode": "ScreenSpaceOverlay",
+      "canvasScalerMode": "ScaleWithScreenSize",
+      "referenceResolution": [1920, 1080],
+      "matchWidthOrHeight": 0.5,
+      "safeAreaPolicy": "profile-safe-area-inset",
+      "reflowPolicy": "profile-specific-reflow-required",
+      "longContentPolicy": "wrap-or-ellipsis-without-action-overlap",
+      "uniformScaleOnly": false,
+      "profileIds": ["wide", "narrow"]
+    },
+    "colorPolicy": {
+      "tokenRoles": ["surface", "text", "action", "feedback", "focus", "border", "icon"],
+      "minimumTextContrast": 4.5,
+      "nonColorStateSignals": {
+        "selected": ["selected-outline", "selected-label"],
+        "disabled": ["disabled-interaction", "disabled-label"],
+        "loading": ["loading-label", "progress-affordance"],
+        "error": ["error-copy", "retry-intent"],
+        "long-content": ["wrap-or-ellipsis"]
+      }
+    },
+    "typographyPolicy": {
+      "fontAssetId": "es-brand-sans-sc",
+      "fontAssetPath": "Assets/UI/Fonts/ESBrandSansSC SDF.asset",
+      "fontAssetHash": "faa6412e55b384fb05d6e33097053cb5ce5f0ceb6a945db2f6191db04cdf1e90",
+      "license": "project-internal-approved",
+      "fallbackFontAssetIds": ["es-brand-sans-sc"],
+      "requiredCharacters": ["曜", "石", "旅", "者", "星", "耀", "排", "位", "匹", "配", "金", "币", "S", "18", "3"],
+      "localeFixtures": ["zh-CN-long-content", "en-US-mixed-numeric"],
+      "overflowPolicy": "wrap-ellipsis-scroll-by-component"
+    }
+  },
+  "profiles": [
+    {"id": "wide", "width": 1920, "height": 1080, "orientation": "landscape", "safeArea": [0.02, 0.03, 0.98, 0.96]},
+    {"id": "narrow", "width": 1080, "height": 1920, "orientation": "portrait", "safeArea": [0.04, 0.02, 0.96, 0.97]}
+  ],
+  "states": [
+    {"id": "default", "fixture": "arena-moba-lobby-layout-review/default"},
+    {"id": "selected", "fixture": "arena-moba-lobby-layout-review/selected"},
+    {"id": "disabled", "fixture": "arena-moba-lobby-layout-review/disabled"},
+    {"id": "loading", "fixture": "arena-moba-lobby-layout-review/loading"},
+    {"id": "error", "fixture": "arena-moba-lobby-layout-review/error"},
+    {"id": "long-content", "fixture": "arena-moba-lobby-layout-review/long-content"}
+  ],
+  "stateSemantics": {
+    "default": {
+      "fixtureData": {"selectedMode": "ranked", "partyOnline": 3, "requestStatus": "idle"},
+      "affectedComponentIds": ["wide-primary-action", "narrow-primary-action", "wide-ranked-mode", "narrow-ranked-mode"],
+      "visualChanges": ["ranked mode uses the selected treatment; primary action retains accent emphasis"],
+      "interactionChanges": ["all declared actions are enabled"],
+      "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}
+    },
+    "selected": {
+      "fixtureData": {"selectedMode": "quick", "focusedIntent": "select-quick-mode"},
+      "affectedComponentIds": ["wide-quick-mode", "narrow-quick-mode", "wide-ranked-mode", "narrow-ranked-mode"],
+      "visualChanges": ["quick mode gains selected treatment; ranked mode returns to surface treatment"],
+      "interactionChanges": ["selection changes fixture state only and does not start matchmaking"],
+      "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}
+    },
+    "disabled": {
+      "fixtureData": {"disabledIntents": ["start-ranked-match", "select-training-mode", "invite-party"], "reason": "party-not-ready"},
+      "affectedComponentIds": ["wide-primary-action", "narrow-primary-action", "wide-training-mode", "narrow-training-mode", "wide-invite"],
+      "visualChanges": ["disabled controls reduce emphasis without removing labels or changing bounds"],
+      "interactionChanges": ["disabled intents reject activation and remain discoverable"],
+      "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}
+    },
+    "loading": {
+      "fixtureData": {"requestStatus": "loading", "loadingLabel": "正在匹配...", "preserveLastData": true},
+      "affectedComponentIds": ["wide-primary-action", "narrow-primary-action", "wide-hero", "narrow-hero"],
+      "visualChanges": ["primary action label becomes 正在匹配... and shows an inline progress affordance"],
+      "interactionChanges": ["start-ranked-match is temporarily disabled; navigation remains available"],
+      "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}
+    },
+    "error": {
+      "fixtureData": {"requestStatus": "error", "errorCode": "MATCHMAKING_UNAVAILABLE", "message": "匹配服务暂不可用，请稍后重试"},
+      "affectedComponentIds": ["wide-primary-action", "narrow-primary-action", "wide-season", "narrow-season"],
+      "visualChanges": ["an inline error message replaces the seasonal status line; primary action label becomes 重试"],
+      "interactionChanges": ["primary action intent becomes retry-matchmaking; global navigation remains enabled"],
+      "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}
+    },
+    "long-content": {
+      "fixtureData": {"playerName": "来自星海彼端的曜石远征指挥官", "eventTitle": "星海远征赛季限时协同挑战与累计胜场奖励活动", "currencyText": "12,840 金币 · 680 星石 · 25 荣耀徽记"},
+      "affectedComponentIds": ["wide-player", "narrow-player", "wide-event-one", "narrow-event", "wide-currency", "narrow-currency"],
+      "visualChanges": ["text wraps or truncates according to component policy without covering adjacent controls"],
+      "interactionChanges": ["text expansion does not change any input intent"],
+      "geometryPolicy": {"preserveBounds": true, "allowedChanges": ["text-line-count"]}
+    }
+  },
+  "assets": [
+    {"id": "lobby-backdrop", "role": "background-focal-art", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/lobby-background-ai-ui-visual-assets-v7.asset", "hash": "957b5271f3f0c6220a4d69cce40cca0ed18cb608c4c6ab7841d81bd3be557f8c", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "preserve", "focalPoint": [0.80, 0.14], "cropPolicy": "contain-focal-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [1024, 512], "fallback": "solid-background"},
+    {"id": "player-avatar", "role": "player-avatar", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/player-avatar-ai-ui-visual-assets-v7.asset", "hash": "597007d0f12ac8b3688fb235f584f251087949a6d2af855d4df528bd68945661", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "avatar-fallback"},
+    {"id": "season-hero", "role": "season-hero-art", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/hero-banner-ai-ui-visual-assets-v7.asset", "hash": "00e912f723be1edafafc2e6fea52f129f34133dd6702b4000f278901b73dfa8a", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "preserve", "focalPoint": [0.69, 0.53], "cropPolicy": "contain-focal-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [1024, 512], "fallback": "hero-fallback"},
+    {"id": "rank-emblem", "role": "rank-emblem", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/rank-emblem-ai-ui-visual-assets-v7.asset", "hash": "3409b2dbccbc13c830ac83b32d504c0ac19cef632c648df4afe3fc96fdc35120", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "rank-fallback"},
+    {"id": "mode-ranked", "role": "mode-ranked-art", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/mode-ranked-ai-ui-visual-assets-v5.asset", "hash": "9e7204e03108a9a4d1b8f83415485e78b564db36a5c2f23a61aecf975ad787d7", "provenance": "ES-generated-procedural-v5", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "mode-fallback"},
+    {"id": "mode-quick", "role": "mode-quick-art", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/mode-match-ai-ui-visual-assets-v7.asset", "hash": "9113bfbe8161c2959684e24b19154b45798a9999b30a08da3a025ce5514bb8a2", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "mode-fallback"},
+    {"id": "mode-training", "role": "mode-training-art", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/mode-training-ai-ui-visual-assets-v7.asset", "hash": "31190c156a219dca83cd0edab5aa7069001f7e20ed9e11fe22780d051108cb22", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "mode-fallback"},
+    {"id": "friend-avatar", "role": "friend-avatar", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/friend-avatar-ai-ui-visual-assets-v7.asset", "hash": "f32238950f0b142f9984b59a24efa861da97ae350c221e2171ea17695893ef04", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "avatar-fallback"},
+    {"id": "mail-icon", "role": "mail-icon", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/mail-icon-ai-ui-visual-assets-v7.asset", "hash": "7e18cd9bd074a4ab17752367603e40816f212583908337fa3f1860115aeaf6ff", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "icon-fallback"},
+    {"id": "settings-icon", "role": "settings-icon", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/settings-icon-ai-ui-visual-assets-v7.asset", "hash": "112c2cce3e29967d0e8803eb747d47abbaf51d5b37e50045663b2fa1a2256c68", "provenance": "ES-generated-procedural-v7", "license": "project-internal-generated-procedural", "importPolicy": "Texture2D-Sprite-RGBA32-Readable-Clamp-Bilinear", "aspectPolicy": "square", "focalPoint": [0.50, 0.50], "cropPolicy": "contain-subject", "nineSlice": "none", "atlasOwner": "ES/UI/Generated/AIUI", "resolutionSet": [256, 256], "fallback": "icon-fallback"}
+  ],
+  "components": [
+    {
+      "id": "background", "type": "frame", "zone": "safe-area",
+      "layout": {"mode": "stretch", "bounds": [0, 0, 1, 1], "minSize": [720, 520]},
+      "content": {}, "visualVariant": "background", "stateVariants": {"default": {}}, "assetSlots": ["lobby-backdrop"]
+    },
+    {
+      "id": "wide-header", "type": "frame", "zone": "header",
+      "layout": {"mode": "absolute", "bounds": [0.03, 0.03, 0.97, 0.14], "minSize": [960, 92], "responsiveMode": "wide"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "loading": {}, "error": {}},
+      "children": [
+        {"id": "wide-avatar", "type": "icon", "zone": "header", "layout": {"mode": "edge-docked", "bounds": [0.02, 0.14, 0.10, 0.86], "minSize": [72, 72], "responsiveMode": "wide"}, "content": {}, "visualVariant": "accent", "stateVariants": {"default": {}}, "assetSlots": ["player-avatar"]},
+        {"id": "wide-player", "type": "text", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.13, 0.22, 0.30, 0.50], "minSize": [180, 28], "responsiveMode": "wide"}, "content": {"text": "曜石旅者"}, "visualVariant": "text", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "wide-rank", "type": "status-badge", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.31, 0.20, 0.49, 0.80], "minSize": [160, 46], "responsiveMode": "wide"}, "content": {"text": "星耀 III  ·  赛季 18"}, "visualVariant": "accent", "stateVariants": {"default": {}}, "assetSlots": ["rank-emblem"]},
+        {"id": "wide-currency", "type": "counter", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.60, 0.20, 0.82, 0.80], "minSize": [220, 46], "responsiveMode": "wide"}, "content": {"text": "12,840 金币  ·  680 星石", "value": 12840}, "visualVariant": "surface", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "wide-mail", "type": "button", "zone": "header", "layout": {"mode": "edge-docked", "bounds": [0.84, 0.18, 0.91, 0.82], "minSize": [64, 52], "responsiveMode": "wide"}, "content": {"text": ""}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "interaction": {"intent": "open-mail", "targetSize": [64, 52]}, "assetSlots": ["mail-icon"]},
+        {"id": "wide-settings", "type": "button", "zone": "header", "layout": {"mode": "edge-docked", "bounds": [0.92, 0.18, 0.99, 0.82], "minSize": [64, 52], "responsiveMode": "wide"}, "content": {"text": ""}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "interaction": {"intent": "open-settings", "targetSize": [64, 52]}, "assetSlots": ["settings-icon"]}
+      ]
+    },
+    {
+      "id": "wide-hero", "type": "frame", "zone": "content",
+      "layout": {"mode": "absolute", "bounds": [0.03, 0.17, 0.67, 0.70], "minSize": [820, 520], "responsiveMode": "wide"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}, "loading": {}, "error": {}},
+      "children": [
+        {"id": "wide-hero-art", "type": "image", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.02, 0.03, 0.47, 0.97], "minSize": [360, 400], "responsiveMode": "wide"}, "content": {}, "visualVariant": "none", "stateVariants": {"default": {}, "loading": {}}, "assetSlots": ["season-hero"]},
+        {"id": "wide-season", "type": "status-badge", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.52, 0.10, 0.94, 0.20], "minSize": [240, 38], "responsiveMode": "wide"}, "content": {"text": "S18  星海远征季"}, "visualVariant": "accent", "stateVariants": {"default": {}, "error": {}}},
+        {"id": "wide-hero-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.52, 0.25, 0.95, 0.43], "minSize": [340, 52], "responsiveMode": "wide"}, "content": {"text": "向星海发起挑战"}, "visualVariant": "text", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "wide-hero-copy", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.52, 0.45, 0.94, 0.57], "minSize": [330, 42], "responsiveMode": "wide"}, "content": {"text": "组建你的队伍，赢取赛季限定奖励"}, "visualVariant": "mutedText", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "wide-primary-action", "type": "button", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.52, 0.64, 0.82, 0.78], "minSize": [180, 58], "responsiveMode": "wide"}, "content": {"text": "开始排位匹配"}, "visualVariant": "accent", "stateVariants": {"default": {}, "selected": {}, "disabled": {}, "loading": {}, "error": {}}, "interaction": {"intent": "start-ranked-match", "targetSize": [180, 58]}},
+        {"id": "wide-mode-list", "type": "list", "zone": "content", "layout": {"mode": "flow", "bounds": [0.52, 0.81, 0.95, 0.95], "minSize": [340, 64], "responsiveMode": "wide", "gap": 10, "padding": [4, 4, 4, 4], "childGeometryOwner": "parent-layout-group"}, "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "children": [
+          {"id": "wide-ranked-mode", "type": "item-card", "zone": "content", "layout": {"mode": "absolute", "bounds": [0, 0, 0.31, 1], "minSize": [108, 64], "responsiveMode": "wide"}, "content": {"text": "排位"}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}}, "interaction": {"intent": "select-ranked-mode", "targetSize": [108, 64]}, "assetSlots": ["mode-ranked"]},
+          {"id": "wide-quick-mode", "type": "item-card", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.345, 0, 0.655, 1], "minSize": [108, 64], "responsiveMode": "wide"}, "content": {"text": "快速"}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}}, "interaction": {"intent": "select-quick-mode", "targetSize": [108, 64]}, "assetSlots": ["mode-quick"]},
+          {"id": "wide-training-mode", "type": "item-card", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.69, 0, 1, 1], "minSize": [108, 64], "responsiveMode": "wide"}, "content": {"text": "训练"}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}, "disabled": {}}, "interaction": {"intent": "select-training-mode", "targetSize": [108, 64]}, "assetSlots": ["mode-training"]}
+        ]}
+      ]
+    },
+    {
+      "id": "wide-support-rail", "type": "frame", "zone": "content",
+      "layout": {"mode": "absolute", "bounds": [0.70, 0.17, 0.97, 0.70], "minSize": [360, 520], "responsiveMode": "wide"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "loading": {}, "error": {}, "long-content": {}},
+      "children": [
+        {"id": "wide-events-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.06, 0.70, 0.14], "minSize": [180, 30], "responsiveMode": "wide"}, "content": {"text": "限时活动"}, "visualVariant": "text", "stateVariants": {"default": {}}},
+        {"id": "wide-event-one", "type": "stat-row", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.20, 0.92, 0.39], "minSize": [280, 72], "responsiveMode": "wide"}, "content": {"text": "星海远征  ·  还剩 3 天"}, "visualVariant": "surface", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "wide-event-two", "type": "stat-row", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.43, 0.92, 0.62], "minSize": [280, 72], "responsiveMode": "wide"}, "content": {"text": "周末双倍经验"}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}},
+        {"id": "wide-party-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.69, 0.70, 0.77], "minSize": [180, 30], "responsiveMode": "wide"}, "content": {"text": "好友与组队"}, "visualVariant": "text", "stateVariants": {"default": {}}},
+        {"id": "wide-party-count", "type": "counter", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.72, 0.69, 0.92, 0.77], "minSize": [70, 30], "responsiveMode": "wide"}, "content": {"text": "3 在线", "value": 3}, "visualVariant": "mutedText", "stateVariants": {"default": {}}},
+        {"id": "wide-invite", "type": "button", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.82, 0.92, 0.94], "minSize": [180, 54], "responsiveMode": "wide"}, "content": {"text": "邀请好友组队"}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "interaction": {"intent": "invite-party", "targetSize": [180, 54]}, "assetSlots": ["friend-avatar"]}
+      ]
+    },
+    {
+      "id": "wide-navigation", "type": "tab-bar", "zone": "navigation",
+      "layout": {"mode": "flow", "bounds": [0.03, 0.75, 0.97, 0.95], "minSize": [960, 76], "responsiveMode": "wide", "gap": 8, "padding": [8, 8, 8, 8], "childGeometryOwner": "parent-layout-group"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "interaction": {"intent": "navigate-main-tab", "targetSize": [960, 76]}, "children": [
+        {"id": "wide-tab-home", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0, 0, 0.20, 1], "minSize": [120, 52], "responsiveMode": "wide"}, "content": {"text": "大厅"}, "visualVariant": "accent", "stateVariants": {"default": {}, "selected": {}}, "interaction": {"intent": "open-home", "targetSize": [120, 52]}},
+        {"id": "wide-tab-heroes", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.20, 0, 0.40, 1], "minSize": [120, 52], "responsiveMode": "wide"}, "content": {"text": "英雄"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-heroes", "targetSize": [120, 52]}},
+        {"id": "wide-tab-inventory", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.40, 0, 0.60, 1], "minSize": [120, 52], "responsiveMode": "wide"}, "content": {"text": "背包"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-inventory", "targetSize": [120, 52]}},
+        {"id": "wide-tab-clan", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.60, 0, 0.80, 1], "minSize": [120, 52], "responsiveMode": "wide"}, "content": {"text": "战队"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-clan", "targetSize": [120, 52]}},
+        {"id": "wide-tab-events", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.80, 0, 1, 1], "minSize": [120, 52], "responsiveMode": "wide"}, "content": {"text": "活动"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-events", "targetSize": [120, 52]}}
+      ]
+    },
+    {
+      "id": "narrow-header", "type": "frame", "zone": "header",
+      "layout": {"mode": "absolute", "bounds": [0.04, 0.02, 0.96, 0.13], "minSize": [720, 104], "responsiveMode": "narrow"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "loading": {}, "error": {}}, "children": [
+        {"id": "narrow-avatar", "type": "icon", "zone": "header", "layout": {"mode": "edge-docked", "bounds": [0.03, 0.15, 0.14, 0.85], "minSize": [72, 72], "responsiveMode": "narrow"}, "content": {}, "visualVariant": "accent", "stateVariants": {"default": {}}, "assetSlots": ["player-avatar"]},
+        {"id": "narrow-player", "type": "text", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.17, 0.21, 0.48, 0.49], "minSize": [190, 28], "responsiveMode": "narrow"}, "content": {"text": "曜石旅者"}, "visualVariant": "text", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "narrow-rank", "type": "status-badge", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.17, 0.53, 0.48, 0.84], "minSize": [190, 28], "responsiveMode": "narrow"}, "content": {"text": "星耀 III"}, "visualVariant": "accent", "stateVariants": {"default": {}}, "assetSlots": ["rank-emblem"]},
+        {"id": "narrow-currency", "type": "counter", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.52, 0.20, 0.78, 0.80], "minSize": [150, 44], "responsiveMode": "narrow"}, "content": {"text": "12,840 金币", "value": 12840}, "visualVariant": "surface", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "narrow-settings", "type": "button", "zone": "header", "layout": {"mode": "edge-docked", "bounds": [0.82, 0.18, 0.98, 0.82], "minSize": [64, 52], "responsiveMode": "narrow"}, "content": {"text": ""}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "interaction": {"intent": "open-settings", "targetSize": [64, 52]}, "assetSlots": ["settings-icon"]}
+      ]
+    },
+    {
+      "id": "narrow-hero", "type": "frame", "zone": "content",
+      "layout": {"mode": "absolute", "bounds": [0.04, 0.16, 0.96, 0.50], "minSize": [720, 620], "responsiveMode": "narrow"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}, "loading": {}, "error": {}}, "children": [
+        {"id": "narrow-hero-art", "type": "image", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.04, 0.05, 0.42, 0.95], "minSize": [260, 420], "responsiveMode": "narrow"}, "content": {}, "visualVariant": "none", "stateVariants": {"default": {}, "loading": {}}, "assetSlots": ["season-hero"]},
+        {"id": "narrow-season", "type": "status-badge", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.48, 0.10, 0.94, 0.20], "minSize": [240, 38], "responsiveMode": "narrow"}, "content": {"text": "S18 星海远征季"}, "visualVariant": "accent", "stateVariants": {"default": {}, "error": {}}},
+        {"id": "narrow-hero-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.48, 0.25, 0.95, 0.43], "minSize": [310, 52], "responsiveMode": "narrow"}, "content": {"text": "向星海发起挑战"}, "visualVariant": "text", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "narrow-hero-copy", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.48, 0.46, 0.94, 0.58], "minSize": [300, 42], "responsiveMode": "narrow"}, "content": {"text": "组建队伍，赢取赛季奖励"}, "visualVariant": "mutedText", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "narrow-primary-action", "type": "button", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.48, 0.66, 0.94, 0.80], "minSize": [220, 58], "responsiveMode": "narrow"}, "content": {"text": "开始排位匹配"}, "visualVariant": "accent", "stateVariants": {"default": {}, "selected": {}, "disabled": {}, "loading": {}, "error": {}}, "interaction": {"intent": "start-ranked-match", "targetSize": [220, 58]}},
+        {"id": "narrow-mode-list", "type": "list", "zone": "content", "layout": {"mode": "flow", "bounds": [0.48, 0.83, 0.95, 0.95], "minSize": [300, 64], "responsiveMode": "narrow", "gap": 8, "padding": [4, 4, 4, 4], "childGeometryOwner": "parent-layout-group"}, "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "children": [
+          {"id": "narrow-ranked-mode", "type": "item-card", "zone": "content", "layout": {"mode": "absolute", "bounds": [0, 0, 0.31, 1], "minSize": [96, 64], "responsiveMode": "narrow"}, "content": {"text": "排位"}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}}, "interaction": {"intent": "select-ranked-mode", "targetSize": [96, 64]}, "assetSlots": ["mode-ranked"]},
+          {"id": "narrow-quick-mode", "type": "item-card", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.345, 0, 0.655, 1], "minSize": [96, 64], "responsiveMode": "narrow"}, "content": {"text": "快速"}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}}, "interaction": {"intent": "select-quick-mode", "targetSize": [96, 64]}, "assetSlots": ["mode-quick"]},
+          {"id": "narrow-training-mode", "type": "item-card", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.69, 0, 1, 1], "minSize": [96, 64], "responsiveMode": "narrow"}, "content": {"text": "训练"}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}, "disabled": {}}, "interaction": {"intent": "select-training-mode", "targetSize": [96, 64]}, "assetSlots": ["mode-training"]}
+        ]}
+      ]
+    },
+    {
+      "id": "narrow-support", "type": "frame", "zone": "content",
+      "layout": {"mode": "absolute", "bounds": [0.04, 0.53, 0.96, 0.78], "minSize": [720, 360], "responsiveMode": "narrow"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "loading": {}, "error": {}, "long-content": {}}, "children": [
+        {"id": "narrow-events-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.06, 0.07, 0.50, 0.16], "minSize": [180, 30], "responsiveMode": "narrow"}, "content": {"text": "限时活动"}, "visualVariant": "text", "stateVariants": {"default": {}}},
+        {"id": "narrow-event", "type": "stat-row", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.06, 0.20, 0.94, 0.43], "minSize": [620, 72], "responsiveMode": "narrow"}, "content": {"text": "星海远征  ·  还剩 3 天"}, "visualVariant": "surface", "stateVariants": {"default": {}, "long-content": {}}},
+        {"id": "narrow-party-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.06, 0.54, 0.50, 0.63], "minSize": [180, 30], "responsiveMode": "narrow"}, "content": {"text": "好友与组队"}, "visualVariant": "text", "stateVariants": {"default": {}}},
+        {"id": "narrow-party", "type": "list", "zone": "content", "layout": {"mode": "flow", "bounds": [0.06, 0.66, 0.94, 0.93], "minSize": [620, 88], "responsiveMode": "narrow", "gap": 8, "padding": [4, 4, 4, 4], "childGeometryOwner": "parent-layout-group"}, "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "loading": {}, "error": {}}, "children": [
+          {"id": "narrow-friend-one", "type": "stat-row", "zone": "content", "layout": {"mode": "absolute", "bounds": [0, 0, 0.30, 1], "minSize": [180, 74], "responsiveMode": "narrow"}, "content": {"text": "青焰 在线"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "assetSlots": ["friend-avatar"]},
+          {"id": "narrow-friend-two", "type": "stat-row", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.34, 0, 0.64, 1], "minSize": [180, 74], "responsiveMode": "narrow"}, "content": {"text": "霜叶 在线"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "assetSlots": ["friend-avatar"]},
+          {"id": "narrow-friend-three", "type": "stat-row", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.68, 0, 1, 1], "minSize": [180, 74], "responsiveMode": "narrow"}, "content": {"text": "北辰 训练中"}, "visualVariant": "surface", "stateVariants": {"default": {}, "disabled": {}}, "assetSlots": ["friend-avatar"]}
+        ]}
+      ]
+    },
+    {
+      "id": "narrow-navigation", "type": "tab-bar", "zone": "navigation",
+      "layout": {"mode": "flow", "bounds": [0.04, 0.82, 0.96, 0.97], "minSize": [720, 84], "responsiveMode": "narrow", "gap": 6, "padding": [6, 6, 6, 6], "childGeometryOwner": "parent-layout-group"},
+      "content": {}, "visualVariant": "surface", "stateVariants": {"default": {}, "selected": {}, "disabled": {}}, "interaction": {"intent": "navigate-main-tab", "targetSize": [720, 84]}, "children": [
+        {"id": "narrow-tab-home", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0, 0, 0.20, 1], "minSize": [96, 56], "responsiveMode": "narrow"}, "content": {"text": "大厅"}, "visualVariant": "accent", "stateVariants": {"default": {}, "selected": {}}, "interaction": {"intent": "open-home", "targetSize": [96, 56]}},
+        {"id": "narrow-tab-heroes", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.20, 0, 0.40, 1], "minSize": [96, 56], "responsiveMode": "narrow"}, "content": {"text": "英雄"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-heroes", "targetSize": [96, 56]}},
+        {"id": "narrow-tab-inventory", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.40, 0, 0.60, 1], "minSize": [96, 56], "responsiveMode": "narrow"}, "content": {"text": "背包"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-inventory", "targetSize": [96, 56]}},
+        {"id": "narrow-tab-clan", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.60, 0, 0.80, 1], "minSize": [96, 56], "responsiveMode": "narrow"}, "content": {"text": "战队"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-clan", "targetSize": [96, 56]}},
+        {"id": "narrow-tab-events", "type": "button", "zone": "navigation", "layout": {"mode": "absolute", "bounds": [0.80, 0, 1, 1], "minSize": [96, 56], "responsiveMode": "narrow"}, "content": {"text": "活动"}, "visualVariant": "surface", "stateVariants": {"default": {}}, "interaction": {"intent": "open-events", "targetSize": [96, 56]}}
+      ]
+    }
+  ],
+  "behaviors": [
+    {"id": "arena-moba-lobby-layout-review.navigation", "inputs": ["open-home", "open-heroes", "open-inventory", "open-clan", "open-events", "open-mail", "open-settings", "start-ranked-match", "select-ranked-mode", "select-quick-mode", "select-training-mode", "invite-party"], "transitions": []}
+  ],
+  "bindings": [
+    {
+      "ruleId": "UI-FB-001",
+      "componentIds": ["wide-hero-art", "narrow-hero-art"],
+      "profileIds": ["wide", "narrow"],
+      "stateIds": ["default", "loading"],
+      "assetPolicy": {"focalPoint": [0.36, 0.48], "orientation": "facing-content", "cropPolicy": "contain-subject", "visualVariant": "none", "minimumContrastRatio": 3.0, "requiredBuildId": "arena-season-hero-r1"},
+      "evidenceRequirements": ["source asset hash and provenance", "wide and narrow GPU capture", "materializer build id and crop receipt"],
+      "nextArtifactFields": ["assets[season-hero]", "components[wide-hero-art].layout", "components[narrow-hero-art].layout"]
+    },
+    {
+      "ruleId": "UI-FB-002",
+      "componentIds": ["wide-primary-action", "narrow-primary-action", "wide-hero", "narrow-hero"],
+      "profileIds": ["wide", "narrow"],
+      "stateIds": ["default", "selected", "disabled"],
+      "hierarchyPolicy": {"primaryIntent": "start-ranked-match", "maximumPrimaryActions": 1, "preserveAcrossStates": true},
+      "evidenceRequirements": ["native-resolution hierarchy review", "selected and disabled comparison"],
+      "nextArtifactFields": ["designEvidence.layoutDecisions", "components[wide-primary-action].visualVariant", "components[narrow-primary-action].visualVariant"]
+    },
+    {
+      "ruleId": "UI-FB-003",
+      "componentIds": ["wide-header", "wide-hero", "wide-support-rail", "wide-navigation", "narrow-header", "narrow-hero", "narrow-support", "narrow-navigation"],
+      "profileIds": ["wide", "narrow"],
+      "stateIds": ["all"],
+      "responsivePolicy": {"wideStrategy": "hero-support-columns", "narrowStrategy": "header-hero-support-navigation-stack", "safeAreaRequired": true, "allowUniformScaleOnly": false},
+      "evidenceRequirements": ["resolved RectTransform snapshot per profile and state", "zero unexplained overlap or clipping", "safe-area containment result"],
+      "nextArtifactFields": ["profiles", "components[].layout.bounds", "components[].layout.childGeometryOwner"]
+    },
+    {
+      "ruleId": "UI-FB-004",
+      "componentIds": ["background", "wide-hero", "narrow-hero"],
+      "profileIds": ["wide", "narrow"],
+      "stateIds": ["all"],
+      "evidenceIdentity": {"requiredFields": ["specSha256", "profileId", "stateId", "materializerBuildId", "runId"], "weakestLayerWins": true, "currentLevel": "S1", "runtimeStatus": "runtime-not-run"},
+      "evidenceRequirements": ["separate Static, Materialization, GPU Visual and Runtime verdicts", "fresh capture identity for every profile/state pair"],
+      "nextArtifactFields": ["evidenceLedger.static", "evidenceLedger.materialization", "evidenceLedger.gpuVisual", "evidenceLedger.runtime"]
+    },
+    {
+      "ruleId": "UI-FB-005",
+      "componentIds": ["wide-primary-action", "narrow-primary-action", "wide-hero-art", "narrow-hero-art"],
+      "profileIds": ["wide", "narrow"],
+      "stateIds": ["all"],
+      "repairPolicy": {"priorEvidenceBatch": "arena-moba-lobby-v18-v19-failure-review", "requireChangedArtifact": true, "rejectCosmeticOnlyChange": true},
+      "evidenceRequirements": ["field-level before/after patch", "expected visual effect", "falsification check and regression result"],
+      "nextArtifactFields": ["designEvidence.feedback.changedFields", "designEvidence.feedback.expectedEffects", "designEvidence.feedback.falsificationChecks"]
+    }
+  ],
+  "profileAvailability": {
+    "wide": {"availableIntents": ["open-home", "open-heroes", "open-inventory", "open-clan", "open-events", "open-mail", "open-settings", "start-ranked-match", "select-ranked-mode", "select-quick-mode", "select-training-mode", "invite-party"], "omittedIntents": []},
+    "narrow": {"availableIntents": ["open-home", "open-heroes", "open-inventory", "open-clan", "open-events", "open-settings", "start-ranked-match", "select-ranked-mode", "select-quick-mode", "select-training-mode"], "omittedIntents": [{"intent": "open-mail", "reason": "collapsed into the player notification drawer for narrow profile; drawer is outside this fixture"}, {"intent": "invite-party", "reason": "friend rows are selection-only in narrow fixture; invite action is deferred to the party detail screen"}]}
+  },
+  "artifactStatus": {
+    "assets": "planned",
+    "prefab": "planned",
+    "fixtureScene": "planned",
+    "gpuEvidence": "not-run",
+    "runtimeEvidence": "not-run"
+  },
+  "designEvidence": {
+    "schemaVersion": 2,
+    "sourceType": "ai-layout-review-fixture",
+    "brief": "原创竞技游戏大厅审查样例。宽屏采用左主视觉、右支持栏、底部主导航；窄屏采用顶部身份、右侧主动作、活动与组队纵向重排。",
+    "referenceImages": [],
+    "layoutDecisions": [
+      {"decisionId": "wide-primary-axis", "profileId": "wide", "decision": "hero owns the main content axis; support rail is a separate sibling owner", "reason": "避免活动/组队内容侵入主动作区域。"},
+      {"decisionId": "narrow-reflow", "profileId": "narrow", "decision": "hero and support stack vertically; navigation remains bottom anchored inside safe area", "reason": "窄屏保留触控目标，不压缩宽屏两列。"},
+      {"decisionId": "single-primary-action", "profileId": "all", "decision": "start-ranked-match is the only accent-filled primary action", "reason": "玩家进入大厅后的首要意图是开始一局游戏。"}
+    ],
+    "conflictHypotheses": [
+      "wide header currency may collide with icon buttons when localization expands",
+      "narrow hero copy may wrap into the primary action band",
+      "narrow support list may require horizontal scroll or a two-row fallback",
+      "bottom navigation must remain outside content scroll ownership",
+      "loading and error overlays must not change hero bounds"
+    ],
+    "feedback": {
+      "priorEvidenceBatch": "arena-moba-lobby-v18-v19-failure-review",
+      "ruleIds": ["UI-FB-001", "UI-FB-002", "UI-FB-003", "UI-FB-004", "UI-FB-005"],
+      "changedFields": ["components[].layout.responsiveMode", "components[].layout.bounds", "components[].layout.minSize", "designEvidence.layoutDecisions", "designEvidence.conflictHypotheses"],
+      "expectedEffects": ["wide and narrow receive independent geometry decisions", "hero art is not token-tinted", "one primary action remains visually dominant", "known collision risks are reviewable before Unity materialization"],
+      "falsificationChecks": ["calculate sibling intersections per profile and state", "measure text against minSize under long-content fixture", "verify navigation safe-area separation", "require Unity/GPU evidence before visual acceptance"]
+    }
+  }
+}

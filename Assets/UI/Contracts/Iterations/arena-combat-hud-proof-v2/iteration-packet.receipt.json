@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sourceSpec": "Assets/UI/Contracts/arena-combat-hud-proof-v1.screen-spec.v3.json",
+  "modes": {
+    "rebuild": {
+      "path": "Assets/UI/Contracts/Iterations/arena-combat-hud-proof-v2/arena-combat-hud-proof-v2-rebuild.screen-spec.v3.json",
+      "specSha256": "4b689d4a07fdb9c81377dfcabede01a2ed21d9ecb0daf8d25ea94082fcf50402",
+      "source": "source-contract-rebuild"
+    },
+    "iterate": {
+      "path": "Assets/UI/Contracts/Iterations/arena-combat-hud-proof-v2/arena-combat-hud-proof-v2-iteration.screen-spec.v3.json",
+      "specSha256": "fe65692c91aa6c55adf4be74101da80c6ccb46aabd6fe611631c55df8b80747c",
+      "source": "existing-screen-spec"
+    }
+  },
+  "deterministic": true
+}

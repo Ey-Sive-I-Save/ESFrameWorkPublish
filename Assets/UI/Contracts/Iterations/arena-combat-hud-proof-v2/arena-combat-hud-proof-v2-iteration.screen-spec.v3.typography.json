@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "evaluator": "es-ui-prefab-authoring/evaluate_ui_typography",
+  "evaluatorVersion": 2,
+  "specPath": "F:/aaProject/ESFrameWorkPublish/Assets/UI/Contracts/Iterations/arena-combat-hud-proof-v2/arena-combat-hud-proof-v2-iteration.screen-spec.v3.json",
+  "specSha256": "fe65692c91aa6c55adf4be74101da80c6ccb46aabd6fe611631c55df8b80747c",
+  "fontAssetPath": "Assets/UI/Fonts/ESBrandSansSC SDF.asset",
+  "fontAssetHash": "faa6412e55b384fb05d6e33097053cb5ce5f0ceb6a945db2f6191db04cdf1e90",
+  "fontAssetId": "es-brand-sans-sc",
+  "unicodeCount": 261,
+  "requiredCharacterCount": 33,
+  "fixtureStringCount": 30,
+  "localeFixtures": [
+    "en-US-combat",
+    "numeric-cooldown"
+  ],
+  "missingRequiredCharacters": [],
+  "missingFixtureCharacters": [],
+  "fallbackFontAssetIds": [
+    "es-brand-sans-sc"
+  ],
+  "fallbackFontAssets": [],
+  "missingCharactersAfterFallback": [],
+  "status": "passed",
+  "issues": [],
+  "nonClaims": [
+    "Unity font import",
+    "font fallback load order",
+    "GPU glyph rendering",
+    "commercial license acceptance"
+  ]
+}

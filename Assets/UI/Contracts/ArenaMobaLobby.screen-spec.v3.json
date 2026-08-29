@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 3,
+  "screenId": "arena-moba-lobby",
+  "screenType": "navigation",
+  "template": "navigation",
+  "prefabPath": "Assets/UI/Prefabs/Generated/ArenaMobaLobby.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/ArenaMobaLobbyFixture.unity",
+  "tokens": {
+    "background": "#07111D",
+    "surface": "#10243A",
+    "surfaceRaised": "#17354B",
+    "accent": "#40C8FF",
+    "onAccent": "#07111D",
+    "text": "#F3F8FF",
+    "mutedText": "#9EB7CC",
+    "danger": "#F06C76",
+    "onDanger": "#07111D",
+    "titleSize": 34,
+    "bodySize": 20,
+    "buttonSize": 22,
+    "spacing": 14,
+    "padding": 24
+  },
+  "qualityGates": {
+    "assetPolicy": {
+      "productionReady": false,
+      "commercialAcceptance": "deferred",
+      "acceptedSources": ["generated-procedural", "project-sprite", "ai-generated"],
+      "requiredFields": ["path", "hash", "provenance", "license", "importPolicy", "aspectPolicy", "focalPoint", "cropPolicy", "nineSlice", "atlasOwner", "resolutionSet"],
+      "plannedSourceClasses": ["generated-procedural", "generated-placeholder"],
+      "placeholderUse": "layout-only"
+    },
+    "responsivePolicy": {
+      "canvasRenderMode": "ScreenSpaceOverlay",
+      "canvasScalerMode": "ScaleWithScreenSize",
+      "referenceResolution": [1920, 1080],
+      "matchWidthOrHeight": 0.5,
+      "safeAreaPolicy": "profile-safe-area-inset",
+      "reflowPolicy": "profile-specific-reflow-required",
+      "longContentPolicy": "wrap-or-ellipsis-without-action-overlap",
+      "uniformScaleOnly": false,
+      "profileIds": ["wide", "narrow"]
+    },
+    "colorPolicy": {
+      "tokenRoles": ["surface", "text", "action", "feedback", "focus", "border", "icon"],
+      "minimumTextContrast": 4.5,
+      "nonColorStateSignals": {
+        "selected": ["selected-outline", "selected-label"],
+        "disabled": ["disabled-interaction", "disabled-label"],
+        "loading": ["loading-label", "progress-affordance"],
+        "error": ["error-copy", "retry-intent"],
+        "long-content": ["wrap-or-ellipsis"]
+      }
+    },
+    "typographyPolicy": {
+      "fontAssetId": "es-brand-sans-sc",
+      "fontAssetPath": "Assets/UI/Fonts/ESBrandSansSC SDF.asset",
+      "fontAssetHash": "faa6412e55b384fb05d6e33097053cb5ce5f0ceb6a945db2f6191db04cdf1e90",
+      "license": "project-internal-approved",
+      "fallbackFontAssetIds": ["es-brand-sans-sc"],
+      "requiredCharacters": ["曜", "石", "旅", "者", "星", "耀", "排", "位", "匹", "配", "金", "币", "S", "18", "3"],
+      "localeFixtures": ["zh-CN-long-content", "en-US-mixed-numeric"],
+      "overflowPolicy": "wrap-ellipsis-scroll-by-component"
+    }
+  },
+  "profiles": [
+    {"id":"wide","width":1920,"height":1080,"orientation":"landscape","safeArea":[0.02,0.03,0.98,0.96]},
+    {"id":"narrow","width":1080,"height":1920,"orientation":"portrait","safeArea":[0.04,0.02,0.96,0.97]}
+  ],
+  "states": [
+    {"id":"default","fixture":"arena-moba-lobby/default"},
+    {"id":"selected","fixture":"arena-moba-lobby/selected"},
+    {"id":"disabled","fixture":"arena-moba-lobby/disabled"},
+    {"id":"loading","fixture":"arena-moba-lobby/loading"},
+    {"id":"error","fixture":"arena-moba-lobby/error"},
+    {"id":"long-content","fixture":"arena-moba-lobby/long-content"}
+  ],
+  "assets": [
+    {"id":"lobby-frame","role":"lobby-frame","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/lobby-frame-ai-ui-visual-assets-v5.asset","hash":"a8a1779b840667e4115c146d391f72f9328cc78efbd62fbb285cd9b2062b368a","provenance":"es-ui-visual-assets-v5 deterministic generated frame","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"preserve","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"frame-border","atlasOwner":"ai-ui-generated-v5","resolutionSet":[256,512],"fallback":"frame-missing"},
+    {"id":"player-avatar","role":"player-avatar","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/player-avatar-ai-ui-visual-assets-v7.asset","hash":"597007d0f12ac8b3688fb235f584f251087949a6d2af855d4df528bd68945661","provenance":"es-ui-visual-assets-v7 deterministic generated avatar","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"square","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"none","atlasOwner":"ai-ui-generated-v7","resolutionSet":[128,256],"fallback":"avatar-missing"},
+    {"id":"hero-banner","role":"original-hero-banner","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/hero-banner-ai-ui-visual-assets-v7.asset","hash":"00e912f723be1edafafc2e6fea52f129f34133dd6702b4000f278901b73dfa8a","provenance":"es-ui-visual-assets-v7 deterministic original hero art","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"wide-2x1","focalPoint":[0.42,0.48],"cropPolicy":"contain-subject","nineSlice":"none","atlasOwner":"ai-ui-generated-v7","resolutionSet":[512,1024],"fallback":"hero-banner-missing"},
+    {"id":"rank-emblem","role":"rank-emblem","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/rank-emblem-ai-ui-visual-assets-v7.asset","hash":"3409b2dbccbc13c830ac83b32d504c0ac19cef632c648df4afe3fc96fdc35120","provenance":"es-ui-visual-assets-v7 deterministic rank emblem","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"square","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"none","atlasOwner":"ai-ui-generated-v7","resolutionSet":[128,256],"fallback":"rank-emblem-missing"},
+    {"id":"mode-ranked","role":"mode-ranked","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/mode-ranked-ai-ui-visual-assets-v5.asset","hash":"9e7204e03108a9a4d1b8f83415485e78b564db36a5c2f23a61aecf975ad787d7","provenance":"es-ui-visual-assets-v5 deterministic ranked mode art","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"square","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"none","atlasOwner":"ai-ui-generated-v5","resolutionSet":[128,256],"fallback":"mode-ranked-missing"},
+    {"id":"mode-match","role":"mode-match","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/mode-match-ai-ui-visual-assets-v7.asset","hash":"9113bfbe8161c2959684e24b19154b45798a9999b30a08da3a025ce5514bb8a2","provenance":"es-ui-visual-assets-v7 deterministic match mode art","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"square","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"none","atlasOwner":"ai-ui-generated-v7","resolutionSet":[128,256],"fallback":"mode-match-missing"},
+    {"id":"mode-training","role":"mode-training","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/mode-training-ai-ui-visual-assets-v7.asset","hash":"31190c156a219dca83cd0edab5aa7069001f7e20ed9e11fe22780d051108cb22","provenance":"es-ui-visual-assets-v7 deterministic training mode art","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"square","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"none","atlasOwner":"ai-ui-generated-v7","resolutionSet":[128,256],"fallback":"mode-training-missing"},
+    {"id":"friend-avatar","role":"friend-avatar","source":"generated-procedural","path":"Assets/UI/Generated/AIUI/friend-avatar-ai-ui-visual-assets-v7.asset","hash":"f32238950f0b142f9984b59a24efa861da97ae350c221e2171ea17695893ef04","provenance":"es-ui-visual-assets-v7 deterministic friend avatar","license":"project-internal-generated","importPolicy":"sprite-asset-preserve-source","aspectPolicy":"square","focalPoint":[0.5,0.5],"cropPolicy":"contain","nineSlice":"none","atlasOwner":"ai-ui-generated-v7","resolutionSet":[128,256],"fallback":"friend-avatar-missing"}
+  ],
+  "components": [
+    {"id":"lobby-frame","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[720,520]},"assetSlots":["lobby-frame"],"content":{},"visualVariant":"background","stateVariants":{"default":{},"selected":{}}},
+    {"id":"wide-topbar","type":"frame","zone":"header","layout":{"mode":"stretch","bounds":[0.025,0.035,0.975,0.155],"minSize":[960,90],"responsiveMode":"wide"},"assetSlots":["lobby-frame"],"content":{},"visualVariant":"surface","children":[
+      {"id":"wide-avatar","type":"icon","zone":"header","layout":{"mode":"absolute","bounds":[0.018,0.12,0.105,0.88],"minSize":[64,64],"responsiveMode":"wide"},"assetSlots":["player-avatar"],"content":{},"visualVariant":"accent","stateVariants":{"default":{}}},
+      {"id":"wide-player-name","type":"text","zone":"header","layout":{"mode":"absolute","bounds":[0.125,0.15,0.33,0.48],"minSize":[170,24],"responsiveMode":"wide"},"content":{"text":"曜石旅者"},"visualVariant":"text","stateVariants":{"default":{},"long-content":{}}},
+      {"id":"wide-player-level","type":"text","zone":"header","layout":{"mode":"absolute","bounds":[0.125,0.52,0.33,0.84],"minSize":[170,20],"responsiveMode":"wide"},"content":{"text":"Lv. 38  ·  巅峰之路"},"visualVariant":"mutedText","stateVariants":{"default":{}}},
+      {"id":"wide-rank","type":"status-badge","zone":"header","layout":{"mode":"absolute","bounds":[0.36,0.20,0.49,0.80],"minSize":[140,42],"responsiveMode":"wide"},"assetSlots":["rank-emblem"],"content":{"text":"星耀 III"},"visualVariant":"accent","stateVariants":{"default":{},"selected":{}}},
+      {"id":"wide-gold","type":"counter","zone":"header","layout":{"mode":"absolute","bounds":[0.63,0.20,0.74,0.80],"minSize":[130,42],"responsiveMode":"wide"},"content":{"text":"12,840 金币","value":12840},"visualVariant":"surface","stateVariants":{"default":{}}},
+      {"id":"wide-gems","type":"counter","zone":"header","layout":{"mode":"absolute","bounds":[0.75,0.20,0.85,0.80],"minSize":[100,42],"responsiveMode":"wide"},"content":{"text":"680  星石","value":680},"visualVariant":"surface","stateVariants":{"default":{}}},
+      {"id":"wide-mail","type":"button","zone":"header","layout":{"mode":"absolute","bounds":[0.875,0.18,0.925,0.82],"minSize":[56,56],"responsiveMode":"wide"},"content":{"text":"✉"},"visualVariant":"accent","interaction":{"intent":"open-mail","targetSize":[56,56]},"stateVariants":{"default":{},"disabled":{}}},
+      {"id":"wide-settings","type":"button","zone":"header","layout":{"mode":"absolute","bounds":[0.935,0.18,0.985,0.82],"minSize":[56,56],"responsiveMode":"wide"},"content":{"text":"⚙"},"visualVariant":"surface","interaction":{"intent":"open-settings","targetSize":[56,56]},"stateVariants":{"default":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"selected":{},"disabled":{}}},
+    {"id":"wide-hero-panel","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.025,0.19,0.665,0.775],"minSize":[760,520],"responsiveMode":"wide"},"assetSlots":["hero-banner"],"content":{},"visualVariant":"surface","children":[
+      {"id":"wide-hero-art","type":"image","zone":"content","layout":{"mode":"absolute","bounds":[0.02,0.04,0.53,0.96],"minSize":[360,380],"responsiveMode":"wide"},"assetSlots":["hero-banner"],"content":{},"visualVariant":"accent","stateVariants":{"default":{},"loading":{}}},
+      {"id":"wide-season","type":"status-badge","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.10,0.93,0.19],"minSize":[220,38],"responsiveMode":"wide"},"content":{"text":"S18  星海远征季"},"visualVariant":"accent","stateVariants":{"default":{}}},
+      {"id":"wide-hero-title","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.23,0.96,0.39],"minSize":[260,48],"responsiveMode":"wide"},"content":{"text":"星曜竞技场"},"visualVariant":"text","stateVariants":{"default":{}}},
+      {"id":"wide-hero-copy","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.41,0.96,0.54],"minSize":[260,54],"responsiveMode":"wide"},"content":{"text":"与好友组队，冲击本周荣耀榜。\n今日首胜奖励已刷新。"},"visualVariant":"mutedText","stateVariants":{"default":{},"long-content":{}}},
+      {"id":"wide-ranked","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.59,0.96,0.70],"minSize":[260,58],"responsiveMode":"wide"},"assetSlots":["mode-ranked"],"content":{"text":"排位赛  ·  开始匹配"},"visualVariant":"accent","interaction":{"intent":"open-ranked","targetSize":[260,58]},"stateVariants":{"default":{},"selected":{},"disabled":{}}},
+      {"id":"wide-match","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.72,0.77,0.84],"minSize":[120,54],"responsiveMode":"wide"},"assetSlots":["mode-match"],"content":{"text":"匹配"},"visualVariant":"surface","interaction":{"intent":"open-match","targetSize":[120,54]},"stateVariants":{"default":{},"disabled":{}}},
+      {"id":"wide-training","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.79,0.72,0.96,0.84],"minSize":[120,54],"responsiveMode":"wide"},"assetSlots":["mode-training"],"content":{"text":"训练营"},"visualVariant":"surface","interaction":{"intent":"open-training","targetSize":[120,54]},"stateVariants":{"default":{},"disabled":{}}},
+      {"id":"wide-season-progress","type":"progress","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.88,0.96,0.94],"minSize":[260,28],"responsiveMode":"wide"},"content":{"text":"赛季进度  68%","value":0.68},"visualVariant":"accent","stateVariants":{"default":{},"loading":{}}}
+    ],"stateVariants":{"default":{},"selected":{},"loading":{},"error":{},"long-content":{}}},
+    {"id":"wide-friends-panel","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.69,0.19,0.975,0.775],"minSize":[360,520],"responsiveMode":"wide"},"assetSlots":["lobby-frame"],"content":{},"visualVariant":"surface","children":[
+      {"id":"wide-friends-title","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.08,0.90,0.92,0.98],"minSize":[220,28],"responsiveMode":"wide"},"content":{"text":"好友与组队"},"visualVariant":"text","stateVariants":{"default":{}}},
+      {"id":"wide-friend-list","type":"list","zone":"content","layout":{"mode":"list","bounds":[0.06,0.12,0.94,0.86],"minSize":[280,360],"gap":10,"padding":[8,8,8,8],"responsiveMode":"wide","childGeometryOwner":"parent-layout-group"},"content":{},"children":[
+        {"id":"wide-friend-one","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[260,70]},"assetSlots":["friend-avatar"],"content":{"text":"澜舟  ·  组队中"},"visualVariant":"accent","stateVariants":{"default":{}}},
+        {"id":"wide-friend-two","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[260,70]},"assetSlots":["friend-avatar"],"content":{"text":"青焰  ·  在线"},"visualVariant":"surface","stateVariants":{"default":{}}},
+        {"id":"wide-friend-three","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[260,70]},"assetSlots":["friend-avatar"],"content":{"text":"北辰  ·  训练中"},"visualVariant":"surface","stateVariants":{"default":{}}},
+        {"id":"wide-friend-four","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[260,70]},"assetSlots":["friend-avatar"],"content":{"text":"霜叶  ·  离线"},"visualVariant":"surface","stateVariants":{"default":{},"disabled":{}}}
+      ],"stateVariants":{"default":{},"empty":{},"loading":{},"error":{}}},
+      {"id":"wide-invite","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.08,0.03,0.92,0.11],"minSize":[260,50],"responsiveMode":"wide"},"content":{"text":"邀请好友组队"},"visualVariant":"accent","interaction":{"intent":"invite-friend","targetSize":[260,50]},"stateVariants":{"default":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"loading":{},"error":{}}},
+    {"id":"wide-navigation","type":"tab-bar","zone":"navigation","layout":{"mode":"flow","bounds":[0.025,0.825,0.975,0.965],"minSize":[960,72],"gap":10,"padding":[8,8,8,8],"responsiveMode":"wide","childGeometryOwner":"parent-layout-group"},"content":{},"interaction":{"intent":"navigate-main-tab","targetSize":[110,56]},"children":[
+      {"id":"wide-home","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[130,56]},"content":{"text":"大厅"},"visualVariant":"accent","interaction":{"intent":"open-home","targetSize":[130,56]},"stateVariants":{"default":{},"selected":{}}},
+      {"id":"wide-heroes","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[130,56]},"content":{"text":"英雄"},"visualVariant":"surface","interaction":{"intent":"open-heroes","targetSize":[130,56]},"stateVariants":{"default":{}}},
+      {"id":"wide-inventory","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[130,56]},"content":{"text":"背包"},"visualVariant":"surface","interaction":{"intent":"open-inventory","targetSize":[130,56]},"stateVariants":{"default":{}}},
+      {"id":"wide-clan","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[130,56]},"content":{"text":"战队"},"visualVariant":"surface","interaction":{"intent":"open-clan","targetSize":[130,56]},"stateVariants":{"default":{}}},
+      {"id":"wide-events","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[130,56]},"content":{"text":"活动"},"visualVariant":"surface","interaction":{"intent":"open-events","targetSize":[130,56]},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{},"selected":{}}},
+    {"id":"narrow-topbar","type":"frame","zone":"header","layout":{"mode":"stretch","bounds":[0.04,0.025,0.96,0.16],"minSize":[760,110],"responsiveMode":"narrow"},"assetSlots":["lobby-frame"],"content":{},"visualVariant":"surface","children":[
+      {"id":"narrow-avatar","type":"icon","zone":"header","layout":{"mode":"absolute","bounds":[0.03,0.18,0.16,0.82],"minSize":[72,72],"responsiveMode":"narrow"},"assetSlots":["player-avatar"],"content":{},"visualVariant":"accent","stateVariants":{"default":{}}},
+      {"id":"narrow-player-name","type":"text","zone":"header","layout":{"mode":"absolute","bounds":[0.19,0.18,0.56,0.48],"minSize":[250,28],"responsiveMode":"narrow"},"content":{"text":"曜石旅者  ·  Lv.38"},"visualVariant":"text","stateVariants":{"default":{},"long-content":{}}},
+      {"id":"narrow-rank","type":"status-badge","zone":"header","layout":{"mode":"absolute","bounds":[0.19,0.54,0.56,0.84],"minSize":[230,38],"responsiveMode":"narrow"},"assetSlots":["rank-emblem"],"content":{"text":"星耀 III  ·  S18"},"visualVariant":"accent","stateVariants":{"default":{}}},
+      {"id":"narrow-gold","type":"counter","zone":"header","layout":{"mode":"absolute","bounds":[0.60,0.18,0.82,0.48],"minSize":[150,40],"responsiveMode":"narrow"},"content":{"text":"12,840 金币","value":12840},"visualVariant":"surface","stateVariants":{"default":{}}},
+      {"id":"narrow-gems","type":"counter","zone":"header","layout":{"mode":"absolute","bounds":[0.60,0.54,0.82,0.84],"minSize":[150,40],"responsiveMode":"narrow"},"content":{"text":"680 星石","value":680},"visualVariant":"surface","stateVariants":{"default":{}}},
+      {"id":"narrow-settings","type":"button","zone":"header","layout":{"mode":"absolute","bounds":[0.86,0.20,0.96,0.80],"minSize":[64,64],"responsiveMode":"narrow"},"content":{"text":"⚙"},"visualVariant":"accent","interaction":{"intent":"open-settings","targetSize":[64,64]},"stateVariants":{"default":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"disabled":{}}},
+    {"id":"narrow-hero-panel","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.04,0.19,0.96,0.575],"minSize":[760,640],"responsiveMode":"narrow"},"assetSlots":["hero-banner"],"content":{},"visualVariant":"surface","children":[
+      {"id":"narrow-hero-art","type":"image","zone":"content","layout":{"mode":"absolute","bounds":[0.04,0.05,0.96,0.52],"minSize":[650,260],"responsiveMode":"narrow"},"assetSlots":["hero-banner"],"content":{},"visualVariant":"accent","stateVariants":{"default":{},"loading":{}}},
+      {"id":"narrow-season","type":"status-badge","zone":"content","layout":{"mode":"absolute","bounds":[0.06,0.58,0.48,0.67],"minSize":[250,34],"responsiveMode":"narrow"},"content":{"text":"S18  星海远征季"},"visualVariant":"accent","stateVariants":{"default":{}}},
+      {"id":"narrow-hero-title","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.06,0.70,0.94,0.80],"minSize":[500,40],"responsiveMode":"narrow"},"content":{"text":"星曜竞技场"},"visualVariant":"text","stateVariants":{"default":{}}},
+      {"id":"narrow-ranked","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.06,0.83,0.94,0.94],"minSize":[620,58],"responsiveMode":"narrow"},"assetSlots":["mode-ranked"],"content":{"text":"排位赛  ·  开始匹配"},"visualVariant":"accent","interaction":{"intent":"open-ranked","targetSize":[620,58]},"stateVariants":{"default":{},"selected":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"selected":{},"loading":{},"error":{}}},
+    {"id":"narrow-friends-panel","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.04,0.595,0.96,0.805],"minSize":[760,300],"responsiveMode":"narrow"},"assetSlots":["lobby-frame"],"content":{},"visualVariant":"surface","children":[
+      {"id":"narrow-friends-title","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.06,0.78,0.50,0.94],"minSize":[260,28],"responsiveMode":"narrow"},"content":{"text":"好友与组队"},"visualVariant":"text","stateVariants":{"default":{}}},
+      {"id":"narrow-friend-list","type":"list","zone":"content","layout":{"mode":"flow","bounds":[0.05,0.10,0.95,0.70],"minSize":[650,140],"gap":10,"padding":[8,8,8,8],"responsiveMode":"narrow","childGeometryOwner":"parent-layout-group"},"content":{},"children":[
+        {"id":"narrow-friend-one","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[200,100]},"assetSlots":["friend-avatar"],"content":{"text":"澜舟\n组队中"},"visualVariant":"accent","stateVariants":{"default":{}}},
+        {"id":"narrow-friend-two","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[200,100]},"assetSlots":["friend-avatar"],"content":{"text":"青焰\n在线"},"visualVariant":"surface","stateVariants":{"default":{}}},
+        {"id":"narrow-friend-three","type":"stat-row","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[200,100]},"assetSlots":["friend-avatar"],"content":{"text":"北辰\n训练中"},"visualVariant":"surface","stateVariants":{"default":{}}}
+      ],"stateVariants":{"default":{},"empty":{},"loading":{},"error":{}}},
+      {"id":"narrow-invite","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.58,0.78,0.94,0.94],"minSize":[240,48],"responsiveMode":"narrow"},"content":{"text":"邀请组队"},"visualVariant":"accent","interaction":{"intent":"invite-friend","targetSize":[240,48]},"stateVariants":{"default":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"loading":{},"error":{}}},
+    {"id":"narrow-navigation","type":"tab-bar","zone":"navigation","layout":{"mode":"flow","bounds":[0.04,0.84,0.96,0.965],"minSize":[760,110],"gap":8,"padding":[8,8,8,8],"responsiveMode":"narrow","childGeometryOwner":"parent-layout-group"},"content":{},"interaction":{"intent":"navigate-main-tab","targetSize":[120,64]},"children":[
+      {"id":"narrow-home","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[125,64]},"content":{"text":"大厅"},"visualVariant":"accent","interaction":{"intent":"open-home","targetSize":[125,64]},"stateVariants":{"default":{},"selected":{}}},
+      {"id":"narrow-heroes","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[125,64]},"content":{"text":"英雄"},"visualVariant":"surface","interaction":{"intent":"open-heroes","targetSize":[125,64]},"stateVariants":{"default":{}}},
+      {"id":"narrow-inventory","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[125,64]},"content":{"text":"背包"},"visualVariant":"surface","interaction":{"intent":"open-inventory","targetSize":[125,64]},"stateVariants":{"default":{}}},
+      {"id":"narrow-clan","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[125,64]},"content":{"text":"战队"},"visualVariant":"surface","interaction":{"intent":"open-clan","targetSize":[125,64]},"stateVariants":{"default":{}}},
+      {"id":"narrow-events","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[125,64]},"content":{"text":"活动"},"visualVariant":"surface","interaction":{"intent":"open-events","targetSize":[125,64]},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{},"selected":{}}}
+  ],
+  "behaviors": [
+    {"id":"arena-moba-lobby.navigation","inputs":["open-home","open-ranked","open-match","open-training","open-heroes","open-inventory","open-clan","open-events","invite-friend","open-mail","open-settings"],"transitions":[]}
+  ],
+  "bindings": [],
+  "designEvidence": {
+    "schemaVersion": 2,
+    "sourceType": "brief-only",
+    "brief": "原创王者类 MOBA 游戏大厅：突出赛季主动作、玩家身份、组队状态和主导航，不使用原作商标、角色或商业素材。",
+    "analysisArtifact": {"path":"Assets/UI/Contracts/ArenaMobaLobby.screen-spec.v3.json","sha256":"pending","method":"semantic-screen-plan","status":"complete"},
+    "visionReview": {"provider":"es-ui-prefab-authoring","model":"screen-spec-v3","reviewMethod":"semantic-layout-and-token-review","reviewedAt":"2026-08-25T00:00:00Z","imageHashes":[],"semanticCoverage":1.0,"status":"complete"},
+    "referenceImages": [{"path":"","role":"original-brief","status":"not-provided"}],
+    "sourceRegions": [
+      {"id":"identity","role":"player-identity","bounds":[0.025,0.035,0.49,0.155],"evidence":"brief observation","confidence":1.0,"major":true},
+      {"id":"primary-action","role":"season-match-action","bounds":[0.025,0.19,0.665,0.775],"evidence":"brief observation","confidence":1.0,"major":true},
+      {"id":"social","role":"party-and-friends","bounds":[0.69,0.19,0.975,0.775],"evidence":"brief observation","confidence":0.95,"major":true},
+      {"id":"navigation","role":"main-navigation","bounds":[0.025,0.825,0.975,0.965],"evidence":"brief observation","confidence":1.0,"major":true}
+    ],
+    "decisions": [
+      {"elementId":"wide-hero-panel","anchorStrategy":"stretch","sizeStrategy":"responsive-region","pivot":"center","rationale":"primary action gets the largest visual area","typographyRole":"title","colorRoles":["surface","accent","text"],"spacingRole":"section"},
+      {"elementId":"wide-friends-panel","anchorStrategy":"edge-docked","sizeStrategy":"fixed-column","pivot":"center","rationale":"social status remains scan-friendly beside the primary action","typographyRole":"body","colorRoles":["surface","mutedText"],"spacingRole":"section"}
+    ],
+    "responsiveDecisions": [
+      {"profileId":"narrow","strategy":"stack-primary-and-social","layoutPolicy":"hero-first","changes":["hero art moves above action","friends become horizontal strip","topbar reduces secondary actions"],"reason":"preserve primary action and minimum touch targets on portrait screens"}
+    ],
+    "assetDecisions": [
+      {"role":"all declared image slots","status":"placeholder","reason":"generated deterministic fallback only; no commercial or official game assets are claimed"}
+    ],
+    "assumptions": [
+      {"statement":"这是原创王者类风格案例，不代表王者荣耀官方界面或素材。","confidence":1.0},
+      {"statement":"所有 intent 仅作为未来业务 Bridge 的稳定链接，不实现真实匹配、好友、经济或导航逻辑。","confidence":1.0}
+    ]
+  }
+}

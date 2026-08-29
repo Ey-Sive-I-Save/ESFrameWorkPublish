@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 3,
+  "screenId": "arena-moba-lobby-v21",
+  "screenType": "navigation",
+  "template": "navigation",
+  "prefabPath": "Assets/UI/Prefabs/Generated/arena-moba-lobby-v21.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/arena-moba-lobby-v21Fixture.unity",
+  "tokens": {
+    "background": "#10151C",
+    "surface": "#1C2733",
+    "surfaceRaised": "#2B3A49",
+    "accent": "#D9A441",
+    "action": "#D9A441",
+    "focus": "#FFF4C2",
+    "text": "#F5F1E8",
+    "mutedText": "#B8C0C7",
+    "danger": "#E26D5A",
+    "onAccent": "#17120A",
+    "onDanger": "#210B08",
+    "titleSize": 34,
+    "bodySize": 20,
+    "labelSize": 20,
+    "captionSize": 16,
+    "numericSize": 22,
+    "spacing": 16,
+    "padding": 24
+  },
+  "designContract": {
+    "coordinateSpace": "screen-top-left-normalized",
+    "canvas": {
+      "rootRole": "screen-root",
+      "renderMode": "ScreenSpaceOverlay",
+      "scalerMode": "ScaleWithScreenSize",
+      "singleRoot": true,
+      "nestedCanvasPolicy": "forbid-unless-declared"
+    },
+    "anchorPolicy": {
+      "defaultPivot": [0.5, 0.5],
+      "allowedStrategies": ["stretch", "absolute", "edge-docked", "center", "flow", "list", "grid"],
+      "safeAreaTarget": "profile-safe-area-inset"
+    },
+    "colorRoles": {
+      "primaryAction": "accent",
+      "secondaryAction": "surface",
+      "feedback": "danger",
+      "foregroundOnAccent": "onAccent",
+      "foregroundOnDanger": "onDanger"
+    },
+    "typographyRoles": {
+      "title": {"token": "titleSize", "maxLines": 1, "overflow": "ellipsis"},
+      "body": {"token": "bodySize", "maxLines": 2, "overflow": "wrap"},
+      "label": {"token": "labelSize", "maxLines": 1, "overflow": "ellipsis"},
+      "caption": {"token": "captionSize", "maxLines": 2, "overflow": "ellipsis"},
+      "numeric": {"token": "numericSize", "maxLines": 1, "overflow": "ellipsis"}
+    },
+    "layerRoles": {"background": 0, "information": 100, "feedback": 200, "action": 300},
+    "advancedComposition": {
+      "primaryActions": [
+        {"logicalId": "play-ranked", "intent": "open-ranked", "componentIdsByProfile": {"wide": "wide-ranked", "narrow": "narrow-ranked"}}
+      ],
+      "focalTreatment": "subject",
+      "focalSubjects": [
+        {"logicalId": "season-hero", "componentIdsByProfile": {"wide": "wide-hero-art", "narrow": "narrow-hero-art"}, "protectedFromPrimaryAction": true}
+      ],
+      "focalAssetPolicies": [
+        {"logicalId": "season-hero", "assetIds": ["hero-banner"], "cropPolicy": "focal-cover", "focalPoint": [0.42, 0.48], "safeCropInsetsNormalized": [0.08, 0.08, 0.08, 0.08]}
+      ],
+      "alignmentGroups": [
+        {"profileId": "wide", "axis": "x", "edge": "start", "componentIds": ["wide-hero-title", "wide-ranked"], "tolerancePx": 2},
+        {"profileId": "narrow", "axis": "x", "edge": "start", "componentIds": ["narrow-hero-title", "narrow-ranked"], "tolerancePx": 2}
+      ],
+      "clearanceConstraints": [
+        {"profileId": "wide", "axis": "y", "relation": "before", "firstComponentId": "wide-ranked", "secondComponentId": "wide-navigation", "minGapPx": 24},
+        {"profileId": "narrow", "axis": "y", "relation": "before", "firstComponentId": "narrow-ranked", "secondComponentId": "narrow-navigation", "minGapPx": 24}
+      ],
+      "responsiveEquivalences": [
+        {"logicalId": "play-ranked", "intent": "open-ranked", "componentIdsByProfile": {"wide": "wide-ranked", "narrow": "narrow-ranked"}},
+        {"logicalId": "season-hero", "componentIdsByProfile": {"wide": "wide-hero-art", "narrow": "narrow-hero-art"}},
+        {"logicalId": "main-navigation", "intent": "navigate-main-tab", "componentIdsByProfile": {"wide": "wide-navigation", "narrow": "narrow-navigation"}}
+      ],
+      "interactionDensity": {
+        "groups": [
+          {"id": "wide-primary-actions", "profileId": "wide", "componentIds": ["wide-ranked", "wide-navigation"], "maxTargets": 2, "minGapPx": 16},
+          {"id": "narrow-primary-actions", "profileId": "narrow", "componentIds": ["narrow-ranked", "narrow-navigation"], "maxTargets": 2, "minGapPx": 16}
+        ]
+      },
+      "contentRequirements": {
+        "profiles": {
+          "wide": {"minComponentCount": 9, "minTextCount": 1, "minInteractiveCount": 4, "requiredTypes": ["frame", "image", "text", "button", "tab-bar"], "zones": [{"zone": "header", "minimum": 1}, {"zone": "content", "minimum": 4}, {"zone": "navigation", "minimum": 1}]},
+          "narrow": {"minComponentCount": 9, "minTextCount": 1, "minInteractiveCount": 4, "requiredTypes": ["frame", "image", "text", "button", "tab-bar"], "zones": [{"zone": "header", "minimum": 1}, {"zone": "content", "minimum": 4}, {"zone": "navigation", "minimum": 1}]}
+        },
+        "requiredTokenConsumers": {"background": 1, "surface": 1, "text": 1, "accent": 1},
+        "stateTokenBindings": [
+          {"stateId": "selected", "token": "focus", "signal": "outline", "componentIds": ["wide-ranked", "narrow-ranked"]},
+          {"stateId": "error", "token": "danger", "signal": "graphicColor", "componentIds": ["wide-hero-title", "narrow-hero-title"]}
+        ],
+        "spacingScalePx": [4, 8, 12, 16, 24]
+      },
+      "visualHierarchy": {
+        "coveragePolicy": "all-non-background",
+        "primaryActionBandId": "action",
+        "bands": [
+          {"id": "context", "rank": 1, "emphasis": 2, "componentIds": ["wide-header", "wide-navigation", "narrow-header", "narrow-navigation"]},
+          {"id": "focal", "rank": 2, "emphasis": 3, "componentIds": ["wide-hero-art", "wide-hero-title", "wide-friends", "narrow-hero-art", "narrow-hero-title", "narrow-friends"]},
+          {"id": "action", "rank": 3, "emphasis": 5, "componentIds": ["wide-ranked", "wide-home", "wide-inventory", "narrow-ranked", "narrow-home", "narrow-inventory"]}
+        ]
+      },
+      "interactionContract": {
+        "inputModes": ["pointer", "keyboard", "gamepad", "touch"],
+        "focusPolicy": "explicit-order",
+        "defaultFocusIntent": "open-ranked",
+        "focusOrderByProfile": {
+          "wide": ["wide-ranked", "wide-navigation", "wide-home", "wide-inventory"],
+          "narrow": ["narrow-ranked", "narrow-navigation", "narrow-home", "narrow-inventory"]
+        },
+        "allInteractiveComponentsFocusable": true,
+        "disabledIntentPolicy": "reject-with-maintenance-reason",
+        "loadingIntentPolicy": "defer-until-season-data-ready"
+      },
+      "stateImpactPolicy": {
+        "maxAffectedComponentRatio": {
+          "default": 0.2,
+          "selected": 0.2,
+          "empty": 0.2,
+          "disabled": 0.2,
+          "loading": 0.2,
+          "error": 0.2,
+          "long-content": 0.2,
+          "missing-art": 0.2
+        }
+      },
+      "anchorContract": {
+        "coordinateSpace": "unity-rect-transform-bottom-left",
+        "requiredComponentIdsByProfile": {
+          "wide": ["wide-header", "wide-hero-art", "wide-hero-title", "wide-ranked", "wide-navigation"],
+          "narrow": ["narrow-header", "narrow-hero-art", "narrow-hero-title", "narrow-ranked", "narrow-navigation"]
+        },
+        "componentsByProfile": {
+          "wide": {
+            "wide-header": {"anchorMin": [0.03, 0.84], "anchorMax": [0.97, 0.97], "pivot": [0.5, 1]},
+            "wide-hero-art": {"anchorMin": [0.04, 0.28], "anchorMax": [0.52, 0.8], "pivot": [0.5, 0.5]},
+            "wide-hero-title": {"anchorMin": [0.58, 0.7], "anchorMax": [0.68, 0.78], "pivot": [0.5, 0.5]},
+            "wide-ranked": {"anchorMin": [0.58, 0.42], "anchorMax": [0.68, 0.54], "pivot": [0.5, 0.5]},
+            "wide-navigation": {"anchorMin": [0.03, 0.04], "anchorMax": [0.97, 0.18], "pivot": [0.5, 0]}
+          },
+          "narrow": {
+            "narrow-header": {"anchorMin": [0.04, 0.84], "anchorMax": [0.96, 0.97], "pivot": [0.5, 1]},
+            "narrow-hero-art": {"anchorMin": [0.04, 0.55], "anchorMax": [0.96, 0.8], "pivot": [0.5, 0.5]},
+            "narrow-hero-title": {"anchorMin": [0.08, 0.46], "anchorMax": [0.92, 0.52], "pivot": [0.5, 0.5]},
+            "narrow-ranked": {"anchorMin": [0.08, 0.34], "anchorMax": [0.92, 0.42], "pivot": [0.5, 0.5]},
+            "narrow-navigation": {"anchorMin": [0.04, 0.04], "anchorMax": [0.96, 0.16], "pivot": [0.5, 0]}
+          }
+        }
+      }
+    }
+  },
+  "intentContract": {
+    "requestedScreenFamily": "navigation",
+    "requestedPrimaryIntent": "open-ranked",
+    "visualTarget": "original-moba-game-lobby",
+    "fidelityMode": "original",
+    "referencePolicy": "not-required",
+    "referenceSources": [],
+    "productBoundary": "original-no-official-assets"
+  },
+  "qualityGates": {
+    "assetPolicy": {
+      "productionReady": false,
+      "commercialAcceptance": "deferred",
+      "acceptedSources": ["generated-procedural", "project-sprite", "ai-generated"],
+      "requiredFields": ["path", "hash", "provenance", "license", "importPolicy", "aspectPolicy", "focalPoint", "cropPolicy", "nineSlice", "atlasOwner", "resolutionSet"],
+      "plannedSourceClasses": ["generated-procedural", "generated-placeholder"],
+      "placeholderUse": "layout-only"
+    },
+    "responsivePolicy": {
+      "canvasRenderMode": "ScreenSpaceOverlay",
+      "canvasScalerMode": "ScaleWithScreenSize",
+      "referenceResolution": [1920, 1080],
+      "matchWidthOrHeight": 0.5,
+      "safeAreaPolicy": "profile-safe-area-inset",
+      "reflowPolicy": "profile-specific-reflow-required",
+      "longContentPolicy": "wrap-or-ellipsis-without-action-overlap",
+      "uniformScaleOnly": false,
+      "profileIds": ["wide", "narrow"]
+    },
+    "colorPolicy": {
+      "tokenRoles": ["surface", "text", "action", "feedback", "focus", "border", "icon"],
+      "minimumTextContrast": 4.5,
+      "nonColorStateSignals": {
+        "selected": ["selected-outline", "selected-label"],
+        "empty": ["empty-copy", "empty-region-frame"],
+        "disabled": ["disabled-interaction", "disabled-label"],
+        "loading": ["loading-label", "progress-affordance"],
+        "error": ["error-copy", "retry-intent"],
+        "long-content": ["wrap-or-ellipsis"],
+        "missing-art": ["fallback-art", "preserved-art-rectangle"]
+      }
+    },
+    "typographyPolicy": {
+      "fontAssetId": "es-brand-sans-sc",
+      "fontAssetPath": "Assets/UI/Fonts/ESBrandSansSC SDF.asset",
+      "fontAssetHash": "faa6412e55b384fb05d6e33097053cb5ce5f0ceb6a945db2f6191db04cdf1e90",
+      "license": "project-internal-approved",
+      "fallbackFontAssetIds": ["es-brand-sans-sc"],
+      "requiredCharacters": ["曜", "石", "旅", "者", "星", "耀", "排", "位", "匹", "配", "金", "币", "S", "18", "3"],
+      "localeFixtures": ["zh-CN-long-content", "en-US-mixed-numeric"],
+      "overflowPolicy": "wrap-ellipsis-scroll-by-component"
+    }
+  },
+  "profiles": [
+    {"id": "wide", "width": 1920, "height": 1080, "orientation": "landscape", "safeArea": [0.02, 0.03, 0.98, 0.96]},
+    {"id": "narrow", "width": 1080, "height": 1920, "orientation": "portrait", "safeArea": [0.04, 0.02, 0.96, 0.97]}
+  ],
+  "states": [
+    {"id": "default", "fixture": "arena-moba-lobby-v21/default"},
+    {"id": "selected", "fixture": "arena-moba-lobby-v21/selected"},
+    {"id": "empty", "fixture": "arena-moba-lobby-v21/empty"},
+    {"id": "disabled", "fixture": "arena-moba-lobby-v21/disabled"},
+    {"id": "loading", "fixture": "arena-moba-lobby-v21/loading"},
+    {"id": "error", "fixture": "arena-moba-lobby-v21/error"},
+    {"id": "long-content", "fixture": "arena-moba-lobby-v21/long-content"},
+    {"id": "missing-art", "fixture": "arena-moba-lobby-v21/missing-art"}
+  ],
+  "assets": [
+    {"id": "hero-banner", "role": "season-hero", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/hero-banner-ai-ui-visual-assets-v7.asset", "hash": "00e912f723be1edafafc2e6fea52f129f34133dd6702b4000f278901b73dfa8a", "provenance": "deterministic original hero placeholder", "license": "project-internal-generated", "importPolicy": "raw-image-preserve-source", "aspectPolicy": "wide-cover", "focalPoint": [0.42, 0.48], "cropPolicy": "focal-cover", "nineSlice": "none", "atlasOwner": "none", "atlasRotationPolicy": "disallow-rotation", "resolutionSet": [1024, 2048], "sourceAspectRatio": 2.0, "fallback": "hero-banner-fallback"}
+  ],
+  "components": [
+    {"id": "background", "type": "frame", "zone": "content", "layout": {"mode": "stretch", "bounds": [0, 0, 1, 1], "minSize": [720, 520], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "ignore"}}, "content": {}, "visualVariant": "background", "colorToken": "background", "typographyRole": "none", "layerRole": "background", "siblingOrder": 0, "stateVariants": {"default": {}}},
+    {"id": "wide-header", "type": "frame", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.03, 0.03, 0.97, 0.16], "minSize": [960, 100], "responsiveMode": "wide", "anchor": {"strategy": "edge-docked", "edge": "top", "pivot": [0.5, 1], "safeArea": "inside"}}, "content": {}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "none", "layerRole": "information", "siblingOrder": 1, "stateVariants": {"default": {}}},
+    {"id": "wide-hero-art", "type": "image", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.04, 0.20, 0.52, 0.72], "minSize": [700, 420], "responsiveMode": "wide", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "assetSlots": ["hero-banner"], "content": {}, "visualVariant": "none", "colorToken": "surface", "typographyRole": "none", "layerRole": "information", "siblingOrder": 3, "stateVariants": {"default": {}, "missing-art": {}}},
+    {"id": "wide-hero-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.58, 0.22, 0.68, 0.30], "minSize": [180, 42], "responsiveMode": "wide", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "content": {"text": "星曜竞技场"}, "visualVariant": "text", "colorToken": "text", "typographyRole": "title", "layerRole": "information", "siblingOrder": 4, "stateVariants": {"default": {}, "error": {}, "long-content": {}}},
+    {"id": "wide-ranked", "type": "button", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.58, 0.46, 0.68, 0.58], "minSize": [180, 96], "responsiveMode": "wide", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "content": {"text": "排位赛"}, "visualVariant": "accent", "colorToken": "accent", "typographyRole": "label", "layerRole": "action", "siblingOrder": 8, "interaction": {"intent": "open-ranked", "targetSize": [180, 96]}, "stateVariants": {"default": {}, "selected": {}, "disabled": {}, "loading": {}}},
+    {"id": "wide-friends", "type": "frame", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.70, 0.62, 0.96, 0.80], "minSize": [380, 180], "responsiveMode": "wide", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "content": {}, "visualVariant": "surface", "colorToken": "surfaceRaised", "typographyRole": "none", "layerRole": "information", "siblingOrder": 6, "stateVariants": {"default": {}, "empty": {}}},
+    {"id": "wide-navigation", "type": "tab-bar", "zone": "navigation", "layout": {"mode": "flow", "bounds": [0.03, 0.82, 0.97, 0.96], "minSize": [960, 80], "responsiveMode": "wide", "gap": 16, "padding": [12, 12, 12, 12], "childGeometryOwner": "parent-layout-group", "anchor": {"strategy": "edge-docked", "edge": "bottom", "pivot": [0.5, 0], "safeArea": "inside"}}, "content": {}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "none", "layerRole": "information", "siblingOrder": 7, "interaction": {"intent": "navigate-main-tab", "targetSize": [120, 64]}, "stateVariants": {"default": {}}, "children": [
+      {"id": "wide-home", "type": "button", "zone": "navigation", "layout": {"mode": "stretch", "bounds": [0, 0, 1, 1], "minSize": [160, 64], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inherit"}}, "content": {"text": "大厅"}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "label", "layerRole": "action", "siblingOrder": 0, "interaction": {"intent": "open-home", "targetSize": [160, 64]}, "stateVariants": {"default": {}}},
+      {"id": "wide-inventory", "type": "button", "zone": "navigation", "layout": {"mode": "stretch", "bounds": [0, 0, 1, 1], "minSize": [160, 64], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inherit"}}, "content": {"text": "背包"}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "label", "layerRole": "action", "siblingOrder": 1, "interaction": {"intent": "open-inventory", "targetSize": [160, 64]}, "stateVariants": {"default": {}}}
+    ]},
+    {"id": "narrow-header", "type": "frame", "zone": "header", "layout": {"mode": "absolute", "bounds": [0.04, 0.03, 0.96, 0.16], "minSize": [760, 120], "responsiveMode": "narrow", "anchor": {"strategy": "edge-docked", "edge": "top", "pivot": [0.5, 1], "safeArea": "inside"}}, "content": {}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "none", "layerRole": "information", "siblingOrder": 1, "stateVariants": {"default": {}}},
+    {"id": "narrow-hero-art", "type": "image", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.04, 0.20, 0.96, 0.45], "minSize": [760, 420], "responsiveMode": "narrow", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "assetSlots": ["hero-banner"], "content": {}, "visualVariant": "none", "colorToken": "surface", "typographyRole": "none", "layerRole": "information", "siblingOrder": 3, "stateVariants": {"default": {}, "missing-art": {}}},
+    {"id": "narrow-hero-title", "type": "text", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.48, 0.92, 0.54], "minSize": [760, 44], "responsiveMode": "narrow", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "content": {"text": "星曜竞技场"}, "visualVariant": "text", "colorToken": "text", "typographyRole": "title", "layerRole": "information", "siblingOrder": 4, "stateVariants": {"default": {}, "error": {}, "long-content": {}}},
+    {"id": "narrow-ranked", "type": "button", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.08, 0.58, 0.92, 0.66], "minSize": [760, 100], "responsiveMode": "narrow", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "content": {"text": "排位赛  ·  开始匹配"}, "visualVariant": "accent", "colorToken": "accent", "typographyRole": "label", "layerRole": "action", "siblingOrder": 8, "interaction": {"intent": "open-ranked", "targetSize": [760, 100]}, "stateVariants": {"default": {}, "selected": {}, "disabled": {}, "loading": {}}},
+    {"id": "narrow-friends", "type": "frame", "zone": "content", "layout": {"mode": "absolute", "bounds": [0.04, 0.70, 0.96, 0.80], "minSize": [760, 160], "responsiveMode": "narrow", "anchor": {"strategy": "absolute", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}}, "content": {}, "visualVariant": "surface", "colorToken": "surfaceRaised", "typographyRole": "none", "layerRole": "information", "siblingOrder": 6, "stateVariants": {"default": {}, "empty": {}}},
+    {"id": "narrow-navigation", "type": "tab-bar", "zone": "navigation", "layout": {"mode": "flow", "bounds": [0.04, 0.84, 0.96, 0.96], "minSize": [760, 120], "responsiveMode": "narrow", "gap": 12, "padding": [12, 12, 12, 12], "childGeometryOwner": "parent-layout-group", "anchor": {"strategy": "edge-docked", "edge": "bottom", "pivot": [0.5, 0], "safeArea": "inside"}}, "content": {}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "none", "layerRole": "information", "siblingOrder": 7, "interaction": {"intent": "navigate-main-tab", "targetSize": [120, 64]}, "stateVariants": {"default": {}}, "children": [
+      {"id": "narrow-home", "type": "button", "zone": "navigation", "layout": {"mode": "stretch", "bounds": [0, 0, 1, 1], "minSize": [180, 72], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inherit"}}, "content": {"text": "大厅"}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "label", "layerRole": "action", "siblingOrder": 0, "interaction": {"intent": "open-home", "targetSize": [180, 72]}, "stateVariants": {"default": {}}},
+      {"id": "narrow-inventory", "type": "button", "zone": "navigation", "layout": {"mode": "stretch", "bounds": [0, 0, 1, 1], "minSize": [180, 72], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inherit"}}, "content": {"text": "背包"}, "visualVariant": "surface", "colorToken": "surface", "typographyRole": "label", "layerRole": "action", "siblingOrder": 1, "interaction": {"intent": "open-inventory", "targetSize": [180, 72]}, "stateVariants": {"default": {}}}
+    ]}
+  ],
+  "stateSemantics": {
+    "default": {"fixtureData": {"season": "S18", "partyCount": 2}, "affectedComponentIds": ["wide-ranked", "narrow-ranked"], "visualChanges": ["ranked action is emphasized"], "interactionChanges": ["primary match intent is available"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-ranked", "changes": {"graphicAlpha": 1.0}}, {"componentId": "narrow-ranked", "changes": {"graphicAlpha": 1.0}}]},
+    "selected": {"fixtureData": {"focusedIntent": "open-ranked"}, "affectedComponentIds": ["wide-ranked", "narrow-ranked"], "visualChanges": ["primary action shows a focus outline"], "interactionChanges": ["keyboard or gamepad focus is on ranked play"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-ranked", "changes": {"outline": true}}, {"componentId": "narrow-ranked", "changes": {"outline": true}}]},
+    "empty": {"fixtureData": {"partyCount": 0, "emptyLabel": "暂无在线好友"}, "affectedComponentIds": ["wide-friends", "narrow-friends"], "visualChanges": ["friends region shows an explicit empty-state message while its frame remains"], "interactionChanges": ["navigation and ranked play remain available"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-friends", "changes": {"graphicAlpha": 0.72}}, {"componentId": "narrow-friends", "changes": {"graphicAlpha": 0.72}}]},
+    "disabled": {"fixtureData": {"reason": "season-maintenance"}, "affectedComponentIds": ["wide-ranked", "narrow-ranked"], "visualChanges": ["ranked action is visibly muted"], "interactionChanges": ["ranked intent rejects activation while maintenance is shown"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-ranked", "changes": {"interactable": false, "graphicAlpha": 0.45}}, {"componentId": "narrow-ranked", "changes": {"interactable": false, "graphicAlpha": 0.45}}]},
+    "loading": {"fixtureData": {"loadingLabel": "正在同步赛季数据..."}, "affectedComponentIds": ["wide-ranked", "narrow-ranked"], "visualChanges": ["ranked action remains visible with loading emphasis"], "interactionChanges": ["ranked intent waits for season data and cannot activate twice"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-ranked", "changes": {"interactable": false, "graphicAlpha": 0.72}}, {"componentId": "narrow-ranked", "changes": {"interactable": false, "graphicAlpha": 0.72}}]},
+    "error": {"fixtureData": {"message": "赛季数据不可用"}, "affectedComponentIds": ["wide-hero-title", "narrow-hero-title"], "visualChanges": ["hero title uses feedback color to expose the data error"], "interactionChanges": ["primary action remains visible for retry through the future Bridge"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-hero-title", "changes": {"graphicColor": "#E26D5A"}}, {"componentId": "narrow-hero-title", "changes": {"graphicColor": "#E26D5A"}}]},
+    "long-content": {"fixtureData": {"wideTitle": "曜石旅者星耀排位匹配金币", "narrowTitle": "曜石旅者星耀排位匹配金币"}, "affectedComponentIds": ["wide-hero-title", "narrow-hero-title"], "visualChanges": ["long hero title wraps or ellipsizes inside its authored rectangle"], "interactionChanges": ["text expansion does not move the ranked action or navigation"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": ["text-line-count"]}, "effects": [{"componentId": "wide-hero-title", "changes": {"wrapText": true}}, {"componentId": "narrow-hero-title", "changes": {"wrapText": true}}], "fixtureTextBindings": [{"componentId": "wide-hero-title", "fixtureDataKey": "wideTitle", "overflowPolicy": "ellipsis", "maxLines": 1, "contentInsetsPx": [12, 4, 12, 4], "reserveActionClearancePx": 16}, {"componentId": "narrow-hero-title", "fixtureDataKey": "narrowTitle", "overflowPolicy": "wrap", "maxLines": 2, "contentInsetsPx": [12, 4, 12, 4], "reserveActionClearancePx": 16}]},
+    "missing-art": {"fixtureData": {"fallbackAsset": "hero-banner-fallback"}, "affectedComponentIds": ["wide-hero-art", "narrow-hero-art"], "visualChanges": ["hero region uses a neutral fallback without collapsing the authored rectangle"], "interactionChanges": ["ranked play remains discoverable and its target is unchanged"], "geometryPolicy": {"preserveBounds": true, "allowedChanges": []}, "effects": [{"componentId": "wide-hero-art", "changes": {"graphicAlpha": 0.55}}, {"componentId": "narrow-hero-art", "changes": {"graphicAlpha": 0.55}}]}
+  },
+  "behaviors": [{"id": "arena-moba-lobby-v21.navigation", "inputs": ["open-ranked", "navigate-main-tab", "open-home", "open-inventory"], "transitions": []}],
+  "bindings": [
+    {"ruleId": "UI-FB-001", "componentIds": ["wide-hero-art", "narrow-hero-art"], "profileIds": ["wide", "narrow"], "stateIds": ["default", "missing-art"], "evidenceRequirements": ["source asset hash and GUID", "focal crop receipt", "missing-art fallback comparison"], "nextArtifactFields": ["assets.hero-banner", "designContract.advancedComposition.focalAssetPolicies", "stateSemantics.missing-art"]},
+    {"ruleId": "UI-FB-002", "componentIds": ["wide-ranked", "narrow-ranked"], "profileIds": ["wide", "narrow"], "stateIds": ["default", "selected", "disabled"], "evidenceRequirements": ["primary intent trace", "action hierarchy comparison"], "nextArtifactFields": ["intentContract.requestedPrimaryIntent", "designContract.advancedComposition.primaryActions"]},
+    {"ruleId": "UI-FB-003", "componentIds": ["wide-header", "wide-hero-art", "wide-ranked", "wide-navigation", "narrow-header", "narrow-hero-art", "narrow-ranked", "narrow-navigation"], "profileIds": ["wide", "narrow"], "stateIds": ["all"], "evidenceRequirements": ["safe-area containment", "resolved profile geometry", "zero unexplained overlap"], "nextArtifactFields": ["profiles", "qualityGates.responsivePolicy", "designContract.advancedComposition.responsiveEquivalences"]},
+    {"ruleId": "UI-FB-004", "componentIds": ["background", "wide-hero-art", "narrow-hero-art"], "profileIds": ["wide", "narrow"], "stateIds": ["all"], "evidenceRequirements": ["separate static/materialization/GPU/runtime verdicts", "fresh spec/profile/state identity"], "nextArtifactFields": ["artifactStatus", "designEvidence.evidenceLedger"]},
+    {"ruleId": "UI-FB-005", "componentIds": ["wide-ranked", "narrow-ranked", "wide-hero-title", "narrow-hero-title"], "profileIds": ["wide", "narrow"], "stateIds": ["all"], "evidenceRequirements": ["field-level before/after patch", "expected visual effect", "regression check"], "nextArtifactFields": ["designEvidence.feedback.changedFields", "stateSemantics"]},
+    {"ruleId": "UI-FB-009", "componentIds": ["wide-ranked", "narrow-ranked"], "profileIds": ["wide", "narrow"], "stateIds": ["default", "selected", "disabled", "loading"], "evidenceRequirements": ["visibility snapshot", "input reachability snapshot", "raycast blocker check"], "nextArtifactFields": ["visibility", "inputReachability", "clipAncestors"]},
+    {"ruleId": "UI-FB-010", "componentIds": ["wide-header", "wide-hero-art", "wide-hero-title", "wide-ranked", "wide-navigation", "narrow-header", "narrow-hero-art", "narrow-hero-title", "narrow-ranked", "narrow-navigation"], "profileIds": ["wide", "narrow"], "stateIds": ["all"], "evidenceRequirements": ["deterministic profile counts", "zone coverage snapshot", "content completeness review"], "nextArtifactFields": ["designContract.advancedComposition.contentRequirements", "designContract.advancedComposition.contentRequirements.profiles"]},
+    {"ruleId": "UI-FB-011", "componentIds": ["background", "wide-header", "wide-hero-title", "wide-ranked", "narrow-header", "narrow-hero-title", "narrow-ranked"], "profileIds": ["wide", "narrow"], "stateIds": ["selected", "error"], "evidenceRequirements": ["token consumer count", "state token effect resolution", "spacing scale membership"], "nextArtifactFields": ["designContract.advancedComposition.contentRequirements.requiredTokenConsumers", "designContract.advancedComposition.contentRequirements.stateTokenBindings", "designContract.advancedComposition.contentRequirements.spacingScalePx"]},
+    {"ruleId": "UI-FB-012", "componentIds": ["wide-hero-art", "wide-hero-title", "wide-ranked", "wide-navigation", "narrow-hero-art", "narrow-hero-title", "narrow-ranked", "narrow-navigation"], "profileIds": ["wide", "narrow"], "stateIds": ["default"], "evidenceRequirements": ["visual hierarchy band coverage", "primary action band membership"], "nextArtifactFields": ["designContract.advancedComposition.visualHierarchy"]},
+    {"ruleId": "UI-FB-013", "componentIds": ["wide-ranked", "wide-navigation", "wide-home", "wide-inventory", "narrow-ranked", "narrow-navigation", "narrow-home", "narrow-inventory"], "profileIds": ["wide", "narrow"], "stateIds": ["selected", "disabled", "loading"], "evidenceRequirements": ["focus order trace", "disabled and loading input effect"], "nextArtifactFields": ["designContract.advancedComposition.interactionContract", "stateSemantics.disabled", "stateSemantics.loading"]},
+    {"ruleId": "UI-FB-014", "componentIds": ["wide-ranked", "wide-friends", "wide-hero-title", "wide-hero-art", "narrow-ranked", "narrow-friends", "narrow-hero-title", "narrow-hero-art"], "profileIds": ["wide", "narrow"], "stateIds": ["all"], "evidenceRequirements": ["per-profile affected component ratio"], "nextArtifactFields": ["designContract.advancedComposition.stateImpactPolicy"]},
+    {"ruleId": "UI-FB-015", "componentIds": ["wide-header", "wide-hero-art", "wide-hero-title", "wide-ranked", "wide-navigation", "narrow-header", "narrow-hero-art", "narrow-hero-title", "narrow-ranked", "narrow-navigation"], "profileIds": ["wide", "narrow"], "stateIds": ["all"], "evidenceRequirements": ["final RectTransform anchorMin anchorMax pivot projection"], "nextArtifactFields": ["designContract.advancedComposition.anchorContract"]}
+  ],
+  "profileAvailability": {
+    "wide": {"availableIntents": ["open-ranked", "navigate-main-tab", "open-home", "open-inventory"], "omittedIntents": []},
+    "narrow": {"availableIntents": ["open-ranked", "navigate-main-tab", "open-home", "open-inventory"], "omittedIntents": []}
+  },
+  "artifactStatus": {"assets": "planned", "prefab": "planned", "fixtureScene": "planned", "gpuEvidence": "not-run", "runtimeEvidence": "not-run"},
+  "designEvidence": {
+    "schemaVersion": 2,
+    "sourceType": "ai-game-lobby-layout-proof",
+    "brief": "原创竞技游戏大厅：赛季主动作是唯一主视觉动作，焦点英雄素材受保护，好友区域和导航在宽窄屏重排。",
+    "referenceImages": [],
+    "feedback": {
+      "priorEvidenceBatch": "arena-moba-lobby-v20-static-review-and-font-blocker",
+      "ruleIds": ["UI-FB-001", "UI-FB-002", "UI-FB-003", "UI-FB-004", "UI-FB-005", "UI-FB-009", "UI-FB-010", "UI-FB-011", "UI-FB-012", "UI-FB-013", "UI-FB-014", "UI-FB-015"],
+      "changedFields": ["intentContract", "designContract.advancedComposition", "designContract.advancedComposition.contentRequirements", "designContract.advancedComposition.visualHierarchy", "designContract.advancedComposition.interactionContract", "designContract.advancedComposition.stateImpactPolicy", "designContract.advancedComposition.anchorContract", "stateSemantics", "bindings", "profileAvailability"],
+      "expectedEffects": ["primary action cannot drift from the requested screen family", "focal art is not token-tinted or overlapped", "each state is executable and observable", "wide/narrow intent mapping is explicit", "visibility and input reachability are evidence-gated", "each profile contains the required content and zones", "declared tokens and spacing values have executable consumers", "all non-background components belong to a ranked visual band", "focus order starts at the primary action and loading or disabled states reject duplicate activation", "state changes remain local to a bounded component set", "key component anchors project to explicit Unity RectTransform values"],
+      "falsificationChecks": ["run strict ScreenSpec validator", "resolve both profile layout plans", "compare focal asset policy with AssetManifest", "evaluate content density and zone coverage", "evaluate token consumers, state effects and spacing scale", "mutate hierarchy focus state-impact and anchor contracts and require rejection", "run Unity materialization before any GPU/runtime claim"]
+    },
+    "evidenceLedger": {"static": "pending", "materialization": "not-run", "gpuVisual": "not-run", "runtime": "not-run"}
+  }
+}

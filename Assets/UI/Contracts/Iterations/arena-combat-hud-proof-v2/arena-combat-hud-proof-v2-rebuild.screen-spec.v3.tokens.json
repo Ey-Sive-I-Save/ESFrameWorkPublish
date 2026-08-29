@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "evaluator": "es-ui-prefab-authoring/evaluate_ui_tokens",
+  "evaluatorVersion": 1,
+  "specPath": "F:/aaProject/ESFrameWorkPublish/Assets/UI/Contracts/Iterations/arena-combat-hud-proof-v2/arena-combat-hud-proof-v2-rebuild.screen-spec.v3.json",
+  "specSha256": "4b689d4a07fdb9c81377dfcabede01a2ed21d9ecb0daf8d25ea94082fcf50402",
+  "status": "passed",
+  "minimumTextContrast": 4.5,
+  "roleResolution": {
+    "surface": "surface",
+    "text": "text",
+    "action": "action",
+    "feedback": "danger",
+    "focus": "focus",
+    "border": "surfaceRaised",
+    "icon": "accent"
+  },
+  "contrastChecks": [
+    {
+      "id": "background-text",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 17.755,
+      "minimum": 4.5,
+      "status": "passed"
+    },
+    {
+      "id": "background-muted-text",
+      "foreground": "mutedText",
+      "background": "background",
+      "ratio": 9.5688,
+      "minimum": 4.5,
+      "status": "passed"
+    },
+    {
+      "id": "surface-text",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 14.668,
+      "minimum": 4.5,
+      "status": "passed"
+    },
+    {
+      "id": "surface-muted-text",
+      "foreground": "mutedText",
+      "background": "surface",
+      "ratio": 7.9051,
+      "minimum": 4.5,
+      "status": "passed"
+    },
+    {
+      "id": "raised-surface-text",
+      "foreground": "text",
+      "background": "surfaceRaised",
+      "ratio": 11.9312,
+      "minimum": 4.5,
+      "status": "passed"
+    },
+    {
+      "id": "accent-label",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 10.5303,
+      "minimum": 4.5,
+      "status": "passed"
+    },
+    {
+      "id": "danger-label",
+      "foreground": "onDanger",
+      "background": "danger",
+      "ratio": 6.2154,
+      "minimum": 4.5,
+      "status": "passed"
+    }
+  ],
+  "consumerTrace": {
+    "background": [
+      "combat-background"
+    ],
+    "surface": [
+      "wide-player-panel",
+      "wide-player-resource",
+      "wide-target-panel",
+      "wide-quest-feed",
+      "wide-quest-one",
+      "wide-quest-two",
+      "wide-center-status",
+      "wide-action-bar",
+      "wide-skill-secondary",
+      "wide-skill-utility",
+      "wide-settings",
+      "narrow-player-panel",
+      "narrow-player-resource",
+      "narrow-target-panel",
+      "narrow-quest-feed",
+      "narrow-quest-one",
+      "narrow-quest-two",
+      "narrow-center-status",
+      "narrow-action-bar",
+      "narrow-skill-secondary",
+      "narrow-skill-utility",
+      "narrow-settings"
+    ],
+    "surfaceRaised": [],
+    "accent": [
+      "wide-player-hp",
+      "wide-status-progress",
+      "wide-skill-primary",
+      "narrow-player-hp",
+      "narrow-status-progress",
+      "narrow-skill-primary"
+    ],
+    "action": [],
+    "focus": [
+      "wide-player-avatar",
+      "wide-target-emblem",
+      "narrow-player-avatar",
+      "narrow-target-emblem"
+    ],
+    "text": [
+      "wide-player-name",
+      "wide-target-name",
+      "wide-status-title",
+      "narrow-player-name",
+      "narrow-target-name",
+      "narrow-status-title"
+    ],
+    "mutedText": [],
+    "danger": [
+      "wide-target-hp",
+      "wide-quest-three",
+      "narrow-target-hp",
+      "narrow-quest-three"
+    ],
+    "onAccent": [
+      "wide-skill-primary",
+      "narrow-skill-primary"
+    ],
+    "onDanger": [],
+    "titleSize": [],
+    "bodySize": [],
+    "buttonSize": [],
+    "labelSize": [],
+    "captionSize": [],
+    "numericSize": [],
+    "spacing": [],
+    "padding": []
+  },
+  "stateSignals": {
+    "default": [],
+    "selected": [
+      "selected-outline",
+      "selected-label"
+    ],
+    "disabled": [
+      "disabled-interaction",
+      "disabled-label"
+    ],
+    "loading": [
+      "loading-label",
+      "progress-affordance"
+    ],
+    "error": [
+      "error-copy",
+      "retry-intent"
+    ],
+    "long-content": [
+      "wrap-or-ellipsis"
+    ]
+  },
+  "issues": [],
+  "nonClaims": [
+    "Unity material assignment",
+    "font rendering",
+    "GPU color management",
+    "commercial visual acceptance"
+  ]
+}

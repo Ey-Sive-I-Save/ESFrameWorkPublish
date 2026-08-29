@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "resolver": "es-ui-prefab-authoring/resolve_ui_asset_manifest",
+  "resolverVersion": 1,
+  "projectRoot": "F:/aaProject/ESFrameWorkPublish",
+  "specPath": "Assets/UI/Contracts/Iterations/arena-combat-hud-proof-v3/arena-combat-hud-proof-v3-rebuild.screen-spec.v3.json",
+  "specSha256": "df3227d162704d4acbadc493a123175a57f5f986c882998c6ce22b4b081998c7",
+  "status": "passed",
+  "assetCount": 7,
+  "verifiedCount": 7,
+  "commercialAcceptance": "deferred",
+  "assets": [
+    {
+      "index": 0,
+      "assetId": "combat-background",
+      "role": "combat-backdrop",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/lobby-background.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/lobby-background.asset",
+      "resolution": "declared",
+      "fallback": "solid-background",
+      "declaredHash": "6a0610e80ba03cbbc024e24a92ef6958f5f64e9a755c246eee64c7364bef7810",
+      "actualHash": "6a0610e80ba03cbbc024e24a92ef6958f5f64e9a755c246eee64c7364bef7810",
+      "guid": "0860da22e380b6b4b89fd9beda0813e8",
+      "dimensions": [
+        1024,
+        512
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    },
+    {
+      "index": 1,
+      "assetId": "player-avatar",
+      "role": "player-avatar",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/player-avatar.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/player-avatar.asset",
+      "resolution": "declared",
+      "fallback": "avatar-fallback",
+      "declaredHash": "ef85da054538b57c1cf57522fb848c171832038db5e0b8298a1d8cbbb349cb17",
+      "actualHash": "ef85da054538b57c1cf57522fb848c171832038db5e0b8298a1d8cbbb349cb17",
+      "guid": "ff3c9b0876ff3c242a776665db6d2265",
+      "dimensions": [
+        256,
+        256
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    },
+    {
+      "index": 2,
+      "assetId": "target-emblem",
+      "role": "target-emblem",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/rank-emblem.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/rank-emblem.asset",
+      "resolution": "declared",
+      "fallback": "target-fallback",
+      "declaredHash": "4526b0d1373807dcb2068e3130a53ae8133c53cab950c20e969322d13e220c6a",
+      "actualHash": "4526b0d1373807dcb2068e3130a53ae8133c53cab950c20e969322d13e220c6a",
+      "guid": "08902beb3abe78f41918619734966758",
+      "dimensions": [
+        256,
+        256
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    },
+    {
+      "index": 3,
+      "assetId": "skill-primary",
+      "role": "skill-primary",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/mode-ranked.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/mode-ranked.asset",
+      "resolution": "declared",
+      "fallback": "skill-fallback",
+      "declaredHash": "25afee009a4dd94f013cb7a4d22c05d2b8da0b4310be5856b570967c22ab758d",
+      "actualHash": "25afee009a4dd94f013cb7a4d22c05d2b8da0b4310be5856b570967c22ab758d",
+      "guid": "4af0dbec32403b44f90b64ad664f7848",
+      "dimensions": [
+        256,
+        256
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    },
+    {
+      "index": 4,
+      "assetId": "skill-secondary",
+      "role": "skill-secondary",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/mode-match.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/mode-match.asset",
+      "resolution": "declared",
+      "fallback": "skill-fallback",
+      "declaredHash": "4d540c2455b53733890f2a1e0073b1f5dc6b0e1088bf9d78115ce18b48e35a83",
+      "actualHash": "4d540c2455b53733890f2a1e0073b1f5dc6b0e1088bf9d78115ce18b48e35a83",
+      "guid": "930fde6755588504a8336d99bb86345b",
+      "dimensions": [
+        256,
+        256
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    },
+    {
+      "index": 5,
+      "assetId": "skill-utility",
+      "role": "skill-utility",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/mode-training.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/mode-training.asset",
+      "resolution": "declared",
+      "fallback": "skill-fallback",
+      "declaredHash": "5d651283206b88a186af2cc171160f0bdc78f2b7dedcdd53afc616c3797aeb69",
+      "actualHash": "5d651283206b88a186af2cc171160f0bdc78f2b7dedcdd53afc616c3797aeb69",
+      "guid": "e05cdbe12db04b445964e6587e47d22f",
+      "dimensions": [
+        256,
+        256
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    },
+    {
+      "index": 6,
+      "assetId": "settings-icon",
+      "role": "settings-icon",
+      "source": "generated-procedural",
+      "declaredPath": "Assets/UI/Generated/AIUI/settings-icon.asset",
+      "resolvedPath": "Assets/UI/Generated/AIUI/settings-icon.asset",
+      "resolution": "declared",
+      "fallback": "icon-fallback",
+      "declaredHash": "dc06bd69c85b2be0084f494dc4eeac0c976b5862101f4058fa2d768d8e3c6f16",
+      "actualHash": "dc06bd69c85b2be0084f494dc4eeac0c976b5862101f4058fa2d768d8e3c6f16",
+      "guid": "48f5ed718e1fb084a9e3b4ae7ed18126",
+      "dimensions": [
+        256,
+        256
+      ],
+      "status": "verified",
+      "commercialAcceptance": "deferred"
+    }
+  ],
+  "issues": [],
+  "nonClaims": [
+    "Unity import success",
+    "GPU visual quality",
+    "commercial license acceptance",
+    "runtime input behavior"
+  ]
+}

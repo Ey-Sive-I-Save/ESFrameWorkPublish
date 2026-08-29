@@ -1,0 +1,2650 @@
+{
+  "schemaVersion": 3,
+  "screenId": "arena-combat-hud-proof-v2-iteration",
+  "screenType": "combat",
+  "template": "combat",
+  "prefabPath": "Assets/UI/Prefabs/Generated/arena-combat-hud-proof-v2-iteration.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/arena-combat-hud-proof-v2-iterationFixture.unity",
+  "tokens": {
+    "background": "#07111D",
+    "surface": "#102536",
+    "surfaceRaised": "#17354B",
+    "accent": "#42D6C5",
+    "action": "#F5B95B",
+    "focus": "#FFFFFF",
+    "text": "#F4F8FA",
+    "mutedText": "#A9BBC4",
+    "danger": "#E86D76",
+    "onAccent": "#07111D",
+    "onDanger": "#07111D",
+    "titleSize": 30,
+    "bodySize": 18,
+    "buttonSize": 20,
+    "labelSize": 20,
+    "captionSize": 16,
+    "numericSize": 18,
+    "spacing": 12,
+    "padding": 20
+  },
+  "designContract": {
+    "coordinateSpace": "screen-top-left-normalized",
+    "canvas": {
+      "rootRole": "screen-root",
+      "renderMode": "ScreenSpaceOverlay",
+      "scalerMode": "ScaleWithScreenSize",
+      "singleRoot": true,
+      "nestedCanvasPolicy": "forbid-unless-declared"
+    },
+    "anchorPolicy": {
+      "defaultPivot": [
+        0.5,
+        0.5
+      ],
+      "allowedStrategies": [
+        "stretch",
+        "absolute",
+        "edge-docked",
+        "center",
+        "flow",
+        "list",
+        "grid"
+      ],
+      "safeAreaTarget": "profile-safe-area-inset"
+    },
+    "colorRoles": {
+      "primaryAction": "accent",
+      "secondaryAction": "surface",
+      "feedback": "danger",
+      "foregroundOnAccent": "onAccent",
+      "foregroundOnDanger": "onDanger"
+    },
+    "typographyRoles": {
+      "title": {
+        "token": "titleSize",
+        "maxLines": 1,
+        "overflow": "ellipsis"
+      },
+      "body": {
+        "token": "bodySize",
+        "maxLines": 2,
+        "overflow": "wrap"
+      },
+      "label": {
+        "token": "labelSize",
+        "maxLines": 1,
+        "overflow": "ellipsis"
+      },
+      "caption": {
+        "token": "captionSize",
+        "maxLines": 2,
+        "overflow": "ellipsis"
+      },
+      "numeric": {
+        "token": "numericSize",
+        "maxLines": 1,
+        "overflow": "ellipsis"
+      }
+    },
+    "layerRoles": {
+      "background": 0,
+      "information": 100,
+      "feedback": 200,
+      "action": 300
+    }
+  },
+  "intentContract": {
+    "requestedScreenFamily": "combat",
+    "requestedPrimaryIntent": "cast-primary",
+    "visualTarget": "original-combat-hud",
+    "fidelityMode": "original",
+    "referencePolicy": "not-required",
+    "referenceSources": [],
+    "productBoundary": "original-no-official-assets"
+  },
+  "qualityGates": {
+    "assetPolicy": {
+      "productionReady": false,
+      "commercialAcceptance": "deferred",
+      "acceptedSources": [
+        "project-sprite",
+        "ai-generated"
+      ],
+      "requiredFields": [
+        "path",
+        "hash",
+        "provenance",
+        "license",
+        "importPolicy",
+        "aspectPolicy",
+        "focalPoint",
+        "cropPolicy",
+        "nineSlice",
+        "atlasOwner",
+        "resolutionSet"
+      ],
+      "plannedSourceClasses": [
+        "generated-procedural",
+        "generated-placeholder"
+      ],
+      "placeholderUse": "layout-only"
+    },
+    "responsivePolicy": {
+      "canvasRenderMode": "ScreenSpaceOverlay",
+      "canvasScalerMode": "ScaleWithScreenSize",
+      "referenceResolution": [
+        1920,
+        1080
+      ],
+      "matchWidthOrHeight": 0.5,
+      "safeAreaPolicy": "profile-safe-area-inset",
+      "reflowPolicy": "profile-specific-reflow-required",
+      "longContentPolicy": "wrap-or-ellipsis-without-action-overlap",
+      "uniformScaleOnly": false,
+      "profileIds": [
+        "wide",
+        "narrow"
+      ]
+    },
+    "colorPolicy": {
+      "tokenRoles": [
+        "surface",
+        "text",
+        "action",
+        "feedback",
+        "focus",
+        "border",
+        "icon"
+      ],
+      "minimumTextContrast": 4.5,
+      "nonColorStateSignals": {
+        "selected": [
+          "selected-outline",
+          "selected-label"
+        ],
+        "disabled": [
+          "disabled-interaction",
+          "disabled-label"
+        ],
+        "loading": [
+          "loading-label",
+          "progress-affordance"
+        ],
+        "error": [
+          "error-copy",
+          "retry-intent"
+        ],
+        "long-content": [
+          "wrap-or-ellipsis"
+        ]
+      }
+    },
+    "typographyPolicy": {
+      "fontAssetId": "es-brand-sans-sc",
+      "fontAssetPath": "Assets/UI/Fonts/ESBrandSansSC SDF.asset",
+      "fontAssetHash": "faa6412e55b384fb05d6e33097053cb5ce5f0ceb6a945db2f6191db04cdf1e90",
+      "license": "project-internal-approved",
+      "fallbackFontAssetIds": [
+        "es-brand-sans-sc"
+      ],
+      "requiredCharacters": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "H",
+        "I",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "%",
+        "/",
+        "+"
+      ],
+      "localeFixtures": [
+        "en-US-combat",
+        "numeric-cooldown"
+      ],
+      "overflowPolicy": "wrap-ellipsis-scroll-by-component"
+    }
+  },
+  "profiles": [
+    {
+      "id": "wide",
+      "width": 1920,
+      "height": 1080,
+      "orientation": "landscape",
+      "safeArea": [
+        0.02,
+        0.03,
+        0.98,
+        0.96
+      ]
+    },
+    {
+      "id": "narrow",
+      "width": 1080,
+      "height": 1920,
+      "orientation": "portrait",
+      "safeArea": [
+        0.04,
+        0.02,
+        0.96,
+        0.97
+      ]
+    }
+  ],
+  "states": [
+    {
+      "id": "default",
+      "fixture": "arena-combat-hud-proof-v2-iteration/default"
+    },
+    {
+      "id": "selected",
+      "fixture": "arena-combat-hud-proof-v2-iteration/selected"
+    },
+    {
+      "id": "disabled",
+      "fixture": "arena-combat-hud-proof-v2-iteration/disabled"
+    },
+    {
+      "id": "loading",
+      "fixture": "arena-combat-hud-proof-v2-iteration/loading"
+    },
+    {
+      "id": "error",
+      "fixture": "arena-combat-hud-proof-v2-iteration/error"
+    },
+    {
+      "id": "long-content",
+      "fixture": "arena-combat-hud-proof-v2-iteration/long-content"
+    }
+  ],
+  "assets": [
+    {
+      "id": "combat-background",
+      "role": "combat-backdrop",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/lobby-background.asset",
+      "hash": "6a0610e80ba03cbbc024e24a92ef6958f5f64e9a755c246eee64c7364bef7810",
+      "fallback": "solid-background"
+    },
+    {
+      "id": "player-avatar",
+      "role": "player-avatar",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/player-avatar.asset",
+      "hash": "ef85da054538b57c1cf57522fb848c171832038db5e0b8298a1d8cbbb349cb17",
+      "fallback": "avatar-fallback"
+    },
+    {
+      "id": "target-emblem",
+      "role": "target-emblem",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/rank-emblem.asset",
+      "hash": "4526b0d1373807dcb2068e3130a53ae8133c53cab950c20e969322d13e220c6a",
+      "fallback": "target-fallback"
+    },
+    {
+      "id": "skill-primary",
+      "role": "skill-primary",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/mode-ranked.asset",
+      "hash": "25afee009a4dd94f013cb7a4d22c05d2b8da0b4310be5856b570967c22ab758d",
+      "fallback": "skill-fallback"
+    },
+    {
+      "id": "skill-secondary",
+      "role": "skill-secondary",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/mode-match.asset",
+      "hash": "4d540c2455b53733890f2a1e0073b1f5dc6b0e1088bf9d78115ce18b48e35a83",
+      "fallback": "skill-fallback"
+    },
+    {
+      "id": "skill-utility",
+      "role": "skill-utility",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/mode-training.asset",
+      "hash": "5d651283206b88a186af2cc171160f0bdc78f2b7dedcdd53afc616c3797aeb69",
+      "fallback": "skill-fallback"
+    },
+    {
+      "id": "settings-icon",
+      "role": "settings-icon",
+      "source": "generated-procedural",
+      "path": "Assets/UI/Generated/AIUI/settings-icon.asset",
+      "hash": "dc06bd69c85b2be0084f494dc4eeac0c976b5862101f4058fa2d768d8e3c6f16",
+      "fallback": "icon-fallback"
+    }
+  ],
+  "components": [
+    {
+      "id": "combat-background",
+      "type": "frame",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "stretch",
+        "bounds": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "minSize": [
+          720,
+          520
+        ],
+        "anchor": {
+          "strategy": "stretch",
+          "edge": "none",
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "background",
+      "colorToken": "background",
+      "typographyRole": "none",
+      "layerRole": "background",
+      "siblingOrder": 0,
+      "stateVariants": {
+        "default": {},
+        "loading": {},
+        "error": {}
+      },
+      "assetSlots": [
+        "combat-background"
+      ]
+    },
+    {
+      "id": "wide-player-panel",
+      "type": "frame",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "absolute",
+        "bounds": [
+          0.03,
+          0.04,
+          0.31,
+          0.22
+        ],
+        "minSize": [
+          510,
+          150
+        ],
+        "responsiveMode": "wide",
+        "anchor": {
+          "strategy": "edge-docked",
+          "edge": "top-left",
+          "pivot": [
+            0,
+            1
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 1,
+      "stateVariants": {
+        "default": {},
+        "disabled": {},
+        "long-content": {}
+      },
+      "children": [
+        {
+          "id": "wide-player-avatar",
+          "type": "icon",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "edge-docked",
+            "bounds": [
+              0.03,
+              0.15,
+              0.2,
+              0.85
+            ],
+            "minSize": [
+              80,
+              80
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "edge-docked",
+              "edge": "left",
+              "pivot": [
+                0,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {},
+          "visualVariant": "none",
+          "colorToken": "focus",
+          "typographyRole": "none",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "disabled": {}
+          },
+          "assetSlots": [
+            "player-avatar"
+          ]
+        },
+        {
+          "id": "wide-player-name",
+          "type": "text",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.25,
+              0.18,
+              0.92,
+              0.38
+            ],
+            "minSize": [
+              280,
+              28
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "ALPHA"
+          },
+          "visualVariant": "text",
+          "colorToken": "text",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "long-content": {}
+          }
+        },
+        {
+          "id": "wide-player-hp",
+          "type": "bar",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.25,
+              0.45,
+              0.92,
+              0.63
+            ],
+            "minSize": [
+              280,
+              24
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "HP 760 / 1000",
+            "value": 0.76
+          },
+          "visualVariant": "accent",
+          "colorToken": "accent",
+          "typographyRole": "numeric",
+          "layerRole": "information",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "disabled": {}
+          }
+        },
+        {
+          "id": "wide-player-resource",
+          "type": "bar",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.25,
+              0.69,
+              0.92,
+              0.84
+            ],
+            "minSize": [
+              280,
+              18
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "MP 42 / 100",
+            "value": 0.42
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "numeric",
+          "layerRole": "information",
+          "siblingOrder": 3,
+          "stateVariants": {
+            "default": {},
+            "loading": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "wide-target-panel",
+      "type": "target-panel",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "absolute",
+        "bounds": [
+          0.69,
+          0.04,
+          0.97,
+          0.22
+        ],
+        "minSize": [
+          470,
+          150
+        ],
+        "responsiveMode": "wide",
+        "anchor": {
+          "strategy": "edge-docked",
+          "edge": "top-right",
+          "pivot": [
+            1,
+            1
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 2,
+      "stateVariants": {
+        "default": {},
+        "selected": {},
+        "error": {}
+      },
+      "children": [
+        {
+          "id": "wide-target-emblem",
+          "type": "icon",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "edge-docked",
+            "bounds": [
+              0.05,
+              0.15,
+              0.22,
+              0.85
+            ],
+            "minSize": [
+              80,
+              80
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "edge-docked",
+              "edge": "left",
+              "pivot": [
+                0,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {},
+          "visualVariant": "none",
+          "colorToken": "focus",
+          "typographyRole": "none",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "selected": {}
+          },
+          "assetSlots": [
+            "target-emblem"
+          ]
+        },
+        {
+          "id": "wide-target-name",
+          "type": "text",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.28,
+              0.18,
+              0.94,
+              0.38
+            ],
+            "minSize": [
+              260,
+              28
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "WARDEN PRIME"
+          },
+          "visualVariant": "text",
+          "colorToken": "text",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "error": {}
+          }
+        },
+        {
+          "id": "wide-target-hp",
+          "type": "bar",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.28,
+              0.48,
+              0.94,
+              0.66
+            ],
+            "minSize": [
+              260,
+              24
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "HP 54%",
+            "value": 0.54
+          },
+          "visualVariant": "feedback",
+          "colorToken": "danger",
+          "typographyRole": "numeric",
+          "layerRole": "feedback",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "error": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "wide-quest-feed",
+      "type": "list",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "list",
+        "axis": "vertical",
+        "bounds": [
+          0.03,
+          0.29,
+          0.29,
+          0.57
+        ],
+        "minSize": [
+          430,
+          280
+        ],
+        "responsiveMode": "wide",
+        "gap": 10,
+        "padding": [
+          10,
+          10,
+          10,
+          10
+        ],
+        "childGeometryOwner": "parent-layout-group",
+        "anchor": {
+          "strategy": "edge-docked",
+          "edge": "left",
+          "pivot": [
+            0,
+            0.5
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 3,
+      "stateVariants": {
+        "default": {},
+        "loading": {},
+        "error": {},
+        "long-content": {}
+      },
+      "children": [
+        {
+          "id": "wide-quest-one",
+          "type": "stat-row",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              400,
+              64
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "MISSION 01  SECURE"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "long-content": {}
+          }
+        },
+        {
+          "id": "wide-quest-two",
+          "type": "stat-row",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              400,
+              64
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "MISSION 02  HOLD"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "loading": {}
+          }
+        },
+        {
+          "id": "wide-quest-three",
+          "type": "stat-row",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              400,
+              64
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "ALERT  INBOUND"
+          },
+          "visualVariant": "feedback",
+          "colorToken": "danger",
+          "typographyRole": "body",
+          "layerRole": "feedback",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "error": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "wide-center-status",
+      "type": "frame",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "absolute",
+        "bounds": [
+          0.34,
+          0.31,
+          0.66,
+          0.52
+        ],
+        "minSize": [
+          480,
+          210
+        ],
+        "responsiveMode": "wide",
+        "anchor": {
+          "strategy": "center",
+          "edge": "none",
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 4,
+      "stateVariants": {
+        "default": {},
+        "loading": {},
+        "error": {}
+      },
+      "children": [
+        {
+          "id": "wide-status-title",
+          "type": "text",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.12,
+              0.62,
+              0.88,
+              0.9
+            ],
+            "minSize": [
+              300,
+              34
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "CONTROL  72%"
+          },
+          "visualVariant": "text",
+          "colorToken": "text",
+          "typographyRole": "title",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "loading": {},
+            "error": {}
+          }
+        },
+        {
+          "id": "wide-status-progress",
+          "type": "progress",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.12,
+              0.3,
+              0.88,
+              0.48
+            ],
+            "minSize": [
+              300,
+              24
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "CAPTURE PROGRESS",
+            "value": 0.72
+          },
+          "visualVariant": "accent",
+          "colorToken": "accent",
+          "typographyRole": "numeric",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "loading": {},
+            "error": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "wide-action-bar",
+      "type": "frame",
+      "zone": "action-bar",
+      "layout": {
+        "mode": "flow",
+        "bounds": [
+          0.34,
+          0.7,
+          0.97,
+          0.94
+        ],
+        "minSize": [
+          1040,
+          210
+        ],
+        "responsiveMode": "wide",
+        "axis": "horizontal",
+        "gap": 14,
+        "padding": [
+          12,
+          12,
+          12,
+          12
+        ],
+        "childGeometryOwner": "parent-layout-group",
+        "anchor": {
+          "strategy": "edge-docked",
+          "edge": "bottom-right",
+          "pivot": [
+            1,
+            0
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "action",
+      "siblingOrder": 5,
+      "stateVariants": {
+        "default": {},
+        "selected": {},
+        "disabled": {},
+        "loading": {}
+      },
+      "children": [
+        {
+          "id": "wide-skill-primary",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.23,
+              1
+            ],
+            "minSize": [
+              220,
+              150
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "SPELL A"
+          },
+          "visualVariant": "accent",
+          "colorToken": "accent",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "selected": {},
+            "disabled": {},
+            "loading": {}
+          },
+          "interaction": {
+            "intent": "cast-primary",
+            "targetSize": [
+              220,
+              150
+            ]
+          },
+          "assetSlots": [
+            "skill-primary"
+          ]
+        },
+        {
+          "id": "wide-skill-secondary",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.46,
+              1
+            ],
+            "minSize": [
+              220,
+              150
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "SPELL B"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "selected": {},
+            "disabled": {},
+            "loading": {}
+          },
+          "interaction": {
+            "intent": "cast-secondary",
+            "targetSize": [
+              220,
+              150
+            ]
+          },
+          "assetSlots": [
+            "skill-secondary"
+          ]
+        },
+        {
+          "id": "wide-skill-utility",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.69,
+              1
+            ],
+            "minSize": [
+              220,
+              150
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "POWER"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "selected": {},
+            "disabled": {},
+            "loading": {}
+          },
+          "interaction": {
+            "intent": "cast-utility",
+            "targetSize": [
+              220,
+              150
+            ]
+          },
+          "assetSlots": [
+            "skill-utility"
+          ]
+        },
+        {
+          "id": "wide-settings",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              120,
+              150
+            ],
+            "responsiveMode": "wide",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": ""
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 3,
+          "stateVariants": {
+            "default": {},
+            "disabled": {}
+          },
+          "interaction": {
+            "intent": "open-combat-menu",
+            "targetSize": [
+              120,
+              150
+            ]
+          },
+          "assetSlots": [
+            "settings-icon"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "narrow-player-panel",
+      "type": "frame",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "absolute",
+        "bounds": [
+          0.04,
+          0.03,
+          0.96,
+          0.16
+        ],
+        "minSize": [
+          720,
+          220
+        ],
+        "responsiveMode": "narrow",
+        "anchor": {
+          "strategy": "absolute",
+          "edge": "none",
+          "pivot": [
+            0.5,
+            1
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 1,
+      "stateVariants": {
+        "default": {},
+        "disabled": {},
+        "long-content": {}
+      },
+      "children": [
+        {
+          "id": "narrow-player-avatar",
+          "type": "icon",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "edge-docked",
+            "bounds": [
+              0.03,
+              0.16,
+              0.14,
+              0.84
+            ],
+            "minSize": [
+              90,
+              90
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "edge-docked",
+              "edge": "left",
+              "pivot": [
+                0,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {},
+          "visualVariant": "none",
+          "colorToken": "focus",
+          "typographyRole": "none",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "disabled": {}
+          },
+          "assetSlots": [
+            "player-avatar"
+          ]
+        },
+        {
+          "id": "narrow-player-name",
+          "type": "text",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.17,
+              0.18,
+              0.62,
+              0.38
+            ],
+            "minSize": [
+              300,
+              30
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "ALPHA"
+          },
+          "visualVariant": "text",
+          "colorToken": "text",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "long-content": {}
+          }
+        },
+        {
+          "id": "narrow-player-hp",
+          "type": "bar",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.17,
+              0.47,
+              0.94,
+              0.64
+            ],
+            "minSize": [
+              500,
+              28
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "HP 760 / 1000",
+            "value": 0.76
+          },
+          "visualVariant": "accent",
+          "colorToken": "accent",
+          "typographyRole": "numeric",
+          "layerRole": "information",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "disabled": {}
+          }
+        },
+        {
+          "id": "narrow-player-resource",
+          "type": "bar",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.17,
+              0.68,
+              0.94,
+              0.8
+            ],
+            "minSize": [
+              500,
+              20
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "MP 42 / 100",
+            "value": 0.42
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "numeric",
+          "layerRole": "information",
+          "siblingOrder": 3,
+          "stateVariants": {
+            "default": {},
+            "loading": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "narrow-target-panel",
+      "type": "target-panel",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "absolute",
+        "bounds": [
+          0.04,
+          0.18,
+          0.96,
+          0.31
+        ],
+        "minSize": [
+          720,
+          190
+        ],
+        "responsiveMode": "narrow",
+        "anchor": {
+          "strategy": "absolute",
+          "edge": "none",
+          "pivot": [
+            0.5,
+            1
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 2,
+      "stateVariants": {
+        "default": {},
+        "selected": {},
+        "error": {}
+      },
+      "children": [
+        {
+          "id": "narrow-target-emblem",
+          "type": "icon",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "edge-docked",
+            "bounds": [
+              0.05,
+              0.16,
+              0.17,
+              0.84
+            ],
+            "minSize": [
+              90,
+              90
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "edge-docked",
+              "edge": "left",
+              "pivot": [
+                0,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {},
+          "visualVariant": "none",
+          "colorToken": "focus",
+          "typographyRole": "none",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "selected": {}
+          },
+          "assetSlots": [
+            "target-emblem"
+          ]
+        },
+        {
+          "id": "narrow-target-name",
+          "type": "text",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.2,
+              0.18,
+              0.94,
+              0.4
+            ],
+            "minSize": [
+              460,
+              30
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "WARDEN PRIME"
+          },
+          "visualVariant": "text",
+          "colorToken": "text",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "error": {}
+          }
+        },
+        {
+          "id": "narrow-target-hp",
+          "type": "bar",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.2,
+              0.48,
+              0.94,
+              0.66
+            ],
+            "minSize": [
+              460,
+              28
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "HP 54%",
+            "value": 0.54
+          },
+          "visualVariant": "feedback",
+          "colorToken": "danger",
+          "typographyRole": "numeric",
+          "layerRole": "feedback",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "error": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "narrow-quest-feed",
+      "type": "list",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "list",
+        "axis": "vertical",
+        "bounds": [
+          0.04,
+          0.34,
+          0.96,
+          0.5
+        ],
+        "minSize": [
+          720,
+          250
+        ],
+        "responsiveMode": "narrow",
+        "gap": 8,
+        "padding": [
+          10,
+          10,
+          10,
+          10
+        ],
+        "childGeometryOwner": "parent-layout-group",
+        "anchor": {
+          "strategy": "absolute",
+          "edge": "none",
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 3,
+      "stateVariants": {
+        "default": {},
+        "loading": {},
+        "error": {},
+        "long-content": {}
+      },
+      "children": [
+        {
+          "id": "narrow-quest-one",
+          "type": "stat-row",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              660,
+              60
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "MISSION 01  SECURE"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "long-content": {}
+          }
+        },
+        {
+          "id": "narrow-quest-two",
+          "type": "stat-row",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              660,
+              60
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "MISSION 02  HOLD"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "body",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "loading": {}
+          }
+        },
+        {
+          "id": "narrow-quest-three",
+          "type": "stat-row",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "minSize": [
+              660,
+              60
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "ALERT  INBOUND"
+          },
+          "visualVariant": "feedback",
+          "colorToken": "danger",
+          "typographyRole": "body",
+          "layerRole": "feedback",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "error": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "narrow-center-status",
+      "type": "frame",
+      "zone": "safe-area",
+      "layout": {
+        "mode": "absolute",
+        "bounds": [
+          0.04,
+          0.54,
+          0.96,
+          0.68
+        ],
+        "minSize": [
+          720,
+          220
+        ],
+        "responsiveMode": "narrow",
+        "anchor": {
+          "strategy": "center",
+          "edge": "none",
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 4,
+      "stateVariants": {
+        "default": {},
+        "loading": {},
+        "error": {}
+      },
+      "children": [
+        {
+          "id": "narrow-status-title",
+          "type": "text",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.1,
+              0.6,
+              0.9,
+              0.88
+            ],
+            "minSize": [
+              520,
+              34
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "CONTROL  72%"
+          },
+          "visualVariant": "text",
+          "colorToken": "text",
+          "typographyRole": "title",
+          "layerRole": "information",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "loading": {},
+            "error": {}
+          }
+        },
+        {
+          "id": "narrow-status-progress",
+          "type": "progress",
+          "zone": "safe-area",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0.1,
+              0.28,
+              0.9,
+              0.46
+            ],
+            "minSize": [
+              520,
+              26
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "absolute",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "CAPTURE PROGRESS",
+            "value": 0.72
+          },
+          "visualVariant": "accent",
+          "colorToken": "accent",
+          "typographyRole": "numeric",
+          "layerRole": "information",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "loading": {},
+            "error": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "narrow-action-bar",
+      "type": "frame",
+      "zone": "action-bar",
+      "layout": {
+        "mode": "grid",
+        "bounds": [
+          0.04,
+          0.73,
+          0.96,
+          0.95
+        ],
+        "minSize": [
+          720,
+          360
+        ],
+        "responsiveMode": "narrow",
+        "columns": 4,
+        "gap": 12,
+        "padding": [
+          12,
+          12,
+          12,
+          12
+        ],
+        "childGeometryOwner": "parent-layout-group",
+        "anchor": {
+          "strategy": "edge-docked",
+          "edge": "bottom",
+          "pivot": [
+            0.5,
+            0
+          ],
+          "safeArea": "inside"
+        }
+      },
+      "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "action",
+      "siblingOrder": 5,
+      "stateVariants": {
+        "default": {},
+        "selected": {},
+        "disabled": {},
+        "loading": {}
+      },
+      "children": [
+        {
+          "id": "narrow-skill-primary",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.25,
+              1
+            ],
+            "minSize": [
+              150,
+              150
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "SPELL A"
+          },
+          "visualVariant": "accent",
+          "colorToken": "accent",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 0,
+          "stateVariants": {
+            "default": {},
+            "selected": {},
+            "disabled": {},
+            "loading": {}
+          },
+          "interaction": {
+            "intent": "cast-primary",
+            "targetSize": [
+              150,
+              150
+            ]
+          },
+          "assetSlots": [
+            "skill-primary"
+          ]
+        },
+        {
+          "id": "narrow-skill-secondary",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.25,
+              1
+            ],
+            "minSize": [
+              150,
+              150
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "SPELL B"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 1,
+          "stateVariants": {
+            "default": {},
+            "selected": {},
+            "disabled": {},
+            "loading": {}
+          },
+          "interaction": {
+            "intent": "cast-secondary",
+            "targetSize": [
+              150,
+              150
+            ]
+          },
+          "assetSlots": [
+            "skill-secondary"
+          ]
+        },
+        {
+          "id": "narrow-skill-utility",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.25,
+              1
+            ],
+            "minSize": [
+              150,
+              150
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": "POWER"
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 2,
+          "stateVariants": {
+            "default": {},
+            "selected": {},
+            "disabled": {},
+            "loading": {}
+          },
+          "interaction": {
+            "intent": "cast-utility",
+            "targetSize": [
+              150,
+              150
+            ]
+          },
+          "assetSlots": [
+            "skill-utility"
+          ]
+        },
+        {
+          "id": "narrow-settings",
+          "type": "button",
+          "zone": "action-bar",
+          "layout": {
+            "mode": "absolute",
+            "bounds": [
+              0,
+              0,
+              0.25,
+              1
+            ],
+            "minSize": [
+              150,
+              150
+            ],
+            "responsiveMode": "narrow",
+            "anchor": {
+              "strategy": "stretch",
+              "edge": "none",
+              "pivot": [
+                0.5,
+                0.5
+              ],
+              "safeArea": "inherit"
+            }
+          },
+          "content": {
+            "text": ""
+          },
+          "visualVariant": "surface",
+          "colorToken": "surface",
+          "typographyRole": "label",
+          "layerRole": "action",
+          "siblingOrder": 3,
+          "stateVariants": {
+            "default": {},
+            "disabled": {}
+          },
+          "interaction": {
+            "intent": "open-combat-menu",
+            "targetSize": [
+              150,
+              150
+            ]
+          },
+          "assetSlots": [
+            "settings-icon"
+          ]
+        }
+      ]
+    }
+  ],
+  "behaviors": [
+    {
+      "id": "arena-combat-hud-proof-v2-iteration.behavior",
+      "inputs": [
+        "cast-primary",
+        "cast-secondary",
+        "cast-utility",
+        "open-combat-menu"
+      ],
+      "transitions": []
+    }
+  ],
+  "stateSemantics": {
+    "default": {
+      "fixtureData": {
+        "target": "WARDEN PRIME",
+        "hp": 0.76,
+        "targetHp": 0.54,
+        "captureProgress": 0.72
+      },
+      "affectedComponentIds": [
+        "wide-player-hp",
+        "narrow-player-hp",
+        "wide-target-hp",
+        "narrow-target-hp",
+        "wide-status-progress",
+        "narrow-status-progress"
+      ],
+      "visualChanges": [
+        "health and capture bars show live fixture values",
+        "primary skill remains the only action-filled control"
+      ],
+      "interactionChanges": [
+        "all combat intents are enabled and target remains locked"
+      ],
+      "geometryPolicy": {
+        "preserveBounds": true,
+        "allowedChanges": []
+      }
+    },
+    "selected": {
+      "fixtureData": {
+        "focusedIntent": "cast-primary",
+        "target": "WARDEN PRIME"
+      },
+      "affectedComponentIds": [
+        "wide-skill-primary",
+        "narrow-skill-primary",
+        "wide-target-panel",
+        "narrow-target-panel"
+      ],
+      "visualChanges": [
+        "primary skill gains focus ring and target panel gains selected outline"
+      ],
+      "interactionChanges": [
+        "focus selection changes the next cast intent without changing geometry"
+      ],
+      "geometryPolicy": {
+        "preserveBounds": true,
+        "allowedChanges": []
+      }
+    },
+    "disabled": {
+      "fixtureData": {
+        "disabledIntents": [
+          "cast-primary",
+          "cast-secondary"
+        ],
+        "reason": "silenced"
+      },
+      "affectedComponentIds": [
+        "wide-skill-primary",
+        "wide-skill-secondary",
+        "narrow-skill-primary",
+        "narrow-skill-secondary"
+      ],
+      "visualChanges": [
+        "disabled skills retain labels and show lock icon plus reduced contrast"
+      ],
+      "interactionChanges": [
+        "disabled cast intents reject activation and remain discoverable"
+      ],
+      "geometryPolicy": {
+        "preserveBounds": true,
+        "allowedChanges": []
+      }
+    },
+    "loading": {
+      "fixtureData": {
+        "requestStatus": "loading",
+        "loadingLabel": "WAIT...",
+        "preserveLastData": true
+      },
+      "affectedComponentIds": [
+        "wide-center-status",
+        "narrow-center-status",
+        "wide-status-progress",
+        "narrow-status-progress"
+      ],
+      "visualChanges": [
+        "status panel shows wait label and progress affordance while preserving last values"
+      ],
+      "interactionChanges": [
+        "combat actions remain enabled but menu opening is deferred until sync completes"
+      ],
+      "geometryPolicy": {
+        "preserveBounds": true,
+        "allowedChanges": []
+      }
+    },
+    "error": {
+      "fixtureData": {
+        "requestStatus": "error",
+        "message": "TARGET DATA UNAVAILABLE",
+        "retryIntent": "open-combat-menu"
+      },
+      "affectedComponentIds": [
+        "wide-target-name",
+        "narrow-target-name",
+        "wide-target-hp",
+        "narrow-target-hp",
+        "wide-quest-three",
+        "narrow-quest-three"
+      ],
+      "visualChanges": [
+        "target panel replaces health value with error copy and alert row uses feedback treatment"
+      ],
+      "interactionChanges": [
+        "combat menu remains available; cast intents remain guarded until a target is restored"
+      ],
+      "geometryPolicy": {
+        "preserveBounds": true,
+        "allowedChanges": []
+      }
+    },
+    "long-content": {
+      "fixtureData": {
+        "playerName": "ALPHA COMMANDER OF THE OUTER",
+        "objectiveText": "MISSION 01  SECURE BEFORE NEXT WAVE",
+        "message": "DATA UNAVAILABLE IN THIS INSTANCE"
+      },
+      "affectedComponentIds": [
+        "wide-player-name",
+        "narrow-player-name",
+        "wide-quest-one",
+        "narrow-quest-one",
+        "wide-target-name",
+        "narrow-target-name"
+      ],
+      "visualChanges": [
+        "long labels wrap or ellipsize within their authored rectangles and never cover bars or action targets"
+      ],
+      "interactionChanges": [
+        "text expansion does not create new intents or move the action bar"
+      ],
+      "geometryPolicy": {
+        "preserveBounds": true,
+        "allowedChanges": [
+          "text-line-count"
+        ]
+      }
+    }
+  },
+  "bindings": [
+    {
+      "ruleId": "UI-FB-001",
+      "componentIds": [
+        "wide-player-avatar",
+        "narrow-player-avatar",
+        "wide-target-emblem",
+        "narrow-target-emblem"
+      ],
+      "profileIds": [
+        "wide",
+        "narrow"
+      ],
+      "stateIds": [
+        "default",
+        "selected"
+      ],
+      "evidenceRequirements": [
+        "source asset hash and GUID",
+        "wide and narrow GPU capture",
+        "focal crop receipt"
+      ],
+      "nextArtifactFields": [
+        "assets[player-avatar]",
+        "assets[target-emblem]",
+        "components[*].layout"
+      ]
+    },
+    {
+      "ruleId": "UI-FB-002",
+      "componentIds": [
+        "wide-skill-primary",
+        "narrow-skill-primary",
+        "wide-center-status",
+        "narrow-center-status"
+      ],
+      "profileIds": [
+        "wide",
+        "narrow"
+      ],
+      "stateIds": [
+        "default",
+        "selected",
+        "disabled"
+      ],
+      "evidenceRequirements": [
+        "native-resolution action hierarchy review",
+        "selected and disabled comparison"
+      ],
+      "nextArtifactFields": [
+        "tokens.action",
+        "components[*].visualVariant",
+        "stateSemantics.selected"
+      ]
+    },
+    {
+      "ruleId": "UI-FB-003",
+      "componentIds": [
+        "wide-player-panel",
+        "wide-target-panel",
+        "wide-action-bar",
+        "narrow-player-panel",
+        "narrow-target-panel",
+        "narrow-action-bar"
+      ],
+      "profileIds": [
+        "wide",
+        "narrow"
+      ],
+      "stateIds": [
+        "all"
+      ],
+      "evidenceRequirements": [
+        "resolved RectTransform snapshot per profile",
+        "safe-area containment",
+        "zero unexplained overlap or clipping"
+      ],
+      "nextArtifactFields": [
+        "profiles",
+        "qualityGates.responsivePolicy",
+        "components[*].layout.childGeometryOwner"
+      ]
+    },
+    {
+      "ruleId": "UI-FB-004",
+      "componentIds": [
+        "combat-background",
+        "wide-center-status",
+        "narrow-center-status"
+      ],
+      "profileIds": [
+        "wide",
+        "narrow"
+      ],
+      "stateIds": [
+        "all"
+      ],
+      "evidenceRequirements": [
+        "separate static, materialization, GPU and runtime verdicts",
+        "fresh capture identity with spec hash/profile/state"
+      ],
+      "nextArtifactFields": [
+        "artifactStatus",
+        "designEvidence.evidenceLedger"
+      ]
+    },
+    {
+      "ruleId": "UI-FB-005",
+      "componentIds": [
+        "wide-action-bar",
+        "narrow-action-bar",
+        "wide-quest-feed",
+        "narrow-quest-feed"
+      ],
+      "profileIds": [
+        "wide",
+        "narrow"
+      ],
+      "stateIds": [
+        "all"
+      ],
+      "evidenceRequirements": [
+        "field-level before/after patch",
+        "expected visual effect",
+        "falsification and regression check"
+      ],
+      "nextArtifactFields": [
+        "designEvidence.feedback.changedFields",
+        "designEvidence.feedback.expectedEffects"
+      ]
+    },
+    {
+      "ruleId": "UI-FB-006",
+      "componentIds": [
+        "combat-background",
+        "wide-center-status",
+        "wide-action-bar",
+        "narrow-center-status",
+        "narrow-action-bar"
+      ],
+      "profileIds": [
+        "wide",
+        "narrow"
+      ],
+      "stateIds": [
+        "default"
+      ],
+      "evidenceRequirements": [
+        "request intent and screen family match",
+        "visual target and reference policy review",
+        "primary intent trace"
+      ],
+      "nextArtifactFields": [
+        "intentContract",
+        "designEvidence.referenceImages",
+        "template"
+      ]
+    }
+  ],
+  "profileAvailability": {
+    "wide": {
+      "availableIntents": [
+        "cast-primary",
+        "cast-secondary",
+        "cast-utility",
+        "open-combat-menu"
+      ],
+      "omittedIntents": []
+    },
+    "narrow": {
+      "availableIntents": [
+        "cast-primary",
+        "cast-secondary",
+        "cast-utility",
+        "open-combat-menu"
+      ],
+      "omittedIntents": []
+    }
+  },
+  "artifactStatus": {
+    "assets": "planned",
+    "prefab": "planned",
+    "fixtureScene": "planned",
+    "gpuEvidence": "not-run",
+    "runtimeEvidence": "not-run"
+  },
+  "designEvidence": {
+    "schemaVersion": 2,
+    "sourceType": "iterated-from-existing-spec",
+    "brief": "原创竞技战斗 HUD：身份与目标在上方形成对向信息带，任务/警报位于侧栏，战斗状态居中，技能操作固定在安全区底部。",
+    "referenceImages": [],
+    "layoutDecisions": [
+      {
+        "decisionId": "combat-information-bands",
+        "profileId": "wide",
+        "decision": "player and target panels are separate top siblings; center status owns the combat objective axis",
+        "reason": "避免目标信息和技能操作争夺同一视觉层级。"
+      },
+      {
+        "decisionId": "combat-touch-reflow",
+        "profileId": "narrow",
+        "decision": "top panels and quest feed stack vertically while action bar becomes a four-column grid",
+        "reason": "保留触控尺寸并避免宽屏 HUD 等比缩小。"
+      },
+      {
+        "decisionId": "combat-action-ownership",
+        "profileId": "all",
+        "decision": "flow/grid parents own child geometry for action and quest groups",
+        "reason": "消除布局组与子节点绝对 bounds 的双重解释。"
+      }
+    ],
+    "conflictHypotheses": [
+      "long target names may collide with health bars",
+      "narrow quest rows may require a scroll fallback",
+      "loading and error copy must preserve the center status rectangle",
+      "action bar must remain inside safe-area inset"
+    ],
+    "feedback": {
+      "priorEvidenceBatch": "ES/UIEvidence/arena-combat-hud-proof-v1",
+      "ruleIds": [
+        "UI-FB-001",
+        "UI-FB-002",
+        "UI-FB-003",
+        "UI-FB-004",
+        "UI-FB-005",
+        "UI-FB-006"
+      ],
+      "changedFields": [
+        "screenId",
+        "prefabPath",
+        "fixtureScenePath",
+        "designEvidence.feedback"
+      ],
+      "expectedEffects": [
+        "the regenerated packet keeps the source design contract and asset hashes",
+        "wide and narrow geometry remains deterministic",
+        "the new evidence is bound to the regenerated spec hash"
+      ],
+      "falsificationChecks": [
+        "fresh wide and narrow default GPU captures",
+        "fresh six-state capture matrix",
+        "spec hash and generated-art build ID match",
+        "visual review at native resolution"
+      ]
+    },
+    "evidenceLedger": {
+      "static": "pending",
+      "materialization": "not-run",
+      "gpuVisual": "not-run",
+      "runtime": "not-run"
+    },
+    "assetDecisions": [
+      {
+        "role": "all declared image slots",
+        "status": "generated-procedural",
+        "reason": "增量迭代将原有 fallback 替换为可重复的原创视觉资源。"
+      }
+    ],
+    "assumptions": [
+      {
+        "statement": "本版本保留原 ScreenSpec 语义树，仅修订视觉资源、颜色角色和呈现层级。",
+        "confidence": 1.0
+      }
+    ]
+  }
+}

@@ -1,0 +1,854 @@
+{
+  "schemaVersion": 1,
+  "resolver": "es-ui-prefab-authoring/resolve_ui_layout_plan",
+  "resolverVersion": 1,
+  "specPath": "F:/aaProject/ESFrameWorkPublish/Assets/UI/Contracts/Iterations/arena-combat-hud-proof-v2/arena-combat-hud-proof-v2-iteration.screen-spec.v3.json",
+  "specSha256": "fe65692c91aa6c55adf4be74101da80c6ccb46aabd6fe611631c55df8b80747c",
+  "status": "passed",
+  "profiles": [
+    {
+      "profileId": "wide",
+      "resolution": [
+        1920,
+        1080
+      ],
+      "safeArea": {
+        "x": 38.4,
+        "y": 32.4,
+        "width": 1843.2,
+        "height": 1004.4
+      },
+      "nodes": [
+        {
+          "id": "combat-background",
+          "type": "frame",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ],
+          "resolvedRect": {
+            "x": 38.4,
+            "y": 32.4,
+            "width": 1843.2,
+            "height": 1004.4
+          },
+          "children": []
+        },
+        {
+          "id": "wide-player-panel",
+          "type": "frame",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.03,
+            0.04,
+            0.31,
+            0.22
+          ],
+          "resolvedRect": {
+            "x": 93.696,
+            "y": 72.576,
+            "width": 516.096,
+            "height": 180.792
+          },
+          "children": [
+            {
+              "id": "wide-player-avatar",
+              "type": "icon",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.03,
+                0.15,
+                0.2,
+                0.85
+              ],
+              "resolvedRect": {
+                "x": 109.179,
+                "y": 99.695,
+                "width": 87.736,
+                "height": 126.554
+              },
+              "children": []
+            },
+            {
+              "id": "wide-player-name",
+              "type": "text",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.25,
+                0.18,
+                0.92,
+                0.38
+              ],
+              "resolvedRect": {
+                "x": 222.72,
+                "y": 105.119,
+                "width": 345.784,
+                "height": 36.158
+              },
+              "children": []
+            },
+            {
+              "id": "wide-player-hp",
+              "type": "bar",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.25,
+                0.45,
+                0.92,
+                0.63
+              ],
+              "resolvedRect": {
+                "x": 222.72,
+                "y": 153.932,
+                "width": 345.784,
+                "height": 32.543
+              },
+              "children": []
+            },
+            {
+              "id": "wide-player-resource",
+              "type": "bar",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.25,
+                0.69,
+                0.92,
+                0.84
+              ],
+              "resolvedRect": {
+                "x": 222.72,
+                "y": 197.322,
+                "width": 345.784,
+                "height": 27.119
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "wide-target-panel",
+          "type": "target-panel",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.69,
+            0.04,
+            0.97,
+            0.22
+          ],
+          "resolvedRect": {
+            "x": 1310.208,
+            "y": 72.576,
+            "width": 516.096,
+            "height": 180.792
+          },
+          "children": [
+            {
+              "id": "wide-target-emblem",
+              "type": "icon",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.05,
+                0.15,
+                0.22,
+                0.85
+              ],
+              "resolvedRect": {
+                "x": 1336.013,
+                "y": 99.695,
+                "width": 87.736,
+                "height": 126.554
+              },
+              "children": []
+            },
+            {
+              "id": "wide-target-name",
+              "type": "text",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.28,
+                0.18,
+                0.94,
+                0.38
+              ],
+              "resolvedRect": {
+                "x": 1454.715,
+                "y": 105.119,
+                "width": 340.623,
+                "height": 36.158
+              },
+              "children": []
+            },
+            {
+              "id": "wide-target-hp",
+              "type": "bar",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.28,
+                0.48,
+                0.94,
+                0.66
+              ],
+              "resolvedRect": {
+                "x": 1454.715,
+                "y": 159.356,
+                "width": 340.623,
+                "height": 32.543
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "wide-quest-feed",
+          "type": "list",
+          "geometryOwner": "parent-layout-group",
+          "authoredBounds": [
+            0.03,
+            0.29,
+            0.29,
+            0.57
+          ],
+          "resolvedRect": {
+            "x": 93.696,
+            "y": 323.676,
+            "width": 479.232,
+            "height": 281.232
+          },
+          "children": [
+            {
+              "id": "wide-quest-one",
+              "type": "stat-row",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 103.696,
+                "y": 514.497,
+                "width": 459.232,
+                "height": 80.411
+              },
+              "children": []
+            },
+            {
+              "id": "wide-quest-two",
+              "type": "stat-row",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 103.696,
+                "y": 424.087,
+                "width": 459.232,
+                "height": 80.411
+              },
+              "children": []
+            },
+            {
+              "id": "wide-quest-three",
+              "type": "stat-row",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 103.696,
+                "y": 333.676,
+                "width": 459.232,
+                "height": 80.411
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "wide-center-status",
+          "type": "frame",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.34,
+            0.31,
+            0.66,
+            0.52
+          ],
+          "resolvedRect": {
+            "x": 665.088,
+            "y": 343.764,
+            "width": 589.824,
+            "height": 210.924
+          },
+          "children": [
+            {
+              "id": "wide-status-title",
+              "type": "text",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.12,
+                0.62,
+                0.88,
+                0.9
+              ],
+              "resolvedRect": {
+                "x": 735.867,
+                "y": 474.537,
+                "width": 448.266,
+                "height": 59.059
+              },
+              "children": []
+            },
+            {
+              "id": "wide-status-progress",
+              "type": "progress",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.12,
+                0.3,
+                0.88,
+                0.48
+              ],
+              "resolvedRect": {
+                "x": 735.867,
+                "y": 407.041,
+                "width": 448.266,
+                "height": 37.966
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "wide-action-bar",
+          "type": "frame",
+          "geometryOwner": "parent-layout-group",
+          "authoredBounds": [
+            0.34,
+            0.7,
+            0.97,
+            0.94
+          ],
+          "resolvedRect": {
+            "x": 665.088,
+            "y": 735.48,
+            "width": 1161.216,
+            "height": 241.056
+          },
+          "children": [
+            {
+              "id": "wide-skill-primary",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.23,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 677.088,
+                "y": 747.48,
+                "width": 273.804,
+                "height": 217.056
+              },
+              "children": []
+            },
+            {
+              "id": "wide-skill-secondary",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.46,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 964.892,
+                "y": 747.48,
+                "width": 273.804,
+                "height": 217.056
+              },
+              "children": []
+            },
+            {
+              "id": "wide-skill-utility",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.69,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 1252.696,
+                "y": 747.48,
+                "width": 273.804,
+                "height": 217.056
+              },
+              "children": []
+            },
+            {
+              "id": "wide-settings",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 1540.5,
+                "y": 747.48,
+                "width": 273.804,
+                "height": 217.056
+              },
+              "children": []
+            }
+          ]
+        }
+      ],
+      "issues": [],
+      "suggestions": []
+    },
+    {
+      "profileId": "narrow",
+      "resolution": [
+        1080,
+        1920
+      ],
+      "safeArea": {
+        "x": 43.2,
+        "y": 38.4,
+        "width": 993.6,
+        "height": 1824.0
+      },
+      "nodes": [
+        {
+          "id": "combat-background",
+          "type": "frame",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ],
+          "resolvedRect": {
+            "x": 43.2,
+            "y": 38.4,
+            "width": 993.6,
+            "height": 1824.0
+          },
+          "children": []
+        },
+        {
+          "id": "narrow-player-panel",
+          "type": "frame",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.04,
+            0.03,
+            0.96,
+            0.16
+          ],
+          "resolvedRect": {
+            "x": 82.944,
+            "y": 93.12,
+            "width": 914.112,
+            "height": 237.12
+          },
+          "children": [
+            {
+              "id": "narrow-player-avatar",
+              "type": "icon",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.03,
+                0.16,
+                0.14,
+                0.84
+              ],
+              "resolvedRect": {
+                "x": 110.367,
+                "y": 131.059,
+                "width": 100.552,
+                "height": 161.242
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-player-name",
+              "type": "text",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.17,
+                0.18,
+                0.62,
+                0.38
+              ],
+              "resolvedRect": {
+                "x": 238.343,
+                "y": 135.802,
+                "width": 411.35,
+                "height": 47.424
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-player-hp",
+              "type": "bar",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.17,
+                0.47,
+                0.94,
+                0.64
+              ],
+              "resolvedRect": {
+                "x": 238.343,
+                "y": 204.566,
+                "width": 703.866,
+                "height": 40.31
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-player-resource",
+              "type": "bar",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.17,
+                0.68,
+                0.94,
+                0.8
+              ],
+              "resolvedRect": {
+                "x": 238.343,
+                "y": 254.362,
+                "width": 703.866,
+                "height": 28.454
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "narrow-target-panel",
+          "type": "target-panel",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.04,
+            0.18,
+            0.96,
+            0.31
+          ],
+          "resolvedRect": {
+            "x": 82.944,
+            "y": 366.72,
+            "width": 914.112,
+            "height": 237.12
+          },
+          "children": [
+            {
+              "id": "narrow-target-emblem",
+              "type": "icon",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.05,
+                0.16,
+                0.17,
+                0.84
+              ],
+              "resolvedRect": {
+                "x": 128.65,
+                "y": 404.659,
+                "width": 109.693,
+                "height": 161.242
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-target-name",
+              "type": "text",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.2,
+                0.18,
+                0.94,
+                0.4
+              ],
+              "resolvedRect": {
+                "x": 265.766,
+                "y": 409.402,
+                "width": 676.443,
+                "height": 52.166
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-target-hp",
+              "type": "bar",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.2,
+                0.48,
+                0.94,
+                0.66
+              ],
+              "resolvedRect": {
+                "x": 265.766,
+                "y": 480.538,
+                "width": 676.443,
+                "height": 42.682
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "narrow-quest-feed",
+          "type": "list",
+          "geometryOwner": "parent-layout-group",
+          "authoredBounds": [
+            0.04,
+            0.34,
+            0.96,
+            0.5
+          ],
+          "resolvedRect": {
+            "x": 82.944,
+            "y": 658.56,
+            "width": 914.112,
+            "height": 291.84
+          },
+          "children": [
+            {
+              "id": "narrow-quest-one",
+              "type": "stat-row",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 92.944,
+                "y": 855.12,
+                "width": 894.112,
+                "height": 85.28
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-quest-two",
+              "type": "stat-row",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 92.944,
+                "y": 761.84,
+                "width": 894.112,
+                "height": 85.28
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-quest-three",
+              "type": "stat-row",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 92.944,
+                "y": 668.56,
+                "width": 894.112,
+                "height": 85.28
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "narrow-center-status",
+          "type": "frame",
+          "geometryOwner": "child-bounds",
+          "authoredBounds": [
+            0.04,
+            0.54,
+            0.96,
+            0.68
+          ],
+          "resolvedRect": {
+            "x": 82.944,
+            "y": 1023.36,
+            "width": 914.112,
+            "height": 255.36
+          },
+          "children": [
+            {
+              "id": "narrow-status-title",
+              "type": "text",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.1,
+                0.6,
+                0.9,
+                0.88
+              ],
+              "resolvedRect": {
+                "x": 174.355,
+                "y": 1176.576,
+                "width": 731.29,
+                "height": 71.501
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-status-progress",
+              "type": "progress",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.1,
+                0.28,
+                0.9,
+                0.46
+              ],
+              "resolvedRect": {
+                "x": 174.355,
+                "y": 1094.861,
+                "width": 731.29,
+                "height": 45.965
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "narrow-action-bar",
+          "type": "frame",
+          "geometryOwner": "parent-layout-group",
+          "authoredBounds": [
+            0.04,
+            0.73,
+            0.96,
+            0.95
+          ],
+          "resolvedRect": {
+            "x": 82.944,
+            "y": 1369.92,
+            "width": 914.112,
+            "height": 401.28
+          },
+          "children": [
+            {
+              "id": "narrow-skill-primary",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.25,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 94.944,
+                "y": 1381.92,
+                "width": 213.528,
+                "height": 377.28
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-skill-secondary",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.25,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 320.472,
+                "y": 1381.92,
+                "width": 213.528,
+                "height": 377.28
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-skill-utility",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.25,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 546.0,
+                "y": 1381.92,
+                "width": 213.528,
+                "height": 377.28
+              },
+              "children": []
+            },
+            {
+              "id": "narrow-settings",
+              "type": "button",
+              "geometryOwner": "child-bounds",
+              "authoredBounds": [
+                0.0,
+                0.0,
+                0.25,
+                1.0
+              ],
+              "resolvedRect": {
+                "x": 771.528,
+                "y": 1381.92,
+                "width": 213.528,
+                "height": 377.28
+              },
+              "children": []
+            }
+          ]
+        }
+      ],
+      "issues": [],
+      "suggestions": []
+    }
+  ],
+  "issues": [],
+  "suggestions": [],
+  "nonClaims": [
+    "Unity RectTransform values",
+    "Canvas layout rebuild order",
+    "GPU visual quality",
+    "runtime input behavior"
+  ]
+}

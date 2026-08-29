@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sourceSpec": "Assets/UI/Contracts/ArenaMobaLobby.screen-spec.v3.json",
+  "modes": {
+    "rebuild": {
+      "path": "Assets/UI/Contracts/arena-moba-lobby-v20-rebuild.screen-spec.v3.json",
+      "specSha256": "ce011a1a1f87faaaccdc3e3b746243bc58a8e8f3e79b670ab69752286aa2ff15",
+      "source": "design-blueprint"
+    },
+    "iterate": {
+      "path": "Assets/UI/Contracts/arena-moba-lobby-v20-iteration.screen-spec.v3.json",
+      "specSha256": "b76b4e551c01e3e288431f44ae5e1f8bb531b3758aaab92c94a2f20df9e0c450",
+      "source": "existing-screen-spec"
+    }
+  },
+  "deterministic": true
+}

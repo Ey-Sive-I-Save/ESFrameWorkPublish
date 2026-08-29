@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 3,
+  "screenId": "es-composite-shader-showcase",
+  "screenType": "system",
+  "template": "system",
+  "prefabPath": "Assets/UI/Prefabs/Generated/ESCompositeShaderShowcase.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/ESCompositeShaderShowcaseFixture.unity",
+  "tokens": {
+    "background": "#050A12",
+    "surface": "#0D1F2E",
+    "accent": "#48D8E8",
+    "text": "#EDF5FC",
+    "mutedText": "#9DB6C8",
+    "danger": "#E86C73",
+    "titleSize": 28,
+    "bodySize": 16,
+    "buttonSize": 14,
+    "spacing": 10,
+    "padding": 20
+  },
+  "profiles": [
+    {"id":"wide","width":1920,"height":1080,"orientation":"landscape"},
+    {"id":"narrow","width":1080,"height":1920,"orientation":"portrait"}
+  ],
+  "states": [
+    {"id":"default","fixture":"es-composite-shader-showcase/default"},
+    {"id":"selected","fixture":"es-composite-shader-showcase/selected"},
+    {"id":"disabled","fixture":"es-composite-shader-showcase/disabled"},
+    {"id":"loading","fixture":"es-composite-shader-showcase/loading"},
+    {"id":"error","fixture":"es-composite-shader-showcase/error"},
+    {"id":"long-content","fixture":"es-composite-shader-showcase/long-content"}
+  ],
+  "assets": [
+    {"id":"brand-mark","role":"es-brand-mark","source":"generated-placeholder","path":"ES/UIAssets/composite-shader-showcase/brand-mark.png","fallback":"brand-mark-missing"},
+    {"id":"preview-surface","role":"shader-preview-surface","source":"generated-placeholder","path":"ES/UIAssets/composite-shader-showcase/preview-surface.png","fallback":"preview-surface-missing"},
+    {"id":"effect-icon","role":"effect-icon","source":"generated-placeholder","path":"ES/UIAssets/composite-shader-showcase/effect-icon.png","fallback":"effect-icon-missing"}
+  ],
+  "components": [
+    {"id":"showcase-frame","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.02,0.02,0.98,0.98],"minSize":[720,520]},"content":{},"stateVariants":{"default":{},"selected":{}}},
+    {"id":"header","type":"frame","zone":"header","layout":{"mode":"stretch","bounds":[0.03,0.03,0.97,0.14],"minSize":[600,72]},"content":{},"children":[
+      {"id":"brand","type":"image","zone":"header","layout":{"mode":"absolute","bounds":[0.02,0.18,0.08,0.82],"minSize":[44,44]},"assetSlots":["brand-mark"],"content":{},"stateVariants":{"default":{}}},
+      {"id":"title","type":"text","zone":"header","layout":{"mode":"absolute","bounds":[0.10,0.12,0.72,0.55],"minSize":[240,28]},"content":{"text":"ES COMPOSITE SHADER LAB"},"stateVariants":{"default":{}}},
+      {"id":"subtitle","type":"text","zone":"header","layout":{"mode":"absolute","bounds":[0.10,0.52,0.72,0.88],"minSize":[240,22]},"content":{"text":"从效果目标出发，实时调整并验证 ES 材质"},"stateVariants":{"default":{}}},
+      {"id":"status","type":"status-badge","zone":"header","layout":{"mode":"absolute","bounds":[0.74,0.22,0.98,0.78],"minSize":[140,36]},"content":{"text":"LIVE PREVIEW"},"stateVariants":{"default":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"selected":{}}},
+    {"id":"intent-strip","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.03,0.16,0.97,0.24],"minSize":[600,48]},"content":{},"children":[
+      {"id":"intent-title","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.02,0.14,0.22,0.86],"minSize":[120,24]},"content":{"text":"当前工作流"},"stateVariants":{"default":{}}},
+      {"id":"intent-copy","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.24,0.14,0.72,0.86],"minSize":[220,24]},"content":{"text":"选择效果 · 调整参数 · 预览结果 · 回到基线"},"stateVariants":{"default":{}}},
+      {"id":"host-badge","type":"badge","zone":"content","layout":{"mode":"absolute","bounds":[0.74,0.14,0.98,0.86],"minSize":[120,24]},"content":{"text":"HOST · 自动识别"},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{}}},
+    {"id":"case-list","type":"list","zone":"content","layout":{"mode":"list","bounds":[0.03,0.27,0.34,0.86],"minSize":[220,260],"gap":8,"padding":[10,10,10,10]},"content":{},"children":[
+      {"id":"case-hit","type":"item-card","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[200,64]},"assetSlots":["effect-icon"],"content":{"text":"角色受击 / Shine"},"interaction":{"intent":"select-shader-case","targetSize":[200,64]},"stateVariants":{"default":{},"selected":{},"disabled":{}}},
+      {"id":"case-dissolve","type":"item-card","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[200,64]},"assetSlots":["effect-icon"],"content":{"text":"溶解揭示 / Dissolve"},"interaction":{"intent":"select-shader-case","targetSize":[200,64]},"stateVariants":{"default":{},"selected":{}}},
+      {"id":"case-hologram","type":"item-card","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[200,64]},"assetSlots":["effect-icon"],"content":{"text":"全息投影 / Hologram"},"interaction":{"intent":"select-shader-case","targetSize":[200,64]},"stateVariants":{"default":{},"selected":{}}}
+    ],"interaction":{"intent":"select-shader-case","targetSize":[220,64]},"stateVariants":{"default":{},"selected":{},"long-content":{}}},
+    {"id":"preview-panel","type":"detail-panel","zone":"content","layout":{"mode":"stretch","bounds":[0.37,0.27,0.97,0.52],"minSize":[360,180]},"content":{},"children":[
+      {"id":"preview-image","type":"image","zone":"content","layout":{"mode":"absolute","bounds":[0.03,0.12,0.32,0.88],"minSize":[120,100]},"assetSlots":["preview-surface"],"content":{},"stateVariants":{"default":{}}},
+      {"id":"preview-title","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.36,0.18,0.96,0.46],"minSize":[200,24]},"content":{"text":"当前效果"},"stateVariants":{"default":{}}},
+      {"id":"preview-copy","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.36,0.48,0.96,0.78],"minSize":[200,44]},"content":{"text":"选择案例后，这里显示宿主、质量档和可调参数。"},"stateVariants":{"default":{},"long-content":{}}},
+      {"id":"usage-guide","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.36,0.80,0.72,0.98],"minSize":[220,44]},"content":{"text":"使用：选择案例 → 调整参数 → 预览 → 应用/保存"},"stateVariants":{"default":{},"long-content":{}}},
+      {"id":"copy-usage","type":"button","zone":"content","layout":{"mode":"absolute","bounds":[0.75,0.80,0.96,0.98],"minSize":[90,44]},"content":{"text":"复制说明"},"interaction":{"intent":"copy-usage-guide","targetSize":[90,44]},"stateVariants":{"default":{}}},
+      {"id":"diagnostic-info","type":"text","zone":"content","layout":{"mode":"absolute","bounds":[0.03,0.90,0.32,0.98],"minSize":[120,20]},"content":{"text":"诊断：等待绑定"},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{},"selected":{},"loading":{},"error":{}}},
+    {"id":"preset-row","type":"tab-bar","zone":"content","layout":{"mode":"flow","bounds":[0.37,0.54,0.97,0.62],"minSize":[360,40],"gap":8},"content":{},"interaction":{"intent":"apply-preview-preset","targetSize":[360,44]},"children":[
+      {"id":"preset-subtle","type":"button","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[88,44]},"content":{"text":"Subtle"},"interaction":{"intent":"apply-preview-preset","targetSize":[88,44]},"stateVariants":{"default":{}}},
+      {"id":"preset-standard","type":"button","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[88,44]},"content":{"text":"Standard"},"interaction":{"intent":"apply-preview-preset","targetSize":[88,44]},"stateVariants":{"default":{},"selected":{}}},
+      {"id":"preset-hero","type":"button","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[88,44]},"content":{"text":"Hero"},"interaction":{"intent":"apply-preview-preset","targetSize":[88,44]},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{},"selected":{}}},
+    {"id":"controls","type":"list","zone":"content","layout":{"mode":"list","bounds":[0.37,0.64,0.97,0.84],"minSize":[360,120],"gap":6,"padding":[8,8,8,8]},"content":{},"interaction":{"intent":"adjust-result-parameter","targetSize":[360,120]},"children":[
+      {"id":"control-intensity","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"效果强度","value":0.65},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-speed","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"动画速度","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-03","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 03","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-04","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 04","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-05","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 05","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-06","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 06","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-07","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 07","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-08","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 08","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-09","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 09","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-10","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 10","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-11","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 11","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-12","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 12","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-13","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 13","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-14","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 14","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-15","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 15","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}},
+      {"id":"control-feature-16","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 16","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-17","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 17","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-18","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 18","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-19","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 19","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-20","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 20","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-21","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 21","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-22","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 22","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-23","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 23","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-24","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 24","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-25","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 25","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-26","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 26","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-27","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 27","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-28","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 28","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-29","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 29","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-30","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 30","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-31","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 31","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-32","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 32","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-33","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 33","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-34","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 34","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-35","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 35","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-36","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 36","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-37","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 37","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-38","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 38","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-39","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 39","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-40","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 40","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-41","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 41","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-42","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 42","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-43","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 43","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-44","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 44","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-45","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 45","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-46","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 46","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-47","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 47","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-48","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 48","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-49","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 49","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-50","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 50","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-51","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 51","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-52","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 52","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-53","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 53","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-54","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 54","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-55","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 55","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-56","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 56","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-57","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 57","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-58","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 58","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-59","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 59","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-60","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 60","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-61","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 61","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-62","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 62","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-63","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 63","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-feature-64","type":"slider","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"功能参数 64","value":0.5},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{}}}
+      ,{"id":"control-auto","type":"toggle","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"自动播放","value":1},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{},"disabled":{}}}
+      ,{"id":"control-solo","type":"toggle","zone":"content","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[320,44]},"content":{"text":"仅显示当前案例","value":0},"interaction":{"intent":"adjust-result-parameter","targetSize":[320,44]},"stateVariants":{"default":{},"disabled":{}}}
+    ],"stateVariants":{"default":{},"disabled":{}}},
+    {"id":"action-bar","type":"frame","zone":"action-bar","layout":{"mode":"flow","bounds":[0.37,0.86,0.97,0.94],"minSize":[360,46],"gap":8},"content":{},"children":[
+      {"id":"reset","type":"button","zone":"action-bar","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[110,44]},"content":{"text":"当前回正"},"interaction":{"intent":"reset-preview","targetSize":[110,44]},"stateVariants":{"default":{}}},
+      {"id":"save","type":"button","zone":"action-bar","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[120,44]},"content":{"text":"保存当前效果"},"interaction":{"intent":"save-material-variant","targetSize":[120,44]},"stateVariants":{"default":{}}},
+      {"id":"apply","type":"button","zone":"action-bar","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[140,44]},"content":{"text":"应用到选中对象"},"interaction":{"intent":"apply-material-preview","targetSize":[140,44]},"stateVariants":{"default":{},"disabled":{}}},
+      {"id":"camera-focus","type":"button","zone":"action-bar","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[76,44]},"content":{"text":"聚焦"},"interaction":{"intent":"focus-camera","targetSize":[76,44]},"stateVariants":{"default":{}}},
+      {"id":"camera-reset","type":"button","zone":"action-bar","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[76,44]},"content":{"text":"视图复位"},"interaction":{"intent":"reset-camera","targetSize":[76,44]},"stateVariants":{"default":{}}},
+      {"id":"run-diagnostics","type":"button","zone":"action-bar","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[90,44]},"content":{"text":"运行诊断"},"interaction":{"intent":"run-diagnostics","targetSize":[90,44]},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{},"disabled":{}}},
+    {"id":"scene-navigation","type":"tab-bar","zone":"navigation","layout":{"mode":"flow","bounds":[0.03,0.95,0.97,0.99],"minSize":[600,44],"gap":6},"content":{},"interaction":{"intent":"roam-scene","targetSize":[600,44]},"children":[
+      {"id":"nav-overview","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[90,44]},"content":{"text":"总览"},"interaction":{"intent":"roam-scene","targetSize":[90,44]},"stateVariants":{"default":{},"selected":{}}},
+      {"id":"nav-2d","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[90,44]},"content":{"text":"2D"},"interaction":{"intent":"roam-scene","targetSize":[90,44]},"stateVariants":{"default":{}}},
+      {"id":"nav-ui","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[90,44]},"content":{"text":"UI"},"interaction":{"intent":"roam-scene","targetSize":[90,44]},"stateVariants":{"default":{}}},
+      {"id":"nav-lit","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[90,44]},"content":{"text":"Lit"},"interaction":{"intent":"roam-scene","targetSize":[90,44]},"stateVariants":{"default":{}}},
+      {"id":"nav-vfx","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[90,44]},"content":{"text":"VFX"},"interaction":{"intent":"roam-scene","targetSize":[90,44]},"stateVariants":{"default":{}}}
+    ],"stateVariants":{"default":{},"selected":{}}}
+  ],
+  "behaviors": [
+    {"id":"shader-showcase.preview","inputs":["select-shader-case","adjust-result-parameter","apply-preview-preset","reset-preview","save-material-variant","apply-material-preview","focus-camera","reset-camera","copy-usage-guide","run-diagnostics","roam-scene"],"transitions":[]}
+  ],
+  "bindings": []
+}

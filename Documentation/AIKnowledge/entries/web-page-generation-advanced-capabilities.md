@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-page-generation-advanced-capabilities.v1`
 `Authority`: Current WebPageStudio source, contracts, validators and acceptance matrix
 `RouteKeys`: `web-page-generation`, `webpagestudio`, `static-html-css`, `dynamic-backend-contract`, `responsive`, `theme`, `forced-colors`, `seo`, `microdata`, `pwa`, `localization`, `freshness`, `evidence-boundary`
-`ContentHash`: `74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d`
+`ContentHash`: `2a741e734810eb02f302222812a001c215a34fdab86833fd11b0e3d2fe0d0930`
 `EvidenceLevel`: `S1`
 `StaleWhen`: WebPageStudio generator, request/generation/backend schema, validator behavior, acceptance matrix, or any SourceRef hash changes.
 

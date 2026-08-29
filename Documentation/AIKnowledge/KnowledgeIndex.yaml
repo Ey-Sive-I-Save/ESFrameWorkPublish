@@ -3264,7 +3264,7 @@ entries:
       - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
     authority: Current WebPageStudio source, contracts, validators and acceptance matrix
     evidenceLevel: S1
-    contentHash: 62343a8f2cf2bc2125a7a605d7adf0bba557458f6ad889fc3c59c58b4ed3b229
+    contentHash: 2a741e734810eb02f302222812a001c215a34fdab86833fd11b0e3d2fe0d0930
     staleWhen: WebPageStudio generator, request/generation/backend schema, validator behavior, acceptance matrix, or any SourceRef hash changes
   - knowledgeId: es.project.web-component-layout-route.v1
     file: entries/web-component-layout-route.md
@@ -3345,3 +3345,44 @@ entries:
     evidenceLevel: S1
     contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
     staleWhen: Manifest, offline package, CSP, deployment contract, or security validator changes
+  - knowledgeId: es.project.web-testing-observability.v1
+    file: entries/web-testing-observability.md
+    topic: Web 测试、观测与视觉证据
+    routeKeys: [web-testing, web-observability, web-visual-regression, web-evidence, web-quality]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator, es-observability-evidence]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-testing-observability.md
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioAccessibility.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1
+    authority: Current WebPageStudio validators and acceptance matrix
+    evidenceLevel: S1
+    contentHash: fe0de56438b8f3c38247482b31745fbfd028de7c409ce6f9742a79841ca9a9d2
+    staleWhen: Web validators, acceptance matrix, RunRecord, or output contracts change
+  - knowledgeId: es.project.web-ai-generation-repair.v1
+    file: entries/web-ai-generation-repair.md
+    topic: Web AI 生成、失败挖掘与修复
+    routeKeys: [web-ai-generation, web-prompt, web-repair, web-revision, web-knowledge]
+    relatedSkills: [es-prompt-engineering, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-ai-generation-repair.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1
+    authority: Current WebPageStudio Page IR and Kernel contracts
+    evidenceLevel: S1
+    contentHash: 6b12ae73746cb1d01158b2836a38366cb162c15aa31c74094eec83676bc4cf38
+    staleWhen: Page IR, generation request, compiler, RevisionPatch, or validation contracts change
+  - knowledgeId: es.project.web-open-source-calibration.v1
+    file: entries/web-open-source-calibration.md
+    topic: Web 开源框架与标准校准边界
+    routeKeys: [web-open-source, web-framework, web-standards, web-calibration, external-authority]
+    relatedSkills: [es-open-source-migration, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-open-source-calibration.md
+      - .agents/skills/es-open-source-migration/SKILL.md
+      - Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md
+    authority: ES external-source migration boundary and current WebPageStudio contract
+    evidenceLevel: S1
+    contentHash: 6b12ae73746cb1d01158b2836a38366cb162c15aa31c74094eec83676bc4cf38
+    staleWhen: External source lock, version, license, project contract, or migration mapping changes

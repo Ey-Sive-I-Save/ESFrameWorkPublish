@@ -3476,7 +3476,6 @@ namespace Scanner.Probes
         }
 
         [Test]
-        [Test]
         public void DuplicateInstanceViolationWakesOnlyAfterLifecycleResume()
         {
             const string presentationPath =

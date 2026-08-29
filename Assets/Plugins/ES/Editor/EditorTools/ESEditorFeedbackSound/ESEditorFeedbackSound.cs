@@ -63,6 +63,9 @@ namespace ES
             "ES.EditorFeedbackSound.CompilationSuccessVolume";
         private const string KindVolumeKeyPrefix = "ES.EditorFeedbackSound.Volume.";
         private const int MaxWavFileBytes = 4 * 1024 * 1024;
+        private const int MaxSchemeNameLength = 64;
+        private const int MaxSchemeCount = 256;
+        private const long MaxSchemeConfigBytes = 1024 * 1024;
         private const float MaxWavDurationSeconds = 2f;
         private const double SchemePreviewIntervalSeconds = 0.28d;
 
@@ -157,7 +160,15 @@ namespace ES
             {
                 if (pair.Value != null)
                 {
-                    UnityEngine.Object.DestroyImmediate(pair.Value);
+                    try
+                    {
+                        UnityEngine.Object.DestroyImmediate(pair.Value);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogWarning("[ES 编辑器音效] 单个 AudioClip 清理失败，继续清理其它缓存："
+                            + exception.Message);
+                    }
                 }
             }
 
@@ -167,10 +178,20 @@ namespace ES
             LastKindPlaybackAt.Clear();
             KindVolumeCache.Clear();
             schemeCacheValid = false;
-            StopSchemePreview();
-            DestroyPreviewHost();
-            StopNativePlayback();
-            ESEditorFeedbackSoundHook.ResetState();
+            SafeCleanup(StopSchemePreview, "停止试听");
+            SafeCleanup(DestroyPreviewHost, "销毁预览宿主");
+            SafeCleanup(StopNativePlayback, "停止原生播放");
+            SafeCleanup(ESEditorFeedbackSoundHook.ResetState, "重置反馈 Hook");
+        }
+
+        private static void SafeCleanup(Action cleanup, string label)
+        {
+            try { cleanup?.Invoke(); }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ES 编辑器音效] " + label + "失败，已继续后续清理："
+                    + exception.Message);
+            }
         }
 
         public static bool Enabled
@@ -533,33 +554,50 @@ namespace ES
                 return;
             }
 
-            PlayInternal(SchemePreviewKinds[previewKindIndex], previewSchemeId);
-            previewKindIndex++;
-            nextSchemePreviewAt = now + SchemePreviewIntervalSeconds;
+            try
+            {
+                PlayInternal(SchemePreviewKinds[previewKindIndex], previewSchemeId);
+                previewKindIndex++;
+                nextSchemePreviewAt = now + SchemePreviewIntervalSeconds;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ES 编辑器音效] 方案试听失败，已停止试听调度：" + exception.Message);
+                StopSchemePreview();
+            }
         }
 
         public static IReadOnlyList<string> GetSchemeIds()
         {
             var result = new List<string>();
-            if (Directory.Exists(SchemeRoot))
+            try
             {
-                string[] directories = Directory.GetDirectories(SchemeRoot);
-                for (int i = 0; i < directories.Length; i++)
+                if (Directory.Exists(SchemeRoot))
                 {
-                    string name = Path.GetFileName(directories[i]);
-                    if (IsValidSchemeToken(name))
+                    foreach (string directory in Directory.EnumerateDirectories(SchemeRoot))
                     {
-                        result.Add(name);
+                        string name = Path.GetFileName(directory);
+                        if (IsValidSchemeToken(name))
+                        {
+                            result.Add(name);
+                        }
                     }
-                }
 
-                result.Sort(StringComparer.Ordinal);
-                int defaultIndex = result.IndexOf(DefaultScheme);
-                if (defaultIndex > 0)
-                {
-                    result.RemoveAt(defaultIndex);
-                    result.Insert(0, DefaultScheme);
+                    result.Sort(StringComparer.Ordinal);
+                    int defaultIndex = result.IndexOf(DefaultScheme);
+                    if (defaultIndex > 0)
+                    {
+                        result.RemoveAt(defaultIndex);
+                        result.Insert(0, DefaultScheme);
+                    }
+                    if (result.Count > MaxSchemeCount)
+                        result.RemoveRange(MaxSchemeCount, result.Count - MaxSchemeCount);
                 }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ES 编辑器音效] 音效方案目录扫描失败，已使用空列表：" + exception.Message);
+                result.Clear();
             }
 
             if (result.Count == 0)
@@ -1016,7 +1054,20 @@ namespace ES
                     return null;
                 }
 
-                byte[] bytes = File.ReadAllBytes(path);
+                int byteLength = checked((int)fileInfo.Length);
+                byte[] bytes = new byte[byteLength];
+                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    int offset = 0;
+                    while (offset < bytes.Length)
+                    {
+                        int read = stream.Read(bytes, offset, bytes.Length - offset);
+                        if (read <= 0) break;
+                        offset += read;
+                    }
+                    if (offset != bytes.Length)
+                        Array.Resize(ref bytes, offset);
+                }
                 if (bytes.Length < 44
                     || Encoding.ASCII.GetString(bytes, 0, 4) != "RIFF"
                     || Encoding.ASCII.GetString(bytes, 8, 4) != "WAVE")
@@ -1386,6 +1437,7 @@ namespace ES
         private static bool IsValidSchemeToken(string name)
         {
             if (string.IsNullOrWhiteSpace(name)
+                || name.Length > MaxSchemeNameLength
                 || name == "."
                 || name == "..")
             {
@@ -1414,14 +1466,13 @@ namespace ES
                 schemeId,
                 "scheme.json");
             SchemeConfig config = null;
-            if (!File.Exists(path))
-            {
-                SchemeConfigCache[schemeId] = null;
-                return null;
-            }
-
             try
             {
+                if (!File.Exists(path) || new FileInfo(path).Length > MaxSchemeConfigBytes)
+                {
+                    SchemeConfigCache[schemeId] = null;
+                    return null;
+                }
                 config = JsonUtility.FromJson<SchemeConfig>(File.ReadAllText(path));
             }
             catch (Exception)

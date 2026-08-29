@@ -386,6 +386,11 @@ namespace ES.Editor
 
         private void OnPreviewEditorUpdate()
         {
+            if (this == null)
+            {
+                EditorApplication.update -= OnPreviewEditorUpdate;
+                return;
+            }
             if (activeProviders.Count <= 0)
                 return;
 
@@ -427,7 +432,17 @@ namespace ES.Editor
             inactiveBuffer.Clear();
 
             if (wantsRepaint)
-                Repaint();
+            {
+                try
+                {
+                    Repaint();
+                }
+                catch (Exception exception)
+                {
+                    EditorApplication.update -= OnPreviewEditorUpdate;
+                    Debug.LogWarning("ES 预览编辑器重绘失败，已停止更新回调：" + exception.Message);
+                }
+            }
         }
 
         private static void SaveFoldoutIfChanged(string prefsKey, ref bool currentValue, bool newValue)

@@ -15,7 +15,7 @@
 
 命令类型：只读体检。
 默认改文件：否，补清理/节流需用户确认。
-风险等级：L1/L2。
+风险等级：L2。
 
 ## 必须先读
 
@@ -37,6 +37,19 @@ Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与�
 自定义标题栏必须声明 ESWindowActionHosts；缺少系统动作宿主时不得靠右上绝对定位或任意 Toolbar 猜测注入。
 ```
 
+## ContractCompleteness
+
+```yaml
+commandId: editor.reload.review
+writeMode: read-only
+cancellation: N/A (read-only; no external effect; stop before analysis)
+recovery: N/A (read-only; rerun from unchanged inputs; no rollback)
+validation: read-only checks only; no writes, runtime, Git, release, or external effects
+evidenceRef: source refs + SHA-256/content hash when available + read receipt; static evidence cannot claim Runtime
+actionBoundary: AIBrain/ABCD selects intent and route; this command only reviews and reports; Automation/ABCC execution is out of scope
+allowRoots: project files explicitly listed in 必须先读 and the contract's declared read-only targets only
+denyPaths: source writes, undeclared paths, Git/history, release, Runtime/Unity, external services; deny-overrides
+```
 ## 交付格式
 
 ```text

@@ -63,6 +63,11 @@ namespace ES
         public static bool Open(VisualElement anchor, EditorWindow hostWindow, string title,
             IReadOnlyList<Option> choices, string hint = null, Vector2? windowSize = null)
         {
+            if (openingPopup)
+            {
+                Debug.LogWarning("[ESCompactChoicePopup] 弹窗正在打开，已拒绝重入 Open。");
+                return false;
+            }
             if (!TryGetScreenAnchor(anchor, hostWindow, out Rect anchorRect))
             {
                 Debug.LogWarning("[ESCompactChoicePopup] 无法打开：锚点尚未加入有效的 EditorWindow 面板。");
@@ -92,6 +97,7 @@ namespace ES
             Option[] choiceSnapshot = new Option[choices.Count];
             for (int index = 0; index < choices.Count; index++)
                 choiceSnapshot[index] = choices[index];
+            openingPopup = true;
             if (activePopup != null)
             {
                 try
@@ -105,12 +111,15 @@ namespace ES
                     Debug.LogException(new InvalidOperationException(
                         "[ESCompactChoicePopup] 现有弹窗关闭失败，已拒绝创建第二个实例。",
                         closeException));
+                    openingPopup = false;
                     return false;
                 }
                 if (activePopup != null)
+                {
+                    openingPopup = false;
                     return false;
+                }
             }
-            openingPopup = true;
             ESCompactChoicePopup popup = null;
             try
             {
@@ -185,6 +194,11 @@ namespace ES
 
         public void CreateGUI()
         {
+            if (!configured)
+            {
+                Close();
+                return;
+            }
             ESWindowFoundation.BindTransient(this);
             focusSchedule?.Pause();
             focusSchedule = null;
@@ -250,44 +264,75 @@ namespace ES
                     keyboardIndex = index;
             }
             rootVisualElement.Add(list);
-            focusSchedule = rootVisualElement.schedule.Execute(FocusCurrent).ExecuteLater(25);
+            focusSchedule = rootVisualElement.schedule.Execute(FocusCurrent);
+            focusSchedule.ExecuteLater(25);
         }
 
         private void OnDisable()
         {
-            EditorApplication.delayCall -= CloseIfContextWasLost;
-            rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
-            focusSchedule?.Pause();
+            try { EditorApplication.delayCall -= CloseIfContextWasLost; }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { rootVisualElement?.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { focusSchedule?.Pause(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             focusSchedule = null;
-            hostRoot?.UnregisterCallback<DetachFromPanelEvent>(OnHostDetached);
+            try { hostRoot?.UnregisterCallback<DetachFromPanelEvent>(OnHostDetached); }
+            catch (Exception exception) { Debug.LogException(exception); }
             hostRoot = null;
             ReleaseHostInteractionHold();
             hostWindow = null;
-            ESWindowFoundation.Suspend(this);
-            configured = false;
-            selectionInProgress = false;
-            options = Array.Empty<Option>();
-            optionButtons.Clear();
-            if (ReferenceEquals(activePopup, this))
-                activePopup = null;
+            try { ESWindowFoundation.Suspend(this); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            finally
+            {
+                configured = false;
+                selectionInProgress = false;
+                options = Array.Empty<Option>();
+                optionButtons.Clear();
+                if (ReferenceEquals(activePopup, this))
+                    activePopup = null;
+            }
         }
 
         private void OnDestroy()
         {
-            ESWindowFoundation.Close(this);
+            try
+            {
+                ESWindowFoundation.Close(this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCompactChoicePopup] 销毁关闭协议失败，已阻止异常穿出编辑器回调。", exception));
+            }
         }
 
         private void CloseIfContextWasLost()
         {
             EditorApplication.delayCall -= CloseIfContextWasLost;
-            bool hostContextLost = hostWindow == null
-                || hostWindow.rootVisualElement == null
-                || hostWindow.rootVisualElement.panel == null
-                || (rootVisualElement != null
-                    && rootVisualElement.panel != null
-                    && !ReferenceEquals(rootVisualElement.panel, hostWindow.rootVisualElement.panel));
+            bool hostContextLost = !IsHostContextValid();
             if (this != null && (!configured || hostContextLost))
                 Close();
+        }
+
+        private bool IsHostContextValid()
+        {
+            if (!configured || hostWindow == null || hostRoot == null
+                || hostWindow.rootVisualElement == null || rootVisualElement == null)
+                return false;
+            try
+            {
+                return hostWindow.rootVisualElement.panel != null
+                    && rootVisualElement.panel != null
+                    && ReferenceEquals(rootVisualElement.panel, hostWindow.rootVisualElement.panel);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCompactChoicePopup] 宿主上下文校验失败，已按失效处理。", exception));
+                return false;
+            }
         }
 
         private void OnHostDetached(DetachFromPanelEvent evt)
@@ -315,6 +360,12 @@ namespace ES
 
         private void OnKeyDown(KeyDownEvent evt)
         {
+            if (!IsHostContextValid())
+            {
+                if (this != null) Close();
+                evt.StopImmediatePropagation();
+                return;
+            }
             if (evt.keyCode == KeyCode.Escape)
             {
                 Close();
@@ -350,6 +401,11 @@ namespace ES
         {
             if (selectionInProgress || index < 0 || index >= options.Count)
                 return;
+            if (!IsHostContextValid())
+            {
+                if (this != null) Close();
+                return;
+            }
             selectionInProgress = true;
             Option option = options[index];
             try { option.OnSelected?.Invoke(); }
@@ -378,6 +434,18 @@ namespace ES
                 return false;
             screenRect = new Rect(screen, new Vector2(Mathf.Max(1f, world.width),
                 Mathf.Max(1f, world.height)));
+            Rect hostBounds = hostWindow.position;
+            if (hostBounds.width > 0f && hostBounds.height > 0f)
+            {
+                screenRect.x = Mathf.Clamp(
+                    screenRect.x,
+                    hostBounds.x,
+                    Mathf.Max(hostBounds.x, hostBounds.xMax - screenRect.width));
+                screenRect.y = Mathf.Clamp(
+                    screenRect.y,
+                    hostBounds.y,
+                    Mathf.Max(hostBounds.y, hostBounds.yMax - screenRect.height));
+            }
             return true;
         }
 

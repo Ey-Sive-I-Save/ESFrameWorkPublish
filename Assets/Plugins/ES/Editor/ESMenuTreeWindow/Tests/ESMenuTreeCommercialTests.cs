@@ -280,6 +280,7 @@ namespace ES.Tests
 
     public sealed class ESMenuTreeCommercialTests
     {
+        private static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
         [Test]
         public void DefaultWindowIconsUseStableSemanticMappings()
         {
@@ -1270,34 +1271,29 @@ namespace ES.Tests
         [Test]
         public void PreviewCameraCreationReclaimsLocalObjectOnConfigurationFailure()
         {
-            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow", "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+            string path = Path.Combine(Application.dataPath, "..", "Scripts", "ESLogic", "Runtime", "EditorPreview", "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
-            int method = source.IndexOf("private void CreateCamera()", StringComparison.Ordinal);
+            int method = source.IndexOf("private void EnsureCamera()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(method, 0);
             string body = source.Substring(method, Math.Min(2200, source.Length - method));
             StringAssert.Contains("catch", body);
-            StringAssert.Contains("DestroyObject(cameraObject)", body);
-            StringAssert.Contains("cameraObject = null", body);
-            StringAssert.Contains("CameraSceneBound = false", body);
+            StringAssert.Contains("DestroyObject(created)", body);
+            StringAssert.Contains("ownership registration failed", body);
+            StringAssert.Contains("cameraObject = created", body);
         }
 
         [Test]
         public void PreviewObjectSceneMovesFailClosedAndVerifyDestination()
         {
-            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow", "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+            string path = Path.Combine(Application.dataPath, "..", "Scripts", "ESLogic", "Runtime", "EditorPreview", "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
-            int previewMove = source.IndexOf("public bool MoveToPreviewScene(GameObject obj)", StringComparison.Ordinal);
-            Assert.GreaterOrEqual(previewMove, 0);
-            string previewBody = source.Substring(previewMove, Math.Min(1000, source.Length - previewMove));
-            StringAssert.Contains("catch (Exception exception)", previewBody);
-            StringAssert.Contains("return false", previewBody);
-
-            int activeMove = source.IndexOf("private static bool MoveToActiveScene(GameObject obj)", StringComparison.Ordinal);
-            Assert.GreaterOrEqual(activeMove, 0);
-            string activeBody = source.Substring(activeMove, Math.Min(900, source.Length - activeMove));
-            StringAssert.Contains("return obj.scene == activeScene", activeBody);
-            StringAssert.Contains("if (!movedBeforeHide)", source);
-            StringAssert.Contains("scene move did not reach the required destination", source);
+            int contextMove = source.IndexOf("private bool MoveToContextScene(GameObject obj)", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(contextMove, 0);
+            string moveBody = source.Substring(contextMove, Math.Min(1300, source.Length - contextMove));
+            StringAssert.Contains("SceneManager.MoveGameObjectToScene(obj, previewScene)", moveBody);
+            StringAssert.Contains("return obj.scene == previewScene", moveBody);
+            StringAssert.Contains("return sceneMode != ESEditorPreviewSceneMode.PreviewScene", moveBody);
+            StringAssert.Contains("if (!moved)", source);
         }
 
         [Test]
@@ -2332,6 +2328,18 @@ namespace ES.Tests
         }
 
         [Test]
+        public void UiFixtureCaptureUsesSharedPreviewFoundation()
+        {
+            string path = Path.Combine(Application.dataPath, "..", "Scripts", "ESLogic", "Editor", "UI", "ESUIGameScreenMaterializer.cs");
+            string source = File.ReadAllText(path, new UTF8Encoding(false, true));
+            StringAssert.Contains("new ESEditorPreviewRenderContext(", source);
+            StringAssert.Contains("ESEditorPreviewUtility.CreateRenderTexture(", source);
+            StringAssert.Contains("ESEditorPreviewUtility.SetLayerRecursive", source);
+            StringAssert.DoesNotContain("new RenderTexture(", source);
+            StringAssert.DoesNotContain("new GameObject(\"UI_Fixture_Camera\"", source);
+        }
+
+        [Test]
         public void WorldContentHashSnapshotsAlwaysReleaseTemporaryAssets()
         {
             string graphPath = Path.Combine(Application.dataPath, "..", "Scripts", "ESLogic", "Editor", "World", "ESWorldDialogueAuthoringUtility.cs");
@@ -3115,7 +3123,7 @@ namespace ES.Tests
             StringAssert.Contains("settings.target == null", windowSource);
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(settings)", windowSource);
             int apply = windowSource.IndexOf("serializedSettings.ApplyModifiedProperties()", StringComparison.Ordinal);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", windowSource.Substring(apply, Math.Min(320, windowSource.Length - apply)));
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", windowSource.Substring(apply, Math.Min(320, windowSource.Length - apply)));
             StringAssert.Contains("Undo.RegisterCreatedObjectUndo(settings, \"创建远端发布配置\")", settingsSource);
         }
 
@@ -3134,7 +3142,7 @@ namespace ES.Tests
             int scopedSave = source.IndexOf("AssetDatabase.SaveAssetIfDirty(targetPlan)", targetPlan, StringComparison.Ordinal);
             Assert.GreaterOrEqual(targetPlan, 0);
             Assert.GreaterOrEqual(scopedSave, 0);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source.Substring(targetPlan, Math.Min(260, source.Length - targetPlan)));
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source.Substring(targetPlan, Math.Min(260, source.Length - targetPlan)));
         }
 
         [Test]
@@ -3213,7 +3221,7 @@ namespace ES.Tests
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(skill);", source);
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(targetGroup);", source);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source);
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source);
         }
 
         [Test]
@@ -3229,7 +3237,7 @@ namespace ES.Tests
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
             StringAssert.Contains("AssetDatabase.CreateAsset(asset, path);", source);
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(asset);", source);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source);
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source);
         }
 
         [Test]
@@ -3248,7 +3256,7 @@ namespace ES.Tests
             StringAssert.Contains("focusAfterOpenSchedule?.Pause();", source);
             StringAssert.Contains("rebuildSchedule?.Pause();", source);
             StringAssert.Contains("private void ScheduleRebuild()", source);
-            Assert.DoesNotContain("schedule.Execute(Rebuild).StartingIn(1);", source);
+            StringAssert.DoesNotContain("schedule.Execute(Rebuild).StartingIn(1);", source);
         }
 
         [Test]
@@ -3270,7 +3278,7 @@ namespace ES.Tests
             {
                 string source = File.ReadAllText(paths[i], new UTF8Encoding(false, true));
                 StringAssert.Contains(required[i], source);
-                Assert.DoesNotContain("AssetDatabase.SaveAssets();", source);
+                StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source);
             }
         }
 
@@ -3289,7 +3297,7 @@ namespace ES.Tests
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(state.bake);", source);
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(bake);", source);
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(stateMachineConfig);", source);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source);
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source);
         }
 
         [Test]
@@ -3311,7 +3319,7 @@ namespace ES.Tests
             {
                 string source = File.ReadAllText(paths[i], new UTF8Encoding(false, true));
                 StringAssert.Contains(required[i], source);
-                Assert.DoesNotContain("AssetDatabase.SaveAssets();", source);
+                StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source);
             }
         }
 
@@ -3330,7 +3338,7 @@ namespace ES.Tests
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(data);", source);
             StringAssert.Contains("AssetDatabase.SaveAssetIfDirty(analysis);", source);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source);
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source);
         }
 
         [Test]
@@ -3348,7 +3356,7 @@ namespace ES.Tests
             int scopedSave = source.IndexOf("AssetDatabase.SaveAssetIfDirty(theme)", restore, StringComparison.Ordinal);
             Assert.GreaterOrEqual(restore, 0);
             Assert.GreaterOrEqual(scopedSave, 0);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source.Substring(restore, Math.Min(260, source.Length - restore)));
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source.Substring(restore, Math.Min(260, source.Length - restore)));
         }
 
         [Test]
@@ -3425,7 +3433,7 @@ namespace ES.Tests
             int typeAssets = source.IndexOf("private static void AddTypeAssetEntries", StringComparison.Ordinal);
             Assert.GreaterOrEqual(fixedAssets, 0);
             Assert.GreaterOrEqual(typeAssets, 0);
-            Assert.DoesNotContain("File.Exists(path)", source.Substring(fixedAssets, typeAssets - fixedAssets));
+            StringAssert.DoesNotContain("File.Exists(path)", source.Substring(fixedAssets, typeAssets - fixedAssets));
         }
 
         [Test]
@@ -3580,8 +3588,8 @@ namespace ES.Tests
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
             StringAssert.Contains("catch (System.Exception exception)", source);
             StringAssert.Contains("Object.DestroyImmediate(instance)", source);
-            StringAssert.Contains("EditorSceneManager.ClosePreviewScene(scene)", source);
-            StringAssert.Contains("scene = default(Scene);", source);
+            StringAssert.Contains("renderContext.Dispose()", source);
+            StringAssert.Contains("renderContext.PreviewScene", source);
         }
 
         [Test]
@@ -5025,7 +5033,7 @@ namespace ES.Tests
             int scopedSave = source.IndexOf("AssetDatabase.SaveAssetIfDirty(globalData)", saveMethod, StringComparison.Ordinal);
             Assert.GreaterOrEqual(saveMethod, 0);
             Assert.GreaterOrEqual(scopedSave, 0);
-            Assert.DoesNotContain("AssetDatabase.SaveAssets();", source.Substring(saveMethod, Math.Min(360, source.Length - saveMethod)));
+            StringAssert.DoesNotContain("AssetDatabase.SaveAssets();", source.Substring(saveMethod, Math.Min(360, source.Length - saveMethod)));
         }
 
         [Test]
@@ -10201,18 +10209,29 @@ namespace ES.Tests
             Assert.IsNotNull(audioPlayer.GetField("previewContext", BindingFlags.Instance | BindingFlags.NonPublic));
             Assert.IsNull(audioPlayer.GetField("runtimeAudioModule", BindingFlags.Instance | BindingFlags.NonPublic));
 
-            Type context = typeof(ESAssetPackagePreviewSceneContext);
-            Assert.IsNotNull(context.GetProperty("OwnsPreviewAudioListener", BindingFlags.Instance | BindingFlags.Public));
+            Type context = typeof(ESAssetPackagePreviewSession);
             Assert.IsNotNull(context.GetProperty("AudioListenerOrigin", BindingFlags.Instance | BindingFlags.Public));
             Assert.IsNotNull(context.GetProperty("AudioListenerRotation", BindingFlags.Instance | BindingFlags.Public));
-            Assert.IsNotNull(context.GetField("sharedPreviewAudioListener", BindingFlags.Static | BindingFlags.NonPublic));
-            Assert.IsNotNull(context.GetField("sharedPreviewAudioUsers", BindingFlags.Static | BindingFlags.NonPublic));
-            Assert.IsNotNull(context.GetField("sharedPreviewAudioPlaying", BindingFlags.Static | BindingFlags.NonPublic));
             Assert.IsNotNull(context.GetMethod("SetPreviewAudioListenerPlaying", BindingFlags.Instance | BindingFlags.Public));
             Assert.IsNotNull(context.GetMethod("GetAudioListenerDescription", BindingFlags.Instance | BindingFlags.Public));
             Assert.IsNotNull(audioPlayer.GetMethod("RegisterTick", BindingFlags.Instance | BindingFlags.NonPublic));
             Assert.IsNotNull(audioPlayer.GetMethod("UnregisterTick", BindingFlags.Instance | BindingFlags.NonPublic));
             Assert.IsNotNull(audioPlayer.GetMethod("DrawDiagnostics", BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        [Test]
+        public void PreviewEnhancerQualityMappingKeepsLowEndFreeOfOptionalResources()
+        {
+            Assert.AreEqual(
+                ESEditorPreviewEnhancerSet.LowEnd,
+                ESEditorPreviewEnhancerBudgets.ForQuality(ESEditorPreviewQuality.Fast));
+            Assert.AreEqual(
+                ESEditorPreviewEnhancerSet.GroundPlane | ESEditorPreviewEnhancerSet.ScaleReference,
+                ESEditorPreviewEnhancerBudgets.ForQuality(ESEditorPreviewQuality.Balanced));
+            Assert.AreEqual(
+                ESEditorPreviewEnhancerSet.Full,
+                ESEditorPreviewEnhancerBudgets.ForQuality(ESEditorPreviewQuality.High));
+            Assert.AreEqual(0, (int)ESEditorPreviewEnhancerSet.LowEnd);
         }
 
         [Test]
@@ -11037,7 +11056,7 @@ namespace ES.Tests
         public void AssetPackagePreviewDisposeDoesNotShortCircuitOnChildFailure()
         {
             string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+                "AssetPackageBakeWindow", "ESAssetPackagePreviewSession.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true)).Replace("\r\n", "\n");
             int materialStart = source.IndexOf("private void DisposeInstance()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(materialStart, 0);
@@ -11072,7 +11091,8 @@ namespace ES.Tests
             string body = source.Substring(start, end - start);
             StringAssert.Contains("GameObject nextObject = null;", body);
             StringAssert.Contains("AudioSource nextSource = null;", body);
-            StringAssert.Contains("PreparePreviewAudioObject(nextObject);", body);
+            StringAssert.Contains("if (!previewContext.PreparePreviewAudioObject(nextObject))", body);
+            StringAssert.Contains("AssetPackage 音频预览对象未能进入公共 PreviewScene。", body);
             StringAssert.Contains("previewAudioObject = nextObject;", body);
             StringAssert.Contains("previewSource = nextSource;", body);
             StringAssert.Contains("DestroyImmediate(nextObject)", body);
@@ -11099,12 +11119,12 @@ namespace ES.Tests
         [Test]
         public void InvalidatedPreviewSceneRebuildsSceneBoundObjects()
         {
-            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+            string path = Path.Combine(Application.dataPath, "../Scripts", "ESLogic", "Runtime", "EditorPreview",
+                "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true)).Replace("\r\n", "\n");
             int ensureStart = source.IndexOf("public void Ensure()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(ensureStart, 0);
-            int ensureEnd = source.IndexOf("public void PreparePreviewObject", ensureStart, StringComparison.Ordinal);
+            int ensureEnd = source.IndexOf("public bool PreparePreviewObject", ensureStart, StringComparison.Ordinal);
             Assert.Greater(ensureEnd, ensureStart);
             string ensureBody = source.Substring(ensureStart, ensureEnd - ensureStart);
             StringAssert.Contains("Camera != null && !previewScene.IsValid()", ensureBody);
@@ -11124,8 +11144,8 @@ namespace ES.Tests
         [Test]
         public void RenderTextureCreationFailurePreservesPreviousTexture()
         {
-            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+            string path = Path.Combine(Application.dataPath, "..", "Scripts", "ESLogic", "Runtime",
+                "EditorPreview", "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true)).Replace("\r\n", "\n");
             int start = source.IndexOf("private void EnsureRenderTexture", StringComparison.Ordinal);
             Assert.GreaterOrEqual(start, 0);
@@ -11133,7 +11153,7 @@ namespace ES.Tests
             Assert.Greater(end, start);
             string body = source.Substring(start, end - start);
             int create = body.IndexOf("CreateRenderTexture(", StringComparison.Ordinal);
-            int nullCheck = body.IndexOf("if (created == null)", create, StringComparison.Ordinal);
+            int nullCheck = body.IndexOf("if (replacement == null)", create, StringComparison.Ordinal);
             int previous = body.IndexOf("RenderTexture previous = renderTexture;", nullCheck, StringComparison.Ordinal);
             Assert.GreaterOrEqual(create, 0);
             Assert.Greater(nullCheck, create);
@@ -11144,22 +11164,23 @@ namespace ES.Tests
         [Test]
         public void PreviewObjectPreparationRejectsUnmanagedObjects()
         {
-            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
-            string source = File.ReadAllText(path, new UTF8Encoding(false, true)).Replace("\r\n", "\n");
-            int lifecycle = source.IndexOf("private bool ApplyPreviewObjectLifecycle", StringComparison.Ordinal);
-            Assert.GreaterOrEqual(lifecycle, 0);
-            int lifecycleEnd = source.IndexOf("private HideFlags GetPreviewObjectHideFlags", lifecycle, StringComparison.Ordinal);
-            Assert.Greater(lifecycleEnd, lifecycle);
-            string lifecycleBody = source.Substring(lifecycle, lifecycleEnd - lifecycle);
-            StringAssert.Contains("return false;", lifecycleBody);
-            StringAssert.Contains("return movedAfterHide;", lifecycleBody);
-
-            int prepare = source.IndexOf("public bool PreparePreviewAudioObject", StringComparison.Ordinal);
+            string sessionPath = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
+                "AssetPackageBakeWindow", "ESAssetPackagePreviewSession.cs");
+            string session = File.ReadAllText(sessionPath, new UTF8Encoding(false, true)).Replace("\r\n", "\n");
+            int prepare = session.IndexOf("public bool PreparePreviewObject", StringComparison.Ordinal);
             Assert.GreaterOrEqual(prepare, 0);
-            int prepareEnd = source.IndexOf("public bool MoveToPreviewScene", prepare, StringComparison.Ordinal);
-            Assert.Greater(prepareEnd, prepare);
-            StringAssert.Contains("if (!PreparePreviewObject(obj))", source.Substring(prepare, prepareEnd - prepare));
+            int audioPrepare = session.IndexOf("public bool PreparePreviewAudioObject", prepare, StringComparison.Ordinal);
+            Assert.Greater(audioPrepare, prepare);
+            StringAssert.Contains("if (EditorUtility.IsPersistent(instance))", session.Substring(prepare, audioPrepare - prepare));
+            StringAssert.Contains("if (!PreparePreviewObject(instance))", session.Substring(audioPrepare, Math.Min(500, session.Length - audioPrepare)));
+
+            string corePath = Path.Combine(Application.dataPath, "..", "Scripts", "ESLogic", "Runtime", "EditorPreview",
+                "ESEditorPreviewCore.cs");
+            string core = File.ReadAllText(corePath, new UTF8Encoding(false, true)).Replace("\r\n", "\n");
+            int corePrepare = core.IndexOf("public bool PreparePreviewObject", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(corePrepare, 0);
+            StringAssert.Contains("EditorUtility.IsPersistent(obj)", core.Substring(corePrepare, Math.Min(1400, core.Length - corePrepare)));
+            StringAssert.Contains("return markerRegistered", core.Substring(corePrepare, Math.Min(1400, core.Length - corePrepare)));
         }
 
         [Test]
@@ -11246,11 +11267,12 @@ namespace ES.Tests
             int dispose = source.IndexOf("private void DisposePreview()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(dispose, 0);
             string body = source.Substring(dispose, Math.Min(1300, source.Length - dispose));
-            StringAssert.Contains("PreviewRenderUtility utility = previewUtility", body);
-            StringAssert.Contains("previewUtility = null", body);
+            StringAssert.Contains("ESEditorPreviewModelHandle model = previewModel", body);
+            StringAssert.Contains("previewModel = null", body);
             StringAssert.Contains("GameObject objectToDestroy = previewObject", body);
             StringAssert.Contains("previewObject = null", body);
-            StringAssert.Contains("utility.Cleanup();", body);
+            StringAssert.Contains("ESEditorPreviewRenderContext context = previewContext", body);
+            StringAssert.Contains("previewContext = null", body);
             StringAssert.Contains("catch (Exception exception)", body);
         }
 
@@ -12293,9 +12315,8 @@ namespace ES.Tests
             int method = source.IndexOf("public AudioListener EnsurePreviewAudioListener()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(method, 0);
             string body = source.Substring(method, Math.Min(1900, source.Length - method));
-            StringAssert.Contains("GameObject listenerObject = null", body);
-            StringAssert.Contains("DestroyObject(listenerObject)", body);
-            StringAssert.Contains("sharedPreviewAudioListener = null", body);
+            StringAssert.Contains("GameObject listenerObject = ESEditorPreviewUtility.CreatePreviewGameObject", body);
+            StringAssert.Contains("ESEditorPreviewUtility.DestroyObject(listenerObject)", body);
             StringAssert.Contains("throw;", body);
         }
 
@@ -12304,13 +12325,13 @@ namespace ES.Tests
         {
             string path = Path.Combine(
                 Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+                "AssetPackageBakeWindow", "ESAssetPackagePreviewSession.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
-            int method = source.IndexOf("public void Dispose()", source.IndexOf("class ESAssetPackagePreviewSceneContext", StringComparison.Ordinal), StringComparison.Ordinal);
+            int method = source.IndexOf("public void Dispose()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(method, 0);
             string body = source.Substring(method, Math.Min(1500, source.Length - method));
-            StringAssert.Contains("if (sharedPreviewAudioListener != null)", body);
-            StringAssert.Contains("sharedPreviewAudioListener = null", body);
+            StringAssert.Contains("if (audioListener != null)", body);
+            StringAssert.Contains("audioListener = null", body);
         }
 
         [Test]
@@ -12318,30 +12339,28 @@ namespace ES.Tests
         {
             string path = Path.Combine(
                 Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+                "Scripts", "ESLogic", "Runtime", "EditorPreview", "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
-            int dispose = source.IndexOf("public void Dispose()", source.IndexOf("class ESAssetPackagePreviewSceneContext", StringComparison.Ordinal), StringComparison.Ordinal);
+            int dispose = source.IndexOf("public void Dispose()", source.IndexOf("public sealed class ESEditorPreviewRenderContext", StringComparison.Ordinal), StringComparison.Ordinal);
             Assert.GreaterOrEqual(dispose, 0);
             string body = source.Substring(dispose, Math.Min(1900, source.Length - dispose));
-            StringAssert.Contains("catch (Exception exception)", body);
-            StringAssert.Contains("Debug.LogException(exception)", body);
-            StringAssert.Contains("finally", body);
-            StringAssert.Contains("previewScene = default", body);
+            StringAssert.Contains("PreviewScene", body);
+            StringAssert.Contains("IsDisposed", source);
         }
 
         [Test]
         public void PreviewRenderTextureCommitsMetadataOnlyAfterCreation()
         {
             string path = Path.Combine(
-                Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+                Application.dataPath, "..", "Scripts", "ESLogic", "Runtime", "EditorPreview",
+                "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
             int method = source.IndexOf("private void EnsureRenderTexture", StringComparison.Ordinal);
             Assert.GreaterOrEqual(method, 0);
-            string body = source.Substring(method, Math.Min(1200, source.Length - method));
-            StringAssert.Contains("RenderTexture created =", body);
-            StringAssert.Contains("if (created == null)", body);
-            StringAssert.Contains("renderTexture = created", body);
+            string body = source.Substring(method, Math.Min(1500, source.Length - method));
+            StringAssert.Contains("RenderTexture replacement =", body);
+            StringAssert.Contains("if (replacement == null)", body);
+            StringAssert.Contains("renderTexture = replacement", body);
         }
 
         [Test]
@@ -12390,12 +12409,19 @@ namespace ES.Tests
         public void PreviewRenderClampsInteractiveTextureDimensions()
         {
             string path = Path.Combine(
-                Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
-                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+                Application.dataPath, "Scripts", "ESLogic", "Runtime", "EditorPreview",
+                "ESEditorPreviewCore.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
-            StringAssert.Contains("private const int MaxRenderTextureSize = 4096", source);
-            StringAssert.Contains("Mathf.Clamp(Mathf.CeilToInt(rect.width * scale), 1, MaxRenderTextureSize)", source);
-            StringAssert.Contains("Mathf.Clamp(Mathf.CeilToInt(rect.height * scale), 1, MaxRenderTextureSize)", source);
+            StringAssert.Contains("private const int MaxRenderTextureDimension = 2048", source);
+            StringAssert.Contains("private static int QuantizeRenderDimension(float pixels)", source);
+            StringAssert.Contains("Mathf.CeilToInt(pixels)", source);
+            StringAssert.Contains("Mathf.Min(MaxRenderTextureDimension", source);
+            StringAssert.Contains("(quantized + 7) / 8 * 8", source);
+            StringAssert.Contains("GlobalPreviewRenderTextureBudgetBytes = 512L * 1024L * 1024L", source);
+            StringAssert.Contains("ApplyGlobalRenderTextureBudget(ref width, ref height, quality)", source);
+            StringAssert.Contains("CaptureDiagnosticsSnapshot()", source);
+            StringAssert.Contains("public bool HasEnhancer(ESEditorPreviewEnhancerSet enhancer)", source);
+            StringAssert.Contains("不会隐式分配资源", source);
         }
 
         [Test]
@@ -12412,6 +12438,69 @@ namespace ES.Tests
             StringAssert.Contains("!IsFinite(rect.height)", body);
             StringAssert.Contains("rect.width <= 0f || rect.height <= 0f", body);
             StringAssert.Contains("private static bool IsFinite(float value)", source);
+        }
+
+        [Test]
+        public void SpecializedPreviewWritersUseTheSharedRenderContext()
+        {
+            string shaderPath = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESShader", "ESCompositeShaderBakeWindow.cs");
+            string fontPath = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow", "FontToolsWindow", "Page_FontBuild.cs");
+            string shader = File.ReadAllText(shaderPath, new UTF8Encoding(false, true));
+            string font = File.ReadAllText(fontPath, new UTF8Encoding(false, true));
+            StringAssert.Contains("ESEditorPreviewRenderContext", shader);
+            StringAssert.Contains("context.Snapshot", shader);
+            StringAssert.DoesNotContain("PreviewRenderUtility", shader);
+            StringAssert.Contains("ESEditorPreviewRenderContext", font);
+            StringAssert.Contains("RenderCurrentCameraGUI", font);
+            StringAssert.DoesNotContain("PreviewRenderUtility", font);
+        }
+
+        [Test]
+        public void ProductionPreviewPathsDoNotInstantiateLegacyUtility()
+        {
+            string[] roots =
+            {
+                Path.Combine(Application.dataPath, "Scripts"),
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor")
+            };
+            foreach (string root in roots)
+            {
+                if (!Directory.Exists(root))
+                    continue;
+                foreach (string file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+                {
+                    if (file.IndexOf(Path.DirectorySeparatorChar + "Tests" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) >= 0)
+                        continue;
+                    string source = File.ReadAllText(file, new UTF8Encoding(false, true));
+                    Assert.Less(source.IndexOf("PreviewRenderUtility", StringComparison.Ordinal), 0,
+                        "生产预览路径仍包含旧 PreviewRenderUtility：" + file);
+                }
+            }
+        }
+
+        [Test]
+        public void AssetPackagePreviewDoesNotReintroducePrivateContext()
+        {
+            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
+                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+            string source = File.ReadAllText(path, new UTF8Encoding(false, true));
+            StringAssert.DoesNotContain("ESAssetPackagePreviewSceneContext", source);
+            StringAssert.Contains("ESAssetPackagePreviewSession", source);
+            StringAssert.Contains("ESEditorPreviewRenderContext", source);
+            StringAssert.Contains("if (!previewContext.PreparePreviewObject(previewInstance))", source);
+        }
+
+        [Test]
+        public void AssetPackageHostDisableUnsubscribesDelayedRepaint()
+        {
+            string path = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow",
+                "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
+            string source = File.ReadAllText(path, new UTF8Encoding(false, true));
+            int method = source.IndexOf("protected override void ESWindow_OnHostDisable()", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(method, 0);
+            string body = source.Substring(method, Math.Min(650, source.Length - method));
+            StringAssert.Contains("EditorApplication.delayCall -= RepaintAssetPackageWindow;", body);
+            StringAssert.Contains("ReleaseInstancePreviewResources();", body);
         }
 
         [Test]
@@ -12499,7 +12588,7 @@ namespace ES.Tests
             string body = source.Substring(method, Math.Min(2600, source.Length - method));
             StringAssert.Contains("DestroyImmediate(instance)", body);
             StringAssert.Contains("utility?.Cleanup();", body);
-            Assert.GreaterOrEqual(Regex.Matches(body, "catch \(Exception exception\)").Count, 2);
+            Assert.GreaterOrEqual(Regex.Matches(body, @"catch \(Exception exception\)").Count, 2);
         }
         [Test]
         public void CompactEditDrawersRecordUndoBeforeOpeningEditorWindow()
@@ -12568,8 +12657,9 @@ namespace ES.Tests
             int method = source.IndexOf("TryInstantiateRegisteredPrefab", StringComparison.Ordinal);
             Assert.GreaterOrEqual(method, 0);
             string body = source.Substring(method, Math.Min(2600, source.Length - method));
-            StringAssert.Contains("bool openedHere = !scene.IsValid();", body);
-            StringAssert.Contains("PrefabUtility.InstantiatePrefab(prefab, scene)", body);
+            StringAssert.Contains("bool openedHere = !IsOpen;", body);
+            StringAssert.Contains("PrefabUtility.InstantiatePrefab(prefab)", body);
+            StringAssert.Contains("SceneManager.MoveGameObjectToScene(instance, renderContext.PreviewScene)", body);
             StringAssert.Contains("Object.DestroyImmediate(instance)", body);
             StringAssert.Contains("if (openedHere) Close();", body);
         }
@@ -12588,7 +12678,8 @@ namespace ES.Tests
             StringAssert.Contains("bool sceneClosed = true;", body);
             StringAssert.Contains("sceneClosed = false;", body);
             StringAssert.Contains("if (sceneClosed)", body);
-            StringAssert.Contains("scene = default(Scene);", body);
+            StringAssert.Contains("renderContext.Dispose();", body);
+            StringAssert.Contains("instances.Clear();", body);
         }
 
         [Test]
@@ -12706,19 +12797,464 @@ namespace ES.Tests
         }
 
         [Test]
+        public void WorkbenchDragCallbacksRejectEventsAfterDispose()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            foreach (string methodName in new[]
+            {
+                "OnDragUpdated", "OnDragPerform", "OnDragLeave", "OnDragExited",
+                "OnRootPointerCaptureOut", "OnRootFocusOut", "OnRootPointerCancel",
+                "OnRootDetachedFromPanel"
+            })
+            {
+                int method = source.IndexOf("private void " + methodName, StringComparison.Ordinal);
+                Assert.GreaterOrEqual(method, 0, methodName);
+                int brace = source.IndexOf('{', method);
+                int firstStatement = source.IndexOf("if (disposed)", brace, StringComparison.Ordinal);
+                Assert.GreaterOrEqual(firstStatement, brace, methodName);
+            }
+        }
+
+        [Test]
+        public void WorkbenchObjectFilteringIsNullSafeForProviderFields()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int rebuild = source.IndexOf("private void RebuildObjectList", StringComparison.Ordinal);
+            int buildTabs = source.IndexOf("BuildContentKindTabs(source)", rebuild, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(rebuild, 0);
+            Assert.Greater(buildTabs, rebuild);
+            string body = source.Substring(rebuild, buildTabs - rebuild);
+            foreach (string field in new[]
+            {
+                "DisplayName", "BaseObjectId", "Category", "ContentKindDisplayName", "Subtitle"
+            })
+            {
+                StringAssert.Contains("item." + field + " ?? string.Empty", body, field);
+            }
+            StringAssert.Contains("string category = item.Category ?? string.Empty;", source);
+        }
+
+        [Test]
+        public void WorkbenchExternalDragBatchIsBoundedAndSanitized()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("MaximumExternalDragBatchItems = 256", source);
+            int resolve = source.IndexOf("private IReadOnlyList<ESWorkbenchObjectDescriptor> ResolveDragBatch()", StringComparison.Ordinal);
+            int next = source.IndexOf("private void NoteExternalDragSignal", resolve, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(resolve, 0);
+            Assert.Greater(next, resolve);
+            string body = source.Substring(resolve, next - resolve);
+            StringAssert.Contains("Mathf.Min(internalBatch.Count, MaximumExternalDragBatchItems)", body);
+            StringAssert.Contains("item != null && item.CanDrag", body);
+            StringAssert.Contains("Mathf.Min(references.Length, MaximumExternalDragBatchItems)", body);
+        }
+
+        [Test]
+        public void WorkbenchInternalDragPayloadRequiresCurrentContentOwnership()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int resolve = source.IndexOf("private ESWorkbenchObjectDescriptor ResolveDragItem()", StringComparison.Ordinal);
+            int next = source.IndexOf("private IReadOnlyList<ESWorkbenchObjectDescriptor> ResolveDragBatch()", resolve, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(resolve, 0);
+            Assert.Greater(next, resolve);
+            StringAssert.Contains("IsCurrentContentDescriptor(internalItem)", source.Substring(resolve, next - resolve));
+            int helper = source.IndexOf("private bool IsCurrentContentDescriptor", next, StringComparison.Ordinal);
+            Assert.Greater(helper, next);
+            string body = source.Substring(helper, Math.Min(700, source.Length - helper));
+            StringAssert.Contains("contentSourceById.ContainsKey(item.BaseObjectId)", body);
+            StringAssert.Contains("string.IsNullOrWhiteSpace(item.BaseObjectId)", body);
+        }
+
+        [Test]
+        public void WorkbenchPopupOwnerCheckFailsClosedOnFoundationErrors()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int helper = source.IndexOf("private bool IsOwnerContextValid()", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(helper, 0);
+            string body = source.Substring(helper, Math.Min(900, source.Length - helper));
+            StringAssert.Contains("ESWindowFoundation.IsBound(ownerWindow)", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("按宿主失效处理", body);
+            StringAssert.Contains("return false;", body);
+        }
+
+        [Test]
+        public void WorkbenchUsagePersistenceCannotBreakAuthoringActions()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchAuthoringContracts.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int store = source.IndexOf("internal sealed class ESWorkbenchContentUsageStore", StringComparison.Ordinal);
+            int descriptor = source.IndexOf("public sealed class ESWorkbenchObjectDescriptor", store, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(store, 0);
+            Assert.Greater(descriptor, store);
+            string body = source.Substring(store, descriptor - store);
+            StringAssert.Contains("if (string.IsNullOrWhiteSpace(objectId))", body);
+            StringAssert.Contains("TrySave();", body);
+            StringAssert.Contains("private void TrySave()", body);
+            StringAssert.Contains("内容使用记录保存失败", body);
+        }
+
+        [Test]
+        public void WorkbenchContentScopeFilterFailsClosedForMissingUsageIdentity()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int method = source.IndexOf("private static bool MatchesContentScope", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(method, 0);
+            string body = source.Substring(method, Math.Min(700, source.Length - method));
+            StringAssert.Contains("usage == null", body);
+            StringAssert.Contains("string.IsNullOrWhiteSpace(item.BaseObjectId)", body);
+            StringAssert.Contains("return false;", body);
+        }
+
+        [Test]
+        public void WorkbenchObjectSortingCommitsVisibleListTransactionally()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int rebuild = source.IndexOf("private void RebuildObjectList", StringComparison.Ordinal);
+            int tabs = source.IndexOf("BuildContentKindTabs(source)", rebuild, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(rebuild, 0);
+            Assert.Greater(tabs, rebuild);
+            string body = source.Substring(rebuild, tabs - rebuild);
+            StringAssert.Contains("var nextVisibleObjects = new List<ESWorkbenchObjectDescriptor>();", body);
+            StringAssert.Contains("nextVisibleObjects.AddRange(filtered);", body);
+            StringAssert.Contains("对象排序/过滤失败，已保留当前可见列表", body);
+            StringAssert.Contains("visibleObjects.Clear();", body);
+            StringAssert.Contains("visibleObjects.AddRange(nextVisibleObjects);", body);
+        }
+
+        [Test]
+        public void WorkbenchThumbnailProviderFailsClosedToFallback()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int method = source.IndexOf("private Texture ResolveContentThumbnail", StringComparison.Ordinal);
+            int next = source.IndexOf("private Texture2D ResolveGeneratedContentThumbnail", method, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(method, 0);
+            Assert.Greater(next, method);
+            string body = source.Substring(method, next - method);
+            StringAssert.Contains("AssetPreview.GetAssetPreview", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("已使用降级图标", body);
+            StringAssert.Contains("return entry.fallback ?? ResolveGeneratedContentThumbnail(item);", body);
+        }
+
+        [Test]
+        public void WorkbenchThumbnailRefreshIsolatesAssetPreviewFailures()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int poll = source.IndexOf("private void PollContentThumbnails", StringComparison.Ordinal);
+            int next = source.IndexOf("private static string ResolveContentKindShortName", poll, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(poll, 0);
+            Assert.Greater(next, poll);
+            string body = source.Substring(poll, next - poll);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("已停止该条目重试", body);
+            StringAssert.Contains("objectList?.RefreshItems()", body);
+            StringAssert.Contains("objectGridList?.RefreshItems()", body);
+        }
+
+        [Test]
+        public void WorkbenchHierarchyProviderFailurePreservesPreviousList()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int method = source.IndexOf("private void RebuildHierarchyList()", StringComparison.Ordinal);
+            int reset = source.IndexOf("visibleHierarchy.Clear();", method, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(method, 0);
+            Assert.Greater(reset, method);
+            string prefix = source.Substring(method, reset - method);
+            StringAssert.Contains("source = getHierarchy?.Invoke();", prefix);
+            StringAssert.Contains("catch (Exception exception)", prefix);
+            StringAssert.Contains("已保留上一次有效列表", prefix);
+            StringAssert.Contains("return;", prefix);
+        }
+
+        [Test]
+        public void WorkbenchFilterCallbacksRejectEventsAfterDispose()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int kind = source.IndexOf("private void SetContentKind", StringComparison.Ordinal);
+            int category = source.IndexOf("private void SetCategory", kind, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(kind, 0);
+            Assert.Greater(category, kind);
+            StringAssert.Contains("if (disposed)", source.Substring(kind, category - kind));
+            int rebuild = source.IndexOf("private void RebuildHierarchyList", category, StringComparison.Ordinal);
+            StringAssert.Contains("if (disposed)", source.Substring(kind, category - kind));
+            Assert.Greater(rebuild, category);
+        }
+
+        [Test]
+        public void WorkbenchHierarchyIndexRejectsMissingIdsAndNullSearchFields()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int rebuild = source.IndexOf("private void RebuildHierarchyList", StringComparison.Ordinal);
+            int filter = source.IndexOf("private HashSet<string> BuildHierarchyFilter", rebuild, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(rebuild, 0);
+            Assert.Greater(filter, rebuild);
+            StringAssert.Contains("!string.IsNullOrWhiteSpace(item.ItemId)", source.Substring(rebuild, filter - rebuild));
+            string body = source.Substring(filter, Math.Min(950, source.Length - filter));
+            StringAssert.Contains("item.DisplayName ?? string.Empty", body);
+            StringAssert.Contains("item.Kind ?? string.Empty", body);
+        }
+
+        [Test]
+        public void WorkbenchHierarchyMutationCallbacksRejectEventsAfterDispose()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            foreach (string methodName in new[]
+            {
+                "ToggleHierarchyVisibility", "ToggleHierarchyLock", "ToggleHierarchy",
+                "ExpandAllHierarchy", "CollapseHierarchy"
+            })
+            {
+                int method = source.IndexOf("private " + (methodName == "ToggleHierarchyVisibility" || methodName == "ToggleHierarchyLock" || methodName == "ToggleHierarchy" ? "void " : "void ") + methodName, StringComparison.Ordinal);
+                Assert.GreaterOrEqual(method, 0, methodName);
+                int brace = source.IndexOf('{', method);
+                Assert.GreaterOrEqual(source.IndexOf("disposed", brace, StringComparison.Ordinal), brace, methodName);
+            }
+        }
+
+        [Test]
+        public void WorkbenchViewportHierarchyProviderFailsClosed()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int method = source.IndexOf("private IReadOnlyList<ESWorkbenchHierarchyDescriptor> GetVisibleViewportHierarchy", StringComparison.Ordinal);
+            int next = source.IndexOf("private int ResolveHierarchyDepth", method, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(method, 0);
+            Assert.Greater(next, method);
+            string body = source.Substring(method, next - method);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("已回退到最近有效快照", body);
+            StringAssert.Contains("hierarchyById.Values", body);
+            StringAssert.Contains("IsHierarchyVisible(item.ItemId)", body);
+        }
+
+        [Test]
+        public void WorkbenchHierarchySortAndRecursionFailClosedForInvalidEntries()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int compare = source.IndexOf("private static int CompareHierarchy", StringComparison.Ordinal);
+            int append = source.IndexOf("private void AppendVisibleHierarchy", compare, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(compare, 0);
+            Assert.Greater(append, compare);
+            string compareBody = source.Substring(compare, append - compare);
+            StringAssert.Contains("if (left == null) return 1;", compareBody);
+            StringAssert.Contains("left.ItemId ?? string.Empty", compareBody);
+            int next = source.IndexOf("private VisualElement CreateHierarchyRow", append, StringComparison.Ordinal);
+            string appendBody = source.Substring(append, next - append);
+            StringAssert.Contains("string.IsNullOrWhiteSpace(item.ItemId)", appendBody);
+            StringAssert.Contains("path == null", appendBody);
+        }
+
+        [Test]
+        public void WorkbenchContentKindTabsHaveStableLabelFallback()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int tabs = source.IndexOf("private void BuildContentKindTabs", StringComparison.Ordinal);
+            int next = source.IndexOf("private static int ResolveContentKindOrder", tabs, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(tabs, 0);
+            Assert.Greater(next, tabs);
+            string body = source.Substring(tabs, next - tabs);
+            StringAssert.Contains("string.IsNullOrWhiteSpace(sample.ContentKindDisplayName)", body);
+            StringAssert.Contains("group.Key.ToString()", body);
+        }
+
+        [Test]
+        public void WorkbenchContentKindTabsCommitAfterStaging()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int method = source.IndexOf("private void BuildContentKindTabs", StringComparison.Ordinal);
+            int next = source.IndexOf("private static int ResolveContentKindOrder", method, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(method, 0);
+            Assert.Greater(next, method);
+            string body = source.Substring(method, next - method);
+            StringAssert.Contains("var nextTabs = new List<ContentKindTabItem>();", body);
+            StringAssert.Contains("nextTabs.Add", body);
+            StringAssert.Contains("contentKindTabs.AddRange(nextTabs);", body);
+        }
+
+        [Test]
+        public void WorkbenchCategoryTreeRestoresPreviousNodesOnFailure()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int wrapper = source.IndexOf("private void BuildContentCategoryTree(IReadOnlyList", StringComparison.Ordinal);
+            int core = source.IndexOf("private void BuildContentCategoryTreeCore", wrapper, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(wrapper, 0);
+            Assert.Greater(core, wrapper);
+            string body = source.Substring(wrapper, core - wrapper);
+            StringAssert.Contains("ContentCategoryNode[] previousNodes", body);
+            StringAssert.Contains("BuildContentCategoryTreeCore(source);", body);
+            StringAssert.Contains("已恢复上一版节点", body);
+            StringAssert.Contains("contentCategoryNodes.AddRange(previousNodes);", body);
+        }
+
+        [Test]
+        public void WorkbenchCategoryTreeRecoveryResynchronizesListControl()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int wrapper = source.IndexOf("private void BuildContentCategoryTree(IReadOnlyList", StringComparison.Ordinal);
+            int core = source.IndexOf("private void BuildContentCategoryTreeCore", wrapper, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(wrapper, 0);
+            Assert.Greater(core, wrapper);
+            string body = source.Substring(wrapper, core - wrapper);
+            StringAssert.Contains("contentCategoryList?.Rebuild();", body);
+            StringAssert.Contains("contentCategoryEmptyLabel.style.display", body);
+            StringAssert.Contains("catch (Exception rebuildException)", body);
+        }
+
+        [Test]
+        public void WorkbenchCategoryTreeRecoveryResynchronizesSelection()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int wrapper = source.IndexOf("private void BuildContentCategoryTree(IReadOnlyList", StringComparison.Ordinal);
+            int core = source.IndexOf("private void BuildContentCategoryTreeCore", wrapper, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(wrapper, 0);
+            Assert.Greater(core, wrapper);
+            string body = source.Substring(wrapper, core - wrapper);
+            StringAssert.Contains("FindIndex(value =>", body);
+            StringAssert.Contains("SetSelectionWithoutNotify", body);
+            StringAssert.Contains("catch (Exception selectionException)", body);
+        }
+
+        [Test]
+        public void WorkbenchCategoryTreeRecoveryResynchronizesDerivedUi()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int wrapper = source.IndexOf("private void BuildContentCategoryTree(IReadOnlyList", StringComparison.Ordinal);
+            int core = source.IndexOf("private void BuildContentCategoryTreeCore", wrapper, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(wrapper, 0);
+            Assert.Greater(core, wrapper);
+            string body = source.Substring(wrapper, core - wrapper);
+            StringAssert.Contains("UpdateContentBreadcrumb();", body);
+            StringAssert.Contains("BuildCompactContentFilterMenu();", body);
+            StringAssert.Contains("catch (Exception breadcrumbException)", body);
+            StringAssert.Contains("catch (Exception filterException)", body);
+        }
+
+        [Test]
+        public void WorkbenchSearchInputsHaveBoundedMatchingCost()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("MaximumWorkbenchSearchCharacters = 512", source);
+            int objectQuery = source.IndexOf("string query = objectSearch?.value", StringComparison.Ordinal);
+            int hierarchyQuery = source.IndexOf("string query = hierarchySearch?.value", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(objectQuery, 0);
+            Assert.Greater(hierarchyQuery, objectQuery);
+            StringAssert.Contains("query.Substring(0, MaximumWorkbenchSearchCharacters)", source.Substring(objectQuery, hierarchyQuery - objectQuery));
+            int next = source.IndexOf("var visible = new HashSet<string>", hierarchyQuery, StringComparison.Ordinal);
+            StringAssert.Contains("query.Substring(0, MaximumWorkbenchSearchCharacters)", source.Substring(hierarchyQuery, next - hierarchyQuery));
+        }
+
+        [Test]
+        public void WorkbenchDeferredCallbacksFailClosedAfterDispose()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("contentCategoryList.selectionChanged += selection =>\n            {\n                if (disposed) return;", source);
+            StringAssert.Contains("objectList.selectionChanged += selection =>\n            {\n                if (disposed) return;", source);
+            StringAssert.Contains("hierarchyList.selectionChanged += selection =>\n            {\n                if (disposed) return;", source);
+            foreach (string methodName in new[] { "SetContentScope", "SetContentSortMode", "SetContentViewMode" })
+            {
+                int method = source.IndexOf("private void " + methodName, StringComparison.Ordinal);
+                Assert.GreaterOrEqual(method, 0, methodName);
+                int brace = source.IndexOf('{', method);
+                StringAssert.Contains("if (disposed) return;", source.Substring(brace, Math.Min(180, source.Length - brace)), methodName);
+            }
+            int selectionChanged = source.IndexOf("private void OnSelectionSetChanged", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(selectionChanged, 0);
+            int selectionBrace = source.IndexOf('{', selectionChanged);
+            StringAssert.Contains("if (disposed) return;", source.Substring(selectionBrace, Math.Min(160, source.Length - selectionBrace)));
+            foreach (string methodName in new[]
+            {
+                "ApplyContentBrowserResponsive",
+                "ApplyContentVerticalResponsive",
+                "ApplyContentResultsResponsive",
+                "RebuildObjectList"
+            })
+            {
+                int method = source.IndexOf("private void " + methodName, StringComparison.Ordinal);
+                Assert.GreaterOrEqual(method, 0, methodName);
+                int brace = source.IndexOf('{', method);
+                StringAssert.Contains("if (disposed) return;", source.Substring(brace, Math.Min(180, source.Length - brace)), methodName);
+            }
+        }
+
+        [Test]
+        public void WorkbenchUndoRedoCallbackFailsClosedAfterHostCleanup()
+        {
+            string basePath = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/Workbench/ESWorkbenchWindowBase.cs");
+            string baseSource = File.ReadAllText(Path.GetFullPath(basePath), new UTF8Encoding(false, true));
+            int callback = baseSource.IndexOf("private void OnWorkbenchUndoRedo", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(callback, 0);
+            int brace = baseSource.IndexOf('{', callback);
+            StringAssert.Contains("if (!workbenchHostSessionActive)", baseSource.Substring(brace, Math.Min(280, baseSource.Length - brace)));
+            StringAssert.Contains("RefreshWorkbench(ESWorkbenchRefreshReason.UndoRedo)", baseSource.Substring(brace, Math.Min(560, baseSource.Length - brace)));
+
+            string worldPath = Path.Combine(
+                Application.dataPath, "../Scripts/ESLogic/Editor/World/ESWorldBuilderWorkbenchWindow.cs");
+            string worldSource = File.ReadAllText(Path.GetFullPath(worldPath), new UTF8Encoding(false, true));
+            int worldCallback = worldSource.IndexOf("protected override void ESWorkbench_OnUndoRedo", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(worldCallback, 0);
+            StringAssert.Contains("editSession.SynchronizeDraftAfterUndoRedo();", worldSource.Substring(worldCallback));
+            StringAssert.Contains("ESWorkbench_SetDirtyStateWithoutNotification(", worldSource.Substring(worldCallback));
+        }
+
+        [Test]
         public void AssetPackagePreviewDisposeRetainsSceneHandleWhenCloseFails()
         {
             string path = Path.Combine(
                 Application.dataPath, "Plugins", "ES", "Editor", "ESMenuTreeWindow", "AssetPackageBakeWindow", "ESAssetPackageBakeWindow.cs");
             string source = File.ReadAllText(path, new UTF8Encoding(false, true));
-            int method = source.IndexOf("public void Dispose()", source.IndexOf("internal sealed class ESAssetPackagePreviewSceneContext", StringComparison.Ordinal), StringComparison.Ordinal);
+            int method = source.IndexOf("public void Dispose()", StringComparison.Ordinal);
             Assert.GreaterOrEqual(method, 0);
             string body = source.Substring(method, Math.Min(2600, source.Length - method));
-            StringAssert.Contains("private bool cellReleased", source);
-            StringAssert.Contains("保留句柄等待重试", body);
-            StringAssert.Contains("return;", body);
-            StringAssert.Contains("if (!cellReleased)", body);
-            StringAssert.Contains("disposed = true;", body);
+            StringAssert.Contains("renderContext.Dispose();", body);
+            StringAssert.Contains("disposed = renderContext.IsDisposed;", body);
         }
 
         [Test]
@@ -12747,6 +13283,984 @@ namespace ES.Tests
             StringAssert.Contains("catch (Exception closeException)", body);
             StringAssert.Contains("return false;", body);
             StringAssert.Contains("if (activePopup != null)", body);
+        }
+
+        [Test]
+        public void CompactChoicePopupSelectionFailsClosedAfterHostContextLoss()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCompactChoicePopup.cs");
+            string source = File.ReadAllText(path, new UTF8Encoding(false, true));
+            int key = source.IndexOf("private void OnKeyDown", StringComparison.Ordinal);
+            int select = source.IndexOf("private void Select", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(key, 0);
+            Assert.Greater(select, key);
+            StringAssert.Contains("if (!IsHostContextValid())", source.Substring(key, select - key));
+            StringAssert.Contains("if (!IsHostContextValid())", source.Substring(select, Math.Min(700, source.Length - select)));
+            StringAssert.Contains("private bool IsHostContextValid()", source);
+            StringAssert.Contains("ReferenceEquals(rootVisualElement.panel, hostWindow.rootVisualElement.panel)", source);
+        }
+
+        [Test]
+        public void CompactChoicePopupRejectsOpenReentrancyBeforeClosingActivePopup()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESCompactChoicePopup.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int open = source.IndexOf("public static bool Open", StringComparison.Ordinal);
+            int anchor = source.IndexOf("if (!TryGetScreenAnchor", open, StringComparison.Ordinal);
+            int active = source.IndexOf("if (activePopup != null)", anchor, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(open, 0);
+            Assert.Greater(anchor, open);
+            Assert.Greater(active, anchor);
+            string prefix = source.Substring(open, anchor - open);
+            StringAssert.Contains("if (openingPopup)", prefix);
+            StringAssert.Contains("已拒绝重入 Open", prefix);
+            StringAssert.Contains("openingPopup = true;", source.Substring(anchor, active - anchor));
+            StringAssert.Contains("openingPopup = false;", source.Substring(active));
+        }
+
+        [Test]
+        public void CompactChoicePopupCreateGuiFailsClosedWhenConfigurationWasCleared()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESCompactChoicePopup.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int create = source.IndexOf("public void CreateGUI()", StringComparison.Ordinal);
+            int bind = source.IndexOf("ESWindowFoundation.BindTransient(this)", create, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(create, 0);
+            Assert.Greater(bind, create);
+            string body = source.Substring(create, bind - create);
+            StringAssert.Contains("if (!configured)", body);
+            StringAssert.Contains("Close();", body);
+            StringAssert.Contains("return;", body);
+        }
+
+        [Test]
+        public void CompactChoicePopupDisableAlwaysClearsActiveState()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESCompactChoicePopup.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int disable = source.IndexOf("private void OnDisable()", StringComparison.Ordinal);
+            int destroy = source.IndexOf("private void OnDestroy()", disable, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(disable, 0);
+            Assert.Greater(destroy, disable);
+            string body = source.Substring(disable, destroy - disable);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("ESWindowFoundation.Suspend(this)", body);
+            StringAssert.Contains("finally", body);
+            StringAssert.Contains("configured = false;", body);
+            StringAssert.Contains("activePopup = null;", body);
+        }
+
+        [Test]
+        public void CompactChoicePopupDestroyFailsClosedAroundFoundationClose()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESCompactChoicePopup.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int destroy = source.IndexOf("private void OnDestroy()", StringComparison.Ordinal);
+            int context = source.IndexOf("private void CloseIfContextWasLost", destroy, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(destroy, 0);
+            Assert.Greater(context, destroy);
+            string body = source.Substring(destroy, context - destroy);
+            StringAssert.Contains("try", body);
+            StringAssert.Contains("ESWindowFoundation.Close(this)", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("阻止异常穿出编辑器回调", body);
+        }
+
+        [Test]
+        public void SearchDropdownDisablesEntryCallbacksAfterNativeWindowDetach()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(path, new UTF8Encoding(false, true));
+            int itemSelected = source.IndexOf("protected override void ItemSelected", StringComparison.Ordinal);
+            int windowState = source.IndexOf("private sealed class WindowState", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(itemSelected, 0);
+            Assert.Greater(windowState, itemSelected);
+            StringAssert.Contains("if (!selectionEnabled)", source.Substring(itemSelected, windowState - itemSelected));
+            StringAssert.Contains("private bool selectionEnabled = true;", source);
+            StringAssert.Contains("private void DisableSelection()", source);
+            StringAssert.Contains("dropdown?.DisableSelection();", source.Substring(windowState));
+            StringAssert.Contains("new WindowState(dropdown, window, root", source);
+        }
+
+        [Test]
+        public void SearchDropdownSelectionFailsClosedAfterHostContextLoss()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int itemSelected = source.IndexOf("protected override void ItemSelected", StringComparison.Ordinal);
+            int disable = source.IndexOf("private void DisableSelection", itemSelected, StringComparison.Ordinal);
+            int resolve = source.IndexOf("private IReadOnlyList<Entry> ResolveEntries", disable, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(itemSelected, 0);
+            Assert.Greater(disable, itemSelected);
+            Assert.Greater(resolve, disable);
+            StringAssert.Contains("bool hostContextValid = IsHostContextValid();", source.Substring(itemSelected, disable - itemSelected));
+            StringAssert.Contains("DisableSelection();", source.Substring(itemSelected, disable - itemSelected));
+            StringAssert.Contains("private bool IsHostContextValid()", source.Substring(disable, resolve - disable));
+            StringAssert.Contains("禁用选择回调", source.Substring(disable, resolve - disable));
+        }
+
+        [Test]
+        public void SearchDropdownToolbarFailsClosedAfterHostContextLoss()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int toolbar = source.IndexOf("private sealed class ToolbarOverlay", StringComparison.Ordinal);
+            int draw = source.IndexOf("private void Draw()", toolbar, StringComparison.Ordinal);
+            int window = source.IndexOf("private sealed class WindowState", draw, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(toolbar, 0);
+            Assert.Greater(draw, toolbar);
+            Assert.Greater(window, draw);
+            string body = source.Substring(toolbar, window - toolbar);
+            StringAssert.Contains("contextValidator", body);
+            StringAssert.Contains("!contextValidator()", body);
+            StringAssert.Contains("disposed = true;", body);
+            StringAssert.Contains("IsHostContextValidForBridge", source);
+        }
+
+        [Test]
+        public void SearchDropdownToolbarCountFailureReleasesInteractionHold()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int count = source.IndexOf("bool hasToolbarActions = false", StringComparison.Ordinal);
+            int bridge = source.IndexOf("AdvancedDropdownNativeBridge.TryAttach", count, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(count, 0);
+            Assert.Greater(bridge, count);
+            string body = source.Substring(count, bridge - count);
+            StringAssert.Contains("toolbarActions.Count", body);
+            StringAssert.Contains("DisposeInteractionHold(interactionHold)", body);
+            StringAssert.Contains("ToolbarAction 集合计数失败", body);
+        }
+
+        [Test]
+        public void SearchDropdownBridgeRemovesDestroyedManagedWindowReference()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int dispose = source.IndexOf("public void Dispose()", StringComparison.Ordinal);
+            int detached = source.IndexOf("private void OnDetachedFromPanel", dispose, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(dispose, 0);
+            Assert.Greater(detached, dispose);
+            string body = source.Substring(dispose, detached - dispose);
+            StringAssert.Contains("ReferenceEquals(window, null)", body);
+            StringAssert.Contains("WindowStates.Remove(window)", body);
+            StringAssert.DoesNotContain("if (window != null)", body);
+        }
+
+        [Test]
+        public void SearchDropdownToolbarTextHasBoundedPresentationCost()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int toolbar = source.IndexOf("public sealed class ToolbarAction", StringComparison.Ordinal);
+            int builder = source.IndexOf("public readonly struct Entry", toolbar, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(toolbar, 0);
+            Assert.Greater(builder, toolbar);
+            string body = source.Substring(toolbar, builder - toolbar);
+            StringAssert.Contains("MaximumToolbarTextCharacters = 512", source);
+            StringAssert.Contains("NormalizeToolbarText(label, \"·\")", body);
+            StringAssert.Contains("NormalizeToolbarText(tooltip, null)", body);
+            StringAssert.Contains("normalized.Substring(0, MaximumToolbarTextCharacters)", source);
+        }
+
+        [Test]
+        public void SearchDropdownEntryPresentationHasBoundedCostWithoutChangingEntryIdentity()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int action = source.IndexOf("private sealed class ActionItem", StringComparison.Ordinal);
+            int fields = source.IndexOf("private readonly string title", action, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(action, 0);
+            Assert.Greater(fields, action);
+            string body = source.Substring(action, fields - action);
+            StringAssert.Contains("BoundPresentationText(entry.Tooltip)", body);
+            StringAssert.Contains("return BoundPresentationText(result);", body);
+            StringAssert.Contains("MaximumEntryPresentationCharacters = 2048", source);
+            StringAssert.Contains("private static string BoundPresentationText", source);
+            StringAssert.Contains("StableId", source);
+        }
+
+        [Test]
+        public void SearchAndChoicePopupAnchorsAreClampedToHostBounds()
+        {
+            string searchPath = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESSearchDropdown.cs");
+            string searchSource = File.ReadAllText(Path.GetFullPath(searchPath), new UTF8Encoding(false, true));
+            int searchAnchor = searchSource.IndexOf("private static bool TryGetGuiAnchorRect", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(searchAnchor, 0);
+            string searchBody = searchSource.Substring(searchAnchor, Math.Min(1800, searchSource.Length - searchAnchor));
+            StringAssert.Contains("Rect hostBounds = host.position", searchBody);
+            StringAssert.Contains("hostBounds.xMax - anchorWidth", searchBody);
+            StringAssert.Contains("hostBounds.yMax - anchorHeight", searchBody);
+
+            string popupPath = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools", "ESCompactChoicePopup.cs");
+            string popupSource = File.ReadAllText(Path.GetFullPath(popupPath), new UTF8Encoding(false, true));
+            int popupAnchor = popupSource.IndexOf("private static bool TryGetScreenAnchor", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(popupAnchor, 0);
+            string popupBody = popupSource.Substring(popupAnchor, Math.Min(1500, popupSource.Length - popupAnchor));
+            StringAssert.Contains("Rect hostBounds = hostWindow.position", popupBody);
+            StringAssert.Contains("hostBounds.xMax - screenRect.width", popupBody);
+            StringAssert.Contains("hostBounds.yMax - screenRect.height", popupBody);
+        }
+
+        [Test]
+        public void CommandPaletteContextCopyFailsClosedAfterWindowDisable()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int copyMethod = source.IndexOf("private void CopyTargetFromContextMenu", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(copyMethod, 0);
+            int copyBrace = source.IndexOf('{', copyMethod);
+            StringAssert.Contains("if (this == null || !lifecycleActive", source.Substring(copyBrace, Math.Min(240, source.Length - copyBrace)));
+            StringAssert.Contains("CopyTargetFromContextMenu(item.TargetId)", source);
+            int execute = source.IndexOf("private void ExecuteSelected", StringComparison.Ordinal);
+            int locate = source.IndexOf("private void LocateSelected", StringComparison.Ordinal);
+            int shortcut = source.IndexOf("private void CopySelectedShortcut", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(execute, 0);
+            Assert.Greater(locate, execute);
+            Assert.Greater(shortcut, locate);
+            StringAssert.Contains("if (this == null || !lifecycleActive", source.Substring(execute, locate - execute));
+            StringAssert.Contains("if (this == null || !lifecycleActive", source.Substring(locate, shortcut - locate));
+            StringAssert.Contains("if (this == null || !lifecycleActive", source.Substring(shortcut, Math.Min(300, source.Length - shortcut)));
+        }
+
+        [Test]
+        public void CommandPaletteQueryInputIsBoundedBeforeStateRetention()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("private static string NormalizeQuery(string value)", source);
+            StringAssert.Contains("ESCommandPaletteSearchEngine.MaximumQueryCharacters", source);
+            StringAssert.Contains("window.query = NormalizeQuery(initialQuery)", source);
+            StringAssert.Contains("window.query = NormalizeQuery(lastTab)", source);
+            StringAssert.Contains("string next = NormalizeQuery(EditorGUILayout.TextField(", source);
+            StringAssert.Contains("query = NormalizeQuery(prefix + CurrentSearchTerm())", source);
+        }
+
+        [Test]
+        public void CommandPaletteRefreshRestoresSelectionByStableId()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int update = source.IndexOf("private void UpdateResults()", StringComparison.Ordinal);
+            int order = source.IndexOf("private static IReadOnlyList<ESCommandPaletteItem> OrderResultsForDisplay", update, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(update, 0);
+            Assert.Greater(order, update);
+            string body = source.Substring(update, order - update);
+            StringAssert.Contains("string previousSelectedId", body);
+            StringAssert.Contains("results[selected]?.StableId", body);
+            StringAssert.Contains("restoredIndex", body);
+            StringAssert.Contains("results[index]?.StableId", body);
+            StringAssert.Contains("Mathf.Clamp(selected, 0, Math.Max(0, results.Count - 1))", body);
+        }
+
+        [Test]
+        public void CommandPaletteExecutionRebindsRegisteredItemAfterRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int execute = source.IndexOf("private void ExecuteItem", StringComparison.Ordinal);
+            int record = source.IndexOf("RecordQuery(query)", execute, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(execute, 0);
+            Assert.Greater(record, execute);
+            string body = source.Substring(execute, record - execute);
+            StringAssert.Contains("ESCommandPaletteRegistry.TryGet(item.StableId", body);
+            StringAssert.Contains("ESCommandPaletteItem currentItem", body);
+            StringAssert.Contains("item = currentItem;", body);
+        }
+
+        [Test]
+        public void CommandPaletteRegistryRejectsNestedRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("private static bool refreshing;", source);
+            int refresh = source.IndexOf("public static void Refresh()", StringComparison.Ordinal);
+            int tryBlock = source.IndexOf("try", refresh, StringComparison.Ordinal);
+            int finallyBlock = source.IndexOf("finally", tryBlock, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(refresh, 0);
+            Assert.Greater(tryBlock, refresh);
+            Assert.Greater(finallyBlock, tryBlock);
+            string body = source.Substring(refresh, finallyBlock - refresh);
+            StringAssert.Contains("if (refreshing)", body);
+            StringAssert.Contains("refreshing = true;", body);
+            StringAssert.Contains("refreshing = false;", source.Substring(finallyBlock, Math.Min(180, source.Length - finallyBlock)));
+        }
+
+        [Test]
+        public void CommandPaletteProviderItemsHaveBoundedRefreshCost()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("public const int MaximumProviderItems = 4096;", source);
+            StringAssert.Contains("public const int MaximumTotalItems = 100000;", source);
+            StringAssert.Contains("int totalCandidateCount;", source);
+            StringAssert.Contains("totalCandidateCount = candidates.Count;", source);
+            StringAssert.Contains("if (totalCandidateCount < 0)", source);
+            StringAssert.Contains("Provider 候选项数量无效", source);
+            StringAssert.Contains("Mathf.Min(totalCandidateCount, MaximumProviderItems)", source);
+            StringAssert.Contains("已截断后续项", source);
+            StringAssert.Contains("Items.Count + stagedItems.Count >= MaximumTotalItems", source);
+        }
+
+        [Test]
+        public void CommandPaletteProviderFieldsHaveBoundedIdentityCost()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("MaximumProviderIdCharacters = 128", source);
+            StringAssert.Contains("MaximumItemIdCharacters = 512", source);
+            StringAssert.Contains("MaximumTitleCharacters = 1024", source);
+            StringAssert.Contains("MaximumCategoryCharacters = 256", source);
+            StringAssert.Contains("MaximumTargetIdCharacters = 4096", source);
+            StringAssert.Contains("命令项字段超过长度上限", source);
+            StringAssert.Contains("ProviderId 或 Prefix 超过长度上限", source);
+        }
+
+        [Test]
+        public void CommandPaletteProviderCountHasGlobalBound()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("public const int MaximumProviders = 64;", source);
+            int register = source.IndexOf("private static ESCommandPaletteRegistrationResult RegisterProviderCore", StringComparison.Ordinal);
+            int rebuild = source.IndexOf("private static bool RebuildProviderItems", register, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(register, 0);
+            Assert.Greater(rebuild, register);
+            string body = source.Substring(register, rebuild - register);
+            StringAssert.Contains("ProviderOrder.Count >= MaximumProviders", body);
+            StringAssert.Contains("Provider 数量超过上限", body);
+            StringAssert.Contains("return result;", body);
+        }
+
+        [Test]
+        public void CommandPaletteProviderRegistrationHasGetterFailureBoundary()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int register = source.IndexOf("public static ESCommandPaletteRegistrationResult RegisterProvider", StringComparison.Ordinal);
+            int refresh = source.IndexOf("public static void Refresh", register, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(register, 0);
+            Assert.Greater(refresh, register);
+            string body = source.Substring(register, refresh - register);
+            StringAssert.Contains("try", body);
+            StringAssert.Contains("return RegisterProviderCore(provider);", body);
+            StringAssert.Contains("Provider 注册边界异常，已安全拒绝", body);
+            StringAssert.Contains("return failed;", body);
+        }
+
+        [Test]
+        public void CommandPaletteInitializationRollsBackPartialBuiltIns()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int ensure = source.IndexOf("public static void EnsureInitialized()", StringComparison.Ordinal);
+            int register = source.IndexOf("public static ESCommandPaletteRegistrationResult RegisterProvider", ensure, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(ensure, 0);
+            Assert.Greater(register, ensure);
+            string body = source.Substring(ensure, register - ensure);
+            StringAssert.Contains("previousProviders", body);
+            StringAssert.Contains("previousProviderOrder", body);
+            StringAssert.Contains("previousItems", body);
+            StringAssert.Contains("previousOrderedItems", body);
+            StringAssert.Contains("previousProviders = new Dictionary", body);
+            StringAssert.Contains("命令索引初始化失败，已回滚部分注册状态", body);
+            StringAssert.Contains("initialized = false;", body);
+        }
+
+        [Test]
+        public void CommandPaletteReentrantProviderDiagnosticReadFailsClosed()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int register = source.IndexOf("public static ESCommandPaletteRegistrationResult RegisterProvider", StringComparison.Ordinal);
+            int core = source.IndexOf("private static ESCommandPaletteRegistrationResult RegisterProviderCore", register, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(register, 0);
+            Assert.Greater(core, register);
+            string body = source.Substring(register, core - register);
+            StringAssert.Contains("string providerId = string.Empty", body);
+            StringAssert.Contains("provider?.ProviderId", body);
+            StringAssert.Contains("重入拒绝诊断读取 ProviderId 失败", body);
+            StringAssert.Contains("providerId, string.Empty", body);
+        }
+
+        [Test]
+        public void CommandPaletteLifecycleCleanupSurvivesFoundationFailures()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int disable = source.IndexOf("private void OnDisable()", StringComparison.Ordinal);
+            int gui = source.IndexOf("private void OnGUI()", disable, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(disable, 0);
+            Assert.Greater(gui, disable);
+            string body = source.Substring(disable, gui - disable);
+            StringAssert.Contains("ESWindowFoundation.Suspend(this)", body);
+            StringAssert.Contains("finally", body);
+            StringAssert.Contains("UnregisterSearchTick();", body);
+            StringAssert.Contains("UnregisterShortcutCheckTick();", body);
+            StringAssert.Contains("searchEngine.Clear();", body);
+            StringAssert.Contains("results = Array.Empty<ESCommandPaletteItem>();", body);
+        }
+
+        [Test]
+        public void CommandPaletteEnableFailureRollsBackPartialStartup()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int enable = source.IndexOf("private void OnEnable()", StringComparison.Ordinal);
+            int disable = source.IndexOf("private void OnDisable()", enable, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(enable, 0);
+            Assert.Greater(disable, enable);
+            string body = source.Substring(enable, disable - enable);
+            StringAssert.Contains("try", body);
+            StringAssert.Contains("lifecycleActive = false;", body);
+            StringAssert.Contains("UnregisterSearchTick();", body);
+            StringAssert.Contains("UnregisterShortcutCheckTick();", body);
+            StringAssert.Contains("ESWindowFoundation.Suspend(this)", body);
+            StringAssert.Contains("searchEngine.Clear();", body);
+            StringAssert.Contains("results = Array.Empty<ESCommandPaletteItem>();", body);
+            StringAssert.Contains("启动初始化失败，已回滚窗口状态", body);
+        }
+
+        [Test]
+        public void CommandPaletteReopenSessionStateReadFailsClosed()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int open = source.IndexOf("public static void OpenWindow()", StringComparison.Ordinal);
+            int enable = source.IndexOf("private void OnEnable()", open, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(open, 0);
+            Assert.Greater(enable, open);
+            string body = source.Substring(open, enable - open);
+            StringAssert.Contains("SessionState.GetString(LastTabKey", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("回退默认标签", body);
+            StringAssert.Contains("window.query = NormalizeQuery(lastTab);", body);
+        }
+
+        [Test]
+        public void CommandPaletteWindowShowFailureStopsPartialInitialization()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int show = source.IndexOf("window.ShowUtility();", StringComparison.Ordinal);
+            int center = source.IndexOf("if (!alreadyOpen)", show, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(show, 0);
+            Assert.Greater(center, show);
+            string body = source.Substring(show, center - show);
+            StringAssert.Contains("window.Focus();", body);
+            StringAssert.Contains("window.minSize = MinimumSize;", body);
+            StringAssert.Contains("window.maxSize = MaximumSize;", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("if (!alreadyOpen)", body);
+            StringAssert.Contains("window.Close();", body);
+            StringAssert.Contains("显示命令面板失败", body);
+            StringAssert.Contains("return;", body);
+        }
+
+        [Test]
+        public void CommandPaletteCenteringRejectsInvalidMainWindowRect()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int center = source.IndexOf("private static void CenterWindowInMainEditor", StringComparison.Ordinal);
+            int openQuery = source.IndexOf("public static void OpenWithQuery", center, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(center, 0);
+            Assert.Greater(openQuery, center);
+            string body = source.Substring(center, openQuery - center);
+            StringAssert.Contains("!IsFinite(mainWindow.x)", body);
+            StringAssert.Contains("!IsFinite(mainWindow.width)", body);
+            StringAssert.Contains("mainWindow.width <= 0f", body);
+            StringAssert.Contains("return;", body);
+        }
+
+        [Test]
+        public void CommandPaletteStylesPublishReadyOnlyAfterCompleteBuild()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int ensure = source.IndexOf("private static void EnsureStyles()", StringComparison.Ordinal);
+            int solid = source.IndexOf("private static Texture2D SolidTexture", ensure, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(ensure, 0);
+            Assert.Greater(solid, ensure);
+            string body = source.Substring(ensure, solid - ensure);
+            int firstReady = body.IndexOf("stylesReady = true;", StringComparison.Ordinal);
+            int lastFooter = body.LastIndexOf("footerStyle =", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(firstReady, 0);
+            Assert.Greater(firstReady, lastFooter);
+            StringAssert.Contains("mid-build exception", body);
+        }
+
+        [Test]
+        public void CommandPaletteStyleRetryClearsPartialTextures()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int ensure = source.IndexOf("private static void EnsureStyles()", StringComparison.Ordinal);
+            int solid = source.IndexOf("private static Texture2D SolidTexture", ensure, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(ensure, 0);
+            Assert.Greater(solid, ensure);
+            string body = source.Substring(ensure, solid - ensure);
+            int ready = body.IndexOf("if (stylesReady)", StringComparison.Ordinal);
+            int skin = body.IndexOf("stylesProSkin =", ready, StringComparison.Ordinal);
+            Assert.Greater(ready, 0);
+            Assert.Greater(skin, ready);
+            StringAssert.Contains("else", body.Substring(ready, skin - ready));
+            StringAssert.Contains("DestroyCreatedTextures();", body.Substring(ready, skin - ready));
+            StringAssert.Contains("partial allocation", body);
+        }
+
+        [Test]
+        public void CommandPaletteSolidTexturePreservesOriginalFailure()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int solid = source.IndexOf("private static Texture2D SolidTexture", StringComparison.Ordinal);
+            int acquire = source.IndexOf("private static void AcquireStyles", solid, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(solid, 0);
+            Assert.Greater(acquire, solid);
+            string body = source.Substring(solid, acquire - solid);
+            StringAssert.Contains("catch (Exception createException)", body);
+            StringAssert.Contains("catch (Exception destroyException)", body);
+            StringAssert.Contains("throw createException;", body);
+        }
+
+        [Test]
+        public void CommandPaletteGuiSkipsFrameWhenStyleBuildFails()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int gui = source.IndexOf("private void OnGUI()", StringComparison.Ordinal);
+            int ensure = source.IndexOf("private static void EnsureStyles()", gui, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(gui, 0);
+            Assert.Greater(ensure, gui);
+            string body = source.Substring(gui, ensure - gui);
+            StringAssert.Contains("try", body);
+            StringAssert.Contains("EnsureStyles();", body);
+            StringAssert.Contains("stylesReady = false;", body);
+            StringAssert.Contains("跳过本帧绘制", body);
+            StringAssert.Contains("if (!stylesReady)", body);
+        }
+
+        [Test]
+        public void CommandPaletteStyleFailureLogIsBoundedUntilRecovery()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("private static bool styleFailureLogged;", source);
+            int gui = source.IndexOf("private void OnGUI()", StringComparison.Ordinal);
+            int ensure = source.IndexOf("private static void EnsureStyles()", gui, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(gui, 0);
+            Assert.Greater(ensure, gui);
+            string guiBody = source.Substring(gui, ensure - gui);
+            StringAssert.Contains("if (!styleFailureLogged)", guiBody);
+            StringAssert.Contains("styleFailureLogged = true;", guiBody);
+            StringAssert.Contains("styleFailureLogged = false;", source.Substring(ensure));
+        }
+
+        [Test]
+        public void CommandPaletteStyleFailureRetriesWithBoundedBackoff()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("StyleRetryBackoffSeconds = 0.25d", source);
+            StringAssert.Contains("nextStyleRetryAt", source);
+            int gui = source.IndexOf("private void OnGUI()", StringComparison.Ordinal);
+            int ensure = source.IndexOf("private static void EnsureStyles()", gui, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(gui, 0);
+            Assert.Greater(ensure, gui);
+            string body = source.Substring(gui, ensure - gui);
+            StringAssert.Contains("EditorApplication.timeSinceStartup < nextStyleRetryAt", body);
+            StringAssert.Contains("nextStyleRetryAt = EditorApplication.timeSinceStartup + StyleRetryBackoffSeconds", body);
+        }
+
+        [Test]
+        public void CommandPaletteStyleRetryBackoffResetsAcrossLifecycle()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int enable = source.IndexOf("private void OnEnable()", StringComparison.Ordinal);
+            int destroy = source.IndexOf("private void OnDestroy()", enable, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(enable, 0);
+            Assert.Greater(destroy, enable);
+            string lifecycle = source.Substring(enable, destroy - enable);
+            StringAssert.Contains("nextStyleRetryAt = 0d;", lifecycle);
+            StringAssert.Contains("finally", lifecycle);
+            StringAssert.Contains("nextStyleRetryAt = 0d;", source.Substring(destroy));
+        }
+
+        [Test]
+        public void WorkbenchDisposeStopsExternalDragWatchdogImmediately()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Scripts", "ESLogic", "Editor", "Workbench",
+                "ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int dispose = source.IndexOf("public void Dispose()", StringComparison.Ordinal);
+            int stop = source.IndexOf("StopDragEdgePan();", dispose, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(dispose, 0);
+            Assert.Greater(stop, dispose);
+            string body = source.Substring(dispose, stop - dispose);
+            StringAssert.Contains("StopExternalDragWatchdog();", body);
+            StringAssert.Contains("disposed = true;", body);
+        }
+
+        [Test]
+        public void WorkbenchClipboardActionsHaveFailureBoundary()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Scripts", "ESLogic", "Editor", "Workbench",
+                "ESWorkbenchUIToolkitHost.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int helper = source.IndexOf("private void CopyToClipboard", StringComparison.Ordinal);
+            int left = source.IndexOf("private VisualElement BuildLeftPanel", helper, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(helper, 0);
+            Assert.Greater(left, helper);
+            string body = source.Substring(helper, left - helper);
+            StringAssert.Contains("EditorGUIUtility.systemCopyBuffer = value", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("复制失败：", body);
+            StringAssert.Contains("disposed", body);
+        }
+
+        [Test]
+        public void CommandPaletteRegistryRejectsRefreshDuringInitialization()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int refresh = source.IndexOf("public static void Refresh()", StringComparison.Ordinal);
+            int nested = source.IndexOf("if (initializing)", refresh, StringComparison.Ordinal);
+            int refreshing = source.IndexOf("if (refreshing)", nested, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(refresh, 0);
+            Assert.Greater(nested, refresh);
+            Assert.Greater(refreshing, nested);
+            StringAssert.Contains("已拒绝 Refresh", source.Substring(nested, refreshing - nested));
+        }
+
+        [Test]
+        public void CommandPalettePersistedStateHasBoundedReadAndSafeWrite()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("MaximumPersistedIdsCharacters = 65536", source);
+            StringAssert.Contains("raw.Length > MaximumPersistedIdsCharacters", source);
+            StringAssert.Contains("raw.Substring(0, MaximumPersistedIdsCharacters)", source);
+            int save = source.IndexOf("private static void SaveIds", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(save, 0);
+            string saveBody = source.Substring(save, Math.Min(1000, source.Length - save));
+            StringAssert.Contains("try", saveBody);
+            StringAssert.Contains("catch (Exception exception)", saveBody);
+            StringAssert.Contains("已保留当前内存状态", saveBody);
+        }
+
+        [Test]
+        public void CommandPaletteProviderItemFailuresAreIsolated()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int loop = source.IndexOf("for (int i = 0; i < candidateCount; i++)", StringComparison.Ordinal);
+            int limit = source.IndexOf("if (totalCandidateCount > MaximumProviderItems)", loop, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(loop, 0);
+            Assert.Greater(limit, loop);
+            string body = source.Substring(loop, limit - loop);
+            StringAssert.Contains("try", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("Provider 单项校验失败，已跳过该项", body);
+            StringAssert.Contains("stagedItems.Add(item);", body);
+            int assign = body.IndexOf("item.ProviderId = registration.ProviderId", StringComparison.Ordinal);
+            int accepted = body.IndexOf("acceptedIds.Add(item.ItemId)", assign, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(assign, 0);
+            Assert.Greater(accepted, assign);
+        }
+
+        [Test]
+        public void CommandPaletteFavoriteRecentLoadRollsBackAtomically()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int load = source.IndexOf("private static void LoadAndCleanState", StringComparison.Ordinal);
+            int loadIds = source.IndexOf("private static void LoadIds", load, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(load, 0);
+            Assert.Greater(loadIds, load);
+            string body = source.Substring(load, loadIds - load);
+            StringAssert.Contains("previousFavorites", body);
+            StringAssert.Contains("previousRecent", body);
+            StringAssert.Contains("FavoriteIds.AddRange(previousFavorites)", body);
+            StringAssert.Contains("RecentIds.AddRange(previousRecent)", body);
+            StringAssert.Contains("已保留上一版内存状态", body);
+        }
+
+        [Test]
+        public void CommandPaletteRegistryExposesStableObservationDuringRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("refreshObservationItems", source);
+            StringAssert.Contains("refreshObservationOrdered", source);
+            StringAssert.Contains("refreshing && refreshObservationOrdered != null", source);
+            StringAssert.Contains("refreshObservationOrdered = previousOrderedItems.AsReadOnly();", source);
+            StringAssert.Contains("refreshObservationItems = previousItems;", source);
+            StringAssert.Contains("refreshObservationItems = null;", source);
+            StringAssert.Contains("refreshObservationOrdered = null;", source);
+            int tryGet = source.IndexOf("public static bool TryGet", StringComparison.Ordinal);
+            int next = source.IndexOf("public static bool IsFavorite", tryGet, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(tryGet, 0);
+            Assert.Greater(next, tryGet);
+            StringAssert.Contains("refreshObservationItems.TryGetValue", source.Substring(tryGet, next - tryGet));
+        }
+
+        [Test]
+        public void CommandPaletteRegistryDiagnosticsStayStableDuringRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("refreshObservationDiagnostics", source);
+            StringAssert.Contains("refreshing && refreshObservationDiagnostics != null", source);
+            StringAssert.Contains("refreshObservationDiagnostics = previousDiagnostics.AsReadOnly();", source);
+            StringAssert.Contains("refreshObservationDiagnostics = null;", source);
+            int diagnostics = source.IndexOf("public static IReadOnlyList<ESCommandPaletteRegistrationDiagnostic> RegistrationDiagnostics", StringComparison.Ordinal);
+            int providerCount = source.IndexOf("public static int ProviderCount", diagnostics, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(diagnostics, 0);
+            Assert.Greater(providerCount, diagnostics);
+            StringAssert.Contains("refreshObservationDiagnostics", source.Substring(diagnostics, providerCount - diagnostics));
+        }
+
+        [Test]
+        public void CommandPaletteRefreshSnapshotCoversStateActionsAndReset()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("ContainsObservableItem(stableId)", source);
+            int helper = source.IndexOf("private static bool ContainsObservableItem", StringComparison.Ordinal);
+            int register = source.IndexOf("private static ESCommandPaletteRegistrationResult RegisterProviderCore", helper, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(helper, 0);
+            Assert.Greater(register, helper);
+            StringAssert.Contains("refreshObservationItems.ContainsKey", source.Substring(helper, register - helper));
+            int reset = source.IndexOf("internal static void ResetForTests", StringComparison.Ordinal);
+            int stored = source.IndexOf("internal static void SetStoredIdsForTests", reset, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(reset, 0);
+            Assert.Greater(stored, reset);
+            string resetBody = source.Substring(reset, stored - reset);
+            StringAssert.Contains("refreshing = false;", resetBody);
+            StringAssert.Contains("refreshObservationItems = null;", resetBody);
+            StringAssert.Contains("refreshObservationDiagnostics = null;", resetBody);
+        }
+
+        [Test]
+        public void CommandPaletteStateWritesAreRejectedDuringRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int favorite = source.IndexOf("public static void ToggleFavorite", StringComparison.Ordinal);
+            int recent = source.IndexOf("public static void RecordRecent", favorite, StringComparison.Ordinal);
+            int helper = source.IndexOf("private static bool ContainsObservableItem", recent, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(favorite, 0);
+            Assert.Greater(recent, favorite);
+            Assert.Greater(helper, recent);
+            StringAssert.Contains("if (refreshing)", source.Substring(favorite, recent - favorite));
+            StringAssert.Contains("拒绝修改收藏状态", source.Substring(favorite, recent - favorite));
+            StringAssert.Contains("if (refreshing)", source.Substring(recent, helper - recent));
+            StringAssert.Contains("拒绝写入最近使用状态", source.Substring(recent, helper - recent));
+        }
+
+        [Test]
+        public void CommandPaletteProviderRegistrationIsRejectedDuringBuild()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int register = source.IndexOf("public static ESCommandPaletteRegistrationResult RegisterProvider", StringComparison.Ordinal);
+            int registerCore = source.IndexOf("private static ESCommandPaletteRegistrationResult RegisterProviderCore", register, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(register, 0);
+            Assert.Greater(registerCore, register);
+            string body = source.Substring(register, registerCore - register);
+            StringAssert.Contains("if (initializing || refreshing)", body);
+            StringAssert.Contains("已拒绝重入注册 Provider", body);
+            StringAssert.Contains("return rejected;", body);
+        }
+
+        [Test]
+        public void CommandPaletteFavoritesAndRecentStayStableDuringRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("refreshObservationFavorites", source);
+            StringAssert.Contains("refreshObservationRecent", source);
+            StringAssert.Contains("refreshing && refreshObservationFavorites != null", source);
+            StringAssert.Contains("refreshing && refreshObservationRecent != null", source);
+            StringAssert.Contains("new List<string>(FavoriteIds).AsReadOnly()", source);
+            StringAssert.Contains("new List<string>(RecentIds).AsReadOnly()", source);
+            StringAssert.Contains("refreshObservationFavorites = null;", source);
+            StringAssert.Contains("refreshObservationRecent = null;", source);
+        }
+
+        [Test]
+        public void CommandPaletteProviderCountStaysStableDuringRefresh()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteRegistry.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            StringAssert.Contains("refreshObservationProviderCount", source);
+            StringAssert.Contains("refreshing && refreshObservationProviderCount >= 0", source);
+            StringAssert.Contains("refreshObservationProviderCount = ProviderOrder.Count;", source);
+            StringAssert.Contains("refreshObservationProviderCount = -1;", source);
+            int provider = source.IndexOf("public static int ProviderCount", StringComparison.Ordinal);
+            int item = source.IndexOf("public static int ItemCount", provider, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(provider, 0);
+            Assert.Greater(item, provider);
+            StringAssert.Contains("refreshObservationProviderCount", source.Substring(provider, item - provider));
+        }
+
+        [Test]
+        public void CommandPaletteExecutorHasFailClosedBoundary()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteExecutors.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int execute = source.IndexOf("public static ESCommandPaletteResult Execute", StringComparison.Ordinal);
+            int openMenu = source.IndexOf("internal static class OpenMenuExecutor", execute, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(execute, 0);
+            Assert.Greater(openMenu, execute);
+            string body = source.Substring(execute, openMenu - execute);
+            StringAssert.Contains("try", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("命令执行边界异常，已安全拒绝", body);
+            StringAssert.Contains("ESCommandPaletteResult.Fail(", body);
+        }
+
+        [Test]
+        public void CommandPaletteCopyTextHasBoundedFileRead()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteExecutors.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int copy = source.IndexOf("internal static class CopyTextExecutor", StringComparison.Ordinal);
+            int select = source.IndexOf("internal static class SelectExecutor", copy, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(copy, 0);
+            Assert.Greater(select, copy);
+            string body = source.Substring(copy, select - copy);
+            StringAssert.Contains("MaximumCopyTextBytes = 4L * 1024L * 1024L", body);
+            StringAssert.Contains("new FileInfo(fullPath).Length > MaximumCopyTextBytes", body);
+            StringAssert.Contains("ReadTextWithinLimit(fullPath)", body);
+            StringAssert.Contains("byte[] buffer = new byte[capacity]", body);
+            StringAssert.Contains("count > MaximumCopyTextBytes", body);
+            StringAssert.Contains("文件超过复制大小上限", body);
+        }
+
+        [Test]
+        public void CommandPaletteCopyPathHasClipboardFailureBoundary()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteExecutors.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int copyPath = source.IndexOf("public static ESCommandPaletteResult CopyPath", StringComparison.Ordinal);
+            int select = source.IndexOf("internal static class SelectExecutor", copyPath, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(copyPath, 0);
+            Assert.Greater(select, copyPath);
+            string body = source.Substring(copyPath, select - copyPath);
+            StringAssert.Contains("GUIUtility.systemCopyBuffer = normalizedPath", body);
+            StringAssert.Contains("catch (Exception exception)", body);
+            StringAssert.Contains("复制路径失败", body);
+            StringAssert.Contains("ESCommandPaletteResult.Fail(", body);
+        }
+
+        [Test]
+        public void CommandPaletteWindowClipboardShortcutsFailClosed()
+        {
+            string path = Path.Combine(
+                Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                "ESCommandPalette", "ESCommandPaletteWindow.cs");
+            string source = File.ReadAllText(Path.GetFullPath(path), new UTF8Encoding(false, true));
+            int helper = source.IndexOf("private static bool TryCopyTargetToClipboard", StringComparison.Ordinal);
+            int shortcut = source.IndexOf("private void CopySelectedShortcut", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(helper, 0);
+            Assert.Greater(shortcut, helper);
+            StringAssert.Contains("catch (Exception exception)", source.Substring(helper, shortcut - helper));
+            StringAssert.Contains("TryCopyTargetToClipboard(item.TargetId, out string copyError)", source.Substring(shortcut));
+            StringAssert.Contains("复制路径失败：", source.Substring(shortcut));
         }
 
         [Test]

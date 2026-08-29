@@ -15,7 +15,7 @@
 
 命令类型：只读体检。
 默认改文件：否，除非用户要求修复单点乱码。
-风险等级：L1/L2。
+风险等级：L1。
 
 ## 必须先读
 
@@ -29,6 +29,20 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 
 ```text
 用 UTF-8 判断文件真实内容，不因 PowerShell 显示乱码误判。输出真乱码、显示乱码和修复建议。
+```
+
+## ContractCompleteness
+
+```yaml
+commandId: encoding.review
+writeMode: read-only
+cancellation: N/A (read-only; no external effect; stop before analysis)
+recovery: N/A (read-only; rerun from unchanged inputs; no rollback)
+validation: read-only checks only; no writes, runtime, Git, release, or external effects
+evidenceRef: source refs + SHA-256/content hash when available + read receipt; static evidence cannot claim Runtime
+actionBoundary: AIBrain/ABCD selects intent and route; this command only reviews and reports; Automation/ABCC execution is out of scope
+allowRoots: project files explicitly listed in 必须先读 and the contract's declared read-only targets only
+denyPaths: source writes, undeclared paths, Git/history, release, Runtime/Unity, external services; deny-overrides
 ```
 
 ## 交付格式

@@ -131,7 +131,7 @@ namespace ES
             catch
             {
                 if (asset != null && !EditorUtility.IsPersistent(asset))
-                    DestroyImmediate(asset);
+                    UnityEngine.Object.DestroyImmediate(asset);
                 throw;
             }
             AssetDatabase.SaveAssetIfDirty(asset);
@@ -242,7 +242,8 @@ namespace ES
         [ShowInInspector, MultiLineProperty(3), LabelText("采样文本")]
         public string sampleText = "简体中文 / 繁體中文 / English / 日本語 / 한국어 / Français / Deutsch / Español / Português / Русский 0123456789";
 
-        [NonSerialized] private PreviewRenderUtility previewUtility;
+        [NonSerialized] private ESEditorPreviewRenderContext previewContext;
+        [NonSerialized] private ESEditorPreviewModelHandle previewModel;
         [NonSerialized] private GameObject previewObject;
         [NonSerialized] private TextMeshPro previewText;
         [NonSerialized] private TMP_FontAsset previewFont;
@@ -404,16 +405,13 @@ namespace ES
             try
             {
                 EnsurePreview(font);
-                if (previewUtility == null || previewText == null)
+                if (previewContext == null || previewModel == null || previewText == null)
                 {
                     EditorGUI.HelpBox(rect, "无法创建字体预览。", MessageType.Warning);
                     return;
                 }
-                previewUtility.BeginPreview(rect, GUIStyle.none);
-                previewUtility.camera.Render();
-                Texture preview = previewUtility.EndPreview();
-                if (preview != null)
-                    GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit, false);
+                if (!previewContext.RenderCurrentCameraGUI(rect, ESEditorPreviewRenderOptions.Fast))
+                    EditorGUI.HelpBox(rect, "字体预览渲染失败。", MessageType.Warning);
             }
             catch (Exception exception)
             {
@@ -424,23 +422,37 @@ namespace ES
 
         private void EnsurePreview(TMP_FontAsset font)
         {
-            if (previewUtility == null)
+            if (previewContext == null)
             {
-                previewUtility = new PreviewRenderUtility();
-                previewUtility.camera.clearFlags = CameraClearFlags.Color;
-                previewUtility.camera.backgroundColor = new Color(0.16f, 0.16f, 0.16f, 1f);
-                previewUtility.camera.orthographic = true;
-                previewUtility.camera.orthographicSize = 1.45f;
-                previewUtility.camera.transform.position = new Vector3(0f, 0f, -10f);
-                previewUtility.camera.transform.rotation = Quaternion.identity;
+                previewContext = new ESEditorPreviewRenderContext(
+                    "ES Font Preview",
+                    ESEditorPreviewSceneMode.PreviewScene,
+                    ESEditorPreviewUtility.DefaultPreviewLayer,
+                    ESEditorPreviewEnhancerSet.LowEnd);
+                previewContext.Ensure();
+                previewContext.Camera.clearFlags = CameraClearFlags.Color;
+                previewContext.Camera.backgroundColor = new Color(0.16f, 0.16f, 0.16f, 1f);
+                previewContext.Camera.orthographic = true;
+                previewContext.Camera.orthographicSize = 1.45f;
+                previewContext.Camera.transform.position = new Vector3(0f, 0f, -10f);
+                previewContext.Camera.transform.rotation = Quaternion.identity;
 
-                previewObject = new GameObject("__ESFontPreview__");
-                previewObject.hideFlags = HideFlags.HideAndDontSave;
+                previewObject = ESEditorPreviewUtility.CreatePreviewGameObject("__ESFontPreview__");
                 previewText = previewObject.AddComponent<TextMeshPro>();
                 previewText.alignment = TextAlignmentOptions.Center;
                 previewText.fontSize = 0.22f;
                 previewText.rectTransform.sizeDelta = new Vector2(7.5f, 2.4f);
-                previewUtility.AddSingleGO(previewObject);
+                previewModel = previewContext.AdoptModelGroup(
+                    previewObject,
+                    previewObject,
+                    "ES Font Preview",
+                    samplingTarget: false,
+                    copyRendererState: false,
+                    disableRuntimeBehaviours: false,
+                    ensureRenderersEnabled: true,
+                    activateInstance: true,
+                    moveToGroupOrigin: true);
+                previewObject = null;
             }
 
             if (previewFont == font && string.Equals(renderedSample, sampleText, StringComparison.Ordinal))
@@ -463,19 +475,14 @@ namespace ES
             previewText = null;
             previewFont = null;
             renderedSample = null;
-            PreviewRenderUtility utility = previewUtility;
-            previewUtility = null;
-            if (utility != null)
-            {
-                try
-                {
-                    utility.Cleanup();
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogException(exception);
-                }
-            }
+            ESEditorPreviewModelHandle model = previewModel;
+            previewModel = null;
+            try { model?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            ESEditorPreviewRenderContext context = previewContext;
+            previewContext = null;
+            try { context?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             GameObject objectToDestroy = previewObject;
             previewObject = null;
             if (objectToDestroy != null)

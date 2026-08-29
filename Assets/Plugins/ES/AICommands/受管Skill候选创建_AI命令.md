@@ -30,6 +30,17 @@ Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
 
 ## 交付格式
 
+```ContractCompleteness
+commandId: skill.create.candidate
+cancellation: before commit; cancel leaves no formal Skill
+recovery: isolated candidate cleanup; NeedsReissue on uncertain state; no replay
+validation: candidate schema, content hash, and isolated-path checks
+evidenceRef: candidate path, SHA-256, receipt, and Static/Runtime status
+allowRoots: ES/Automation/Candidates/AgentAuthoring/<request-id>/candidate/ only
+denyPaths: .agents/skills, Assets/Plugins/ES/AICommands, Assets, Runtime, Git, release
+deny-overrides: true
+```
+
 ```text
 1. 已读规则
 2. 候选目录和目标映射

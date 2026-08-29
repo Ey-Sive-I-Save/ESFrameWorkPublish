@@ -25,6 +25,18 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 5. 必须保留 InvocationId、PlanHash、Graph 指纹和 RunRecord；不得把已发送描述成已完成。
 6. 不得借单次执行安装永久 Skill、修改正式 AICommand、提交 Git 或发布。
 
+## ContractCompleteness
+
+```text
+commandId: graph.single-use.execute
+cancellation: before Automation dispatch only; after dispatch returns RecoveryRequired.
+recovery: RunRecord/idempotency guarded; unknown state returns NeedsReissue, no replay.
+validation: baked graph fingerprint, AIBrain PlanHash, TaskContract and registered task checks.
+evidenceRef: commandBodyHash, planHash, graph fingerprint, RunId, receipt and static-runtime split.
+allowRoots: registered Stable Graph task and受管 RunRecord only.
+denyPaths: scripts, interpreters, arbitrary output, source writes, Git and release; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

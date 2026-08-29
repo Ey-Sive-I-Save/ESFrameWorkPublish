@@ -1,64 +1,22 @@
 # 角色 Prefab 职责与 DataInfo 入口：AI 协作警告
 
-状态：现行约束；角色模板与正式 Variant 的实现/验收按本文件执行。  
-最后核对：2026-08-16。
+Status: current
+StableId: es.aiwarning.arch.character-prefab-datainfo-boundary.v1
+Authority: AIWarnings；详细事实见 Knowledge
+RouteKeys: aiwarnings, architecture, entity, prefab, datainfo, identity
+Applicability: Entity 根、EntityCharacterIdentity、角色 Prefab、挂点、FinalIK、武器根与制作验证
+Owner: ESFramework EntityWorld 维护者
+EvidenceRef: Documentation/AIKnowledge/entries/aiwarning-architecture-character-prefab-datainfo-boundary.md
+StaleWhen: Entity 绑定、角色 Profile/Variant、挂点映射、FinalIK 或装备域实现变化。
 
-## 负责范围
+## 长期约束
 
-本规则约束 `Entity` 根、`EntityCharacterIdentity`、三种角色 Prefab 身份、挂点、FinalIK、武器根和角色制作验证。它不把 AI、Buff、战斗或对象池变成新的角色 MonoBehaviour 体系。
+- Entity 是唯一定义绑定执行者，经同根 `EntityCharacterIdentity` 调用 `Entity.BindDefinition(唯一 DataInfo)`；Profile 只保存静态身份、阵营与唯一 DataInfo。BuildInput 不可发布，RuntimePoolTemplate 由租出方绑定，Variant 自动绑定唯一 Actor/Monster/Npc DataInfo。
+- 角色根固定 `Entity + KinematicCharacterMotor + CapsuleCollider + EntityCharacterIdentity + EntityTransformMapping`，模型承载一个 Animator；AI/Buff/战斗/状态/装备留在 Domain/Module，不新增桥接 MonoBehaviour。
+- `EntityTransformMapping` 是挂点缓存服务，缺失正式 Socket 必须拒绝装配，不回退 Humanoid 骨骼/根节点/自动造点；WeaponBinding 仅挂在实际武器根。FinalIK 模板默认轻量，Variant 只有 Solver/前置依赖齐全才启用。
+- 禁止用 SerializedObject、反射或跨程序集私有字段配置 Driver；禁止用 Layer、GameTag、手骨冒充阵营/定义/武器偏移；基础模板、预览模型或未配置 Solver 的 Variant 不得发布。
+- 回池清除定义、Buff、ValueChange、Tag 生命周期，旧 Lease 不得影响下一租户。静态结构或验证器通过不等于角色运行时、IK、武器与发布验收通过。
 
-正式说明见：`Documentation/CHARACTER_PREFAB_CONTRACT.md`。
+## Knowledge 导航
 
-## 当前有效设计
-
-```text
-Entity 生命周期
-  -> 同根 EntityCharacterIdentity
-  -> Entity.BindDefinition(唯一 DataInfo)
-```
-
-- `Entity` 是唯一的定义绑定执行者；Profile 只保存 Prefab 静态身份、阵营和正式 Variant 的唯一 DataInfo。
-- `BuildInput` 无定义，禁止直接发布；`RuntimePoolTemplate` 无定义，由租出方直接 `Entity.BindDefinition(...)`；`CharacterVariant` 自动绑定 Profile 中唯一的 Actor、Monster 或 Npc DataInfo。
-- 角色根固定为 `Entity + KinematicCharacterMotor + CapsuleCollider + EntityCharacterIdentity + EntityTransformMapping`；模型固定承载一个 Animator。
-- AI、Buff、战斗、状态和装备能力留在 Entity 的 Domain / Module。`EntityEquipmentDomain` 是正式第五 Domain，聚合 Inventory / Slot / Attachment / Effect；`EntityBuffDomain` 已有 Buff 实例、叠层、持续时间、ValueChange / Permit、Op 与 Tag Lease 的运行时底座。源码存在不等于完整玩法已经验收。
-- `StateFinalIKDriver` 是状态到 IK 的表现桥。模板使用无 Solver、全部能力关闭的轻量基线；正式 Variant 仅在对应 Solver/前置依赖齐全后启用能力。
-- `EntityWeaponBinding` 只按需挂在每个实际武器根；无武器角色不挂空组件。角色整体挂载只使用 `EntityTransformMapping` 中作者化的 MainHand / OffHand / PrimaryBack / SecondaryBack / Hip / TemporaryHand Socket；武器根只提供 GripPivot、OffHandGrip、Muzzle、AimReference 与 PresentationRoot 等本地参考。
-- `EntityTransformMapping` 是挂点缓存服务。固定挂点读取缓存，热路径禁止重新 Find；缺失正式业务 Socket 必须拒绝装配，禁止回退到 Humanoid 手骨、角色根或运行时自动造点。
-
-## 已废止或禁止的设计
-
-- 禁止增加 `EntityCharacterComposition`、`EntityCharacterDefinitionBinding`、`CharacterActor` 或同义桥接组件来转发 Profile 到 Entity。
-- 禁止使用“运行时生成器”作为通用池角色的定义所有者；只有明确的租出方调用 `Entity.BindDefinition(...)`。
-- 禁止通过 `SerializedObject`、反射、跨程序集读取 Driver 私有/`internal` 序列化字段配置模板。Driver 制作工具需要的语义必须走其 `public` API。
-- 禁止把 Unity Layer、GameTag 或 Humanoid 手骨滥当阵营、角色定义或武器业务偏移。
-- 禁止把基础模板、预览模型或 Solver 未配置的正式 Variant 当成可发布角色。
-
-## 高风险误区
-
-1. BuildInput 和 RuntimePoolTemplate 的结构可验证，不代表它们可进入正式内容。
-2. Formal Variant 的 DataInfo、阵营、Layer、Collider、HurtBox/HitBox、InteractionProbe、装备和 IK 都是独立验收项；仅跑“创建并验证全部角色模板”不够。
-3. Driver 存在但启用能力缺 Solver 必须报错；不能悄悄降级。
-4. 回池时 Entity 清除本轮定义、Buff、ValueChange 和 Tag 生命周期；旧 Lease 不得影响下一位租户。
-5. 不要为“固定脚本数量”空挂 WeaponBinding 或另加战斗/AI/Buff MonoBehaviour。
-
-## 入口文件
-
-```text
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterIdentity.cs
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityTransformMapping.cs
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityWeaponBinding.cs
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs
-Assets/Scripts/ESLogic/Runtime/State/IK/StateFinalIKDriver_/StateFinalIKDriver.AuthoringContract.cs
-Assets/Scripts/ESLogic/Editor/CharacterTemplates/ESBasicCharacterTemplateBuilder.cs
-Assets/ESNormalAssets/CharacterTemplates/ES基础角色模板.prefab
-Assets/ESNormalAssets/CharacterTemplates/ES通用角色完整架构.prefab
-```
-
-## 下一步与验收
-
-1. P0：构建/发布门禁阻止基础模板与预览模型进入正式内容。
-2. P0：验证器对启用的 FinalIK 能力执行 Solver 契约检查。
-3. P1：正式 Variant 补齐阵营、Layer、Collider、HurtBox/HitBox、InteractionProbe、装备和唯一 DataInfo。
-4. P1：正式 Variant 跑移动、状态切换、池复用、武器挂载、命中检测、已启用 IK 的 PlayMode 烟雾测试。
-5. P2：为动画事件驱动的 Equip / Holster / Switch、双持与最终 IK Pose 补 PlayMode、Profiler 和 Player 证据。
+完整当前设计、废止方案、高风险误区、入口文件和分级验收矩阵见 `es.aiwarning.arch.character-prefab-datainfo-boundary.v1`。

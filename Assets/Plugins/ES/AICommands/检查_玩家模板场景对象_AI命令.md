@@ -31,6 +31,20 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界�
 定位场景对象或 Prefab，但不移动不删除不改层级。输出层级、职责、风险和商业级可扩展性。
 ```
 
+## ContractCompleteness
+
+```yaml
+commandId: player-template.review
+writeMode: read-only
+cancellation: N/A (read-only; no external effect; stop before analysis)
+recovery: N/A (read-only; rerun from unchanged inputs; no rollback)
+validation: read-only checks only; no writes, runtime, Git, release, or external effects
+evidenceRef: source refs + SHA-256/content hash when available + read receipt; static evidence cannot claim Runtime
+actionBoundary: AIBrain/ABCD selects intent and route; this command only reviews and reports; Automation/ABCC execution is out of scope
+allowRoots: project files explicitly listed in 必须先读 and the contract's declared read-only targets only
+denyPaths: source writes, undeclared paths, Git/history, release, Runtime/Unity, external services; deny-overrides
+```
+
 ## 交付格式
 
 ```text

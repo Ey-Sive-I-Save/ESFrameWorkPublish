@@ -15,7 +15,7 @@
 
 命令类型：安全执行。
 默认改文件：是，仅 Command 相关明确文件。
-风险等级：L2/L3。
+风险等级：L3。
 
 ## 必须先读
 
@@ -29,6 +29,18 @@ Assets/Scripts/ESLogic/Runtime/Command/
 
 ```text
 强约束新增 ESCommand：命名 ESCommand_<模块>_<动作>，强类型字段参数，简单命令只实现 Invoke。
+```
+
+## ContractCompleteness
+
+```text
+commandId: command.add-runtime.strict
+cancellation: before Command source commit may cancel; after commit stop, preserve the diff and report partial state; no implicit rollback.
+recovery: retain patch and compile evidence, retry with a new invocationId/CAS, and require NeedsReissue for identity or source drift; no blind replay.
+validation: ESCommand_STANDARD, strong typed fields, Invoke-only simplicity, namespace/assembly placement, duplicate identity, ES_Logic.csproj compile and negative boundary probes.
+evidenceRef: planHash, commandBodyHash, source SHA-256, diff, compiler output, negative probes and explicit Runtime-not-run status.
+allowRoots: Assets/Scripts/ESLogic/Runtime/Command and minimum explicitly required Command tests/docs only.
+denyPaths: Plugins/ES/2_Feature, legacy player, unrelated runtime systems, AIWarnings, AICommands Catalog/index, ProjectSettings, Packages, release, Library and Git/.git; deny-overrides.
 ```
 
 ## 交付格式

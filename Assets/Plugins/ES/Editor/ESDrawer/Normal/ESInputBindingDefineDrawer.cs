@@ -748,7 +748,7 @@ namespace ES.EditorInternal
                 }
                 catch (Exception exception)
                 {
-                    context.SetStatus("临时 InputAction 已失效，窗口将安全关闭。", MessageType.Error);
+                    context.SetStatus("临时 InputAction 已失效，窗口将安全关闭。", ESMenuTreePageStatus.Error);
                     Debug.LogException(new InvalidOperationException(
                         "ES InputAction 绑定导入窗口绘制失败。", exception));
                     ReleaseTemporaryInputAction();

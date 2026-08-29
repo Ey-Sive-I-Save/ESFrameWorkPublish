@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -114,21 +115,34 @@ namespace ES
 
         private void OnEditorUpdate()
         {
-            double now = EditorApplication.timeSinceStartup;
-            if (now < nextRepaintAt)
-                return;
-
-            bool active = ESDeveloperObservationController.IsObserving
-                || EditorApplication.isPlayingOrWillChangePlaymode;
-            bool observing = ESDeveloperObservationController.IsObserving;
-            if (observing != lastObservingState)
+            if (this == null)
             {
-                lastObservingState = observing;
-                ESWindow_CurrentPageContext?.RefreshPageActions();
+                EditorApplication.update -= OnEditorUpdate;
+                return;
             }
-            double interval = active && hasFocus ? 0.10d : active ? 0.25d : 0.50d;
-            nextRepaintAt = now + interval;
-            Repaint();
+            try
+            {
+                double now = EditorApplication.timeSinceStartup;
+                if (now < nextRepaintAt)
+                    return;
+
+                bool active = ESDeveloperObservationController.IsObserving
+                    || EditorApplication.isPlayingOrWillChangePlaymode;
+                bool observing = ESDeveloperObservationController.IsObserving;
+                if (observing != lastObservingState)
+                {
+                    lastObservingState = observing;
+                    ESWindow_CurrentPageContext?.RefreshPageActions();
+                }
+                double interval = active && hasFocus ? 0.10d : active ? 0.25d : 0.50d;
+                nextRepaintAt = now + interval;
+                Repaint();
+            }
+            catch (Exception exception)
+            {
+                EditorApplication.update -= OnEditorUpdate;
+                Debug.LogWarning("ES 开发者驾驶舱刷新失败，已停止编辑器更新回调：" + exception.Message);
+            }
         }
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)

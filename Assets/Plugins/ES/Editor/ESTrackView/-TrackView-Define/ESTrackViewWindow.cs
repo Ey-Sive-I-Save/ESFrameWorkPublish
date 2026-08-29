@@ -591,14 +591,14 @@ public class ESTrackViewWindow : OdinEditorWindow, ES.IESWindowPresentationShort
             window.ApplyTrackPanelLayout(false);
             window.UpdateTimelineContentHeight();
 
-            int projectionGeneration = m_ProjectionGeneration;
+            int projectionGeneration = window.m_ProjectionGeneration;
             ESEditorHandle.AddSimpleHandleTask(() =>
             {
-                if (projectionGeneration != m_ProjectionGeneration
-                    || window != this
-                    || leftPanel == null)
+                if (projectionGeneration != window.m_ProjectionGeneration
+                    || window == null
+                    || window.leftPanel == null)
                     return;
-                foreach (var it in ESTrackViewWindow.window.Items)
+                foreach (var it in window.Items)
                 {
                     it.UpdateNodes();
                 }
@@ -4890,16 +4890,17 @@ public class ESTrackViewWindow : OdinEditorWindow, ES.IESWindowPresentationShort
         }
         finally
         {
-            if (candidate == null)
-                return;
-            try
+            if (candidate != null)
             {
-                candidate.DisposeEditorPreviewTarget();
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(new InvalidOperationException(
-                    "Track 预览播放器提交失败，临时预览对象释放也失败。", exception));
+                try
+                {
+                    candidate.DisposeEditorPreviewTarget();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "Track 预览播放器提交失败，临时预览对象释放也失败。", exception));
+                }
             }
         }
     }
@@ -6544,16 +6545,16 @@ public class ESTrackViewWindow : OdinEditorWindow, ES.IESWindowPresentationShort
             double remainingDelay = validationIdleDelay - (EditorApplication.timeSinceStartup - m_LastAutoValidationRequestTime);
             if (remainingDelay > 0d)
             {
-                m_AutoValidationTask = rootVisualElement.schedule
-                    .Execute(validateWhenIdle)
-                    .ExecuteLater(Mathf.CeilToInt((float)(remainingDelay * 1000d)));
+                m_AutoValidationTask = rootVisualElement.schedule.Execute(validateWhenIdle);
+                m_AutoValidationTask.ExecuteLater(Mathf.CeilToInt((float)(remainingDelay * 1000d)));
                 return;
             }
 
             m_AutoValidationScheduled = false;
             AutoValidateSequenceVisuals();
         };
-        m_AutoValidationTask = rootVisualElement.schedule.Execute(validateWhenIdle).ExecuteLater(250);
+        m_AutoValidationTask = rootVisualElement.schedule.Execute(validateWhenIdle);
+        m_AutoValidationTask.ExecuteLater(250);
     }
 
     private void AutoValidateSequenceVisuals()

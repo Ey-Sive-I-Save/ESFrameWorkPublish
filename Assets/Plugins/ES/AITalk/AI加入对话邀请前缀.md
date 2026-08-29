@@ -7,10 +7,14 @@
 
 请先定位到下面的工程绝对路径，再进入 AITalk 会话。不要只按 `Assets/...` 相对路径查找。
 
-本工程有 AITalk 文件协作机制：多个 AI 在同一个 Session 文件夹里通过 Messages/ 轮流发言，通过 Consensus/ 沉淀共同意见。当前需要多人连续讨论，请不要提前定稿；你写完第一条消息后不要直接结束，请持续轮询该会话目录一段时间。发现其他 AI 写入新消息后，读取新增消息并继续回复，直到达成共识、达到轮次上限，或遇到必须用户拍板的问题。
+本工程有 AITalk 文件协作机制：多个 AI 在同一个 Session 文件夹里通过 Messages/ 轮流发言，通过 Consensus/ 沉淀共同意见。AITalk 是协作记录与意见聚合层，不拥有执行授权、任务完成权、Runtime 验收权或 Codex handoff 权。当前需要多人连续讨论，请不要提前定稿；你写完第一条消息后不要直接结束，请按 00_会话说明.md 的 `pollPolicy` 轮询该会话目录一段时间。发现其他 AI 写入新消息后，读取新增消息并继续回复，直到达成共识、达到轮次上限，或遇到必须用户拍板的问题。
+
+主 AI 可以在讨论后运行 `ES/Automation/TaskCollaboration/Invoke-ESAITalkHumanLightFlow.ps1`，把全部 Session 自动汇总成一份候选结果。正常情况下用户只收到 `auto-ready`，无需逐条阅读或转发消息；只有输出 `actionItems` 时才需要用户处理明确事项。
+
+对普通用户只暴露五句入口话术：`开始 AITalk：<主题>`、`继续 AITalk：<主题>`、`汇总 AITalk：<主题>`、`暂停 AITalk：<主题>`、`结束 AITalk：<主题>`。不要要求用户填写 SessionPath、pollPolicy、Hash 或 TaskContract；缺少主题时只追问主题。
 
 你必须先摸清并遵守 AITalk 准则：
-1. 连续交流时约每 20 秒轮询一次会话目录。
+1. 连续交流时按 `pollPolicy` 轮询会话目录（约 20 秒仅为兼容默认值）。
 2. 单次讨论一般控制在 15 分钟以内。
 3. 尽量完成 3 轮以上有效对话；少于 3 轮结束必须说明原因。
 4. 最终结论写入文件后，负责最终回复的主 AI 必须通过对话框主动告诉用户，不让用户自己去找文件。
@@ -18,6 +22,7 @@
 6. 先确认会话说明是否允许改代码，以及允许改哪里；没有授权就不要改项目代码。
 7. 达成共识后不要单方面结束，应明确询问或写明“我认为可以结束对话”，等待关键参与 AI 一起确认。
 8. 不能因为约 1 分钟没有新消息就自行结束轮询；无新消息只表示等待，不表示结束。
+9. 结构化消息必须携带 `conversationId/messageId/authorId/sequence/messageKind/taskBinding/visibility/payloadHash/evidenceRefs`；聚合只输出候选状态，不能自报 `Accepted` 或 `Completed`。
 
 请按以下规则操作：
 1. 根据最后的工程绝对路径打开项目。
@@ -34,6 +39,8 @@
 12. 连续交流要求：轮询间隔约 20 秒，自动交流 3-5 轮；不要让用户在每一步之间当中间人。
 13. 结束前尽量让关键参与 AI 明确表示可以结束；如果只是长时间没有新消息，只能标记暂停，不能伪装成共同同意。
 14. 如果是 PlayMode 玩家，你不是写一条消息就完成任务；在主持者宣布结束前，必须持续轮询公开 State、Moderator 消息和自己的 Private 目录。
+
+AITalk Session 路径只用于会话记录。Codex 新窗口、恢复或正式交接必须使用 immutable launch envelope，不能把 AITalk Session 当作 handoff 来源。
 
 工程绝对路径：
 

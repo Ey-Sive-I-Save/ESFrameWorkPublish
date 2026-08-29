@@ -29,6 +29,8 @@ namespace ES
         public const string ProjectSkillDiscoveryPolicyPath = ".agents/SKILL_DISCOVERY_POLICY.json";
         public const string RoutePlanContractId = "es://automation/contracts/route-plan/v1";
         public const string RouteStageRegistryPath = "ES/Automation/Contracts/es-route-stage.registry.json";
+        public const string AbcModeRegistryPath = "ES/Automation/Contracts/es-ai-abc-mode.registry.json";
+        public const string ChineseSkillAliasPath = ".agents/SKILL_ROUTE_ALIASES.zh-CN.json";
         private const string AuthorizationStorePath = "ES/Output/Automation/AIBrain/authorizations.json";
         private const int AuthorizationStoreSchemaVersion = 3;
         private const int MaximumAuthorizationRecords = 4096;
@@ -64,10 +66,12 @@ namespace ES
             ".agents/SKILL_RESOURCE_INDEX.yaml",
             ".agents/SKILL_CATALOG.yaml",
             ".agents/SKILL_DISCOVERY_POLICY.json",
+            ChineseSkillAliasPath,
             "Documentation/AIKnowledge/KnowledgeIndex.yaml",
             "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
             "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
             RouteStageRegistryPath,
+            AbcModeRegistryPath,
         };
         private static string capabilityMetadataFingerprint = string.Empty;
         private static string capabilityDriftTrigger = string.Empty;
@@ -1383,7 +1387,7 @@ namespace ES
         public static ESAIBrainProductionSurface DescribeProductionSurface(
             IEnumerable<string> requestedRouteKeys = null)
         {
-            List<string> routeKeys = NormalizeValues(requestedRouteKeys);
+            List<string> routeKeys = NormalizeDiscoveryRouteKeys(requestedRouteKeys);
             if (routeKeys.Count == 0)
                 routeKeys.AddRange(DefaultDiscoveryRouteKeys);
 
@@ -1406,6 +1410,7 @@ namespace ES
             surface.knowledge.AddRange(probe.knowledge);
             surface.blockers.AddRange(probe.blockers);
 
+            CollectAbcModes(surface);
             CollectCommands(surface);
             CollectSkills(surface);
             CollectAutomationAndCli(surface);
@@ -1426,6 +1431,139 @@ namespace ES
             "task", "read", "snapshot", "consistency", "parser", "projection", "binary",
             "feishu", "lark", "external-adapter", "dry-run",
         };
+
+        private static readonly string[] RequiredAbcModeIds =
+        {
+            "ABCD.Dynamic", "ABCC.Core", "ABCP.Part",
+        };
+
+        private static List<string> NormalizeDiscoveryRouteKeys(IEnumerable<string> values)
+        {
+            List<string> routeKeys = NormalizeValues(values);
+            if (routeKeys.Any(IsAbcdDynamicRouteAlias)
+                && !routeKeys.Contains("agent-mechanism-replication", StringComparer.Ordinal))
+                routeKeys.Add("agent-mechanism-replication");
+            return routeKeys;
+        }
+
+        private static bool IsAbcdDynamicRouteAlias(string value)
+        {
+            switch (value)
+            {
+                case "abcd":
+                case "abcd.dynamic":
+                case "abcd dynamic":
+                case "abcd动态":
+                case "abcd动态体系":
+                case "abcd动态协作":
+                case "es动态协作体":
+                case "es 动态协作体":
+                case "动态协作体":
+                case "动态协作接管":
+                case "abcd接管":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static void CollectAbcModes(ESAIBrainProductionSurface surface)
+        {
+            if (!TryResolveProjectPath(AbcModeRegistryPath, out string path, out string pathError))
+            {
+                surface.blockers.Add("ABC 模式注册表路径无效：" + pathError);
+                return;
+            }
+            if (!TryReadTextAndHash(path, out string text, out string registryHash, out string readError))
+            {
+                surface.blockers.Add("ABC 模式注册表无法严格读取：" + readError);
+                return;
+            }
+
+            try
+            {
+                JObject root = JObject.Parse(text);
+                if (root.Value<int?>("schemaVersion") != 1
+                    || !string.Equals(root.Value<string>("registryId"),
+                        "es-ai-abc-mode-registry", StringComparison.Ordinal))
+                    throw new InvalidDataException("ABC 模式注册表身份或版本无效。");
+
+                JObject namingAuthority = root["namingAuthority"] as JObject
+                    ?? throw new InvalidDataException("ABC 模式命名权威缺失。");
+                string authorityId = namingAuthority.Value<string>("authorityId") ?? string.Empty;
+                string authorityVersion = namingAuthority.Value<string>("version") ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(authorityId)
+                    || string.IsNullOrWhiteSpace(authorityVersion))
+                    throw new InvalidDataException("ABC 模式命名权威身份不完整。");
+                JObject modeNames = namingAuthority["modeNames"] as JObject
+                    ?? throw new InvalidDataException("ABC 模式命名映射缺失。");
+                JArray modes = root["modes"] as JArray
+                    ?? throw new InvalidDataException("ABC 模式列表缺失。");
+                string[] modeIds = modes.OfType<JObject>()
+                    .Select(item => item.Value<string>("modeId") ?? string.Empty)
+                    .ToArray();
+                if (modes.Count != modeIds.Length || modeIds.Length == 0
+                    || modeIds.Any(string.IsNullOrWhiteSpace)
+                    || modeIds.Distinct(StringComparer.Ordinal).Count() != modeIds.Length)
+                    throw new InvalidDataException("ABC 模式 ID 必须非空且唯一。");
+                if (modeIds.Length != RequiredAbcModeIds.Length
+                    || RequiredAbcModeIds.Any(required => !modeIds.Contains(required, StringComparer.Ordinal)))
+                    throw new InvalidDataException("ABC 模式注册表必须完整声明 ABCD.Dynamic、ABCC.Core 和 ABCP.Part。");
+
+                var bindings = new List<ESAIBrainModeBinding>();
+                foreach (JObject mode in modes.OfType<JObject>())
+                {
+                    string modeId = mode.Value<string>("modeId") ?? string.Empty;
+                    if (!Regex.IsMatch(modeId, "^[A-Za-z][A-Za-z0-9._-]{1,80}$"))
+                        throw new InvalidDataException("ABC 模式 ID 格式无效：" + modeId);
+                    JObject names = modeNames[modeId] as JObject
+                        ?? throw new InvalidDataException("ABC 模式缺少命名权威：" + modeId);
+                    JArray coverage = mode["capabilityCoverage"] as JArray
+                        ?? throw new InvalidDataException("ABC 模式缺少能力覆盖声明：" + modeId);
+                    List<string> capabilities = coverage.Values<string>()
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList();
+                    if (capabilities.Count == 0)
+                        throw new InvalidDataException("ABC 模式能力覆盖不能为空：" + modeId);
+
+                    bindings.Add(new ESAIBrainModeBinding
+                    {
+                        modeId = modeId,
+                        authorityId = authorityId,
+                        authorityVersion = authorityVersion,
+                        displayName = mode.Value<string>("displayName") ?? string.Empty,
+                        englishName = names.Value<string>("english") ?? string.Empty,
+                        chineseName = names.Value<string>("chinese") ?? string.Empty,
+                        shortName = names.Value<string>("shortName") ?? string.Empty,
+                        suffix = names.Value<string>("suffix") ?? string.Empty,
+                        independent = mode.Value<bool?>("independent") ?? false,
+                        orchestration = mode.Value<string>("orchestration") ?? string.Empty,
+                        dependsOnCore = mode.Value<bool?>("dependsOnCore") ?? false,
+                        fallback = mode.Value<string>("fallback") ?? string.Empty,
+                        contractRef = mode.Value<string>("contractRef") ?? string.Empty,
+                        registryHash = registryHash,
+                        capabilityCoverage = capabilities,
+                    });
+                }
+
+                ESAIBrainModeBinding dynamicMode = bindings.Single(item =>
+                    string.Equals(item.modeId, "ABCD.Dynamic", StringComparison.Ordinal));
+                ESAIBrainModeBinding coreMode = bindings.Single(item =>
+                    string.Equals(item.modeId, "ABCC.Core", StringComparison.Ordinal));
+                JObject parityRule = root["parityRule"] as JObject;
+                if (parityRule != null && parityRule.Value<bool?>("coreMustCoverDynamic") == true
+                    && dynamicMode.capabilityCoverage.Any(capability =>
+                        !coreMode.capabilityCoverage.Contains(capability, StringComparer.Ordinal)))
+                    throw new InvalidDataException("ABCC.Core 能力覆盖未闭合 ABCD.Dynamic。");
+
+                surface.modes.AddRange(bindings);
+            }
+            catch (Exception exception)
+            {
+                surface.blockers.Add("ABC 模式注册表校验失败：" + exception.Message);
+            }
+        }
 
         private static void CollectCommands(ESAIBrainProductionSurface surface)
         {
@@ -1656,6 +1794,12 @@ namespace ES
             {
                 surface.contractVersion,
                 surface.routeKeys,
+                modes = surface.modes.Select(item => item.modeId + "@" + item.registryHash
+                    + "@" + item.authorityId + "@" + item.authorityVersion + "@" + item.displayName
+                    + "@" + item.englishName + "@" + item.chineseName
+                    + "@" + item.shortName + "@" + item.suffix + "@" + item.independent
+                    + "@" + item.orchestration + "@" + item.dependsOnCore + "@" + item.fallback
+                    + "@" + item.contractRef + "@" + string.Join(",", item.capabilityCoverage)),
                 warnings = surface.warnings.Select(item => item.projectPath + "@" + item.sha256),
                 knowledge = surface.knowledge.Select(item => item.knowledgeId + "@" + item.contentHash),
                 commands = surface.commands.Select(item => item.id + "@" + item.contractHash),
@@ -1698,7 +1842,7 @@ namespace ES
             if (objective.Length == 0)
                 plan.blockers.Add("目标不能为空。");
 
-            List<string> routeKeys = NormalizeValues(request.routeKeys);
+            List<string> routeKeys = NormalizeDiscoveryRouteKeys(request.routeKeys);
             foreach (string inferredRouteKey in InferObjectiveRouteKeys(objective))
             {
                 if (!routeKeys.Contains(inferredRouteKey, StringComparer.Ordinal))
@@ -2864,6 +3008,8 @@ namespace ES
                 AiwarningsRuleIndex,
             };
 
+            ApplyAiwarningsMigrationSafetyGate(plan, objective, routeKeys, false);
+
             if (!TryResolveProjectPath(AiwarningsRouteCatalog, out string catalogPath,
                     out string catalogPathError))
             {
@@ -2886,6 +3032,8 @@ namespace ES
                             || (route["match"] as JArray ?? new JArray()).Values<string>()
                                 .Any(match => ContainsIgnoreCase(objective, match));
                         if (!matched) continue;
+                        if (route.Value<bool?>("requiresExplicitSourcePreservation") == true)
+                            ApplyAiwarningsMigrationSafetyGate(plan, objective, routeKeys, true);
                         string state = route.Value<string>("state") ?? string.Empty;
                         if (string.Equals(state, "reserved", StringComparison.Ordinal))
                         {
@@ -3228,6 +3376,10 @@ namespace ES
         private static List<string> InferObjectiveRouteKeys(string objective)
         {
             string text = objective ?? string.Empty;
+            bool hasAbcdDynamicModeSignal = ContainsAnyIgnoreCase(text,
+                "ABCD", "ABCD.Dynamic", "ABCD Dynamic", "ABCD动态", "ABCD动态体系",
+                "ABCD动态协作", "ES动态协作体", "ES 动态协作体", "动态协作体",
+                "动态协作接管", "ABCD接管");
             bool hasSkillUnderstandingRefreshSignal = ContainsAnyIgnoreCase(text,
                 "你的理解已经过时", "理解已经过时", "刷新一下技能理解", "刷新技能理解",
                 "重新理解当前项目提供的 skill", "重新理解当前项目的 skill",
@@ -3544,6 +3696,13 @@ namespace ES
                         "容量", "大小", "内存", "驻留", "保留", "峰值", "trim", "缩容"));
 
             var inferred = new List<string>();
+            if (hasAbcdDynamicModeSignal)
+            {
+                inferred.AddRange(new[]
+                {
+                    "agent-mechanism-replication"
+                });
+            }
             if (hasSkillUnderstandingRefreshSignal)
             {
                 inferred.AddRange(new[]
@@ -3747,6 +3906,105 @@ namespace ES
         {
             return (values ?? Array.Empty<string>())
                 .Any(value => ContainsIgnoreCase(text, value));
+        }
+
+        private static void ApplyAiwarningsMigrationSafetyGate(ESAIBrainPlan plan,
+            string objective, IReadOnlyCollection<string> routeKeys,
+            bool matchedPreservingRoute)
+        {
+            // This is a plan-only gate: it never moves, deletes, renames, or overwrites files.
+            bool hasWarningKnowledgeTarget = ContainsAnyIgnoreCase(objective,
+                    "警告", "warning", "warnings")
+                && ContainsAnyIgnoreCase(objective, "知识库", "Knowledge", "AIKnowledge");
+            bool hasAiwarningsTarget = ContainsAnyIgnoreCase(objective, "AIWarnings", "AIWarning")
+                || hasWarningKnowledgeTarget
+                || (routeKeys?.Contains("es.aiwarnings.full-coverage", StringComparer.Ordinal) ?? false)
+                || matchedPreservingRoute;
+            if (!hasAiwarningsTarget)
+                return;
+
+            bool hasTransferIntent = matchedPreservingRoute
+                || (routeKeys?.Contains("es.aiwarnings.full-coverage", StringComparer.Ordinal) ?? false)
+                || ContainsAnyIgnoreCase(objective,
+                    "迁移", "迁入", "迁出", "迁往", "转移", "转入", "搬迁",
+                    "移动", "移到", "移走", "搬到", "挪到", "导入", "导出", "抽离",
+                    "migration", "transfer", "move", "relocate", "projection", "投影", "聚合", "外置");
+            if (!hasTransferIntent)
+                return;
+
+            bool hasUnnegatedDestructiveAction = ContainsUnnegatedAnyIgnoreCase(objective,
+                "移动", "移到", "移走", "搬到", "挪到", "转移", "搬迁", "迁出",
+                "删除", "清空", "清除", "移除", "抹掉", "擦除", "销毁", "覆盖", "替换", "重写", "改写",
+                "move", "relocate", "delete", "remove", "erase", "purge", "destroy", "overwrite", "replace", "rewrite");
+            if (hasUnnegatedDestructiveAction)
+            {
+                AddAiwarningsMigrationBlocker(plan, "[AIWARNINGS.MIGRATION_DESTRUCTIVE_ACTION_DENIED] "
+                    + "AIWarnings 到 AIKnowledge 的迁移意图包含未被否定的移动、删除、覆盖或替换操作；"
+                    + "必须改为保留源 Warning 的非破坏性投影，并重新提交明确目标。");
+                return;
+            }
+
+            bool hasSourceRetention = ContainsAnyIgnoreCase(objective,
+                "保留全部 AIWarnings", "保留 AIWarnings", "保留原 Warning", "保留源 Warning",
+                "保留全部警告", "保留原警告", "保留源警告",
+                "保留原文件", "保留原路径", "保留权威", "源文件不变", "原始文件不变", "留存",
+                "权威性", "preserve source", "preserve source warnings", "source remains unchanged",
+                "do not alter source", "keep source");
+            bool hasNoDelete = ContainsAnyIgnoreCase(objective, "不删除", "禁止删除");
+            bool hasNoMove = ContainsAnyIgnoreCase(objective, "不移动", "禁止移动");
+            bool hasNoRename = ContainsAnyIgnoreCase(objective, "不重命名", "禁止重命名");
+            bool hasNoOverwrite = ContainsAnyIgnoreCase(objective, "不覆盖", "禁止覆盖");
+            bool hasDestructiveProhibition = ContainsAnyIgnoreCase(objective,
+                "源文件不变", "保持源不变", "不可变源", "非破坏性", "non-destructive", "immutable source")
+                || (hasNoDelete && hasNoMove && hasNoRename && hasNoOverwrite);
+            if (!hasSourceRetention || !hasDestructiveProhibition)
+            {
+                AddAiwarningsMigrationBlocker(plan, "[AIWARNINGS.MIGRATION_SOURCE_PRESERVATION_REQUIRED] "
+                    + "AIWarnings 到 AIKnowledge 的迁移必须明确保留原 Warning、原路径和权威性，"
+                    + "并禁止删除、移动、重命名或覆盖源文件。");
+            }
+        }
+
+        private static void AddAiwarningsMigrationBlocker(ESAIBrainPlan plan, string blocker)
+        {
+            if (plan == null || string.IsNullOrWhiteSpace(blocker)
+                || plan.blockers.Any(item => string.Equals(item, blocker, StringComparison.Ordinal)))
+                return;
+            plan.blockers.Add(blocker);
+        }
+
+        private static bool ContainsUnnegatedAnyIgnoreCase(string text, params string[] values)
+        {
+            string source = text ?? string.Empty;
+            string[] negations =
+            {
+                "禁止", "不得", "不允许", "不应", "不要", "不能", "严禁", "避免",
+                "不删除", "不移动", "不重命名", "不覆盖", "非破坏性", "源文件不变", "保持源不变",
+                "not", "do not", "must not", "without", "non-destructive", "preserve", "keep",
+            };
+
+            foreach (string value in values ?? Array.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                int offset = 0;
+                while (offset < source.Length)
+                {
+                    int index = source.IndexOf(value, offset, StringComparison.OrdinalIgnoreCase);
+                    if (index < 0)
+                        break;
+
+                    int prefixStart = Math.Max(0, index - 16);
+                    string prefix = source.Substring(prefixStart, index - prefixStart);
+                    if (!ContainsAnyIgnoreCase(prefix, negations))
+                        return true;
+
+                    offset = index + Math.Max(1, value.Length);
+                }
+            }
+
+            return false;
         }
 
         private static bool IsCompleteProjectSkill(string name)
@@ -4844,6 +5102,26 @@ namespace ES
         public string registrationState = string.Empty;
     }
 
+    [Serializable]
+    public sealed class ESAIBrainModeBinding
+    {
+        public string modeId = string.Empty;
+        public string authorityId = string.Empty;
+        public string authorityVersion = string.Empty;
+        public string displayName = string.Empty;
+        public string englishName = string.Empty;
+        public string chineseName = string.Empty;
+        public string shortName = string.Empty;
+        public string suffix = string.Empty;
+        public bool independent;
+        public string orchestration = string.Empty;
+        public bool dependsOnCore;
+        public string fallback = string.Empty;
+        public string contractRef = string.Empty;
+        public string registryHash = string.Empty;
+        public List<string> capabilityCoverage = new List<string>();
+    }
+
     internal sealed class SkillEligibility
     {
         public string discoveryState = string.Empty;
@@ -4933,6 +5211,7 @@ namespace ES
         public string status = string.Empty;
         public string inventoryHash = string.Empty;
         public readonly List<string> routeKeys = new List<string>();
+        public readonly List<ESAIBrainModeBinding> modes = new List<ESAIBrainModeBinding>();
         public readonly List<string> blockers = new List<string>();
         public readonly List<ESAIBrainEvidenceBinding> warnings = new List<ESAIBrainEvidenceBinding>();
         public readonly List<ESAIBrainKnowledgeBinding> knowledge = new List<ESAIBrainKnowledgeBinding>();
@@ -5030,7 +5309,7 @@ namespace ES
                         + ". Existing plans are stale until route-scoped comparison and re-plan.",
                         MessageType.Warning);
                 }
-                if (GUILayout.Button("刷新生产力面（Skills / CLI / MCP / Warnings / Knowledge）", GUILayout.Height(26f)))
+                if (GUILayout.Button("刷新生产力面（ABC 模式 / Skills / CLI / MCP / Warnings / Knowledge）", GUILayout.Height(26f)))
                 {
                     productionSurface = ESAIBrainCoordinator.DescribeProductionSurface(Split(routeKeys));
                     context.SetStatus("生产力面已刷新：" + productionSurface.status,
@@ -5060,6 +5339,7 @@ namespace ES
                     EditorGUILayout.Space(8f);
                     EditorGUILayout.LabelField("生产力面", productionSurface.status, EditorStyles.boldLabel);
                     DrawSelectableValue("InventoryHash", productionSurface.inventoryHash);
+                    EditorGUILayout.LabelField("ABC 模式", productionSurface.modes.Count.ToString());
                     EditorGUILayout.LabelField("Skills", productionSurface.skills.Count.ToString());
                     EditorGUILayout.LabelField("CLI", productionSurface.cli.Count.ToString());
                     EditorGUILayout.LabelField("MCP", productionSurface.mcp.Count.ToString());

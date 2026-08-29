@@ -14,6 +14,18 @@
 
 严禁把本命令当作源文件写入、命令执行、Unity/MCP 授权或 Runtime 证据。所有写入必须可由 receipt 逐项对账并支持幂等重试。
 
+## ContractCompleteness
+
+```text
+commandId: task.read-snapshot.write
+cancellation: before snapshot/cache commit only; committed immutable receipts are not edited or deleted.
+recovery: reread last valid snapshot, recompute source/parser/projection hashes, use new idempotencyKey; drift returns blocked.
+validation: TaskContract/PlanHash, ReadSet bounds, UTF-8, duplicate/path/reparse checks, SHA-256 and receipt reconciliation.
+evidenceRef: commandId, commandBodyHash, planHash, taskId, snapshot/cache hashes, write manifest, receipt and failure/recovery state.
+allowRoots: ES/Output/TaskReadSnapshots and ES/Output/FileProjectionCache entries matching current TaskId and content Hash only.
+denyPaths: Assets, source, Git, Unity state, external network, release, Runtime and unrelated TaskId/cache entries; deny-overrides.
+```
+
 ## 交付格式
 
 返回 TaskId、快照 Hash、缓存命中/失效计数、实际写入路径清单、Receipt 路径和失败/恢复状态；缺少任何绑定时返回 blocked。

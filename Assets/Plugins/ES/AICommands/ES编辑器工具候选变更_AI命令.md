@@ -30,6 +30,17 @@ Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
 
 ## 交付格式
 
+```ContractCompleteness
+commandId: editor.tooling.change.candidate
+cancellation: before commit; cancel leaves no formal editor asset
+recovery: isolated candidate cleanup; NeedsReissue on uncertain state; no replay
+validation: candidate schema, content hash, and isolated-path checks
+evidenceRef: candidate path, SHA-256, receipt, and Static/Runtime status
+allowRoots: ES/Automation/Candidates/EditorTooling/<request-id>/candidate/ only
+denyPaths: .agents/skills, Assets/Plugins/ES/AICommands, Assets, Runtime, Git, release
+deny-overrides: true
+```
+
 ```text
 1. 候选目录和差异摘要。
 2. StaticDeepReplay 已执行案例及结果。

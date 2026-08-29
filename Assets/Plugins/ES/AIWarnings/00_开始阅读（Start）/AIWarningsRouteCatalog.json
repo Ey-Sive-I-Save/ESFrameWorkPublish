@@ -23,6 +23,52 @@
       ]
     },
     {
+      "id": "es.aiwarnings.agent-skills-aicommands-boundary",
+      "state": "current",
+      "match": [
+        "Agent Skills AICommands 协作边界",
+        "Agent Skills AICommands collaboration boundary",
+        "Knowledge authority evidence boundary permission boundary",
+        "Skill discovery AICommand contract user authorization"
+      ],
+      "mustRead": [
+        "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+        "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+        "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md",
+        "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md"
+      ]
+    },
+    {
+      "id": "es.aiwarnings.full-coverage",
+      "state": "current",
+      "operation": "knowledge-projection",
+      "sourcePolicy": "preserve",
+      "requiresExplicitSourcePreservation": true,
+      "forbiddenOperations": [
+        "move",
+        "delete",
+        "rename",
+        "overwrite",
+        "replace"
+      ],
+      "match": [
+        "AIWarnings 详细内容迁入 Knowledge（保留原 Warning）",
+        "AIWarnings 非破坏性全量迁移",
+        "AIWarnings full coverage migration preserving source warnings",
+        "警告详细内容迁入知识库（保留原警告）",
+        "警告非破坏性迁移",
+        "Warning Knowledge coverage",
+        "规则覆盖整改需求"
+      ],
+      "mustRead": [
+        "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+        "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+        "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md"
+      ]
+    },
+    {
       "id": "ui-icon-atlas",
       "state": "current",
       "match": [

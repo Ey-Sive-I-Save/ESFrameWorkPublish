@@ -24,6 +24,9 @@ namespace ES
         private const int MinComponentSlotCount = 2;
         private const int VisibleRowLimit = 20;
         private const int MaxGameObjectCaches = 256;
+        private const int MaximumHiddenPreferenceCharacters = 64 * 1024;
+        private const int MaximumHiddenEntries = 2048;
+        private const int MaximumSearchCharacters = 512;
         private const int CacheCleanupAccessInterval = 128;
         private const string NavigatorSessionKeyPrefix = "ES.EditorSectionNavigator.Window.";
         private const string MenuRoot = MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "检查器/组件筛选/";
@@ -304,7 +307,9 @@ namespace ES
             HashSet<string> hiddenIds)
         {
             string stateKey = GetStableObjectKey(gameObject);
-            string search = SessionState.GetString(GetSearchKey(stateKey), string.Empty);
+            string search = SessionState.GetString(GetSearchKey(stateKey), string.Empty) ?? string.Empty;
+            if (search.Length > MaximumSearchCharacters)
+                search = search.Substring(0, MaximumSearchCharacters);
             bool showAll = GetPanelBoolState(GetShowAllKey(stateKey), false);
             bool panelVisible = GetPanelBoolState(GetPanelVisibleKey(stateKey), true);
 
@@ -392,6 +397,8 @@ namespace ES
 
             if (!string.Equals(nextSearch, search, StringComparison.Ordinal))
             {
+                if (nextSearch.Length > MaximumSearchCharacters)
+                    nextSearch = nextSearch.Substring(0, MaximumSearchCharacters);
                 search = nextSearch;
                 SessionState.SetString(GetSearchKey(stateKey), search);
             }
@@ -781,10 +788,10 @@ namespace ES
             cachedHiddenIds = new HashSet<string>(StringComparer.Ordinal);
             cachedHiddenOriginalFlags = new Dictionary<string, HideFlags>(StringComparer.Ordinal);
             string raw = EditorPrefs.GetString(GetHiddenStorageKey(), string.Empty);
-            if (!string.IsNullOrWhiteSpace(raw))
+            if (!string.IsNullOrWhiteSpace(raw) && raw.Length <= MaximumHiddenPreferenceCharacters)
             {
                 string[] parts = raw.Split('\n');
-                for (int i = 0; i < parts.Length; i++)
+                for (int i = 0; i < parts.Length && cachedHiddenIds.Count < MaximumHiddenEntries; i++)
                 {
                     string part = parts[i].Trim();
                     if (!string.IsNullOrWhiteSpace(part))
@@ -793,10 +800,10 @@ namespace ES
             }
 
             string flagsRaw = EditorPrefs.GetString(GetHiddenOriginalFlagsStorageKey(), string.Empty);
-            if (!string.IsNullOrWhiteSpace(flagsRaw))
+            if (!string.IsNullOrWhiteSpace(flagsRaw) && flagsRaw.Length <= MaximumHiddenPreferenceCharacters)
             {
                 string[] parts = flagsRaw.Split('\n');
-                for (int i = 0; i < parts.Length; i++)
+                for (int i = 0; i < parts.Length && cachedHiddenOriginalFlags.Count < MaximumHiddenEntries; i++)
                 {
                     string part = parts[i].Trim();
                     int separator = part.IndexOf('|');

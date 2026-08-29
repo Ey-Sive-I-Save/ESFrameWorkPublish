@@ -1,80 +1,21 @@
 # P0：Projectile / Weapon 热路径冻结合同
 
-> 状态：现行 P0 约束。
-> 规则 ID：`es.p0.projectile-weapon-hotpath-freeze`。
-> 路由键：`projectile-hotpath`、`weapon-fire-hotpath`、`hitscan`、`beam`、`steady-gc`。
-> 适用范围：`Shot`、`Projectile`、`HitScan`、`Beam`、`Fire`、`Tick`、命中候选、命中解析和它们直接调用的缓存/事件/查询代码。
+`Status`: `current`
+`StableId`: `es.aiwarning.p0.projectile-weapon-hotpath.v1`
+`Authority`: `AIWarnings`
+`RouteKeys`: `aiwarnings`, `p0`, `projectile-hotpath`, `weapon-fire-hotpath`, `hitscan`, `beam`, `steady-gc`
+`Applicability`: Shot/Projectile/HitScan/Beam/Fire/Tick、命中候选/解析及直接调用的缓存、事件、查询。
+`EvidenceRef`: `Documentation/AIKnowledge/entries/aiwarning-p0-projectile-weapon-hotpath.md`
+`StaleWhen`: 热路径入口、Prepare/Running 生命周期、容量/Lease 规则、静态门禁或 SourceRefs 变化。
 
-## 最高结论
+## 长期 P0 约束
 
-只要代码会被每发子弹、每次开火、每个活动飞行物或每帧更新调用，就先按热路径处理，再讨论功能扩展。不能等 Profiler 或用户提醒后才补预热和低 GC。
+- 每发子弹、每次开火、活动飞行物和每帧更新都先按热路径处理；正式入口包括 ItemShotModule、ItemShotPhysicsHitSolver、EntityBasicCombatModule 开火/射线/攻击事件。新入口加 `[ESHotPath]` 并纳入静态门禁；无标记不代表可分配。
+- 高频实例严格 `Authoring → Prepare → Running → Despawn`：Prepare 完成数组、集合、事件快照、Physics 缓冲和依赖；Running 只读已准备结构，不创建、扩容、重建或首次查找；Despawn 清空状态但复用缓冲。
+- 热路径禁止 Ensure、GetComponent、反射、LINQ、格式化/动态日志、异常控制流、Resize、临时集合/数组、GetInvocationList 和首发补建委托。回调在 Prepare 缓存，未准备必须拒绝。
+- NonAlloc 查询须有作者可见容量、上限和溢出计数；饱和行为、穿透/忽略集合容量和事件快照语义必须确定，不能以 HashSet(capacity) 声称永不扩容。
+- 发射不得逐发 TryAcquireReady 或创建 Lease；Shot Prefab 由 ResourcePlan 预热并通过 ActivePlan 借用。ActivePlan 缺失拒绝发射，Plan Owner 结束前停止并归池活动 Shot。
+- Shot 只负责飞行/追踪/碰撞候选/到达/过期/停止；伤害、Buff、VFX、音频、网络和池业务由外层消费。WeaponDefinition 由 Shared/Variable/RuntimeData 持有，特殊子弹复用 Solver/Policy/Resolver。
+- 修改链路后执行 `Test-ESProjectileWeaponHotPath.ps1`。静态通过最高为 `Implemented-Unverified`；`Accepted` 必须有 Profiler 稳态 0 B GC、Physics/主线程/溢出率证据，`Released` 还需 Player/IL2CPP/设备与资源生命周期证据。
 
-当前正式热路径入口为：
-
-```text
-ItemShotModule.Tick / TickScan / TryBuildHitCandidate / ResolveHit
-ItemShotPhysicsHitSolver.Query
-EntityBasicCombatModule.TryFireWeapon / TryResolveWeaponRaycast / PublishPrimaryAttackEvent
-```
-
-新入口必须使用 `[ESHotPath]` 标记，并纳入本规则的静态门禁。没有标记不代表可以分配；标记只是让审查工具能够拒绝漏检。
-
-## 冻结生命周期
-
-每个高频实例必须遵守：
-
-```text
-Authoring -> Prepare -> Running -> Despawn
-```
-
-- `Authoring`：可配置容量、比较器、Solver、Policy、事件订阅和依赖。
-- `Prepare`：在 `Start`、`OnPoolSpawned`、`Internal_InitializeSpawn`、场景预热或明确绑定边界完成数组、集合、事件快照、Physics 缓冲和必需依赖初始化。
-- `Running`：配置视为只读；热路径只读已准备结构，不得创建、扩容、重建或首次查找。
-- `Despawn`：清空实例状态，不销毁可复用缓冲；下一次 Spawn 必须复用同一结构。
-
-热路径不得调用 `Ensure*`、`GetComponent*`、`GetComponents*`、反射、LINQ、字符串格式化、动态日志、异常控制流、`Array.Resize`、临时集合、临时数组或每次派发 `GetInvocationList()`。
-
-实例方法组转换为 `Action`/委托也必须按分配处理：Shot 生命周期观察者、命中回调和其他每发回调必须在 `Prepare` 阶段创建并缓存，热路径只能读取已缓存委托；未准备时必须确定性拒绝，禁止在首发时偷偷补建。
-
-## 容量与正确性
-
-1. 所有 `NonAlloc` 查询必须有作者可见容量、明确上限和溢出计数。
-2. 饱和时禁止隐式扩容；必须记录溢出，并在定义/测试中说明“可能遗漏未返回命中”还是采用替代 Solver。
-3. 穿透/忽略命中集合必须说明稳定容量和超过容量后的行为；仅仅用 `new HashSet(capacity)` 不能声称永不扩容。
-4. 事件订阅产生的快照只能在订阅冷路径重建；派发期间必须复用稳定快照，并保留订阅变更期间的快照语义。
-5. 调试名称、日志和完整诊断只能在显式诊断开关下读取或格式化，不能污染默认开火路径。
-6. 每次发射不得调用 `TryAcquireReady` 或创建独立资源 Lease；Shot Prefab 必须由 ResourcePlan 预热并通过 ActivePlan 只读借用。ActivePlan 缺失时拒绝发射，禁止退回 Provider 缓存或临时租约。活动 Shot 必须订阅 `ActivePlanAssetOwnershipEnding`，并在最终 Plan Owner 释放前同步停止和归池。
-
-## 扩展边界
-
-- Shot 只负责飞行、追踪、碰撞候选、到达、过期和停止；伤害、Buff、VFX、音频、网络和对象池业务由外层消费。
-- WeaponDefinition 只由 `ItemWeaponSharedData` / `ItemWeaponVariableData` / `ESWeaponRuntimeData` 持有；`EntityBasicCombatModule` 只读取已解析定义并执行。
-- 特殊子弹应通过 `IItemShotHitSolver`、`IItemShotTickPolicy`、命中 Resolver 和生命周期事件扩展，不复制第二套 Tick 或 Combat 管线。
-- 需要批量 Physics、空间索引、Job/Burst 或分组 Tick 时，替换 Solver/调度边界，不把复杂策略塞进单个 Shot 的每帧方法。
-
-## 自动门禁
-
-修改上述链路后必须执行：
-
-```powershell
-& '.agents/skills/es-entity-authoring/scripts/Test-ESProjectileWeaponHotPath.ps1' `
-  -ProjectRoot 'F:\aaProject\ESFrameWorkPublish' -Json
-```
-
-门禁至少拒绝标记热方法中的动态缓存准备、数组/集合扩容、组件查找、反射、LINQ、临时集合、未缓存的每发委托、每次事件调用列表复制，以及 Shot Spawner 中的逐发 `TryAcquireReady`。命中时先修复或明确把代码移到 `Prepare`/诊断冷路径，不能用注释压过检查。
-
-## 验收层级
-
-- `Implemented-Unverified`：静态门禁通过，生成工程编译通过，定向 EditMode 覆盖容量饱和、池复用、跳帧累计和事件快照语义。
-- `Accepted`：在声明的实例规模、命中密度和容量下，Unity Profiler 稳态 `GC Alloc = 0 B`，并记录 Physics、主线程、溢出率和调用次数。
-- `Released`：Player/IL2CPP 和目标设备复验，且资源预热、对象池、生命周期和失败回收证据完整。
-
-静态检查、Editor 单次测试或生成 `.csproj` 编译不得冒充 `Accepted` / `Released`。没有 Profiler 证据只能报告“静态无已识别显式分配，待实测”。
-
-## 审查清单
-
-1. 是否列出了完整调用链，而不是只看某个数组或某个方法？
-2. 所有容量、事件快照、比较器和依赖是否在 `Prepare` 完成？
-3. 命中饱和、穿透集合饱和、池复用和定义缺失是否有确定行为？
-4. 特殊子弹是否复用 Solver/Policy/Resolver，而不是复制 Combat 或 Tick？
-5. 结论属于源码、静态编译、EditMode、Profiler、Player 还是 IL2CPP 哪一层？
+详细调用链、容量矩阵、自动门禁和原文快照见 Knowledge：`es.aiwarning.p0.projectile-weapon-hotpath.v1`。

@@ -38,6 +38,7 @@ namespace ES
         private const string PreferencePrefix = "ES.WindowLauncher.";
         private const int MaxFavoriteCount = 32;
         private const int MaxRecentCount = 12;
+        private const int MaximumPreferenceCharacters = 64 * 1024;
         private static readonly Dictionary<string, ESWindowCommand> Commands = new Dictionary<string, ESWindowCommand>(StringComparer.Ordinal);
         private static readonly List<ESWindowCommand> SortedCommands = new List<ESWindowCommand>();
         private static readonly List<string> Favorites = new List<string>();
@@ -265,7 +266,14 @@ namespace ES
             try
             {
                 string raw = EditorPrefs.GetString(Key(suffix), string.Empty);
-                return raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToList();
+                if (string.IsNullOrEmpty(raw) || raw.Length > MaximumPreferenceCharacters)
+                    return new List<string>();
+                return raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(value => value.Trim())
+                    .Where(value => value.Length <= 512)
+                    .Distinct(StringComparer.Ordinal)
+                    .Take(MaxFavoriteCount + MaxRecentCount)
+                    .ToList();
             }
             catch (Exception exception)
             {
@@ -306,6 +314,7 @@ namespace ES
         private bool showRecent = true;
         private bool showCore = true;
         private bool showPeripheral;
+        private const int MaximumSearchCharacters = 512;
 
         [MenuItem(MenuItemPathDefine.WINDOW_LAUNCHER_PATH, false, 0)]
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "工具启动器 %#e", false, -1100)]
@@ -345,6 +354,8 @@ namespace ES
             {
                 GUI.SetNextControlName("ESWindowLauncherSearch");
                 search = EditorGUILayout.TextField(search, GUI.skin.FindStyle("ToolbarSearchTextField") ?? EditorStyles.toolbarTextField, GUILayout.MinWidth(280f));
+                if (search != null && search.Length > MaximumSearchCharacters)
+                    search = search.Substring(0, MaximumSearchCharacters);
                 if (GUILayout.Button("快速搜索", EditorStyles.toolbarButton, GUILayout.Width(82f))) OpenSearchDropdown();
                 if (GUILayout.Button("清除", EditorStyles.toolbarButton, GUILayout.Width(46f))) search = string.Empty;
             }

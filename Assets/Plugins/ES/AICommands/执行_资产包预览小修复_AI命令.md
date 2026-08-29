@@ -31,6 +31,18 @@ Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPac
 优先扩展 ESAssetPackagePreviewWorkflow。禁止临时 AnimatorController、禁止小格子实时多 PreviewRenderUtility、禁止缓存写入 Assets。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: asset-package.preview.fix
+cancellation: before preview-state commit only; interruption leaves existing preview assets/state unchanged.
+recovery: discard transient preview state, reread source and rebuild through ESAssetPackagePreviewWorkflow; no blind replay.
+validation: preview workflow checks, forbidden AnimatorController/small-grid PreviewRenderUtility/cache-under-Assets checks, editor build and receipt.
+evidenceRef: commandId, commandBodyHash, planHash, invocationId, preview input/output hashes, build receipt and runtime-not-run marker.
+allowRoots: explicitly named AssetPackage preview workflow/editor files and non-persistent preview output only.
+denyPaths: Assets cache writes, unrelated source, AIWarnings, AICommands, ProjectSettings, Packages, Git, release and Runtime; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

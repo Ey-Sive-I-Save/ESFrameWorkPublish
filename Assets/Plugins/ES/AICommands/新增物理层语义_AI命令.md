@@ -31,6 +31,18 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 新增或调整 Layer 语义。说明层名、归属、查询方、阻挡关系，不在业务脚本硬编码 LayerMask。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: physics-layer.add
+cancellation: before layer-name/mapping commit may cancel; after commit stop and report partial state, never repurpose an existing layer silently.
+recovery: preserve prior layer mappings, retry with a new invocationId and CAS; identity or collision conflict requires NeedsReissue.
+validation: layer ownership/query consumers/blocking relations, LayerMask indirection, duplicate/collision checks and ES_Logic.csproj compile.
+evidenceRef: planHash, commandBodyHash, changed-file SHA-256, layer/mapping diff, validator output and Runtime-not-run marker.
+allowRoots: existing physics-layer semantic definitions, mappings and required tests/docs only.
+denyPaths: business-script hard-coded LayerMask, unrelated runtime physics behavior, AIWarnings, AICommands Catalog, ProjectSettings, Packages, release, Library and Git/.git; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

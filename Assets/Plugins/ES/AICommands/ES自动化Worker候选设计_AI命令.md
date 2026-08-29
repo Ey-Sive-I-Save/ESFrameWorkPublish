@@ -19,6 +19,17 @@ Command type: candidate content generation. It must run through AIBrain `planTas
 
 ## 交付格式
 
+```ContractCompleteness
+commandId: automation.worker.candidate
+cancellation: before commit; cancel leaves no formal Worker
+recovery: isolated candidate cleanup; NeedsReissue on uncertain state; no replay
+validation: candidate schema, content hash, and isolated-path checks
+evidenceRef: candidate path, SHA-256, receipt, and Static/Runtime status
+allowRoots: ES/Automation/Candidates/WorkerAuthoring/<request-id>/candidate/ only
+denyPaths: .agents/skills, Assets/Plugins/ES/AICommands, Assets, Runtime, Git, release
+deny-overrides: true
+```
+
 Produce a candidate manifest, contract diff, allowed roots, cancellation/recovery matrix, StaticDeepReplay results, and separate runtime claims not proven. Candidate output must preserve existing ES TaskContract, Facade, Worker registration, and ProcessRunner boundaries.
 
 ## Prohibitions

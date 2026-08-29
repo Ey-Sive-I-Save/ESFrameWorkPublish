@@ -417,20 +417,20 @@ namespace ES
 
         private static void CancelActiveRunsForLifecycle(string reason)
         {
-            foreach (ActiveRun active in ActiveRuns.Values.ToList())
+            foreach (ESTaskContextEvaluationAutomation.ActiveRun active in ESTaskContextEvaluationAutomation.ActiveRuns.Values.ToList())
             {
                 try
                 {
                     if (!active.Execution.HasExited)
                         active.Execution.Terminate();
-                    FinishWithoutResult(active, ESAutomationRunStatus.Cancelled, reason);
+                    ESTaskContextEvaluationAutomation.FinishWithoutResult(active, ESAutomationRunStatus.Cancelled, reason);
                 }
                 catch (Exception exception)
                 {
                     Debug.LogError("[ESAutomationAiBridge] 生命周期取消受管 Run 失败：" + exception);
                     try
                     {
-                        FinishWithoutResult(active, ESAutomationRunStatus.Failed,
+                        ESTaskContextEvaluationAutomation.FinishWithoutResult(active, ESAutomationRunStatus.Failed,
                             "生命周期取消未能确认进程终止：" + exception.GetBaseException().Message);
                     }
                     catch (Exception recordException)
@@ -440,7 +440,7 @@ namespace ES
                 }
                 finally
                 {
-                    ActiveRuns.Remove(active.Record.runId);
+                    ESTaskContextEvaluationAutomation.ActiveRuns.Remove(active.Record.runId);
                     try { active.Execution.Dispose(); }
                     catch (Exception exception) { Debug.LogError("[ESAutomationAiBridge] 释放受管 Run 失败：" + exception); }
                 }
@@ -841,7 +841,7 @@ namespace ES
                 ? new List<string>() : ReadStringArray(payload, "routeKeys");
             ESAIBrainProductionSurface surface = ESAIBrainCoordinator.DescribeProductionSurface(routeKeys);
             return ESAutomationAiResponse.Completed(requestId, action,
-                "已返回 Skills、AIWarnings、Knowledge、AICommand、CLI、Diagnostics 和 MCP 生产力面。",
+                "已返回 ABC 模式、Skills、AIWarnings、Knowledge、AICommand、CLI、Diagnostics 和 MCP 生产力面。",
                 string.Empty, JObject.FromObject(surface));
         }
 
@@ -1933,7 +1933,7 @@ namespace ES
         private const long MaxResultBytes = 512L * 1024L;
         private const ESAutomationCapability RequiredCapabilities =
             ESAutomationCapability.ReadArtifacts | ESAutomationCapability.WriteReports;
-        private static readonly Dictionary<string, ActiveRun> ActiveRuns =
+        internal static readonly Dictionary<string, ActiveRun> ActiveRuns =
             new Dictionary<string, ActiveRun>(StringComparer.Ordinal);
 
         private static string RunsRoot => Path.Combine(ESAutomationPathPolicy.ProjectRoot,
@@ -2287,7 +2287,7 @@ namespace ES
             WriteRunRecord(active.RecordPath, active.Record);
         }
 
-        private static void FinishWithoutResult(ActiveRun active, string status, string error)
+        internal static void FinishWithoutResult(ActiveRun active, string status, string error)
         {
             active.Record.exitCode = -1;
             active.Record.errors.Add(error ?? string.Empty);
@@ -2530,7 +2530,7 @@ namespace ES
             public string IdempotencyKey;
         }
 
-        private sealed class ActiveRun
+        internal sealed class ActiveRun
         {
             public ESAutomationProcessExecution Execution;
             public ESAutomationRunRecord Record;
@@ -2548,6 +2548,9 @@ namespace ES
             try
             {
                 ESTaskContextEvaluationAutomation.Register();
+                ESCodexMultiLaunchAutomation.Register();
+                ESUserSpaceAutomation.Register();
+                ESTeamSpaceAutomation.Register();
             }
             catch (Exception exception)
             {

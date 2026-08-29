@@ -1,116 +1,21 @@
 # 项目最高警告：配置双键与 Inspector 分层
 
-职责：这是 ESFramework 给后续 AI 的项目最高警告。凡是 Buff、Tag、State、Skill、Item、Camera、Mode 等可配置运行对象，配置层允许使用“枚举键 + 字符串键”双键体系，但运行时热路径必须优先使用已烘焙、已缓存的强类型键。
+Status: current
+StableId: es.aiwarning.p0.config-dual-key-inspector-layer.v1
+Authority: AIWarnings（长期 P0 约束）；详细事实与示例见 Knowledge
+RouteKeys: aiwarnings, p0, identity, config-key, enum-key, string-key, inspector, runtime-key
+Applicability: Buff、Tag、State、Skill、Item、Camera、Mode 等可配置运行对象
+EvidenceRef: Documentation/AIKnowledge/entries/aiwarning-p0-config-dual-key-inspector-layer.md
+StaleWhen: ConfigKey/RuntimeKey、Inspector 分类、热路径规则或任一 SourceRef 哈希变化。
 
-## 核心结论
+## P0 长期约束
 
-配置不是只能靠字符串路径表达层级。
+- 配置层可同时使用枚举键与字符串键：枚举键强类型、可编译期检查，适合核心高频对象；字符串键服务扩展、热更新、外部表格和非核心低频配置。两者都可在 Inspector 显示 `分类/名称`，但显示路径不是运行时身份。
+- 核心对象使用强类型 `ESBuffKey`、`ESGameTag`、`ESSkillKey`、`ESStateKey` 等；Inspector 用 `[InspectorName("控制/眩晕")]` 分层展示。字符串如 `"控制/冰冻"` 必须在编辑器/烘焙/初始化阶段转换成缓存 Key。
+- BuffKey 表示配置身份，GameTag 表示实体当前事实，RuntimeKey 表示当前进程对应 AssetTable 的运行索引；RuntimeKey 必须与 AssetKind/EnumType 一起解释，不得把裸 int 当跨资产或跨进程身份。
+- 禁止把 `Buff.控制.冰冻` 等点号字符串作为核心运行时 Key；禁止为分层展示强造多层类、资产或字典；高频 Buff/Tag/State 查询不得字符串查找或在 Update、KCC、StateMachine Evaluate、IK、Buff Tick 中做字符串转 Key。
+- 分类展示交给 Inspector，配置身份交给强类型 ConfigKey；启动后可解析为当前表 RuntimeKey，但字符串不进入高频判断。AI/Player 内容仍受稳定 Key、RuntimeKey 进程边界和相关 GameCore P0 约束。
 
-Unity 枚举字段可以使用 `[InspectorName("分类/名称")]` 在 Inspector 中显示成分层菜单，例如：
+## Knowledge 导航
 
-```csharp
-public enum ESBuffKey : ushort
-{
-    None = 0,
-
-    [InspectorName("控制/冰冻")]
-    控制类_冰冻 = 1,
-
-    [InspectorName("控制/眩晕")]
-    控制类_眩晕 = 2,
-
-    [InspectorName("伤害/燃烧")]
-    伤害类_燃烧 = 20,
-}
-```
-
-这比默认推广 `Buff.控制.冰冻` 这种运行时字符串路径更合适。
-
-## 正确理解
-
-配置层可以同时保留：
-
-- 枚举键：高频、强类型、可编译期检查，适合核心游戏对象。
-- 字符串键：扩展、热更新、外部表格、非核心低频配置。
-
-两者可以共享 Inspector 分层表达：
-
-- 枚举用 `[InspectorName("控制/冰冻")]`。
-- 字符串配置可以用 `"控制/冰冻"` 作为编辑器分类路径。
-
-但不要把字符串路径本身误当成运行时最高身份。
-
-## Buff / Tag / RuntimeKey 规则
-
-Buff 的身份可以是：
-
-```csharp
-ESBuffKey.控制类_冰冻
-```
-
-它在 Inspector 里显示为：
-
-```text
-控制/冰冻
-```
-
-它带来的事实状态可以是：
-
-```csharp
-ESGameTag.控制类_冰冻
-ESGameTag.行为类_禁止移动
-ESGameTag.行为类_禁止释放技能
-```
-
-注意：
-
-- `ESBuffKey` 表示“这个 Buff 配置是谁”。
-- `ESGameTag` 表示“实体当前拥有什么状态事实”。
-- `RuntimeKey` 表示当前进程中对应强类型 AssetTable 的运行索引；由 `ConfigKey` 解析得到。必须与 AssetKind/EnumType 一起解释，不允许把裸 int 当成跨资产类型或跨进程身份。
-
-三者可以协作，但不能混成一个东西。
-
-## 禁止误区
-
-- 不要默认设计 `Buff.控制.冰冻` 这种点号字符串作为核心运行时 Key。
-- 不要为了 Inspector 分层强行发明多层类、多层资产、多层字典。
-- 不要让高频 Buff / Tag / State 查询依赖字符串查找。
-- 不要在 Update、KCC、StateMachine Evaluate、IK 求解、Buff Tick 中做字符串转 Key。
-- 不要把枚举中文名、Inspector 显示名、RuntimeKey、GameTag 语义混为一谈。
-
-## 推荐默认方案
-
-核心高频对象：
-
-```csharp
-public enum ESGameTag : ushort
-public enum ESBuffKey : ushort
-public enum ESSkillKey : ushort
-public enum ESStateKey : ushort
-```
-
-Inspector 显示：
-
-```csharp
-[InspectorName("控制/眩晕")]
-控制类_眩晕 = 1
-```
-
-运行时：
-
-```csharp
-entity.HasGameTag(ESGameTag.控制类_眩晕);
-entity.buffDomain.HasBuff(ESBuffKey.控制类_眩晕);
-```
-
-扩展配置：
-
-```csharp
-string customKey = "控制/冰冻";
-```
-
-但字符串必须在编辑器、烘焙、初始化阶段转换成缓存 Key，不能进入核心热路径。
-
-## 一句话
-
-分类展示交给 Inspector，配置身份交给强类型 ConfigKey；热路径可在启动后把它解析为当前表内的 RuntimeKey。字符串不进入高频判断。
+完整示例、三种身份协作关系、扩展配置转换时机和原文快照见 `es.aiwarning.p0.config-dual-key-inspector-layer.v1`。本 Warning 不授予配置写入或运行时修改权限。

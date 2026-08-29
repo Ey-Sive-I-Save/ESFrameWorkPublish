@@ -15,7 +15,7 @@
 
 命令类型：安全执行/方案评审。
 默认改文件：是，仅明确 Command 相关文件。
-风险等级：L2/L3。
+风险等级：L3。
 
 ## 必须先读
 
@@ -29,6 +29,18 @@ Assets/Scripts/ESLogic/Runtime/Command/
 
 ```text
 按 ESCommand 标准新增运行时命令。禁止放回 Plugins/ES/2_Feature，禁止旧播放器，复杂播放流程先出方案。
+```
+
+## ContractCompleteness
+
+```text
+commandId: command.add-runtime
+cancellation: before code/file commit may cancel; after commit stop and report partial state, with no unapproved cleanup.
+recovery: preserve existing edits, use a new invocationId after interruption, restore only through an explicitly declared reversible patch; no blind replay.
+validation: ESCommand_STANDARD conformance, strong field types, namespace/assembly placement, duplicate identity, ES_Logic.csproj compile and negative scope checks.
+evidenceRef: planHash, commandBodyHash, changed-file SHA-256, compiler output and explicit unverified Runtime/Unity status.
+allowRoots: Assets/Scripts/ESLogic/Runtime/Command and the minimum explicitly required Command tests/docs only.
+denyPaths: Plugins/ES/2_Feature, legacy player, AIWarnings, AICommand Catalog/index, ProjectSettings, Packages, release, Runtime assets and Git/.git; deny-overrides.
 ```
 
 ## 交付格式

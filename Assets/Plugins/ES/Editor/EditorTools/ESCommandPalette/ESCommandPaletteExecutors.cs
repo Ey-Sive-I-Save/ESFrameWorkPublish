@@ -164,6 +164,7 @@ namespace ES
         public const string AICommandCatalogPath = AICommandRoot + "/AICommandCatalog.json";
         public const string GlobalDataRoot = "Assets/ESNormalAssets/Data/GlobalData";
         private const int StableReadAttempts = 2;
+        private const int MaximumCatalogEntries = 512;
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
         private static readonly HashSet<string> AllowedAICommandRoles = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -225,6 +226,11 @@ namespace ES
             if (document == null || document.schemaVersion != 1 || document.commands == null)
             {
                 reason = "AICommand 目录 schemaVersion 必须为 1 且包含 commands";
+                return false;
+            }
+            if (document.commands.Length > MaximumCatalogEntries)
+            {
+                reason = "AICommand 目录条目超过 512 项上限";
                 return false;
             }
 
@@ -440,7 +446,14 @@ namespace ES
                     return false;
                 }
                 if (validateUtf8)
-                    StrictUtf8.GetString(File.ReadAllBytes(candidateFullPath));
+                {
+                    if (!TryReadBytesWithinLimit(candidateFullPath, MaximumFileBytes, out byte[] bytes))
+                    {
+                        reason = "文件超过 1 MiB 上限或无法稳定读取";
+                        return false;
+                    }
+                    StrictUtf8.GetString(bytes);
+                }
             }
             catch (Exception exception)
             {
@@ -462,10 +475,18 @@ namespace ES
             {
                 try
                 {
-                    byte[] first = File.ReadAllBytes(fullPath);
+                    if (!TryReadBytesWithinLimit(fullPath, MaximumFileBytes, out byte[] first))
+                    {
+                        reason = "AICommand 文件超过读取上限或已失效";
+                        return false;
+                    }
                     string firstHash = ComputeSha256(first);
                     string decoded = StrictUtf8.GetString(first);
-                    byte[] second = File.ReadAllBytes(fullPath);
+                    if (!TryReadBytesWithinLimit(fullPath, MaximumFileBytes, out byte[] second))
+                    {
+                        reason = "AICommand 文件超过读取上限或已失效";
+                        return false;
+                    }
                     if (string.Equals(firstHash, ComputeSha256(second), StringComparison.Ordinal))
                     {
                         text = decoded;
@@ -481,6 +502,28 @@ namespace ES
             }
             reason = "AICommand 在读取期间发生变化；请等待写入完成后重试";
             return false;
+        }
+
+        private static bool TryReadBytesWithinLimit(string path, long maximumBytes, out byte[] bytes)
+        {
+            bytes = null;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                if (stream.Length < 0 || stream.Length > maximumBytes
+                    || stream.Length > int.MaxValue)
+                    return false;
+                bytes = new byte[(int)stream.Length];
+                int offset = 0;
+                while (offset < bytes.Length)
+                {
+                    int read = stream.Read(bytes, offset, bytes.Length - offset);
+                    if (read <= 0) break;
+                    offset += read;
+                }
+                if (offset != bytes.Length)
+                    Array.Resize(ref bytes, offset);
+                return true;
+            }
         }
 
         private static string ComputeSha256(byte[] bytes)
@@ -597,24 +640,35 @@ namespace ES
                 return ESCommandPaletteResult.Fail("v1 拒绝执行带写入或确认要求的命令", "移除该注册项");
             }
 
-            switch (item.ActionKind)
+            try
             {
-                case ESCommandPaletteActionKind.OpenMenu:
-                    return OpenMenuExecutor.Execute(item);
-                case ESCommandPaletteActionKind.OpenWindow:
-                    return OpenWindowExecutor.Execute(item);
-                case ESCommandPaletteActionKind.OpenFile:
-                    return OpenFileExecutor.Execute(item);
-                case ESCommandPaletteActionKind.OpenAsset:
-                    return OpenAssetExecutor.Execute(item);
-                case ESCommandPaletteActionKind.CopyText:
-                    return CopyTextExecutor.Execute(item);
-                case ESCommandPaletteActionKind.CopyPath:
-                    return CopyTextExecutor.CopyPath(item);
-                case ESCommandPaletteActionKind.Select:
-                    return SelectExecutor.Execute(item);
-                default:
-                    return ESCommandPaletteResult.Fail("不支持的命令动作");
+                switch (item.ActionKind)
+                {
+                    case ESCommandPaletteActionKind.OpenMenu:
+                        return OpenMenuExecutor.Execute(item);
+                    case ESCommandPaletteActionKind.OpenWindow:
+                        return OpenWindowExecutor.Execute(item);
+                    case ESCommandPaletteActionKind.OpenFile:
+                        return OpenFileExecutor.Execute(item);
+                    case ESCommandPaletteActionKind.OpenAsset:
+                        return OpenAssetExecutor.Execute(item);
+                    case ESCommandPaletteActionKind.CopyText:
+                        return CopyTextExecutor.Execute(item);
+                    case ESCommandPaletteActionKind.CopyPath:
+                        return CopyTextExecutor.CopyPath(item);
+                    case ESCommandPaletteActionKind.Select:
+                        return SelectExecutor.Execute(item);
+                    default:
+                        return ESCommandPaletteResult.Fail("不支持的命令动作");
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 命令执行边界异常，已安全拒绝。", exception));
+                return ESCommandPaletteResult.Fail(
+                    "命令执行失败：" + exception.Message,
+                    "刷新命令面板后重试");
             }
         }
     }
@@ -713,6 +767,31 @@ namespace ES
 
     internal static class CopyTextExecutor
     {
+        private const long MaximumCopyTextBytes = 4L * 1024L * 1024L;
+
+        private static string ReadTextWithinLimit(string fullPath)
+        {
+            int capacity = checked((int)MaximumCopyTextBytes + 1);
+            byte[] buffer = new byte[capacity];
+            int count = 0;
+            using (FileStream stream = new FileStream(
+                fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                while (count < buffer.Length)
+                {
+                    int read = stream.Read(buffer, count, buffer.Length - count);
+                    if (read <= 0)
+                        break;
+                    count += read;
+                }
+            }
+
+            if (count > MaximumCopyTextBytes)
+                throw new InvalidDataException("文件在读取期间超过复制大小上限");
+
+            return new UTF8Encoding(false, true).GetString(buffer, 0, count);
+        }
+
         public static ESCommandPaletteResult Execute(ESCommandPaletteItem item)
         {
             if (item == null || item.ActionKind != ESCommandPaletteActionKind.CopyText)
@@ -728,7 +807,15 @@ namespace ES
             try
             {
                 string fullPath = Path.Combine(ESCommandPalettePathPolicy.ProjectRoot, normalizedPath.Replace('/', Path.DirectorySeparatorChar));
-                GUIUtility.systemCopyBuffer = File.ReadAllText(fullPath, new UTF8Encoding(false, true));
+                if (!File.Exists(fullPath))
+                    return ESCommandPaletteResult.Fail("文件不存在：" + normalizedPath, "刷新 AICommand 索引");
+                if (new FileInfo(fullPath).Length > MaximumCopyTextBytes)
+                {
+                    return ESCommandPaletteResult.Fail(
+                        "文件超过复制大小上限（" + MaximumCopyTextBytes + " 字节）：" + normalizedPath,
+                        "改用文件打开或缩小文件范围");
+                }
+                GUIUtility.systemCopyBuffer = ReadTextWithinLimit(fullPath);
                 return ESCommandPaletteResult.Ok("已复制 " + normalizedPath + " 的文本");
             }
             catch (Exception exception)
@@ -749,8 +836,17 @@ namespace ES
                 return ESCommandPaletteResult.Fail("文件路径未通过受管根校验：" + reason, "刷新 AICommand 索引");
             }
 
-            GUIUtility.systemCopyBuffer = normalizedPath;
-            return ESCommandPaletteResult.Ok("已复制路径 " + normalizedPath);
+            try
+            {
+                GUIUtility.systemCopyBuffer = normalizedPath;
+                return ESCommandPaletteResult.Ok("已复制路径 " + normalizedPath);
+            }
+            catch (Exception exception)
+            {
+                return ESCommandPaletteResult.Fail(
+                    "复制路径失败：" + exception.Message,
+                    "检查编辑器剪贴板状态后重试");
+            }
         }
     }
 

@@ -16,6 +16,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 

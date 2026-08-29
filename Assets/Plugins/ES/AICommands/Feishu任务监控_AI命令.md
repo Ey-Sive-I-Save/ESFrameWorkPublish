@@ -45,6 +45,18 @@ taskVersion: 1
 - 缺凭据、权限不足、分页、限流、网络中断、超时、取消、重复 InvocationId、Hash 漂移和 Domain Reload 分别有终态 RunRecord。
 - 没有 fresh Runtime receipt 时只报告 `runtime-not-run`，不得宣称任务监控已连通。
 
+## ContractCompleteness
+
+```text
+commandId: feishu.task.monitor
+cancellation: before remote request; cancellation returns Cancelled and preserves prior snapshot.
+recovery: cursor/freshness guarded; unknown result returns NeedsReissue, no duplicate monitoring request.
+validation: tenant/app identity, read-only contract, pagination, task schema and freshness checks.
+evidenceRef: commandBodyHash, planHash, RunId, task IDs/statuses, content hashes and receipt.
+allowRoots: Feishu task read response and受管 snapshot only.
+denyPaths: remote mutation, source writes, Git and release; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

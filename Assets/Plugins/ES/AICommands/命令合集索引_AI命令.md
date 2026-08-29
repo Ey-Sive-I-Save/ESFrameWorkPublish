@@ -34,6 +34,38 @@ AICommands 是受管通道任务协议，`.agents/skills` 是可复用执行层�
 Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
 ```
 
+## Catalog 其余命令（机器目录闭合）
+
+以下条目由 `AICommandCatalog.json` 维护；本索引仅提供人类导航，不改变命令权限或合同语义。
+
+```text
+Assets/Plugins/ES/AICommands/UI ScreenSpec物化_AI命令.md
+Assets/Plugins/ES/AICommands/检查_玩家模板场景对象_AI命令.md
+Assets/Plugins/ES/AICommands/执行_StableGraph单次AI任务_AI命令.md
+Assets/Plugins/ES/AICommands/执行_AISkillGraph工作流_AI命令.md
+Assets/Plugins/ES/AICommands/资产包分离_导出链路体检_AI命令.md
+Assets/Plugins/ES/AICommands/资产包分离_预览工作流安全检查_AI命令.md
+Assets/Plugins/ES/AICommands/Feishu只读知识接入_AI命令.md
+Assets/Plugins/ES/AICommands/Feishu任务监控_AI命令.md
+Assets/Plugins/ES/AICommands/Feishu任务派发与推进_AI命令.md
+Assets/Plugins/ES/AICommands/Feishu本地角色与机器人认领_AI命令.md
+Assets/Plugins/ES/AICommands/Feishu单人文本消息发送_AI命令.md
+Assets/Plugins/ES/AICommands/任务读取快照_受控缓存写入_AI命令.md
+Assets/Plugins/ES/AICommands/任务上下文运行时_受控生命周期_AI命令.md
+Assets/Plugins/ES/AICommands/会话交接_受控启动_AI命令.md
+Assets/Plugins/ES/AICommands/AITalk全自动Codex多启动_AI命令.md
+Assets/Plugins/ES/AICommands/受管Skill候选创建_AI命令.md
+Assets/Plugins/ES/AICommands/受管AIKnowledge更新_AI命令.md
+Assets/Plugins/ES/AICommands/ES编辑器工具候选变更_AI命令.md
+Assets/Plugins/ES/AICommands/ES自动化Worker候选设计_AI命令.md
+Assets/Plugins/ES/AICommands/ES变更风险登记候选_AI命令.md
+Assets/Plugins/ES/AICommands/ES实体候选变更_AI命令.md
+Assets/Plugins/ES/AICommands/ES发布验收证据候选_AI命令.md
+Assets/Plugins/ES/AICommands/ES测试夹具候选创建_AI命令.md
+Assets/Plugins/ES/AICommands/UserSpace用户区域管理_AI命令.md
+Assets/Plugins/ES/AICommands/ESTeam团队协作区管理_AI命令.md
+```
+
 不要为每个命令机械创建一个 Skill。只有跨任务高频复用、步骤稳定、适合脚本或工具集成的执行能力才进入 `.agents/skills`。
 
 模块范围明确时，上述三个短语可直接触发 `$es-module-lifecycle`。唯一续接状态入口为 `ES/Documentation/Status/MODULE_AUDIT_STATE.md`，无需用户另行选择路径或区域。
@@ -175,6 +207,26 @@ Assets/Plugins/ES/AICommands/执行_新增AIWarning交接_AI命令.md
 4. 不要让 AI 根据文件名猜任务，必须读取命令全文。
 5. 不要绕过 AIWarnings，旧理解可能已经过时。
 ```
+
+## 单任务合同与 ES 流入口
+
+AICommand 的最终定位是“单任务受管动作合同层”：一次用户授权的具体动作必须有稳定 ID、输入/输出 schema、必读路径、执行边界、dry-run、确认、取消、恢复、验证和 evidenceRef。完整字段模板与边界矩阵以 [README.md](README.md) 为准，Catalog 的 `contractStandard` 是机器可读的标准指针。
+
+```text
+自然语言目标
+→ AIBrain route/plan（生成 PlanHash）
+→ Catalog 唯一发现
+→ planTask（多候选则 review；无候选则 NoMatchingCommand）
+→ 用户授权 + TaskContract + 命令正文 hash + invocation/idempotency key
+→ runTask / Worker（CAS、Lease、恢复）
+→ ResultEnvelope + Evidence Receipt
+```
+
+P0/P1/P2/P3 仅是导航优先级；`role`、`riskLevel`、`writeMode` 才描述合同角色、风险和写入/外部执行方式，仍必须与当前用户授权和 TaskContract 同时满足。AITalk 负责批次对话编排，SubAgent 负责分解或子任务，二者都不能绕过 AICommand 合同。
+
+## 固定拒绝与回放用例
+
+维护/CI 应覆盖：唯一命令正向命中、歧义消歧、NoMatchingCommand、缺输入、越权写入、旧 command/Plan hash、重复 invocation 幂等、中断恢复，以及 `command-id-closure`、`task-contract-binding`、`write-scope-denial`、`risk-level-consistency`、`command-hash-stale`。静态回执不能冒充 Unity/Runtime/性能/发布证据。
 
 ## 交付格式
 

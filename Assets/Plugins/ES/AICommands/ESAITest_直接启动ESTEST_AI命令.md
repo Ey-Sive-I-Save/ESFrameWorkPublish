@@ -68,6 +68,18 @@ ESAITestPlayerBootstrap.RequestCancel()
 - 禁止写 Git、AI 协作历程、模块审计状态或发布状态。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: estest.start
+cancellation: stop only through supported ESTEST cancellation entry; cancelled is not passed.
+recovery: retain RunId and status; timeout/unknown returns NeedsReissue, no duplicate start.
+validation: environment/project-path/process-window match and RunRecord state checks.
+evidenceRef: commandBodyHash, planHash, RunId, process/window evidence and static-runtime split.
+allowRoots: existing ESTEST entry and its受管 RunRecord only.
+denyPaths: arbitrary scripts, source writes, Git, release and unrelated Runtime; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

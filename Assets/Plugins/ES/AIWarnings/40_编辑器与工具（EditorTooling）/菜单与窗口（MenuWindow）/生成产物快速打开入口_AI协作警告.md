@@ -1,16 +1,14 @@
-# 编辑器交付警告：生成产物必须提供快速打开入口
+# 编辑器交付警告：生成产物快速打开
 
-凡是 AI、C#、Python、PowerShell、Worker 或 Unity Editor 工具生成了报告、日志、配置、快照、审计状态、交接文案或其他用户需要继续处理的文件，交付结果必须同时提供：
+Status: current
+StableId: es.aiwarning.editor-generated-artifact-quick-open.v1
+Authority: AIWarnings；详见 Knowledge
+RouteKeys: aiwarnings, editor, delivery, artifact, quick-open, path-safety, recovery
+EvidenceRef: Documentation/AIKnowledge/entries/aiwarning-editor-generated-artifact-quick-open.md
+StaleWhen: 产物入口、路径策略、宿主能力或 SourceRef 哈希变化。
 
-- 产物名称和用途；
-- 稳定的项目相对路径或受控绝对路径；
-- `快速打开`、`在项目窗口定位`、`打开报告`、`复制路径`等至少一个直接入口；
-- 失败或部分成功时的下一步动作。
+- 交付须给出产物用途、稳定路径、快速打开/定位/复制入口，以及失败或部分成功的下一步。
+- 只打印路径不算交付；入口只能访问声明的输出根/安全项目路径，不得绕过路径策略。
+- 无按钮时必须明确“快速打开入口不可用”，提供可复制路径和最短手工动作，不得假装已提供。
 
-只在 Console、聊天文本或日志中打印路径，不算完成交付。快速打开不能绕过 ES 路径策略，也不能访问任意系统目录或未声明的输出根。
-
-如果当前宿主无法提供按钮，必须在结果中明确报告“快速打开入口不可用”，并给出可复制路径和最短手工动作；不得假装已经提供了按钮。
-
-该规则是 P0 编辑器交付体验标准的具体落地项，完整原则见：
-
-`10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_P0_编辑器交付体验与下一步可发现性_AI协作警告.md`
+Knowledge：`es.aiwarning.editor-generated-artifact-quick-open.v1`。

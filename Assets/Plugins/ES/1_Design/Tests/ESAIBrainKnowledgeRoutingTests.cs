@@ -86,6 +86,100 @@ namespace ES.Tests
 
             Assert.That(plan.status, Is.EqualTo("PlanTaskUnavailable"));
         }
+
+        [Test]
+        public void Plan_AiwarningsKnowledgeMigration_RequiresNonDestructiveSourcePreservation()
+        {
+            const string safeObjective =
+                "在保留全部 AIWarnings 原文件、原路径和权威性的前提下，将详细内容迁入 Knowledge（保留原 Warning）；"
+                + "按迁移台账处理，禁止删除、移动、重命名或覆盖任何 AIWarning。";
+            ESAIBrainPlan safePlan = PlanObjective(safeObjective,
+                "aiwarnings", "migration", "knowledge");
+
+            Assert.That(safePlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_", StringComparison.Ordinal)), Is.False,
+                safeObjective);
+            Assert.That(safePlan.warnings.Select(item => item.projectPath), Does.Contain(
+                "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md"));
+
+            ESAIBrainPlan qualifiedRoutePlan = PlanObjective(
+                "AIWarnings 详细内容迁入 Knowledge（保留原 Warning）；"
+                + "保留原文件、原路径和权威性；禁止删除、移动、重命名或覆盖。");
+            Assert.That(qualifiedRoutePlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_", StringComparison.Ordinal)), Is.False,
+                "限定的全量路由正例不应触发迁移安全门禁。");
+
+            ESAIBrainPlan localizedQualifiedRoutePlan = PlanObjective(
+                "警告详细内容迁入知识库（保留原警告）；保留原文件、原路径和权威性；"
+                + "禁止删除、移动、重命名或覆盖。");
+            Assert.That(localizedQualifiedRoutePlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_", StringComparison.Ordinal)), Is.False,
+                "中文限定的全量路由正例不应触发迁移安全门禁。");
+
+            ESAIBrainPlan missingPreservationPlan = PlanObjective(
+                "AIWarnings 全量迁移到 Knowledge", "aiwarnings", "migration", "knowledge");
+            Assert.That(missingPreservationPlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_SOURCE_PRESERVATION_REQUIRED]",
+                    StringComparison.Ordinal)), Is.True);
+
+            ESAIBrainPlan destructivePlan = PlanObjective(
+                "把全部 AIWarnings 移动到 Knowledge 目录，并删除原 Warning",
+                "aiwarnings", "migration", "knowledge");
+            Assert.That(destructivePlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_DESTRUCTIVE_ACTION_DENIED]",
+                    StringComparison.Ordinal)), Is.True);
+
+            ESAIBrainPlan destructiveTransferPlan = PlanObjective(
+                "将 AIWarnings 转移到 Knowledge，并清除源文件",
+                "aiwarnings", "migration", "knowledge");
+            Assert.That(destructiveTransferPlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_DESTRUCTIVE_ACTION_DENIED]",
+                    StringComparison.Ordinal)), Is.True);
+
+            ESAIBrainPlan localizedDestructivePlan = PlanObjective("将所有警告迁移到知识库");
+            Assert.That(localizedDestructivePlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_SOURCE_PRESERVATION_REQUIRED]",
+                    StringComparison.Ordinal)), Is.True,
+                "中文泛化的警告迁移表达也不能绕过源保留门禁。");
+
+            ESAIBrainPlan partialProhibitionPlan = PlanObjective(
+                "AIWarnings 迁移到 Knowledge，保留源 Warning，但只禁止删除。");
+            Assert.That(partialProhibitionPlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_SOURCE_PRESERVATION_REQUIRED]",
+                    StringComparison.Ordinal)), Is.True,
+                "只声明单项禁止操作时仍必须补全非破坏性约束。");
+
+            ESAIBrainPlan genericRoutePlan = PlanObjective("Warning Knowledge coverage");
+            Assert.That(genericRoutePlan.blockers.Any(item =>
+                item.StartsWith("[AIWARNINGS.MIGRATION_SOURCE_PRESERVATION_REQUIRED]",
+                    StringComparison.Ordinal)), Is.True,
+                "泛化的覆盖路由也必须先声明源 Warning 保留策略。");
+        }
+
+        [Test]
+        public void AiwarningsFullCoverageRoute_UsesQualifiedPreservingMatchLanguage()
+        {
+            string catalogPath = Path.Combine(
+                ESCommandPalettePathPolicy.ProjectRoot,
+                "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json"
+                    .Replace('/', Path.DirectorySeparatorChar));
+            JObject catalog = JObject.Parse(File.ReadAllText(catalogPath,
+                new UTF8Encoding(false, true)));
+            JObject route = catalog["routes"].OfType<JObject>().Single(item =>
+                string.Equals(item.Value<string>("id"), "es.aiwarnings.full-coverage",
+                    StringComparison.Ordinal));
+
+            Assert.That(route.Value<string>("operation"), Is.EqualTo("knowledge-projection"));
+            Assert.That(route.Value<string>("sourcePolicy"), Is.EqualTo("preserve"));
+            Assert.That(route.Value<bool?>("requiresExplicitSourcePreservation"), Is.True);
+            Assert.That(route["forbiddenOperations"].Values<string>(), Does.Contain("move"));
+            Assert.That(route["forbiddenOperations"].Values<string>(), Does.Contain("delete"));
+            Assert.That(route["match"].Values<string>(), Does.Not.Contain("AIWarnings 全量迁移"));
+            Assert.That(route["match"].Values<string>(), Does.Contain(
+                "AIWarnings 详细内容迁入 Knowledge（保留原 Warning）"));
+            Assert.That(route["match"].Values<string>(), Does.Contain("警告非破坏性迁移"));
+        }
+
         [Test]
         public void Plan_RouteProbeRegistry_MatchesFixedCrossDomainExpectations()
         {

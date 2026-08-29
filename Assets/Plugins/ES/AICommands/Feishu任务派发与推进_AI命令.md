@@ -16,6 +16,22 @@
 
 命令类型：安全执行：外部受控写入。
 默认改文件：否；只允许写飞书测试清单/任务和受管 RunRecord 临时目录。
+
+## 取消（cancellation）
+
+DryRun 或远端提交前收到取消立即停止并返回 `Cancelled`；提交后无法撤销的操作不得伪装成功，响应丢失统一返回 `UNCERTAIN_REMOTE_RESULT`，并附停止回执。
+
+## 恢复（recovery）
+
+仅凭同一 client_token、CAS 和新鲜任务版本恢复；不确定结果禁止猜测重发。无法证明幂等或版本一致时返回 `NeedsReissue`，等待新的授权与新 InvocationId。
+
+## 验证（validation）
+
+执行前验证用户授权、DryRun 绑定、Actor/租户/应用身份 Hash、目标清单和 TaskContract；执行后逐项核对远端对象 ID、状态、RunRecord 与部分成功结果。
+
+## evidenceRef
+
+回执必须包含 commandId、commandBodyHash、planHash、DryRun RunId、InvocationId、目标对象 ID、幂等键、验证结果和未验证项；静态回执不得升级为 Runtime 验收。
 风险等级：L3。
 
 ## TaskContract

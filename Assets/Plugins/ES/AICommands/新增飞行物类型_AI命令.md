@@ -30,6 +30,18 @@ Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Sh
 按 Item Shot shared + variable 规范新增飞行物能力。Shared 放模板，Variable 放每发变量，必中是合法模式。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: projectile.add
+cancellation: before static type/config commit may cancel; after commit stop and report partial state without removing existing projectile definitions.
+recovery: preserve shared/variable data and pool references, retry with a new invocationId and CAS; contradictory identity or pool state requires NeedsReissue.
+validation: Item/Shot shared+variable separation, pooling ownership,必中 mode legality, stable identity, source-reference checks and ES_Logic.csproj compile.
+evidenceRef: planHash, commandBodyHash, changed-file SHA-256, type/config diff, validator output and explicit Runtime-not-run status.
+allowRoots: existing projectile/Item/Shot static type, configuration and required tests/docs roots only.
+denyPaths: unrelated gameplay systems, runtime behavior changes, AIWarnings, AICommands Catalog, ProjectSettings, Packages, release, Library and Git/.git; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

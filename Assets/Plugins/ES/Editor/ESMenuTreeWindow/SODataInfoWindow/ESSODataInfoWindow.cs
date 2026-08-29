@@ -1281,7 +1281,7 @@ namespace ES
                 }
                 else
                 {
-                    if (AssetDatabase.IsPersistent(dataSO) && !AssetDatabase.IsSubAsset(dataSO))
+                    if (EditorUtility.IsPersistent(dataSO) && !AssetDatabase.IsSubAsset(dataSO))
                     {
                         Debug.LogError("拒绝删除：未解析到父 Group，不能删除已持久化主资产。");
                         return;

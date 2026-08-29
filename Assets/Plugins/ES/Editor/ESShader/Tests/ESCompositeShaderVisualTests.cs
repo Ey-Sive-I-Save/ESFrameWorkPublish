@@ -561,42 +561,59 @@ namespace ES.Tests
 
         private static Texture2D RenderMaterial(Material material, float worldHeight, bool orthographic)
         {
-            PreviewRenderUtility utility = null;
+            ESEditorPreviewRenderContext context = null;
+            ESEditorPreviewModelHandle modelHandle = null;
+            GameObject previewObject = null;
             Mesh mesh = null;
             Texture2D preview = null;
             try
             {
-                utility = new PreviewRenderUtility();
-                utility.camera.orthographic = orthographic;
-                utility.camera.orthographicSize = 0.55f;
-                utility.camera.fieldOfView = 30f;
-                utility.camera.transform.position = new Vector3(0f, worldHeight, -2.05f);
-                utility.camera.transform.rotation = Quaternion.identity;
-                utility.camera.nearClipPlane = 0.01f;
-                utility.camera.farClipPlane = 10f;
-                utility.camera.clearFlags = CameraClearFlags.Color;
-                utility.camera.backgroundColor = PreviewBackground;
-                utility.lights[0].intensity = 1.25f;
-                utility.lights[0].transform.rotation = Quaternion.Euler(30f, 30f, 0f);
-                utility.lights[1].intensity = 0.55f;
+                context = new ESEditorPreviewRenderContext(
+                    "ES Composite Shader Visual Test",
+                    ESEditorPreviewSceneMode.PreviewScene,
+                    ESEditorPreviewUtility.DefaultPreviewLayer,
+                    ESEditorPreviewEnhancerSet.LowEnd);
+                context.Ensure();
+                context.Camera.orthographic = orthographic;
+                context.Camera.orthographicSize = 0.55f;
+                context.Camera.fieldOfView = 30f;
+                context.Camera.clearFlags = CameraClearFlags.Color;
+                context.Camera.backgroundColor = PreviewBackground;
 
                 mesh = CreateQuad();
-                utility.BeginStaticPreview(new Rect(0f, 0f, PreviewSize, PreviewSize));
-                utility.DrawMesh(
-                    mesh,
-                    Matrix4x4.TRS(new Vector3(0f, worldHeight, 0f), Quaternion.identity, Vector3.one),
-                    material,
-                    0);
-                utility.camera.Render();
-                preview = utility.EndStaticPreview();
+                previewObject = ESEditorPreviewUtility.CreatePreviewGameObject(
+                    "ES Composite Shader Visual Test Quad", typeof(MeshFilter), typeof(MeshRenderer));
+                previewObject.transform.localPosition = new Vector3(0f, worldHeight, 0f);
+                previewObject.GetComponent<MeshFilter>().sharedMesh = mesh;
+                previewObject.GetComponent<MeshRenderer>().sharedMaterial = material;
+                modelHandle = context.AdoptModelGroup(
+                    previewObject,
+                    previewObject,
+                    "ES Composite Shader Visual Test Quad",
+                    samplingTarget: false,
+                    copyRendererState: false,
+                    disableRuntimeBehaviours: false,
+                    ensureRenderersEnabled: true,
+                    activateInstance: true,
+                    moveToGroupOrigin: false);
+                previewObject = null;
+                Assert.That(modelHandle, Is.Not.Null, material.shader.name + " preview model setup failed.");
+                ESEditorPreviewCameraPose pose = context.CreateCameraPose(
+                    context.WorldToPreviewLocalPoint(modelHandle.Bounds.center),
+                    Mathf.Max(0.5f, modelHandle.Bounds.extents.magnitude),
+                    0f, 0f, 1f);
+                preview = context.Snapshot(PreviewSize, PreviewSize, pose,
+                    ESEditorPreviewQuality.Fast, "ES Composite Shader Visual Test Snapshot");
                 Assert.That(preview, Is.Not.Null, material.shader.name + " preview render returned null.");
-                return CloneTexture(preview);
+                return preview;
             }
             finally
             {
-                DestroyImmediateSafe(preview);
+                modelHandle?.Dispose();
+                if (previewObject != null)
+                    DestroyImmediateSafe(previewObject);
                 DestroyImmediateSafe(mesh);
-                utility?.Cleanup();
+                context?.Dispose();
             }
         }
 

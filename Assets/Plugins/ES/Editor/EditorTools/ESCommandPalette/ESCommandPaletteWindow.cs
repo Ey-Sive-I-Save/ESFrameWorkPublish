@@ -5,6 +5,7 @@ using System.Diagnostics;
 using UnityEditor;
 using UnityEditor.ShortcutManagement;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace ES
 {
@@ -391,9 +392,18 @@ namespace ES
         private const float MinDetailWidth = 760f;
         private const string LastTabKey = "ES.CommandPalette.LastTab";
         private const int MaximumQueryHistory = 20;
+        private const double StyleRetryBackoffSeconds = 0.25d;
         private static readonly Vector2 DefaultSize = new Vector2(800f, 520f);
         private static readonly Vector2 MinimumSize = new Vector2(360f, 320f);
         private static readonly Vector2 MaximumSize = new Vector2(1100f, 760f);
+
+        private static string NormalizeQuery(string value)
+        {
+            string normalized = value ?? string.Empty;
+            return normalized.Length > ESCommandPaletteSearchEngine.MaximumQueryCharacters
+                ? normalized.Substring(0, ESCommandPaletteSearchEngine.MaximumQueryCharacters)
+                : normalized;
+        }
 
         private readonly ESCommandPaletteSearchEngine searchEngine = new ESCommandPaletteSearchEngine();
         private readonly List<string> queryHistory = new List<string>(24);
@@ -450,6 +460,8 @@ namespace ES
         private static int lastThemeGeneration = -1;
         private static int lastSkinGeneration = -1;
         private static readonly List<Texture2D> CreatedTextures = new List<Texture2D>();
+        private static bool styleFailureLogged;
+        private static double nextStyleRetryAt;
 
         private enum ShortcutConflictState
         {
@@ -576,24 +588,47 @@ namespace ES
             }
 
             ESCommandPaletteWindow window = GetWindow<ESCommandPaletteWindow>(true, "ES 命令面板", true);
-            window.minSize = MinimumSize;
-            window.maxSize = MaximumSize;
-            window.titleContent = new GUIContent("ES 命令面板");
-            window.ShowUtility();
-            window.Focus();
+            try
+            {
+                window.minSize = MinimumSize;
+                window.maxSize = MaximumSize;
+                window.titleContent = new GUIContent("ES 命令面板");
+                window.ShowUtility();
+                window.Focus();
+            }
+            catch (Exception exception)
+            {
+                if (!alreadyOpen)
+                {
+                    try { window.Close(); }
+                    catch (Exception closeException) { Debug.LogException(closeException); }
+                }
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 显示命令面板失败，已拒绝继续初始化。", exception));
+                return;
+            }
             if (!alreadyOpen)
             {
                 CenterWindowInMainEditor(window);
             }
             if (alreadyOpen)
             {
-                window.query = window.query ?? string.Empty;
+                window.query = NormalizeQuery(window.query);
             }
             else
             {
-                string lastTab = SessionState.GetString(LastTabKey, string.Empty);
+                string lastTab = string.Empty;
+                try
+                {
+                    lastTab = SessionState.GetString(LastTabKey, string.Empty);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "[ESCommandPalette] 重开时读取上次标签失败，已回退默认标签。", exception));
+                }
                 window.activeTab = lastTab;
-                window.query = lastTab;
+                window.query = NormalizeQuery(lastTab);
             }
             window.selected = 0;
             window.focusSearchOnNextLayout = true;
@@ -604,6 +639,13 @@ namespace ES
         private static void CenterWindowInMainEditor(ESCommandPaletteWindow window)
         {
             Rect mainWindow = EditorGUIUtility.GetMainWindowPosition();
+            if (window == null
+                || !IsFinite(mainWindow.x) || !IsFinite(mainWindow.y)
+                || !IsFinite(mainWindow.width) || !IsFinite(mainWindow.height)
+                || mainWindow.width <= 0f || mainWindow.height <= 0f)
+            {
+                return;
+            }
             float width = Mathf.Min(
                 DefaultSize.x,
                 Mathf.Max(MinimumSize.x, mainWindow.width - 80f));
@@ -623,11 +665,16 @@ namespace ES
                 height);
         }
 
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
         public static void OpenWithQuery(string initialQuery)
         {
             OpenWindow();
             ESCommandPaletteWindow window = GetWindow<ESCommandPaletteWindow>();
-            window.query = initialQuery ?? string.Empty;
+            window.query = NormalizeQuery(initialQuery);
             window.activeTab = window.query;
             window.selected = 0;
             window.ScheduleSearch();
@@ -636,47 +683,103 @@ namespace ES
         private void OnEnable()
         {
             lifecycleActive = true;
-            ESWindowFoundation.BindTransient(this);
-            if (!stylesAcquired)
+            nextStyleRetryAt = 0d;
+            try
             {
-                AcquireStyles();
-                stylesAcquired = true;
+                ESWindowFoundation.BindTransient(this);
+                if (!stylesAcquired)
+                {
+                    AcquireStyles();
+                    stylesAcquired = true;
+                }
+                ESCommandPaletteRegistry.EnsureInitialized();
+                focusSearchOnNextLayout = true;
+                ScheduleSearch();
             }
-            ESCommandPaletteRegistry.EnsureInitialized();
-            focusSearchOnNextLayout = true;
-            ScheduleSearch();
+            catch (Exception exception)
+            {
+                lifecycleActive = false;
+                UnregisterSearchTick();
+                UnregisterShortcutCheckTick();
+                if (stylesAcquired)
+                {
+                    try { ReleaseStyles(); }
+                    catch (Exception releaseException) { Debug.LogException(releaseException); }
+                    stylesAcquired = false;
+                }
+                try { ESWindowFoundation.Suspend(this); }
+                catch (Exception suspendException) { Debug.LogException(suspendException); }
+                nextSearchAt = double.MaxValue;
+                searchEngine.Clear();
+                results = Array.Empty<ESCommandPaletteItem>();
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 启动初始化失败，已回滚窗口状态。", exception));
+            }
         }
 
         private void OnDisable()
         {
             lifecycleActive = false;
-            SessionState.SetString(LastTabKey, activeTab);
-            ESWindowFoundation.Suspend(this);
-            UnregisterSearchTick();
-            UnregisterShortcutCheckTick();
-            if (stylesAcquired)
+            try
             {
-                ReleaseStyles();
-                stylesAcquired = false;
+                SessionState.SetString(LastTabKey, activeTab);
             }
-            nextSearchAt = double.MaxValue;
-            searchEngine.Clear();
-            results = Array.Empty<ESCommandPaletteItem>();
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 关闭时保存标签失败。", exception));
+            }
+            try
+            {
+                ESWindowFoundation.Suspend(this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 关闭挂起协议失败。", exception));
+            }
+            finally
+            {
+                UnregisterSearchTick();
+                UnregisterShortcutCheckTick();
+                if (stylesAcquired)
+                {
+                    ReleaseStyles();
+                    stylesAcquired = false;
+                }
+                nextSearchAt = double.MaxValue;
+                nextStyleRetryAt = 0d;
+                searchEngine.Clear();
+                results = Array.Empty<ESCommandPaletteItem>();
+            }
         }
 
         private void OnDestroy()
         {
             lifecycleActive = false;
-            ESWindowFoundation.Close(this);
-            UnregisterSearchTick();
-            UnregisterShortcutCheckTick();
-            if (stylesAcquired)
+            try
             {
-                ReleaseStyles();
-                stylesAcquired = false;
+                ESWindowFoundation.Close(this);
             }
-            nextSearchAt = double.MaxValue;
-            searchEngine.Clear();
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 销毁关闭协议失败。", exception));
+            }
+            finally
+            {
+                UnregisterSearchTick();
+                UnregisterShortcutCheckTick();
+                if (stylesAcquired)
+                {
+                    ReleaseStyles();
+                    stylesAcquired = false;
+                }
+                nextSearchAt = double.MaxValue;
+                nextStyleRetryAt = 0d;
+                searchEngine.Clear();
+                results = Array.Empty<ESCommandPaletteItem>();
+            }
         }
 
         private void OnGUI()
@@ -686,7 +789,26 @@ namespace ES
             // that frame after transient resources have been released.
             if (!lifecycleActive)
                 return;
-            EnsureStyles();
+            if (!stylesReady && EditorApplication.timeSinceStartup < nextStyleRetryAt)
+                return;
+            try
+            {
+                EnsureStyles();
+            }
+            catch (Exception exception)
+            {
+                stylesReady = false;
+                nextStyleRetryAt = EditorApplication.timeSinceStartup + StyleRetryBackoffSeconds;
+                if (!styleFailureLogged)
+                {
+                    styleFailureLogged = true;
+                    Debug.LogException(new InvalidOperationException(
+                        "[ESCommandPalette] 样式构建失败，已跳过本帧绘制。", exception));
+                }
+                return;
+            }
+            if (!stylesReady)
+                return;
             if (EditorApplication.timeSinceStartup >= nextSearchAt)
             {
                 UpdateResultsNow();
@@ -728,7 +850,8 @@ namespace ES
                 }
 
                 GUI.SetNextControlName("ESCommandPaletteSearch");
-                string next = EditorGUILayout.TextField(query, searchFieldStyle, GUILayout.MinWidth(120f));
+                string next = NormalizeQuery(EditorGUILayout.TextField(
+                    query, searchFieldStyle, GUILayout.MinWidth(120f)));
                 if (!string.Equals(next, query, StringComparison.Ordinal))
                 {
                     query = next;
@@ -958,13 +1081,8 @@ namespace ES
             else if (item.ActionKind == ESCommandPaletteActionKind.OpenAsset
                 || item.ActionKind == ESCommandPaletteActionKind.Select)
             {
-                menu.AddItem(new GUIContent("复制路径"), false, () =>
-                {
-                    GUIUtility.systemCopyBuffer = item.TargetId;
-                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Copy);
-                    feedback = "已复制路径 " + item.TargetId;
-                    Repaint();
-                });
+                menu.AddItem(new GUIContent("复制路径"), false,
+                    () => CopyTargetFromContextMenu(item.TargetId));
             }
 
             menu.AddSeparator(string.Empty);
@@ -975,6 +1093,43 @@ namespace ES
                 () => ToggleFavoriteFromContextMenu(item.StableId));
             menu.AddItem(new GUIContent("查看详情"), false, OpenDetailSelected);
             menu.ShowAsContext();
+        }
+
+        private void CopyTargetFromContextMenu(string targetId)
+        {
+            if (this == null || !lifecycleActive || string.IsNullOrEmpty(targetId))
+                return;
+            if (!TryCopyTargetToClipboard(targetId, out string copyError))
+            {
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Warning);
+                feedback = "复制路径失败：" + copyError;
+                Repaint();
+                return;
+            }
+            ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Copy);
+            feedback = "已复制路径 " + targetId;
+            Repaint();
+        }
+
+        private static bool TryCopyTargetToClipboard(string targetId, out string error)
+        {
+            error = string.Empty;
+            if (string.IsNullOrEmpty(targetId))
+            {
+                error = "目标路径为空";
+                return false;
+            }
+
+            try
+            {
+                GUIUtility.systemCopyBuffer = targetId;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = string.IsNullOrEmpty(exception.Message) ? "编辑器剪贴板不可用" : exception.Message;
+                return false;
+            }
         }
 
         private void ToggleFavoriteFromContextMenu(string stableId)
@@ -1162,7 +1317,7 @@ namespace ES
         private void ApplyTab(string prefix)
         {
             activeTab = prefix;
-            query = prefix + CurrentSearchTerm();
+            query = NormalizeQuery(prefix + CurrentSearchTerm());
             selected = 0;
             ScheduleSearch();
         }
@@ -1353,7 +1508,8 @@ namespace ES
 
         private void ExecuteSelected()
         {
-            if (selected < 0 || selected >= results.Count)
+            if (this == null || !lifecycleActive
+                || selected < 0 || selected >= results.Count)
             {
                 return;
             }
@@ -1369,6 +1525,12 @@ namespace ES
             if (this == null || !lifecycleActive || item == null)
             {
                 return;
+            }
+
+            if (ESCommandPaletteRegistry.TryGet(item.StableId, out ESCommandPaletteItem currentItem)
+                && currentItem != null)
+            {
+                item = currentItem;
             }
 
             RecordQuery(query);
@@ -1531,7 +1693,8 @@ namespace ES
 
         private void LocateSelected()
         {
-            if (selected < 0 || selected >= results.Count)
+            if (this == null || !lifecycleActive
+                || selected < 0 || selected >= results.Count)
             {
                 return;
             }
@@ -1578,7 +1741,8 @@ namespace ES
 
         private void CopySelectedShortcut()
         {
-            if (selected < 0 || selected >= results.Count)
+            if (this == null || !lifecycleActive
+                || selected < 0 || selected >= results.Count)
             {
                 return;
             }
@@ -1605,7 +1769,13 @@ namespace ES
             if (item.ActionKind == ESCommandPaletteActionKind.OpenAsset
                 || item.ActionKind == ESCommandPaletteActionKind.Select)
             {
-                GUIUtility.systemCopyBuffer = item.TargetId;
+                if (!TryCopyTargetToClipboard(item.TargetId, out string copyError))
+                {
+                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Warning);
+                    feedback = "复制路径失败：" + copyError;
+                    Repaint();
+                    return;
+                }
                 ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Copy);
                 feedback = "已复制路径 " + item.TargetId;
                 Repaint();
@@ -1759,6 +1929,9 @@ namespace ES
         private void UpdateResults()
         {
             nextSearchAt = double.MaxValue;
+            string previousSelectedId = selected >= 0 && selected < results.Count
+                ? results[selected]?.StableId
+                : null;
             results = searchEngine.Search(query, ESCommandPaletteRegistry.AllItems);
             results = OrderResultsForDisplay(results);
             indexedCount = ESCommandPaletteRegistry.ItemCount;
@@ -1769,7 +1942,21 @@ namespace ES
             }
             else
             {
-                selected = Mathf.Clamp(selected, 0, Math.Max(0, results.Count - 1));
+                int restoredIndex = -1;
+                if (!string.IsNullOrEmpty(previousSelectedId))
+                {
+                    for (int index = 0; index < results.Count; index++)
+                    {
+                        if (string.Equals(results[index]?.StableId, previousSelectedId, StringComparison.Ordinal))
+                        {
+                            restoredIndex = index;
+                            break;
+                        }
+                    }
+                }
+                selected = restoredIndex >= 0
+                    ? restoredIndex
+                    : Mathf.Clamp(selected, 0, Math.Max(0, results.Count - 1));
             }
             hoveredIndex = -1;
         }
@@ -1859,8 +2046,14 @@ namespace ES
                 DestroyCreatedTextures();
                 stylesReady = false;
             }
+            else
+            {
+                // A previous build may have failed after creating only part of
+                // the temporary textures. Clear that partial allocation before
+                // retrying so repeated repaints cannot accumulate resources.
+                DestroyCreatedTextures();
+            }
 
-            stylesReady = true;
             stylesProSkin = EditorGUIUtility.isProSkin;
             lastThemeGeneration = themeGeneration;
             lastSkinGeneration = skinGeneration;
@@ -2025,6 +2218,11 @@ namespace ES
                 fontSize = 10,
                 normal = { textColor = muted }
             };
+            // Only publish the ready flag after every style and texture has been
+            // created successfully; a mid-build exception must be retried.
+            stylesReady = true;
+            styleFailureLogged = false;
+            nextStyleRetryAt = 0d;
         }
 
         private static Texture2D SolidTexture(Color color)
@@ -2038,11 +2236,18 @@ namespace ES
                 CreatedTextures.Add(texture);
                 return texture;
             }
-            catch
+            catch (Exception createException)
             {
                 if (texture != null)
-                    DestroyImmediate(texture);
-                throw;
+                {
+                    try { DestroyImmediate(texture); }
+                    catch (Exception destroyException)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "[ESCommandPalette] 样式纹理创建失败后的清理也失败。", destroyException));
+                    }
+                }
+                throw createException;
             }
         }
 

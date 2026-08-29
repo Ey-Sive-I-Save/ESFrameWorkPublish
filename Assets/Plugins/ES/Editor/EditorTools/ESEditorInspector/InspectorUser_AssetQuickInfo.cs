@@ -626,13 +626,34 @@ namespace ES
 
         private static string ReadTextWithFallback(string path)
         {
-            try
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidOperationException("文件路径为空。");
+
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                return File.ReadAllText(path, new UTF8Encoding(false, true));
-            }
-            catch (DecoderFallbackException)
-            {
-                return File.ReadAllText(path, Encoding.Default);
+                if (stream.Length > MaxCopyTextBytes)
+                    throw new InvalidOperationException("文件超过 1MB 读取上限。");
+
+                int length = checked((int)stream.Length);
+                byte[] bytes = new byte[length];
+                int offset = 0;
+                while (offset < bytes.Length)
+                {
+                    int read = stream.Read(bytes, offset, bytes.Length - offset);
+                    if (read <= 0) break;
+                    offset += read;
+                }
+                if (offset != bytes.Length)
+                    Array.Resize(ref bytes, offset);
+
+                try
+                {
+                    return new UTF8Encoding(false, true).GetString(bytes);
+                }
+                catch (DecoderFallbackException)
+                {
+                    return Encoding.Default.GetString(bytes);
+                }
             }
         }
 
@@ -658,22 +679,41 @@ namespace ES
 
             string finalContent = content;
 
-            if (appendMode)
+            try
             {
-                string currentBuffer = EditorGUIUtility.systemCopyBuffer;
-                if (string.IsNullOrEmpty(currentBuffer)) finalContent = content;
-                else finalContent = currentBuffer + "\n" + content;
-            }
+                if (appendMode)
+                {
+                    string currentBuffer = EditorGUIUtility.systemCopyBuffer;
+                    if (!string.IsNullOrEmpty(currentBuffer)
+                        && currentBuffer.Length > MaxCopyTextBytes)
+                    {
+                        Debug.LogWarning($"追加复制 {label} 失败：现有剪贴板内容超过 1MB 上限。");
+                        return;
+                    }
+                    if (!string.IsNullOrEmpty(currentBuffer))
+                        finalContent = currentBuffer + "\n" + content;
+                }
 
-            ESDesignUtility.SafeEditor.Wrap_SystemCopyBuffer(finalContent);
+                if (finalContent.Length > MaxCopyTextBytes)
+                {
+                    Debug.LogWarning($"复制 {label} 失败：合并后的内容超过 1MB 上限。");
+                    return;
+                }
 
-            if (appendMode)
-            {
-                Debug.Log($"<color=#00FF00>[追加模式]</color> 已添加 {label}。当前剪贴板共 {finalContent.Split('\n').Length} 行");
+                ESDesignUtility.SafeEditor.Wrap_SystemCopyBuffer(finalContent);
+
+                if (appendMode)
+                {
+                    Debug.Log($"<color=#00FF00>[追加模式]</color> 已添加 {label}。当前剪贴板共 {finalContent.Split('\n').Length} 行");
+                }
+                else
+                {
+                    Debug.Log($"<color=#FFFF00>[覆盖模式]</color> 已复制 {label}");
+                }
             }
-            else
+            catch (Exception exception)
             {
-                Debug.Log($"<color=#FFFF00>[覆盖模式]</color> 已复制 {label}");
+                Debug.LogWarning($"复制 {label} 失败：{exception.Message}");
             }
         }
     }

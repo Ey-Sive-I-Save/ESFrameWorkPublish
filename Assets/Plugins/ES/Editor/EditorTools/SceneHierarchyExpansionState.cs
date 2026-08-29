@@ -2,6 +2,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -25,6 +27,7 @@ public static class SceneHierarchyExpansionState
 
     // 单次最多保存的展开对象数量。用于限制大场景中展开节点过多导致的保存/恢复开销。
     private const int MaxStoredExpandedObjects = 250;
+    private const int MaxExpandedIdsRead = 10000;
 
     // 自动恢复前额外等待的 Editor Update 次数，用于避开场景刚打开时 Hierarchy 尚未稳定的阶段。
     private const int RestoreDelayTicks = 2;
@@ -399,34 +402,41 @@ public static class SceneHierarchyExpansionState
         int resolvedPathCount = 0;
         int restoredCount = 0;
 
-        for (int i = 0; i < SceneManager.sceneCount; i++)
+        int sceneCountSnapshot = SceneManager.sceneCount;
+        for (int i = 0; i < sceneCountSnapshot; i++)
         {
-            var scene = SceneManager.GetSceneAt(i);
-            if (!CanStoreScene(scene))
-                continue;
-
-            if (!TryLoadSceneExpansionData(scene, out SceneExpansionData data))
-                continue;
-
-            loadedSceneCount++;
-            candidatePathCount += data.expandedTransformPaths.Count;
-
-            // 先恢复浅层，再恢复深层，避免父节点未展开时子节点恢复失败或不可见。
-            data.expandedTransformPaths.Sort(ComparePathDepthThenName);
-            foreach (string transformPath in data.expandedTransformPaths)
+            try
             {
-                double resolveStart = EditorApplication.timeSinceStartup;
-                var transform = ResolveTransformPath(scene, transformPath);
-                resolveMs += ToMilliseconds(EditorApplication.timeSinceStartup - resolveStart);
-                if (transform == null)
+                var scene = SceneManager.GetSceneAt(i);
+                if (!CanStoreScene(scene)
+                    || !TryLoadSceneExpansionData(scene, out SceneExpansionData data))
                     continue;
 
-                resolvedPathCount++;
+                loadedSceneCount++;
+                candidatePathCount += data.expandedTransformPaths.Count;
 
-                double applyStart = EditorApplication.timeSinceStartup;
-                if (SceneHierarchyReflection.SetExpanded(transform.gameObject.GetInstanceID(), true))
-                    restoredCount++;
-                applyMs += ToMilliseconds(EditorApplication.timeSinceStartup - applyStart);
+                // 先恢复浅层，再恢复深层，避免父节点未展开时子节点恢复失败或不可见。
+                data.expandedTransformPaths.Sort(ComparePathDepthThenName);
+                foreach (string transformPath in data.expandedTransformPaths)
+                {
+                    double resolveStart = EditorApplication.timeSinceStartup;
+                    var transform = ResolveTransformPath(scene, transformPath);
+                    resolveMs += ToMilliseconds(EditorApplication.timeSinceStartup - resolveStart);
+                    if (transform == null)
+                        continue;
+
+                    resolvedPathCount++;
+
+                    double applyStart = EditorApplication.timeSinceStartup;
+                    if (SceneHierarchyReflection.SetExpanded(transform.gameObject.GetInstanceID(), true))
+                        restoredCount++;
+                    applyMs += ToMilliseconds(EditorApplication.timeSinceStartup - applyStart);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[SceneHierarchyExpansionState] 单个场景层级恢复失败，已跳过："
+                    + exception.Message);
             }
         }
 
@@ -668,24 +678,31 @@ public static class SceneHierarchyExpansionState
         if (segments.Length == 0 || segments.Length > MaxDepth + 1)
             return null;
 
-        Transform current = null;
-        var roots = scene.GetRootGameObjects();
-
-        for (int i = 0; i < segments.Length; i++)
+        try
         {
-            if (!TryParsePathSegment(segments[i], out string name, out int sameNameIndex, out int siblingIndex))
-                return null;
+            Transform current = null;
+            var roots = scene.GetRootGameObjects();
 
-            // 严格按完整路径段匹配，避免同名对象被误展开。
-            current = i == 0
-                ? FindRoot(roots, name, sameNameIndex, siblingIndex)
-                : FindChild(current, name, sameNameIndex, siblingIndex);
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (!TryParsePathSegment(segments[i], out string name, out int sameNameIndex, out int siblingIndex))
+                    return null;
 
-            if (current == null)
-                return null;
+                // 严格按完整路径段匹配，避免同名对象被误展开。
+                current = i == 0
+                    ? FindRoot(roots, name, sameNameIndex, siblingIndex)
+                    : FindChild(current, name, sameNameIndex, siblingIndex);
+
+                if (current == null)
+                    return null;
+            }
+
+            return current;
         }
-
-        return current;
+        catch
+        {
+            return null;
+        }
     }
 
     private static Transform FindRoot(GameObject[] roots, string name, int sameNameIndex, int siblingIndex)
@@ -752,9 +769,21 @@ public static class SceneHierarchyExpansionState
         if (hashIndex <= 0 || atIndex <= hashIndex)
             return false;
 
-        name = Uri.UnescapeDataString(segment.Substring(0, hashIndex));
-        return int.TryParse(segment.Substring(hashIndex + 1, atIndex - hashIndex - 1), out sameNameIndex)
-            && int.TryParse(segment.Substring(atIndex + 1), out siblingIndex);
+        try
+        {
+            name = Uri.UnescapeDataString(segment.Substring(0, hashIndex));
+            return int.TryParse(segment.Substring(hashIndex + 1, atIndex - hashIndex - 1), out sameNameIndex)
+                && int.TryParse(segment.Substring(atIndex + 1), out siblingIndex)
+                && sameNameIndex >= 0
+                && siblingIndex >= 0;
+        }
+        catch
+        {
+            name = string.Empty;
+            sameNameIndex = 0;
+            siblingIndex = -1;
+            return false;
+        }
     }
 
     private static int GetSameNameIndex(Transform transform)
@@ -850,7 +879,13 @@ public static class SceneHierarchyExpansionState
             && record.expandedTransformPaths != null)
         {
             data = new SceneExpansionData();
-            data.expandedTransformPaths.AddRange(record.expandedTransformPaths);
+            for (int i = 0; i < record.expandedTransformPaths.Count
+                && data.expandedTransformPaths.Count < MaxStoredExpandedObjects; i++)
+            {
+                string path = record.expandedTransformPaths[i];
+                if (!string.IsNullOrWhiteSpace(path) && path.Length <= 4096)
+                    data.expandedTransformPaths.Add(path);
+            }
             return true;
         }
 
@@ -858,9 +893,25 @@ public static class SceneHierarchyExpansionState
         if (string.IsNullOrEmpty(json))
             return false;
 
-        data = JsonUtility.FromJson<SceneExpansionData>(json);
+        try
+        {
+            data = JsonUtility.FromJson<SceneExpansionData>(json);
+        }
+        catch
+        {
+            data = null;
+            return false;
+        }
         if (data == null || data.expandedTransformPaths == null)
             return false;
+
+        if (data.expandedTransformPaths.Count > MaxStoredExpandedObjects)
+            data.expandedTransformPaths.RemoveRange(
+                MaxStoredExpandedObjects,
+                data.expandedTransformPaths.Count - MaxStoredExpandedObjects);
+        data.expandedTransformPaths = data.expandedTransformPaths
+            .Where(path => !string.IsNullOrWhiteSpace(path) && path.Length <= 4096)
+            .ToList();
 
         SaveSceneExpansionData(scene, data);
         return true;
@@ -908,7 +959,8 @@ public static class SceneHierarchyExpansionState
 
     private static string GetLastOpenedScenePath()
     {
-        return EditorPrefs.GetString(GetLastOpenedScenePathKey(), string.Empty);
+        string path = EditorPrefs.GetString(GetLastOpenedScenePathKey(), string.Empty);
+        return IsSafeSceneAssetPath(path) ? path.Replace('\\', '/') : string.Empty;
     }
 
     private static bool GetAutoOpenLastSceneOnStartup()
@@ -929,8 +981,18 @@ public static class SceneHierarchyExpansionState
 
     private static void RememberLastOpenedScenePath(string scenePath)
     {
-        if (!string.IsNullOrWhiteSpace(scenePath))
+        if (IsSafeSceneAssetPath(scenePath))
             EditorPrefs.SetString(GetLastOpenedScenePathKey(), scenePath);
+    }
+
+    private static bool IsSafeSceneAssetPath(string scenePath)
+    {
+        if (string.IsNullOrWhiteSpace(scenePath)) return false;
+        string normalized = scenePath.Trim().Replace('\\', '/');
+        return !Path.IsPathRooted(normalized)
+            && normalized.EndsWith(".unity", StringComparison.OrdinalIgnoreCase)
+            && !normalized.Split('/').Any(segment => segment == ".." || segment == ".")
+            && !normalized.Contains("//", StringComparison.Ordinal);
     }
 
     private static void RememberActiveSceneAsLastOpened()
@@ -1131,13 +1193,42 @@ public static class SceneHierarchyExpansionState
         if (string.IsNullOrEmpty(json))
             return false;
 
-        record = JsonUtility.FromJson<SceneViewCameraRecord>(json);
-        if (record == null || record.savedUtcTicks <= 0)
-            return false;
+        try
+        {
+            record = JsonUtility.FromJson<SceneViewCameraRecord>(json);
+            if (record == null || record.savedUtcTicks <= 0
+                || !IsFinite(record.pivot) || !IsFinite(record.rotation)
+                || !IsFinite(record.size) || record.size <= 0f
+                || record.size > 10000000f || !IsFinite(record.fieldOfView))
+                return false;
 
-        DateTime savedUtc = new DateTime(record.savedUtcTicks, DateTimeKind.Utc);
-        return SceneViewCameraRecordMaxAgeDays <= 0
-            || DateTime.UtcNow - savedUtc <= TimeSpan.FromDays(SceneViewCameraRecordMaxAgeDays);
+            DateTime savedUtc = new DateTime(record.savedUtcTicks, DateTimeKind.Utc);
+            TimeSpan age = DateTime.UtcNow - savedUtc;
+            return age >= TimeSpan.Zero
+                && (SceneViewCameraRecordMaxAgeDays <= 0
+                    || age <= TimeSpan.FromDays(SceneViewCameraRecordMaxAgeDays));
+        }
+        catch
+        {
+            record = null;
+            return false;
+        }
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(Quaternion value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y)
+            && IsFinite(value.z) && IsFinite(value.w);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private static bool RestoreActiveSceneViewCameraNow()
@@ -1260,26 +1351,43 @@ public static class SceneHierarchyExpansionState
         {
             get
             {
-                object hierarchyObject = GetSceneHierarchyObject();
-                return FindMethodOwner(hierarchyObject, "SetExpanded", ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out _, out _)
-                    || TryFindExpandedIds(hierarchyObject, ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out _);
+                try
+                {
+                    object hierarchyObject = GetSceneHierarchyObject();
+                    return FindMethodOwner(hierarchyObject, "SetExpanded", ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out _, out _)
+                        || TryFindExpandedIds(hierarchyObject, ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out _);
+                }
+                catch
+                {
+                    return false;
+                }
             }
         }
 
         public static HashSet<int> GetExpandedInstanceIds()
         {
             var result = new HashSet<int>();
-            object hierarchyObject = GetSceneHierarchyObject();
-            if (hierarchyObject == null)
-                return result;
-
-            if (!TryFindExpandedIds(hierarchyObject, ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out IList expandedIds))
-                return result;
-
-            foreach (object item in expandedIds)
+            try
             {
-                if (item is int id)
-                    result.Add(id);
+                object hierarchyObject = GetSceneHierarchyObject();
+                if (hierarchyObject == null)
+                    return result;
+
+                if (!TryFindExpandedIds(hierarchyObject, ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out IList expandedIds))
+                    return result;
+
+                int inspected = 0;
+                foreach (object item in expandedIds)
+                {
+                    if (item is int id)
+                        result.Add(id);
+                    if (++inspected >= MaxExpandedIdsRead)
+                        break;
+                }
+            }
+            catch
+            {
+                result.Clear();
             }
 
             return result;
@@ -1369,31 +1477,38 @@ public static class SceneHierarchyExpansionState
 
         private static bool TrySetExpandedId(object hierarchyObject, int instanceId, bool expanded)
         {
-            if (!TryFindExpandedIds(hierarchyObject, ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out IList expandedIds))
-                return false;
-
-            bool contains = false;
-            foreach (object item in expandedIds)
+            try
             {
-                if (item is int id && id == instanceId)
+                if (!TryFindExpandedIds(hierarchyObject, ReflectionSearchDepth, new HashSet<object>(ReferenceComparer.Instance), out IList expandedIds))
+                    return false;
+
+                bool contains = false;
+                foreach (object item in expandedIds)
                 {
-                    contains = true;
-                    break;
+                    if (item is int id && id == instanceId)
+                    {
+                        contains = true;
+                        break;
+                    }
                 }
-            }
 
-            if (expanded)
-            {
-                if (!contains)
-                    expandedIds.Add(instanceId);
+                if (expanded)
+                {
+                    if (!contains)
+                        expandedIds.Add(instanceId);
+
+                    return true;
+                }
+
+                if (contains)
+                    expandedIds.Remove(instanceId);
 
                 return true;
             }
-
-            if (contains)
-                expandedIds.Remove(instanceId);
-
-            return true;
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool FindMethodOwner(object source, string methodName, int depth, HashSet<object> visited, out object owner, out MethodInfo method)

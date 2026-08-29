@@ -16,7 +16,7 @@
 
 命令类型：只读体检；可选受控状态登记。
 默认改文件：否。“审计并记录”或审计后用户明确确认时，仅允许更新 `ES/Documentation/Status/MODULE_AUDIT_STATE.md` 中目标模块块；源码修复、模块迁移、删除、Git 操作、Unity 操作或发布仍必须另行明确授权。
-风险等级：L1/L2。
+风险等级：L1。
 
 ## 必须先读
 
@@ -75,6 +75,20 @@ resume
 
 ```text
 是否把本次审计检查点写入固定状态文件？
+```
+
+## ContractCompleteness
+
+```yaml
+commandId: module-maturity.review
+writeMode: read-only
+cancellation: N/A (read-only; no external effect; stop before analysis)
+recovery: N/A (read-only; rerun from unchanged inputs; no rollback)
+validation: read-only checks only; no writes, runtime, Git, release, or external effects
+evidenceRef: source refs + SHA-256/content hash when available + read receipt; static evidence cannot claim Runtime
+actionBoundary: AIBrain/ABCD selects intent and route; this command only reviews and reports; Automation/ABCC execution is out of scope
+allowRoots: project files explicitly listed in 必须先读 and the contract's declared read-only targets only
+denyPaths: source writes, undeclared paths, Git/history, release, Runtime/Unity, external services; deny-overrides
 ```
 
 ## 交付格式

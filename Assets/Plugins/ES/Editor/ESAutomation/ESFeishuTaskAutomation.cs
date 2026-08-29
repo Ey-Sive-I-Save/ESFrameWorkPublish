@@ -242,6 +242,10 @@ namespace ES
                 && !Guid.TryParseExact(invocation.invocationId, "N", out _))
                 return ESAutomationTaskInvocationResult.Rejected(
                     "InvocationId 必须为空或为 N 格式 GUID。");
+            if (!invocation.dryRun && spec.TaskId != MonitorTaskId
+                && string.IsNullOrWhiteSpace(invocation.invocationId))
+                return ESAutomationTaskInvocationResult.Blocked(
+                    "Live 外部写入必须显式提供 InvocationId；不得自动生成幂等身份。");
             if (!invocation.fromAi)
                 return ESAutomationTaskInvocationResult.Blocked(
                     "飞书任务必须来自当前 AIBrain 有界计划。");

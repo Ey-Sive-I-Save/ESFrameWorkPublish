@@ -16,6 +16,22 @@
 默认改文件：否；只允许发送一条飞书纯文本并写受管临时 RunRecord。
 风险等级：L3。
 
+## 取消（cancellation）
+
+DryRun 或发送请求提交前可取消；提交后若响应缺失返回 `UNCERTAIN_REMOTE_RESULT`，不得重发或报告已送达，必须写停止回执。
+
+## 恢复（recovery）
+
+仅在服务端 uuid 幂等键、角色解析 Hash 和新 InvocationId 均更新后重试；任何不确定结果返回 `NeedsReissue`，等待新的授权，不自动猜测重发。
+
+## 验证（validation）
+
+执行前验证 commandId、角色许可、纯文本长度、DryRun 同输入/同 Hash；执行后核对 RunId、服务端消息 ID、状态和 partial 结果。
+
+## evidenceRef
+
+回执必须包含 commandId、commandBodyHash、planHash、DryRun RunId、InvocationId、roleId、服务端消息 ID、幂等键、验证结果和未验证项；不得把静态证据描述为 Runtime 验收。
+
 ## TaskContract
 
 ```text

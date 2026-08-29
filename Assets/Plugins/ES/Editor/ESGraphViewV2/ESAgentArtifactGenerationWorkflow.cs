@@ -2434,6 +2434,7 @@ namespace ES.EditorInternal
                 .ThenBy(relation => relation.edgeId, StringComparer.Ordinal)
                 .ToArray();
             builder.AppendLine();
+            // Agent Authoring Graph 的思路图只服务于候选能力包生成和审查，不是 AI 协作运行时内核。
             builder.AppendLine("思路图关系（这是需求归属、约束作用和审查链，不是运行时执行图）：");
             if (relations.Length == 0)
             {

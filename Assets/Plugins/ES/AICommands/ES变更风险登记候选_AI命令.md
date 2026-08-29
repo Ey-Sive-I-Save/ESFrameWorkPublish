@@ -18,6 +18,17 @@ Command type: candidate content generation. It requires AIBrain `planTask` and w
 
 ## 交付格式
 
+```ContractCompleteness
+commandId: change.risk-register.candidate
+cancellation: before commit; cancel leaves no formal risk register
+recovery: isolated candidate cleanup; NeedsReissue on uncertain state; no replay
+validation: candidate schema, content hash, and isolated-path checks
+evidenceRef: candidate path, SHA-256, receipt, and Static/Runtime status
+allowRoots: ES/Automation/Candidates/RiskRegister/<request-id>/candidate/ only
+denyPaths: .agents/skills, Assets/Plugins/ES/AICommands, Assets, Runtime, Git, release
+deny-overrides: true
+```
+
 Produce owner, scope, risk, permission, budget, stop condition, rollback, compatibility, evidence, and unresolved-runtime fields. Do not silently convert a risk register into authorization; all production changes still require their own AICommand.
 
 ## Prohibitions

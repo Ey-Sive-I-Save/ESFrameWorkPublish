@@ -4,7 +4,13 @@
 
 `AITalk` 用来让多个 AI 在同一个工程内通过文件交换意见。用户可以把两个或多个 AI 引导到同一个对话文件夹里，让它们轮流查看对方观点、补充分析、形成共同意见，最后由其中一个 AI 把结论返回给用户。
 
-`AITalk` 是纯文本协议包，不依赖 Unity Editor 脚本。第一次接触本功能的 AI 必须先阅读本协议、`AITalk_目标效果.md` 和邀请前缀，再创建或加入会话。
+`AITalk` 是协作记录与意见聚合层：消息仍以 Markdown 便于人和不同模型阅读，同时可按 `ES/Automation/TaskCollaboration/es-aitalk-message-v1.schema.json` 生成结构化消息，并由 `ESAITalkAggregation.psm1` 做确定性去重、冲突隔离和任务上下文绑定检查。它不依赖 Unity Editor 脚本即可工作。
+
+AITalk 不拥有执行授权、任务生命周期、Scheduler、Runtime/Release 验收、Codex handoff 或最终 `Accepted`/`Completed` 判定。聚合结果只能是 `candidate`、`partial`、`conflict` 或 `needs-review`；任务完成唯一由 TaskContextRuntime 的 `completionDecision` 决定。
+
+第一次接触本功能的 AI 必须先阅读本协议、`AITalk_目标效果.md` 和邀请前缀，再创建或加入会话。
+
+普通用户不需要理解 Session、Messages、pollPolicy、Hash 或 TaskContract。用户侧统一使用 [AITalk用户话术入口.md](AITalk用户话术入口.md) 中的五句短话术：`开始 AITalk`、`继续 AITalk`、`汇总 AITalk`、`暂停 AITalk`、`结束 AITalk`。主 AI 负责补齐内部路径、参与者、轮询和聚合步骤；缺少主题时只追问主题，不把内部字段甩给用户。
 
 重要：邀请其他 AI 加入时，必须提供工程绝对路径和会话绝对路径。不要只写 `Assets/...` 相对路径。新开的 AI 可能尚未进入本工程，只有绝对路径才能稳定定位。
 
@@ -37,6 +43,42 @@ Templates/
 Sessions/
   每次真实对话的独立会话文件夹。
 ```
+
+## 结构化消息与聚合
+
+Markdown 发言应能对应一个结构化消息，至少保留会话、消息、作者、顺序、消息类型、任务绑定、可见性、负载哈希和外部证据引用。`evidenceRefs` 只引用可重读的外部证据，聊天正文本身不自动成为证据。
+
+推荐使用 `New-ESAITalkMessage` 创建消息，使用 `Test-ESAITalkMessage` 校验，再用 `Invoke-ESAITalkAggregation` 聚合。聚合按 `sequence`、`createdUtc`、`messageId` 排序；重复消息幂等，身份相同但哈希不同视为冲突；旧 `taskRevision/contextVersion`、`routePlanHash` 或 `sourceScopeHash` 必须隔离并标记原因。私密消息只有显式授权的参与者才能进入当前视图。
+
+对已有 Session，可直接运行 `ES/Automation/TaskCollaboration/Invoke-ESAITalkSessionAggregation.ps1 -SessionPath <Session绝对路径>`。它会读取 `Messages/` 下全部 Markdown 并输出聚合 JSON；只有明确传入 `-WriteConsensus` 时才写入候选版 `Consensus/当前共同意见.md`。
+
+工程级查看可运行 `ES/Automation/TaskCollaboration/Invoke-ESAITalkProjectAggregation.ps1 -SessionsRoot <Sessions根目录>`，它会按 Session 目录稳定排序并汇总消息数、隔离项、共同意见文件存在性和聚合哈希。协作推进最多五轮：显式共识或用户拍板可提前停止；五轮仍未达成时必须返回 `interrupted/MAX_ROUNDS_EXCEEDED`，不能把中断伪装成同意或完成。
+
+工程级扫描会报告实际发现的 Session 数量；当 `MaxSessions` 截断扫描，必须查看 `sessionLimitReached`，不能把受限索引误读为全工程全集。缺失 `Messages/` 的 Session 会标记为 `needs-review`，不会静默丢失。
+
+默认资源预算为：每次最多扫描 256 个 Session、每个 Session 最多解析 512 条消息、单条 Markdown 最大 256 KiB。超过任一上限会拒绝该 Session 并标记 `needs-review`；不会为了“继续聚合”而无限扩大内存或截断后伪造完整结果。性能预算见 `ES/Output/Performance/aitalk-performance-budget.json`，当前仅有静态边界证据，没有 Unity/Player Profiler 的 GC 或延迟结论。
+
+如果不想逐条查看消息，可运行 `ES/Automation/TaskCollaboration/Invoke-ESAITalkHumanLightFlow.ps1 -SessionsRoot <Sessions根目录>`。正常候选会直接返回 `auto-ready` 且 `humanActionRequired=false`；只有冲突、格式/权限/资源审查、用户拍板或五轮中断才返回少量 `actionItems`。这减少人工搬运，不替用户做业务决定。
+
+聚合只能产生候选意见和待确认项，不能直接改写 TaskContext 状态。需要提交给 TaskCollaboration 时，使用 `Convert-ESAITalkMessagesToResultEnvelopes` 映射为 `CandidateResultEnvelope`，并继续接受 Lease/CAS 与父任务聚合约束。
+
+## 强化后的会话入口
+
+每次聚合前必须满足会话合同：
+
+1. `SessionPath` 必须位于项目 `Assets/Plugins/ES/AITalk/Sessions` 根目录内，且会话目录及其子项不得是重解析点、符号链接或 Junction。
+2. 会话必须有 `00_*.md` 说明文件，说明内容需包含 AITalk 标识和当前目录会话 ID。
+3. `Messages/` 下消息文件必须使用 `<sequence>_<author>.md` 命名、严格 UTF-8，并拒绝重复序号。
+4. 任一检查失败都返回 `needs-review`/失败证据，不自动换用其它 Session 或静默跳过文件。
+
+可执行静态检查：
+
+```powershell
+& ES/Automation/TaskCollaboration/Test-ESAITalkSessionContract.ps1 `
+  -SessionPath <Session绝对路径> -ProjectRoot <工程绝对路径> -Json
+```
+
+该检查和聚合器都只做文件级、可重放验证；不会宣称跨进程窗口投递、Unity/Runtime、性能或发布行为已经通过。
 
 ## 核心目标
 
@@ -175,7 +217,7 @@ AITalk 的目标不是让用户在两个 AI 之间搬运每句话。用户表示
 所有加入 AITalk 的 AI 必须先理解并遵守以下准则：
 
 ```text
-1. 必须间隔轮询：连续交流时，每隔约 20 秒检查一次会话目录是否有其他 AI 的新消息。
+1. 必须按会话说明轮询：由 `pollPolicy` 指定 host-driven、mailbox 或 manual 模式、间隔、截止时间、最大轮次和停止条件；约 20 秒只是兼容默认值，不是完成权威。
 2. 必须控制时长：单次讨论一般控制在 15 分钟以内，除非用户明确要求更长。
 3. 不能太短：多人讨论尽量至少完成 3 轮以上有效对话；如果少于 3 轮就结束，必须说明原因。
 4. 必须主动回报：最终结论写入文件后，负责最终回复的主 AI 必须通过对话框直接告诉用户结论，不让用户自己去找文件。

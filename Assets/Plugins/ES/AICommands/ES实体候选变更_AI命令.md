@@ -19,6 +19,17 @@ Command type: candidate content generation. It requires AIBrain `planTask` and w
 
 ## 交付格式
 
+```ContractCompleteness
+commandId: entity.change.candidate
+cancellation: before commit; cancel leaves no formal entity or prefab
+recovery: isolated candidate cleanup; NeedsReissue on uncertain state; no replay
+validation: candidate schema, content hash, and isolated-path checks
+evidenceRef: candidate path, SHA-256, receipt, and Static/Runtime status
+allowRoots: ES/Automation/Candidates/EntityAuthoring/<request-id>/candidate/ only
+denyPaths: .agents/skills, Assets/Plugins/ES/AICommands, Assets, Runtime, Git, release
+deny-overrides: true
+```
+
 Produce an entity category, authoritative prefab/DataInfo entry, ownership and lifecycle table, compatibility diff, StaticDeepReplay results, and runtime claims not proven. Preserve ES registration, pooling, control arbitration, and serialization ownership.
 
 ## Prohibitions

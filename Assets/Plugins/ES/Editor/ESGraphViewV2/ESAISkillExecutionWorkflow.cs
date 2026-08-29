@@ -13,6 +13,9 @@ using UnityEngine;
 
 namespace ES.EditorInternal
 {
+    // GraphView 边界：AISkill Execution Graph 是固定、可烘焙、可验证的流程作者/执行工具。
+    // 它当前不是已验证的动态多子 Agent 协作内核；FanOut/Join 的拓扑表达、编辑效率、
+    // 并行性能、上下文隔离和执行准确性均不能替代 AIBrain/TaskContext/Automation 的证据。
     public enum ESAISkillValueType : byte
     {
         Text,
@@ -135,6 +138,7 @@ namespace ES.EditorInternal
         public int schemaVersion = 1;
         public string fanOutId = "fan-out";
         public bool stopOnFailure = true;
+        // 当前执行器按确定顺序推进分支；不要将此节点的存在解释为真实并行 Agent 调度。
     }
 
     [Serializable]

@@ -69,6 +69,19 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 6. 编译，并验证启动期加载、强类型按 Key 查询、准备异常回滚、重复 Key 回滚、Clear/Remove 后 Ready=false 与载荷释放、同 Key 重建复用，以及非 GameCore Info 跳过场景。
 ```
 
+命令 ID：`gamecore.root.execute`
+
+## ContractCompleteness
+
+```text
+cancellation: before-commit only; after-commit requires compensation and RecoveryRequired.
+recovery: retain/CAS transaction, AbandonRetained on failure, no blind replay.
+validation: compile plus duplicate-key, rollback, Ready=false and payload-release checks.
+evidenceRef: commandBodyHash, planHash, writeScope, test output and source SHA-256.
+allowRoots: target GameCore domain directory and its necessary tests only.
+denyPaths: AIWarnings, AICommands Catalog, Git/.git, ProjectSettings, Packages, release, Runtime and Library; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

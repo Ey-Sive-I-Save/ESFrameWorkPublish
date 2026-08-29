@@ -1887,7 +1887,7 @@ namespace ES
                     if (assetCommitted && string.Equals(AssetDatabase.GetAssetPath(consumer), path, StringComparison.Ordinal))
                         AssetDatabase.DeleteAsset(path);
                     else if (consumer != null && !EditorUtility.IsPersistent(consumer))
-                        DestroyImmediate(consumer);
+                        UnityEngine.Object.DestroyImmediate(consumer);
                     throw;
                 }
                 AssetDatabase.Refresh();

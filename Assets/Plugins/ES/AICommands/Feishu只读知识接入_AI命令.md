@@ -51,6 +51,18 @@ Skill 只提供 AICommand 选择和验证流程，不扩大 Feishu TaskContract 
 - 禁止把 DryRun 或静态构建结果写成真实网络已连通。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: feishu.read
+cancellation: before remote request; cancellation returns Cancelled with no write claim.
+recovery: request cursor/idempotency guarded; unknown result returns NeedsReissue, no duplicate pull.
+validation: tenant/app identity, read-only contract, query bounds, freshness and response schema.
+evidenceRef: commandBodyHash, planHash, RunId, source document IDs/content hashes and receipt.
+allowRoots: Feishu read/pull response and受管 local cache only.
+denyPaths: remote mutation, local source writes, Git and release; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

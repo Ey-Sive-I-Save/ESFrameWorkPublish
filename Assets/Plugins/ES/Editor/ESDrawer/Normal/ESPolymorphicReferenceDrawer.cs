@@ -1679,21 +1679,6 @@ namespace ES.EditorInternal
                 error = exception.GetType().Name + "：" + exception.Message;
                 return false;
             }
-            finally
-            {
-                for (int index = 0; index < assignments.Count; index++)
-                {
-                    try
-                    {
-                        assignments[index].SerializedObject?.Dispose();
-                    }
-                    catch (Exception exception)
-                    {
-                        Debug.LogException(new InvalidOperationException(
-                            "多态引用批量写入序列化视图释放失败。", exception));
-                    }
-                }
-            }
         }
 
         private void RefreshSerializedProjection()
@@ -1840,21 +1825,6 @@ namespace ES.EditorInternal
             {
                 error = exception.GetType().Name + "：" + exception.Message;
                 return false;
-            }
-            finally
-            {
-                for (int index = 0; index < assignments.Count; index++)
-                {
-                    try
-                    {
-                        assignments[index].SerializedObject?.Dispose();
-                    }
-                    catch (Exception exception)
-                    {
-                        Debug.LogException(new InvalidOperationException(
-                            "多态引用批量写入序列化视图释放失败。", exception));
-                    }
-                }
             }
         }
 

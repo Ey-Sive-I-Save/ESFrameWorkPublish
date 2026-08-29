@@ -97,6 +97,19 @@ Asset 类型通常涉及：
 8. 禁止把 `CreateRuntimeData`、默认值解析或 filler 放在 Acquire 后的事务 try 外。
 ```
 
+命令 ID：`gamecore.index.execute`
+
+## ContractCompleteness
+
+```text
+cancellation: before-commit or preflight only; preserve the previous mapping on cancellation.
+recovery: preflight rebuild, CAS and retained old mapping; failure returns NeedsReissue, no blind replay.
+validation: schema, EnumKey jump, duplicate-key, preflight and source/runtime separation checks.
+evidenceRef: commandBodyHash, planHash, writeScope, validation output and source SHA-256.
+allowRoots: target type directory plus explicitly named ConfigKey/module/Drawer files.
+denyPaths: AIWarnings, AICommands Catalog, Git/.git, ProjectSettings, Packages, release, Runtime and Library; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

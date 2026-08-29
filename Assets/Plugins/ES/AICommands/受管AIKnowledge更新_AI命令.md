@@ -28,6 +28,18 @@ Documentation/AIKnowledge/AIBRAIN_ENTRY.md
 6. 旧条目发生源漂移时生成 replan/stale 报告，不覆盖冲突事实。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: knowledge.entry.update
+cancellation: before Knowledge file/index commit only; after commit interruption preserves prior entry and returns RecoveryRequired.
+recovery: reread source refs and current entry/index hashes, use new idempotencyKey; source drift yields stale/replan, never overwrite conflicts.
+validation: user-scope or bound plan, SourceRef reachability, SHA-256 ContentHash, Authority/EvidenceLevel/StaleWhen/RouteKeys and bounded-output checks.
+evidenceRef: commandId, commandBodyHash, planHash, invocationId, SourceRefs, source/content hashes, validator receipt and unproven Runtime marker.
+allowRoots: explicitly declared Documentation/AIKnowledge entries and their corresponding index/AIBRAIN_ENTRY route projections only.
+denyPaths: Assets, source/runtime code, Skills, AIWarnings, AICommand Catalog, secrets, Git, release and unrelated Knowledge entries; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

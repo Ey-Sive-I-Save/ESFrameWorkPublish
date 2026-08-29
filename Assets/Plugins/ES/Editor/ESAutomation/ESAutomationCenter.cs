@@ -139,7 +139,10 @@ namespace ES
         public void Validate()
         {
             if (protocolVersion != 1) throw new InvalidOperationException("不支持的 Automation 任务协议版本。");
-            if (string.IsNullOrWhiteSpace(taskId) || !Regex.IsMatch(taskId, "^es\\.[a-z0-9]+(?:\\.[a-z0-9-]+)+$")) throw new InvalidOperationException("TaskId 必须符合 es.<domain>.<name> 的稳定命名。");
+            // Domain/name segments may contain internal hyphens (for example
+            // es.task-context.evaluate), but must start with an alphanumeric
+            // character and remain stable lowercase identifiers.
+            if (string.IsNullOrWhiteSpace(taskId) || !Regex.IsMatch(taskId, "^es\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")) throw new InvalidOperationException("TaskId 必须符合 es.<domain>.<name> 的稳定命名。");
             if (version < 1 || timeoutSeconds < 1 || timeoutSeconds > MaximumTimeoutSeconds)
                 throw new InvalidOperationException("任务版本和超时必须位于 1–7200 秒范围内。");
             if (!string.IsNullOrWhiteSpace(inputSchemaHash) && !ESAutomationWorkerRegistration.IsSha256(inputSchemaHash))
@@ -477,7 +480,7 @@ namespace ES
         public void Validate()
         {
             if (protocolVersion != 1) throw new InvalidOperationException("不支持的 Automation 结果协议版本。");
-            if (string.IsNullOrWhiteSpace(taskId) || !Regex.IsMatch(taskId, "^es\\.[a-z0-9]+(?:\\.[a-z0-9-]+)+$"))
+            if (string.IsNullOrWhiteSpace(taskId) || !Regex.IsMatch(taskId, "^es\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"))
                 throw new InvalidOperationException("RunResult 的 TaskId 无效。");
             if (taskVersion < 1) throw new InvalidOperationException("RunResult 的任务版本无效。");
             if (!Guid.TryParseExact(runId, "N", out _)) throw new InvalidOperationException("RunResult 的 RunId 必须是 N 格式 GUID。");
@@ -1235,6 +1238,9 @@ namespace ES
         public static string ReportsRoot => Path.Combine(ProjectRoot, "ES", "Automation", "Reports");
         public static string TempRoot => Path.Combine(ProjectRoot, "ES", "Automation", "Temp");
         public static string RunsRoot => Path.Combine(ProjectRoot, "ES", "Automation", "Runs");
+        // Public UserSpace registration cards are bounded, non-Unity artifacts. They
+        // are intentionally separate from Assets and from private ignored UserSpace data.
+        public static string PublicPeopleRoot => Path.Combine(ProjectRoot, "ES", "AISpace", "Public", "People");
 
         public static string Normalize(string path)
         {
@@ -1353,8 +1359,9 @@ namespace ES
             if (!IsWithin(normalized, new[] { ReportsRoot, TempRoot, RunsRoot,
                     Path.Combine(ProjectRoot, "Assets", "UI"),
                     Path.Combine(ProjectRoot, "ES", "UIEvidence"),
-                    Path.Combine(ProjectRoot, "ES", "Output", "TaskContextRuntime") }))
-                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI、ES/UIEvidence 或平台 TaskContextRuntime StoreRoot：" + normalized);
+                    Path.Combine(ProjectRoot, "ES", "Output", "TaskContextRuntime"),
+                    PublicPeopleRoot }))
+                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI、ES/UIEvidence、TaskContextRuntime 或 ES/AISpace/Public/People：" + normalized);
         }
 
         private static IEnumerable<string> ProtectedWriteRoots

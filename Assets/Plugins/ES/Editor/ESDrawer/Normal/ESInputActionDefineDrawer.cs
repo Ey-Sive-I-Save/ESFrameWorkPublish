@@ -401,7 +401,7 @@ namespace ES.EditorInternal
                             {
                                 rebuiltAction?.Dispose();
                                 rebuiltObject?.Dispose();
-                                context.SetStatus("重建临时 InputAction 失败，已保留旧状态。", MessageType.Error);
+                                context.SetStatus("重建临时 InputAction 失败，已保留旧状态。", ESMenuTreePageStatus.Error);
                                 Debug.LogException(new InvalidOperationException(
                                     "ES InputAction 辅助窗口重建失败。", exception));
                             }
@@ -497,7 +497,7 @@ namespace ES.EditorInternal
                 }
                 catch (Exception exception)
                 {
-                    context.SetStatus("临时 InputAction 已失效，窗口将安全关闭。", MessageType.Error);
+                    context.SetStatus("临时 InputAction 已失效，窗口将安全关闭。", ESMenuTreePageStatus.Error);
                     Debug.LogException(new InvalidOperationException(
                         "ES InputAction 辅助窗口绘制失败。", exception));
                     ReleaseTemporaryInputAction();

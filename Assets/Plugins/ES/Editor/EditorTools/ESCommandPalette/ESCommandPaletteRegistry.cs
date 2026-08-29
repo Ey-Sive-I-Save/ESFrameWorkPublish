@@ -11,6 +11,15 @@ namespace ES
     {
         public const int MaximumFavorites = 200;
         public const int MaximumRecent = 30;
+        public const int MaximumProviders = 64;
+        public const int MaximumProviderItems = 4096;
+        public const int MaximumTotalItems = 100000;
+        private const int MaximumPersistedIdsCharacters = 65536;
+        private const int MaximumProviderIdCharacters = 128;
+        private const int MaximumItemIdCharacters = 512;
+        private const int MaximumTitleCharacters = 1024;
+        private const int MaximumCategoryCharacters = 256;
+        private const int MaximumTargetIdCharacters = 4096;
 
         private static readonly Dictionary<string, ProviderRegistration> Providers =
             new Dictionary<string, ProviderRegistration>(StringComparer.Ordinal);
@@ -31,13 +40,22 @@ namespace ES
 
         private static bool initialized;
         private static bool initializing;
+        private static bool refreshing;
+        private static IReadOnlyDictionary<string, ESCommandPaletteItem> refreshObservationItems;
+        private static IReadOnlyList<ESCommandPaletteItem> refreshObservationOrdered;
+        private static IReadOnlyList<ESCommandPaletteRegistrationDiagnostic> refreshObservationDiagnostics;
+        private static IReadOnlyList<string> refreshObservationFavorites;
+        private static IReadOnlyList<string> refreshObservationRecent;
+        private static int refreshObservationProviderCount = -1;
 
         public static IReadOnlyList<ESCommandPaletteItem> AllItems
         {
             get
             {
                 EnsureInitialized();
-                return OrderedItemsView;
+                return refreshing && refreshObservationOrdered != null
+                    ? refreshObservationOrdered
+                    : OrderedItemsView;
             }
         }
 
@@ -46,7 +64,9 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return DiagnosticsView;
+                return refreshing && refreshObservationDiagnostics != null
+                    ? refreshObservationDiagnostics
+                    : DiagnosticsView;
             }
         }
 
@@ -55,7 +75,9 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return ProviderOrder.Count;
+                return refreshing && refreshObservationProviderCount >= 0
+                    ? refreshObservationProviderCount
+                    : ProviderOrder.Count;
             }
         }
 
@@ -64,7 +86,9 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return OrderedItems.Count;
+                return refreshing && refreshObservationOrdered != null
+                    ? refreshObservationOrdered.Count
+                    : OrderedItems.Count;
             }
         }
 
@@ -73,7 +97,9 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return FavoriteIdsView;
+                return refreshing && refreshObservationFavorites != null
+                    ? refreshObservationFavorites
+                    : FavoriteIdsView;
             }
         }
 
@@ -82,7 +108,9 @@ namespace ES
             get
             {
                 EnsureInitialized();
-                return RecentIdsView;
+                return refreshing && refreshObservationRecent != null
+                    ? refreshObservationRecent
+                    : RecentIdsView;
             }
         }
 
@@ -94,14 +122,57 @@ namespace ES
             }
 
             initializing = true;
+            Dictionary<string, ProviderRegistration> previousProviders = null;
+            List<ProviderRegistration> previousProviderOrder = null;
+            Dictionary<string, ESCommandPaletteItem> previousItems = null;
+            List<ESCommandPaletteItem> previousOrderedItems = null;
+            List<ESCommandPaletteRegistrationDiagnostic> previousDiagnostics = null;
             try
             {
+                previousProviders = new Dictionary<string, ProviderRegistration>(Providers, StringComparer.Ordinal);
+                previousProviderOrder = new List<ProviderRegistration>(ProviderOrder);
+                previousItems = new Dictionary<string, ESCommandPaletteItem>(Items, StringComparer.Ordinal);
+                previousOrderedItems = new List<ESCommandPaletteItem>(OrderedItems);
+                previousDiagnostics = new List<ESCommandPaletteRegistrationDiagnostic>(Diagnostics);
                 RegisterProviderCore(new WindowProvider());
                 RegisterProviderCore(new AICommandProvider());
                 RegisterProviderCore(new SceneProvider());
                 RegisterProviderCore(new GlobalDataProvider());
                 initialized = true;
                 LoadAndCleanState();
+            }
+            catch (Exception exception)
+            {
+                if (previousProviders != null)
+                {
+                    Providers.Clear();
+                    foreach (KeyValuePair<string, ProviderRegistration> pair in previousProviders)
+                        Providers.Add(pair.Key, pair.Value);
+                }
+                if (previousProviderOrder != null)
+                {
+                    ProviderOrder.Clear();
+                    ProviderOrder.AddRange(previousProviderOrder);
+                }
+                if (previousItems != null)
+                {
+                    Items.Clear();
+                    foreach (KeyValuePair<string, ESCommandPaletteItem> pair in previousItems)
+                        Items.Add(pair.Key, pair.Value);
+                }
+                if (previousOrderedItems != null)
+                {
+                    OrderedItems.Clear();
+                    OrderedItems.AddRange(previousOrderedItems);
+                }
+                if (previousDiagnostics != null)
+                {
+                    Diagnostics.Clear();
+                    Diagnostics.AddRange(previousDiagnostics);
+                }
+                initialized = false;
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] 命令索引初始化失败，已回滚部分注册状态。", exception));
             }
             finally
             {
@@ -112,15 +183,66 @@ namespace ES
         public static ESCommandPaletteRegistrationResult RegisterProvider(IESCommandPaletteProvider provider)
         {
             EnsureInitialized();
-            return RegisterProviderCore(provider);
+            if (initializing || refreshing)
+            {
+                var rejected = new ESCommandPaletteRegistrationResult();
+                string providerId = string.Empty;
+                try
+                {
+                    providerId = provider?.ProviderId ?? string.Empty;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "[ESCommandPalette] 重入拒绝诊断读取 ProviderId 失败。", exception));
+                }
+                AddDiagnostic(rejected, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    providerId, string.Empty,
+                    "命令索引正在初始化或刷新，已拒绝重入注册 Provider");
+                return rejected;
+            }
+            try
+            {
+                return RegisterProviderCore(provider);
+            }
+            catch (Exception exception)
+            {
+                var failed = new ESCommandPaletteRegistrationResult();
+                AddDiagnostic(failed, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    string.Empty, string.Empty,
+                    "Provider 注册边界异常，已安全拒绝：" + exception.Message);
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] Provider 注册边界异常，已安全拒绝。", exception));
+                return failed;
+            }
         }
 
         public static void Refresh()
         {
             EnsureInitialized();
+            if (initializing)
+            {
+                Debug.LogWarning("[ESCommandPalette] 命令索引正在初始化，已拒绝 Refresh。", null);
+                return;
+            }
+            if (refreshing)
+            {
+                Debug.LogWarning("[ESCommandPalette] 命令索引正在刷新，已拒绝嵌套 Refresh。", null);
+                return;
+            }
+
+            refreshing = true;
+            try
+            {
             var previousItems = new Dictionary<string, ESCommandPaletteItem>(Items, StringComparer.Ordinal);
             var previousOrderedItems = new List<ESCommandPaletteItem>(OrderedItems);
             var previousDiagnostics = new List<ESCommandPaletteRegistrationDiagnostic>(Diagnostics);
+            refreshObservationItems = previousItems;
+            refreshObservationOrdered = previousOrderedItems.AsReadOnly();
+            refreshObservationDiagnostics = previousDiagnostics.AsReadOnly();
+            refreshObservationFavorites = new List<string>(FavoriteIds).AsReadOnly();
+            refreshObservationRecent = new List<string>(RecentIds).AsReadOnly();
+            refreshObservationProviderCount = ProviderOrder.Count;
             Items.Clear();
             OrderedItems.Clear();
             Diagnostics.Clear();
@@ -156,11 +278,24 @@ namespace ES
             }
 
             LoadAndCleanState();
+            }
+            finally
+            {
+                refreshObservationItems = null;
+                refreshObservationOrdered = null;
+                refreshObservationDiagnostics = null;
+                refreshObservationFavorites = null;
+                refreshObservationRecent = null;
+                refreshObservationProviderCount = -1;
+                refreshing = false;
+            }
         }
 
         public static bool TryGet(string stableId, out ESCommandPaletteItem item)
         {
             EnsureInitialized();
+            if (refreshing && refreshObservationItems != null)
+                return refreshObservationItems.TryGetValue(stableId ?? string.Empty, out item);
             return Items.TryGetValue(stableId ?? string.Empty, out item);
         }
 
@@ -179,7 +314,12 @@ namespace ES
         public static void ToggleFavorite(string stableId)
         {
             EnsureInitialized();
-            if (string.IsNullOrEmpty(stableId) || !Items.ContainsKey(stableId))
+            if (refreshing)
+            {
+                Debug.LogWarning("[ESCommandPalette] 命令索引刷新期间拒绝修改收藏状态。", null);
+                return;
+            }
+            if (string.IsNullOrEmpty(stableId) || !ContainsObservableItem(stableId))
             {
                 return;
             }
@@ -203,7 +343,12 @@ namespace ES
         public static void RecordRecent(string stableId)
         {
             EnsureInitialized();
-            if (string.IsNullOrEmpty(stableId) || !Items.ContainsKey(stableId))
+            if (refreshing)
+            {
+                Debug.LogWarning("[ESCommandPalette] 命令索引刷新期间拒绝写入最近使用状态。", null);
+                return;
+            }
+            if (string.IsNullOrEmpty(stableId) || !ContainsObservableItem(stableId))
             {
                 return;
             }
@@ -213,6 +358,13 @@ namespace ES
             TrimList(RecentIds, MaximumRecent);
             RebuildRecentRanks();
             SaveIds("recent", RecentIds, true);
+        }
+
+        private static bool ContainsObservableItem(string stableId)
+        {
+            if (refreshing && refreshObservationItems != null)
+                return refreshObservationItems.ContainsKey(stableId ?? string.Empty);
+            return Items.ContainsKey(stableId ?? string.Empty);
         }
 
         private static ESCommandPaletteRegistrationResult RegisterProviderCore(IESCommandPaletteProvider provider)
@@ -232,6 +384,14 @@ namespace ES
                 return result;
             }
 
+            if (providerId.Length > MaximumProviderIdCharacters
+                || prefix != null && prefix.Length > MaximumProviderIdCharacters)
+            {
+                AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    providerId, string.Empty, "ProviderId 或 Prefix 超过长度上限，已拒绝注册");
+                return result;
+            }
+
             if (Providers.ContainsKey(providerId))
             {
                 AddDiagnostic(result, ESCommandPaletteRegistrationCode.DuplicateProviderId, providerId, string.Empty, "ProviderId 已注册，拒绝后注册项");
@@ -241,6 +401,14 @@ namespace ES
             if (string.IsNullOrEmpty(prefix))
             {
                 AddDiagnostic(result, ESCommandPaletteRegistrationCode.EmptyProviderPrefix, providerId, string.Empty, "Provider Prefix 为空");
+                return result;
+            }
+
+            if (ProviderOrder.Count >= MaximumProviders)
+            {
+                AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    providerId, string.Empty,
+                    "Provider 数量超过上限 " + MaximumProviders + "，已拒绝注册");
                 return result;
             }
 
@@ -273,11 +441,38 @@ namespace ES
             }
 
             var acceptedIds = new HashSet<string>(StringComparer.Ordinal);
-            var stagedItems = new List<ESCommandPaletteItem>(candidates.Count);
+            int totalCandidateCount;
             try
             {
-                for (int i = 0; i < candidates.Count; i++)
+                totalCandidateCount = candidates.Count;
+            }
+            catch (Exception exception)
+            {
+                AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    registration.ProviderId, string.Empty,
+                    "Provider 候选项数量读取失败：" + exception.Message);
+                return false;
+            }
+            if (totalCandidateCount < 0)
+            {
+                AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    registration.ProviderId, string.Empty,
+                    "Provider 候选项数量无效（不能为负数），已拒绝注册");
+                return false;
+            }
+            int candidateCount = Mathf.Min(totalCandidateCount, MaximumProviderItems);
+            var stagedItems = new List<ESCommandPaletteItem>(candidateCount);
+            for (int i = 0; i < candidateCount; i++)
+            {
+                try
                 {
+                    if (Items.Count + stagedItems.Count >= MaximumTotalItems)
+                    {
+                        AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                            registration.ProviderId, string.Empty,
+                            "命令项总数超过上限 " + MaximumTotalItems + "，已截断后续项");
+                        break;
+                    }
                     ESCommandPaletteItem item = candidates[i];
                     if (!TryValidateItem(registration, item, out ESCommandPaletteRegistrationCode code, out string reason))
                     {
@@ -286,7 +481,7 @@ namespace ES
                     }
 
                     string stableId = string.Concat(registration.ProviderId, ":", item.ItemId);
-                    if (!acceptedIds.Add(item.ItemId) || Items.ContainsKey(stableId))
+                    if (acceptedIds.Contains(item.ItemId) || Items.ContainsKey(stableId))
                     {
                         AddDiagnostic(result, ESCommandPaletteRegistrationCode.DuplicateItemId, registration.ProviderId, item.ItemId,
                             "providerId + itemId 重复，拒绝后注册项");
@@ -294,14 +489,22 @@ namespace ES
                     }
 
                     item.ProviderId = registration.ProviderId;
+                    acceptedIds.Add(item.ItemId);
                     stagedItems.Add(item);
                 }
+                catch (Exception exception)
+                {
+                    AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                        registration.ProviderId, string.Empty,
+                        "Provider 单项校验失败，已跳过该项：" + exception.Message);
+                }
             }
-            catch (Exception exception)
+
+            if (totalCandidateCount > MaximumProviderItems)
             {
-                AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed, registration.ProviderId, string.Empty,
-                    "Provider 命令项校验失败，未提交任何项：" + exception.Message);
-                return false;
+                AddDiagnostic(result, ESCommandPaletteRegistrationCode.ProviderBuildFailed,
+                    registration.ProviderId, string.Empty,
+                    "Provider 候选项超过上限 " + MaximumProviderItems + "，已截断后续项");
             }
 
             for (int i = 0; i < stagedItems.Count; i++)
@@ -357,6 +560,16 @@ namespace ES
             {
                 code = ESCommandPaletteRegistrationCode.EmptyTargetId;
                 reason = "targetId 为空";
+                return false;
+            }
+
+            if (item.ItemId.Length > MaximumItemIdCharacters
+                || item.Title.Length > MaximumTitleCharacters
+                || item.Category.Length > MaximumCategoryCharacters
+                || item.TargetId.Length > MaximumTargetIdCharacters)
+            {
+                code = ESCommandPaletteRegistrationCode.ProviderBuildFailed;
+                reason = "命令项字段超过长度上限，已拒绝注册";
                 return false;
             }
 
@@ -500,10 +713,26 @@ namespace ES
 
         private static void LoadAndCleanState()
         {
-            LoadIds("favorites", false, MaximumFavorites, FavoriteIds);
-            RebuildFavoriteSet();
-            LoadIds("recent", true, MaximumRecent, RecentIds);
-            RebuildRecentRanks();
+            var previousFavorites = new List<string>(FavoriteIds);
+            var previousRecent = new List<string>(RecentIds);
+            try
+            {
+                LoadIds("favorites", false, MaximumFavorites, FavoriteIds);
+                RebuildFavoriteSet();
+                LoadIds("recent", true, MaximumRecent, RecentIds);
+                RebuildRecentRanks();
+            }
+            catch (Exception exception)
+            {
+                FavoriteIds.Clear();
+                FavoriteIds.AddRange(previousFavorites);
+                RebuildFavoriteSet();
+                RecentIds.Clear();
+                RecentIds.AddRange(previousRecent);
+                RebuildRecentRanks();
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] Favorites/Recent 状态恢复失败，已保留上一版内存状态。", exception));
+            }
         }
 
         private static void LoadIds(string suffix, bool session, int maximum, List<string> destination)
@@ -512,9 +741,11 @@ namespace ES
             string raw = session
                 ? SessionState.GetString(PreferenceKey(suffix), string.Empty)
                 : EditorPrefs.GetString(PreferenceKey(suffix), string.Empty);
+            bool changed = raw.Length > MaximumPersistedIdsCharacters;
+            if (changed)
+                raw = raw.Substring(0, MaximumPersistedIdsCharacters);
             string[] values = raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            bool changed = false;
             for (int i = 0; i < values.Length; i++)
             {
                 string value = values[i].Trim();
@@ -535,14 +766,22 @@ namespace ES
 
         private static void SaveIds(string suffix, List<string> ids, bool session)
         {
-            string value = string.Join("\n", ids);
-            if (session)
+            try
             {
-                SessionState.SetString(PreferenceKey(suffix), value);
+                string value = string.Join("\n", ids);
+                if (session)
+                {
+                    SessionState.SetString(PreferenceKey(suffix), value);
+                }
+                else
+                {
+                    EditorPrefs.SetString(PreferenceKey(suffix), value);
+                }
             }
-            else
+            catch (Exception exception)
             {
-                EditorPrefs.SetString(PreferenceKey(suffix), value);
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandPalette] " + suffix + " 状态保存失败，已保留当前内存状态。", exception));
             }
         }
 
@@ -590,6 +829,13 @@ namespace ES
 
         internal static void ResetForTests(bool includeBuiltIns)
         {
+            refreshing = false;
+            refreshObservationItems = null;
+            refreshObservationOrdered = null;
+            refreshObservationDiagnostics = null;
+            refreshObservationFavorites = null;
+            refreshObservationRecent = null;
+            refreshObservationProviderCount = -1;
             Providers.Clear();
             ProviderOrder.Clear();
             Items.Clear();

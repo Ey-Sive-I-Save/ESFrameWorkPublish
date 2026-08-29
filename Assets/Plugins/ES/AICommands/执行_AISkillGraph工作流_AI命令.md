@@ -25,6 +25,18 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 5. Graph、AICommand、TaskContract 或当前用户授权任一失效时阻断当前步骤并保留失败证据。
 6. 不得把源码或静态构建结果描述成 Unity Test Runner、PlayMode、Profiler 或发布通过。
 
+## ContractCompleteness
+
+```text
+commandId: aiskill.graph.execute
+cancellation: before registered task dispatch; after dispatch returns RecoveryRequired.
+recovery: idempotency and RunRecord guarded; unknown state returns NeedsReissue, no blind replay.
+validation: SkillGraph fingerprint, approved plan, TaskContract, capability and evidence checks.
+evidenceRef: commandBodyHash, planHash, graph hash, RunId, receipt and static-runtime split.
+allowRoots: registered SkillGraph task and受管 RunRecord only.
+denyPaths: direct scripts, permanent Skill registration, source writes, Git and release; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

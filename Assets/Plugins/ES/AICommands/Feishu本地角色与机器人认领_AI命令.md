@@ -56,6 +56,18 @@ Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
 Assets/Plugins/ES/AICommands/Feishu本地角色与机器人认领_AI命令.md
 ```
 
+## ContractCompleteness
+
+```text
+commandId: feishu.identity.manage
+cancellation: claim/release cancellation is allowed before private registry commit; after commit returns RecoveryRequired.
+recovery: reread registry and AppId/Actor hashes, use new InvocationId and CAS; conflict returns NeedsReissue, no blind replay.
+validation: AppId/owner hash, role and alias uniqueness, DryRun freshness, CAS, private-path and secret-leak checks.
+evidenceRef: commandId, commandBodyHash, planHash, invocationId, AppId/Actor/owner hashes, DryRun/Live receipt and source SHA-256.
+allowRoots: ES/Automation/Runs/FeishuIdentity private registry and FeishuTasks request envelope only.
+denyPaths: credentials, source, Git, AIKnowledge, AIWarnings, ordinary reports, arbitrary local paths, external/network state and Runtime; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

@@ -41,6 +41,18 @@ skill: es-task-context-runtime
 
 取消发生在下一次 create-only mutation 之前；已提交 event 不回滚。中断后重新读取最后一条连续、Hash 有效的 event，忽略未被 event 引用的 orphan Receipt，并以新的 idempotency key 和当前 CAS 对重试。
 
+## ContractCompleteness
+
+```text
+commandId: task.context-runtime.mutate
+cancellation: before each create-only mutation; committed events and receipts are immutable and never rolled back.
+recovery: reread last contiguous hash-valid event, ignore unreferenced orphan receipts, retry with current CAS and new idempotencyKey; conflicts fail closed.
+validation: platform schema/action, TaskRevision/ContextVersion, GoalRevision/AcceptanceProfile verifier bindings, sourceScope, Event/Receipt hashes and evaluator result.
+evidenceRef: commandId, commandBodyHash, planHash, taskId, TaskRevision, ContextVersion, Event/Receipt hashes, verifier snapshot and source SHA-256.
+allowRoots: current TaskId events and accepted Completion Receipt under the declared project-relative StoreRoot only.
+denyPaths: existing event/receipt edits, orphan deletion, Assets, source, Git, Unity/Worker startup, release, Runtime and external state; deny-overrides.
+```
+
 ## 交付格式
 
 交付前运行平台确定性测试、OutcomeEvaluator、`/eval` Adapter 回放、StaticDeepReplay、严格 Evidence Receipt 校验、Skill/Knowledge/route 发现验证、严格 UTF-8 与目标 diff 检查。报告 TaskId、TaskRevision、ContextVersion、completionDecision、deliveryAcceptance、Receipt 绑定、实际 StoreRoot、验证状态和 `runtime-not-run`；静态证据只能证明 advisory `/eval` 的源码注册和隔离 Worker 回放，不得声明 Unity 注册、生产执行、其他 AIBrain 生命周期动作或 Release acceptance。

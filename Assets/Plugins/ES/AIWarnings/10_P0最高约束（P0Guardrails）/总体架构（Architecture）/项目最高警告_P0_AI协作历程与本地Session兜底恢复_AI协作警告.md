@@ -1,160 +1,23 @@
 # 项目最高警告：AI 协作历程与本地 Session 兜底恢复
 
-状态：P0 现行约束
+Status: current
+StableId: es.aiwarning.p0.ai-collaboration-history-session-recovery.v1
+Authority: AIWarnings（长期 P0 约束）；详细协议与恢复规则见 Knowledge
+RouteKeys: aiwarnings, p0, codex, session, history, handoff, recovery, timeline, privacy
+Applicability: AI 协作历程、Session 定位、窗口恢复、交接档案和时间线审计
+EvidenceRef: Documentation/AIKnowledge/entries/aiwarning-p0-ai-collaboration-history-session-recovery.md
+StaleWhen: session bootstrap、handoff envelope、timeline coverage 工具、档案格式或 SourceRef 哈希变化。
 
-适用范围：维护 `ES/AI协作历程（Codex）`、恢复失联对话窗口、查找本机 Codex session、生成交接记录或判断窗口档案归属。
+## P0 长期约束
 
-## 一、必须解决的问题
+- 协作历程只回答真实窗口按时间顺序做了什么、证据到哪一级、哪里失败或被纠正；不是阶段总结、成果宣传、源码验收或运行时通过的替代品。
+- 一个真实窗口只能对应一个唯一档案；候选定位、归属确认、逐轮恢复和技术验收必须分开。`history.jsonl` 只做候选索引，`rollout-*.jsonl` 才是逐轮恢复证据。
+- 普通问答、代码修改、读取、构建和测试不得自动写历程；只有用户明确要求创建、更新、恢复、整理或交接时才获得对应范围授权。
+- 交接必须使用项目既有 bootstrap/handoff 路由：先解析 Session、档案和 TaskKey，完成覆盖校验与 Bootstrap Validate；目标窗口返回 `ContextAccepted=true` 前不得关闭源窗口，不得用聊天摘要冒充交接。
+- 新窗口必须依据 immutable launch envelope、私有 handoff snapshot 和最新工作树重新确认；交接授权不扩大源码、Git、Unity、发布、删除或外部发送权限。
+- 每条独立用户消息、纠正、失败、重试和交付复核都要有连续唯一时间线节点；`task_complete` 不等于实现或验收，失败/中止/否决必须保留。
+- 必须脱敏凭据和隐私、排除 system/developer/reasoning 等无关内容；禁止手改 session JSONL、自动合并候选或在覆盖脚本失败后声称恢复完成。
 
-AI 协作历程用于回答：某个真实对话窗口按时间顺序接受过哪些任务、实际做了什么、证据到哪一级、哪里失败或被纠正。它不是阶段总结、主题文章、最终成果宣传或源码验收替代品。
+## Knowledge 导航
 
-当原窗口达到上下文上限、持续容量失败、无法继续写档案，或压缩后遗失窗口档案 ID 时，必须能够从本机记录中定位并恢复；不得因“找不到自己的文件”而写入其他窗口，也不得直接放弃完整时间线。
-
-## 二、权威术语
-
-- **窗口档案**：一个真实对话窗口唯一对应的 Markdown 文件。
-- **窗口档案ID**：窗口永久身份，文件重命名后保持不变。
-- **候选定位**：从 `history.jsonl` 的用户文本和 session ID 中搜索可能会话，只提供候选路径。
-- **逐轮恢复**：读取确定的 `rollout-*.jsonl`，按 task、用户消息、工具、完成和中止事件重建时间线。
-- **归属确认**：用 session ID、开始时间、CWD、首尾任务及档案尾部连续性确认唯一窗口。
-- **失联窗口**：已经无法可靠维护自己档案的原对话窗口；模型暂时繁忙但记录仍可继续写入不等于失联。
-
-禁止混用“找到候选”“确认归属”“完成恢复”和“完成技术验收”。它们是四个不同状态。
-
-## 三、历程写入授权门禁
-
-1. 禁止 AI 因普通问答、代码修改、工具读取、构建、测试、纠正或结论变化而自动创建或更新协作历程。
-2. 只有用户明确要求创建、更新、补全、恢复、整理或交接历程时，AI 才获得对应范围的写入权限。
-3. 距上次历程更新、用户拒绝或询问起经过大约 10 轮有实质内容的对话后，AI 可以询问一次用户是否需要整理；用户明确同意前不得写入。
-4. 用户拒绝、忽略或要求稍后处理时，AI 必须继续业务工作，不得催促、强求、反复询问或用历程维护阻断交付；再次询问至少再等待约 10 轮。
-5. 一次授权只覆盖用户明确指定的窗口、范围和操作，不恢复“每条消息自动落账”。获准写入后仍必须遵守唯一档案、真实归属、证据分层、UTF-8 和完整性门禁。
-
-### 3.1 ES 原生交接能力与自然语言路由门禁（P0）
-
-用户明确表达交接意图时，AI 必须优先执行 ES 已有交接编排，禁止把普通聊天总结、手写 Markdown 或“这里是一份交接说明”冒充项目交接能力。
-
-自然语言至少按以下语义路由：
-
-| 用户意图 | 必须执行的行为 |
-|---|---|
-| “生成交接文案”“给我一份可复制交接” | 生成受当前证据和权限边界约束的交接文案；不得擅自启动新窗口 |
-| “准备交接”“先校验交接” | 调用 `Complete-ESCodexHandoff.ps1` 的默认准备/校验路径，不传 `-OpenNew` |
-| “直接交接一下”“开始交接”“交给新窗口”“让新 AI 接手” | 视为已明确授权启动接收窗口，调用 `Complete-ESCodexHandoff.ps1 -OpenNew`；不得退化为聊天文本 |
-| “交接后关闭当前窗口” | 调用 `Complete-ESCodexHandoff.ps1 -OpenNew -CloseSource`；只有目标窗口返回 `ContextAccepted=true` 后才允许关闭源窗口 |
-| “再开一个独立窗口” | 只有该语义明确时才允许追加 `-ForceNew`；普通重试必须复用稳定 `TaskKey` 去重 |
-
-执行交接前必须解析当前 Session、唯一窗口档案和稳定 `TaskKey`，并完成覆盖校验与 Bootstrap Validate。当前档案不存在、归属未确认或覆盖校验失败时，必须报告具体阻断阶段并停在门禁处；不得为了看起来已经交接而临时拼一份摘要替代。
-
-AI 不得以“没有发现 Skill”“本轮没有代码修改”“用户只说了一句话”或“聊天回复更快”为理由跳过项目已有脚本。项目能力入口已登记在 CurrentStatus、RuleIndex 或当前源码时，必须先使用该入口；确实不可调用时，必须明确报告不可调用的技术原因、已完成的只读检查和允许的降级方案，禁止静默降级。
-
-“交接”只授予本节描述的交接编排权限，不自动授予新窗口源码修改、Git、Unity、发布、删除或外部发送权限。新窗口仍须依据 immutable launch envelope、handoff snapshot 和最新工作树重新确认范围。
-
-## 四、强制恢复流水线
-
-```text
-用户描述、主题词、时间或旧输出
-  -> Find-CodexSession.ps1 查询 history.jsonl
-  -> 获得候选 session ID、分数和 rollout 绝对路径
-  -> 人工核对首尾提示、CWD、时间与档案尾部
-  -> 唯一确认窗口归属
-  -> Recover-CodexSessionHistory.ps1 逐轮恢复
-  -> 用户消息数与任务节点数覆盖审计
-  -> UTF-8、ID、链接、编号、脱敏和空白门禁
-```
-
-模糊搜索工具：
-
-`ES/AI协作历程（Codex）/Tools/Find-CodexSession.ps1`
-
-结构恢复工具：
-
-`ES/AI协作历程（Codex）/Tools/Recover-CodexSessionHistory.ps1`
-
-示例：
-
-```powershell
-# 主题词模糊搜索
-& '.\ES\AI协作历程（Codex）\Tools\Find-CodexSession.ps1' `
-  -Query 'ResourcePlan TemporaryScope Raw AliyunOss' -Top 5
-
-# 时间和项目辅助过滤
-& '.\ES\AI协作历程（Codex）\Tools\Find-CodexSession.ps1' `
-  -Query '资源加载方案 UniTask' `
-  -ProjectPath 'F:\aaProject\ESFrameWorkPublish' `
-  -Since '2026-07-20' -Until '2026-07-31 23:59:59'
-
-# 已知 session ID 时精确定位
-& '.\ES\AI协作历程（Codex）\Tools\Find-CodexSession.ps1' `
-  -Query '019f8dd5-6319-7fb3-a5fe-8136852d041e'
-```
-
-## 五、候选分数不授予写权限
-
-工具分数只帮助排序：
-
-| 结果 | 含义 | 允许动作 |
-|---|---|---|
-| `ExactSessionId` / 100 | 查询明确包含唯一 session ID | 核对档案尾部后可确认 |
-| `HighCandidate` / 80-99.99 | 文本高度相似或精确长句命中 | 必须人工核对，不自动合并 |
-| `ManualReview` / 50-79.99 | 多主题窗口或多个候选均可能匹配 | 只读检查，禁止写候选档案 |
-| `LowCandidate` / 0-49.99 | 证据不足 | 不认领；继续补关键词、日期或路径 |
-
-任何分数都不能单独证明两个窗口相同。多主题长窗口的关键词分数可能低于 80，精确长句也可能出现在引用或转述中。
-
-必须分开判断：
-
-1. **session 定位**：先确认哪个 `rollout-*.jsonl` 是目标；低分时继续补关键词、日期或项目路径，不能直接选中。
-2. **档案归属**：session 确定后，再检查它是否对应某个已有窗口档案；已有档案没有唯一证据时，不写该档案。
-
-只有 session 已确定、但不存在可靠已有档案时，才新建独立恢复档案。不得把“搜索分数低”误解成“立即为任意候选新建档案”。
-
-## 六、数据源和只读边界
-
-- `%USERPROFILE%\.codex\history.jsonl`：候选索引，只含 session ID、时间和用户文本，不是完整执行记录。
-- `%USERPROFILE%\.codex\sessions\yyyy\MM\dd\rollout-*.jsonl`：逐轮恢复证据。
-- 定位结果的 `UserMessages` 取自 history 索引，可能与某个 session 快照不同；覆盖审计必须重新统计选定的 session JSONL，不能复用候选计数。
-- 定位工具默认只返回本机 session 文件存在的候选；`-IncludeMissingFiles` 只用于诊断已清理或迁移的历史记录，无路径候选不能进入恢复步骤。
-- Codex 内部 JSONL 是本机观察格式，不承诺为稳定公开 API；解析前必须检测字段。
-- 原始 session 与 history 永远只读，禁止修改、截断、迁移或清理。
-- 必须排除 system、developer、world state、reasoning 原文与无关工具输出。
-- API Key、Authorization、Cookie、密码、环境凭据和个人隐私必须脱敏。
-- 活跃 session 要记录读取前后大小和最后事件时间；继续增长时只能声明“截至某时的快照”。
-
-## 七、完整性和语义门禁
-
-1. 用户授权建档或恢复后，一个真实窗口只能有一个档案；低置信匹配宁可新建恢复档案，也不能污染已有窗口。
-2. 在用户授权覆盖的范围内，每条独立请求、改变语义的补充或纠正都必须有独立时间线节点；未授权范围不得自动补写。
-3. `task_complete` 只表示当时产生答复，不等于源码已改、构建通过或 Unity 已验收。
-4. `turn_aborted`、工具失败、错误判断、用户否决和撤回必须保留。
-5. 工具读取不得写成代码修改；外部交付不得写成本窗口实现；设计讨论不得写成落地。
-6. 恢复后必须核对：用户消息数、节点数、同 turn 多消息差异、完成/中止/未闭合总数。
-7. 原阶段总结可以保留在完整时间线之后，但不能替代、覆盖或重排时间线；其中旧节点标题必须降级为 `旧节点 Txxx` 等非正式标题，禁止再次使用 `### Txxx` 被覆盖校验器误计为正式时间线节点。
-8. 最终必须验证编号连续、ID 唯一、README 索引尾号、链接、严格 UTF-8、U+FFFD、尾随空白和敏感信息扫描。
-9. **阶段不是任务节点。** 阶段只能作为同一执行轮或连续上下文的容器；每条独立用户消息、改变语义的补充、纠正、失败、重试和外部交付复核仍必须在阶段内拥有独立 `Txxx` 节点。任何“阶段已覆盖”不得抵扣节点数量。
-10. 生成或恢复档案后必须运行 `Tools/Test-ESCodexTimelineCoverage.ps1`，同时核对确认 session JSONL 的用户消息数、档案 T 节点数、阶段数、T 编号连续性和节点必备字段。脚本非零退出时，状态只能是“未完成/待修复”，不得口头宣称“已完整记录”。
-
-## 八、禁止事项
-
-- 禁止按“最新修改文件”“技术主题像”“README 第一项”猜窗口归属。
-- 禁止未经用户明确授权自动创建、追加、重命名或恢复历程档案。
-- 禁止把“约 10 轮后可询问一次”解释为强制更新、反复催促或默认同意。
-- 禁止只有阶段总结，没有逐条任务时间线。
-- 禁止用“阶段 + 若干代表性节点”冒充完整时间线；不得选择性保留最近几条或最重要几条消息。
-- 禁止在未运行覆盖校验脚本，或脚本失败后，声称历程已补全、已恢复或已完成审计。
-- 禁止因为窗口太长而人为压缩为少量主题节点。
-- 禁止把候选搜索脚本做成自动覆盖或自动合并器。
-- 禁止手改 Codex session JSONL 或生成的项目文件来制造通过。
-- 禁止声称“完整恢复”却不报告快照截止时间、消息数量和中止任务。
-- 禁止同一交接任务未经检查就重复执行 `New`；启动前必须按 `TaskKey`/任务指纹检查活跃进程和启动标记。参数修复只能 `Validate`/`DryRun`，不得用再次 `New` 试错。
-- `-ForceNew` 只能在用户明确要求第二个独立窗口时使用；普通重试必须返回已有窗口的进程 ID、任务指纹和已登记 session ID，未登记时标记 `pending`，不能据此再开窗口。
-
-## 九、当前实现状态
-
-- 模糊定位、精确 ID、日期范围、项目 CWD 辅助和绝对路径输出已由 `Find-CodexSession.ps1` 提供。
-- 结构化逐轮恢复、受限节选、状态保留、覆盖统计和凭据脱敏已由 `Recover-CodexSessionHistory.ps1` 提供。
-- `Recover-CodexSessionHistory.ps1` 重复运行时只保留既有“原阶段总结”正文，并将其中旧 `Txxx` 标题降级；不得嵌套上一轮生成的完整时间线或制造重复节点。
-- `Test-ESCodexTimelineCoverage.ps1` 已提供用户消息数、正式节点数、阶段、编号连续性和必备字段的机械门禁。
-- `Complete-ESCodexHandoff.ps1` 已提供受门禁的交接编排：覆盖校验 -> Bootstrap Validate -> 私有 handoff snapshot -> 新窗口 -> `ContextAccepted` -> 不可变回执 -> 可选关闭源窗口。默认只准备不启动；`-CloseSource` 不得脱离 `-OpenNew`，且未收到 `ContextAccepted=true` 时必须拒绝关闭。该脚本仍需真实新窗口和源窗口生命周期冒烟，不能替代 session、Unity 或发布验收。
-- 工具是人工治理辅助，不是 AIWarnings、源码或运行验收的替代品。
-
-违反本文件会造成跨窗口归属污染、遗漏失败过程或虚假实现记录，按 P0 协作事故处理。
+术语、路由、恢复流水线、候选分数、时间线完整性、隐私和工具入口见 `es.aiwarning.p0.ai-collaboration-history-session-recovery.v1`。本 Warning 不授予历程写入、交接启动、源码、Git、运行时或发布权限。

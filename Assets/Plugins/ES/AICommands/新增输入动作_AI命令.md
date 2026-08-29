@@ -32,6 +32,18 @@ Assets/Plugins/ES/1_Design/RuntimeMode/
 新增 ESInput 动作。先说明分类和 RuntimeMode，修改枚举、默认中文名、默认分类、必要绑定。禁止硬编码按键。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: input-action.add
+cancellation: before enum/metadata/binding commit may cancel; after commit report partial state and do not rewrite user bindings.
+recovery: preserve prior action IDs and profile bindings, retry with a new invocationId and CAS; conflicting stable identity requires NeedsReissue.
+validation: category/display-name/RuntimeMode consistency, profile binding references, no hard-coded keys, duplicate identity and ES_Logic.csproj compile.
+evidenceRef: planHash, commandBodyHash, changed-file SHA-256, binding/profile diff, validator output and Runtime-not-run marker.
+allowRoots: Assets/Plugins/ES/1_Design/Input, Assets/Plugins/ES/1_Design/RuntimeMode and explicitly required input tests/docs only.
+denyPaths: hard-coded key injection, unrelated gameplay/runtime code, AIWarnings, AICommands Catalog, ProjectSettings, Packages, release, Library and Git/.git; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

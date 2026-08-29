@@ -87,9 +87,28 @@ namespace ES
 
         private static void Update()
         {
-            ProcessSimpleTask();
-            ProcessLongTask();
-            UnregisterUpdateIfIdle();
+            try
+            {
+                ProcessSimpleTask();
+                ProcessLongTask();
+            }
+            catch (Exception exception)
+            {
+                // The individual task paths are guarded as well, but keep the
+                // global callback fail-closed if an invariant or Unity API
+                // unexpectedly escapes those boundaries.
+                Debug.LogWarning("[ES] ESEditorHandle 更新异常，已清理挂起任务：" + exception.Message);
+                try { ForceClearAllTasks(); }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogWarning("[ES] ESEditorHandle 挂起任务清理未完全完成："
+                        + cleanupException.Message);
+                }
+            }
+            finally
+            {
+                UnregisterUpdateIfIdle();
+            }
         }
 
         private static void ProcessSimpleTask()

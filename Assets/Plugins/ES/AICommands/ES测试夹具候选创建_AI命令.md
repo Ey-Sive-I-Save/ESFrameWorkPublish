@@ -18,6 +18,17 @@ Command type: candidate content generation. It requires AIBrain `planTask` and w
 
 ## 交付格式
 
+```ContractCompleteness
+commandId: test.fixture.candidate
+cancellation: before commit; cancel leaves no formal fixture
+recovery: isolated candidate cleanup; NeedsReissue on uncertain state; no replay
+validation: candidate schema, content hash, and isolated-path checks
+evidenceRef: candidate path, SHA-256, receipt, and Static/Runtime status
+allowRoots: ES/Automation/Candidates/TestFixtureAuthoring/<request-id>/candidate/ only
+denyPaths: .agents/skills, Assets/Plugins/ES/AICommands, Assets, Runtime, Git, release
+deny-overrides: true
+```
+
 Produce fixture inputs, expected outputs, invalid and denial cases, idempotency key, interruption recovery, source snapshot, deterministic replay results, and runtime claims not proven. Fixtures must target existing ES contracts rather than introduce a parallel execution path.
 
 ## Prohibitions

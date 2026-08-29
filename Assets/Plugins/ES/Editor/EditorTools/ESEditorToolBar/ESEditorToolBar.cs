@@ -21,7 +21,8 @@ namespace ES
             private static List<string> cachedAllScenes = new List<string>();
             private static bool scenesCached = false;
             private const string RecentScenesPrefsKey = "ES_Toolbar_RecentScenes";
-            private const int MaxRecentSceneCount = 8;
+        private const int MaxRecentSceneCount = 8;
+        private const int MaxRecentPreferenceCharacters = 64 * 1024;
             private const string RecentAssetsPrefsKey = "ES_Toolbar_RecentAssets";
             private const int MaxRecentAssetCount = 10;
 
@@ -1113,7 +1114,7 @@ namespace ES
             private static IReadOnlyList<string> GetRecentScenePaths()
             {
                 string value = EditorPrefs.GetString(RecentScenesPrefsKey, string.Empty);
-                if (string.IsNullOrWhiteSpace(value))
+                if (string.IsNullOrWhiteSpace(value) || value.Length > MaxRecentPreferenceCharacters)
                     return Array.Empty<string>();
 
                 return value.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
@@ -1138,7 +1139,7 @@ namespace ES
             private static IReadOnlyList<string> GetRecentAssetPaths()
             {
                 string value = EditorPrefs.GetString(RecentAssetsPrefsKey, string.Empty);
-                if (string.IsNullOrWhiteSpace(value))
+                if (string.IsNullOrWhiteSpace(value) || value.Length > MaxRecentPreferenceCharacters)
                     return Array.Empty<string>();
 
                 return value.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)

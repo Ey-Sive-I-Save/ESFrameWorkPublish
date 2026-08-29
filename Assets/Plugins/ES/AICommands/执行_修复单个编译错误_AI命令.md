@@ -31,6 +31,18 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 只改导致唯一编译错误的最小范围，不格式化整文件，不回滚其他改动。修复后编译并报告。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: compile.error.fix
+cancellation: before-edit only; after-edit interruption returns RecoveryRequired and preserves the prior file.
+recovery: reread source and compiler output, use a new idempotencyKey; no blind replay or broad refactor.
+validation: exact single diagnostic, required-read checks, targeted dotnet build and per-item result.
+evidenceRef: commandId, commandBodyHash, planHash, invocationId, changed-file SHA-256, build receipt and unverified Runtime note.
+allowRoots: only the explicitly named source file causing the single compiler error and its required test/output receipt.
+denyPaths: unrelated source, Assets, AIWarnings, AICommands, ProjectSettings, Packages, Git, release, Runtime and broad formatting; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

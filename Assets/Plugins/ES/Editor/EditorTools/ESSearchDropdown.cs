@@ -27,10 +27,27 @@ namespace ES
         private const int MaximumGroupPathCharacters = 4096;
         private const int MaximumGroupPathSegments = 64;
         private const int MaximumGroupSegmentCharacters = 256;
+        private const int MaximumToolbarTextCharacters = 512;
+        private const int MaximumEntryPresentationCharacters = 2048;
         private static readonly PropertyInfo NativeTooltipProperty = FindNativeTooltipProperty();
         private static readonly Action<AdvancedDropdownItem, string> NativeTooltipSetter =
             CreateNativeTooltipSetter(NativeTooltipProperty);
         private static bool nativeTooltipFailureLogged;
+
+        private static void DisposeInteractionHold(IDisposable interactionHold)
+        {
+            if (interactionHold == null)
+                return;
+            try
+            {
+                interactionHold.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESSearchDropdown] 宿主交互保持释放失败。", exception));
+            }
+        }
 
         public sealed class Builder
         {
@@ -199,10 +216,20 @@ namespace ES
 
             public ToolbarAction(string label, Action onClick, string tooltip = null)
             {
-                Label = string.IsNullOrWhiteSpace(label) ? "·" : label.Trim();
-                Tooltip = tooltip?.Trim();
+                Label = NormalizeToolbarText(label, "·");
+                Tooltip = NormalizeToolbarText(tooltip, null);
                 OnClick = onClick;
             }
+        }
+
+        private static string NormalizeToolbarText(string value, string fallback)
+        {
+            string normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            if (string.IsNullOrEmpty(normalized))
+                return null;
+            return normalized.Length > MaximumToolbarTextCharacters
+                ? normalized.Substring(0, MaximumToolbarTextCharacters)
+                : normalized;
         }
 
         public readonly struct Entry
@@ -319,7 +346,7 @@ namespace ES
             {
                 Entry = entry;
                 if (!string.IsNullOrWhiteSpace(entry.Tooltip))
-                    ApplyNativeTooltip(this, entry.Tooltip);
+                    ApplyNativeTooltip(this, BoundPresentationText(entry.Tooltip));
                 icon = entry.Icon;
                 enabled = entry.Enabled;
                 id = entry.Id;
@@ -331,13 +358,23 @@ namespace ES
                 if (!string.IsNullOrWhiteSpace(entry.Subtitle)) result += "  ·  " + entry.Subtitle;
                 if (!string.IsNullOrWhiteSpace(entry.Badge)) result += "  [" + entry.Badge + "]";
                 if (!string.IsNullOrWhiteSpace(entry.Keywords)) result += "  ‹" + entry.Keywords + "›";
-                return result;
+                return BoundPresentationText(result);
             }
 
         }
 
+        private static string BoundPresentationText(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= MaximumEntryPresentationCharacters)
+                return value;
+            return value.Substring(0, MaximumEntryPresentationCharacters);
+        }
+
         private readonly string title;
         private readonly Func<IEnumerable<Entry>> provider;
+        private readonly EditorWindow hostWindow;
+        private readonly VisualElement hostRoot;
+        private bool selectionEnabled = true;
 
         public static Builder Create(string title) => new Builder(title);
 
@@ -410,11 +447,14 @@ namespace ES
             AdvancedDropdownState state,
             string title,
             Func<IEnumerable<Entry>> provider,
-            Vector2 minimumWindowSize)
+            Vector2 minimumWindowSize,
+            EditorWindow hostWindow = null)
             : base(state ?? new AdvancedDropdownState())
         {
             this.title = string.IsNullOrWhiteSpace(title) ? "选择" : title.Trim();
             this.provider = provider;
+            this.hostWindow = hostWindow;
+            this.hostRoot = hostWindow != null ? hostWindow.rootVisualElement : null;
             minimumWindowSize = NormalizeMinimumWindowSize(minimumWindowSize);
             minimumSize = new Vector2(
                 Mathf.Max(AbsoluteMinimumWidth, minimumWindowSize.x),
@@ -485,7 +525,8 @@ namespace ES
                 state,
                 title,
                 provider,
-                minimumWindowSize ?? new Vector2(DefaultMinimumWidth, 320f));
+                minimumWindowSize ?? new Vector2(DefaultMinimumWidth, 320f),
+                hostWindow);
             IDisposable interactionHold = hostWindow != null
                 ? ESWindowFoundation.HoldInteraction(hostWindow, "ESSearchDropdown")
                 : null;
@@ -501,7 +542,20 @@ namespace ES
 
             // AdvancedDropdown 在 Show 内部才创建原生窗口。生命周期和可选工具栏都挂到
             // 该窗口的 DetachFromPanelEvent，不增加 EditorApplication.update 常驻轮询。
-            if (interactionHold != null || toolbarActions != null && toolbarActions.Count > 0)
+            bool hasToolbarActions = false;
+            try
+            {
+                hasToolbarActions = toolbarActions != null && toolbarActions.Count > 0;
+            }
+            catch (Exception exception)
+            {
+                DisposeInteractionHold(interactionHold);
+                Debug.LogException(new InvalidOperationException(
+                    "[ESSearchDropdown] ToolbarAction 集合计数失败，已放弃原生桥接。", exception));
+                return;
+            }
+
+            if (interactionHold != null || hasToolbarActions)
                 AdvancedDropdownNativeBridge.TryAttach(dropdown, toolbarActions, interactionHold);
         }
 
@@ -562,6 +616,20 @@ namespace ES
             // ToolbarMenu 的回调可能来自另一个临时 GUIView。先算出宿主窗口中的真实屏幕位置，
             // 再转换回“当前 GUIView”的局部坐标，保证 AdvancedDropdown 内部二次 GUIToScreenRect 后仍落在锚点下方。
             Vector2 screenPosition = host.position.position + localPosition;
+            Rect hostBounds = host.position;
+            if (hostBounds.width > 0f && hostBounds.height > 0f)
+            {
+                float anchorWidth = Mathf.Max(1f, worldRect.width);
+                float anchorHeight = Mathf.Max(1f, worldRect.height);
+                screenPosition.x = Mathf.Clamp(
+                    screenPosition.x,
+                    hostBounds.x,
+                    Mathf.Max(hostBounds.x, hostBounds.xMax - anchorWidth));
+                screenPosition.y = Mathf.Clamp(
+                    screenPosition.y,
+                    hostBounds.y,
+                    Mathf.Max(hostBounds.y, hostBounds.yMax - anchorHeight));
+            }
             Vector2 guiPosition = GUIUtility.ScreenToGUIPoint(screenPosition);
             anchorRect = new Rect(
                 guiPosition,
@@ -705,6 +773,13 @@ namespace ES
 
         protected override void ItemSelected(AdvancedDropdownItem item)
         {
+            bool hostContextValid = IsHostContextValid();
+            if (!selectionEnabled || !hostContextValid)
+            {
+                if (!hostContextValid)
+                    DisableSelection();
+                return;
+            }
             if (!(item is ActionItem actionItem) || !actionItem.Entry.Enabled)
                 return;
 
@@ -716,6 +791,36 @@ namespace ES
             {
                 Debug.LogException(new InvalidOperationException(
                     "[ESSearchDropdown] 选项回调执行失败：" + actionItem.Entry.Label, exception));
+            }
+        }
+
+        internal void DisableSelection()
+        {
+            selectionEnabled = false;
+        }
+
+        internal bool IsHostContextValidForBridge()
+        {
+            return IsHostContextValid();
+        }
+
+        private bool IsHostContextValid()
+        {
+            if (hostWindow == null)
+                return true;
+            if (hostRoot == null || hostWindow.rootVisualElement == null)
+                return false;
+            try
+            {
+                return hostRoot.panel != null
+                    && ReferenceEquals(hostRoot, hostWindow.rootVisualElement)
+                    && hostWindow.rootVisualElement.panel == hostRoot.panel;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESSearchDropdown] 宿主上下文校验失败，已禁用选择回调。", exception));
+                return false;
             }
         }
 
@@ -805,10 +910,14 @@ namespace ES
             private readonly ESSearchDropdown.ToolbarAction[] actions;
             private readonly GUIContent[] contents;
             private readonly float[] widths;
+            private readonly System.Func<bool> contextValidator;
             private bool disposed;
 
-            internal ToolbarOverlay(IReadOnlyList<ESSearchDropdown.ToolbarAction> source)
+            internal ToolbarOverlay(
+                IReadOnlyList<ESSearchDropdown.ToolbarAction> source,
+                System.Func<bool> contextValidator)
             {
+                this.contextValidator = contextValidator;
                 int sourceCount = Mathf.Min(
                     source?.Count ?? 0,
                     ESSearchDropdown.MaximumToolbarActions);
@@ -858,6 +967,11 @@ namespace ES
             {
                 if (disposed)
                     return;
+                if (contextValidator != null && !contextValidator())
+                {
+                    disposed = true;
+                    return;
+                }
                 float x = 2f;
                 for (int i = 0; i < Count; i++)
                 {
@@ -892,6 +1006,7 @@ namespace ES
 
         private sealed class WindowState : IDisposable
         {
+            private readonly ESSearchDropdown dropdown;
             private readonly EditorWindow window;
             private readonly VisualElement root;
             private readonly IDisposable interactionHold;
@@ -899,11 +1014,13 @@ namespace ES
             private bool disposed;
 
             internal WindowState(
+                ESSearchDropdown dropdown,
                 EditorWindow window,
                 VisualElement root,
                 IDisposable interactionHold,
                 ToolbarOverlay toolbar)
             {
+                this.dropdown = dropdown;
                 this.window = window;
                 this.root = root;
                 this.interactionHold = interactionHold;
@@ -925,6 +1042,7 @@ namespace ES
                     return;
 
                 disposed = true;
+                dropdown?.DisableSelection();
                 try
                 {
                     root?.UnregisterCallback<DetachFromPanelEvent>(OnDetachedFromPanel);
@@ -963,7 +1081,9 @@ namespace ES
                 }
                 finally
                 {
-                    if (window != null)
+                    // UnityEngine.Object 被销毁后会让 operator != 返回 false，
+                    // 但 ConditionalWeakTable 仍需要使用托管引用完成移除。
+                    if (!ReferenceEquals(window, null))
                         WindowStates.Remove(window);
                 }
             }
@@ -1001,9 +1121,11 @@ namespace ES
                     existing.Dispose();
 
                 ToolbarOverlay toolbar = actions != null && actions.Count > 0
-                    ? new ToolbarOverlay(actions)
+                    ? new ToolbarOverlay(actions, dropdown != null
+                        ? dropdown.IsHostContextValidForBridge
+                        : null)
                     : null;
-                attachedState = new WindowState(window, root, interactionHold, toolbar);
+                attachedState = new WindowState(dropdown, window, root, interactionHold, toolbar);
                 WindowStates.Add(window, attachedState);
                 attachedState.Attach();
                 return true;

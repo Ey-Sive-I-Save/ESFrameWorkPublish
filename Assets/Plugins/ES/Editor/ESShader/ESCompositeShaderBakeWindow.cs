@@ -365,23 +365,23 @@ namespace ES.EditorInternal
             float time,
             bool useSrgb)
         {
-            PreviewRenderUtility utility = null;
+            ESEditorPreviewRenderContext context = null;
+            ESEditorPreviewModelHandle modelHandle = null;
+            GameObject previewObject = null;
             Material runtimeMaterial = null;
             Mesh mesh = null;
             try
             {
-                utility = new PreviewRenderUtility();
-                utility.camera.orthographic = true;
-                utility.camera.orthographicSize = 0.5f;
-                utility.camera.transform.position = new Vector3(0f, 0f, -2f);
-                utility.camera.transform.rotation = Quaternion.identity;
-                utility.camera.nearClipPlane = 0.01f;
-                utility.camera.farClipPlane = 10f;
-                utility.camera.clearFlags = CameraClearFlags.Color;
-                utility.camera.backgroundColor = Color.clear;
-                utility.lights[0].intensity = 1.2f;
-                utility.lights[0].transform.rotation = Quaternion.Euler(30f, 30f, 0f);
-                utility.lights[1].intensity = 0.6f;
+                context = new ESEditorPreviewRenderContext(
+                    "ES Composite Shader Bake",
+                    ESEditorPreviewSceneMode.PreviewScene,
+                    ESEditorPreviewUtility.DefaultPreviewLayer,
+                    ESEditorPreviewEnhancerSet.LowEnd);
+                context.Ensure();
+                context.Camera.orthographic = true;
+                context.Camera.orthographicSize = 0.5f;
+                context.Camera.clearFlags = CameraClearFlags.Color;
+                context.Camera.backgroundColor = Color.clear;
 
                 runtimeMaterial = new Material(sourceMaterial) { hideFlags = HideFlags.HideAndDontSave };
                 if (runtimeMaterial.HasProperty(MainTextureProperty))
@@ -407,21 +407,44 @@ namespace ES.EditorInternal
                 ESCompositeShaderGUI.SyncMaterialKeywords(runtimeMaterial);
 
                 mesh = CreateBakeQuad();
-                Rect rect = new Rect(0f, 0f, size.x, size.y);
-                utility.BeginPreview(rect, GUIStyle.none);
-                utility.DrawMesh(mesh, Matrix4x4.identity, runtimeMaterial, 0);
-                utility.camera.Render();
-                Texture preview = utility.EndPreview();
-                return CopyTexture(preview, size.x, size.y, useSrgb);
+                previewObject = ESEditorPreviewUtility.CreatePreviewGameObject(
+                    "ES Composite Shader Bake Quad", typeof(MeshFilter), typeof(MeshRenderer));
+                MeshFilter filter = previewObject.GetComponent<MeshFilter>();
+                MeshRenderer renderer = previewObject.GetComponent<MeshRenderer>();
+                filter.sharedMesh = mesh;
+                renderer.sharedMaterial = runtimeMaterial;
+                modelHandle = context.AdoptModelGroup(
+                    previewObject,
+                    previewObject,
+                    "ES Composite Shader Bake Quad",
+                    samplingTarget: false,
+                    copyRendererState: false,
+                    disableRuntimeBehaviours: false,
+                    ensureRenderersEnabled: true,
+                    activateInstance: true,
+                    moveToGroupOrigin: true);
+                previewObject = null;
+                if (modelHandle == null)
+                    return null;
+                ESEditorPreviewCameraPose pose = context.CreateCameraPose(
+                    context.WorldToPreviewLocalPoint(modelHandle.Bounds.center),
+                    Mathf.Max(0.5f, modelHandle.Bounds.extents.magnitude),
+                    0f, 0f, 1f);
+                return context.Snapshot(size.x, size.y, pose, ESEditorPreviewQuality.Fast,
+                    "ES Composite Shader Bake Frame", !useSrgb);
             }
             finally
             {
+                try { modelHandle?.Dispose(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                if (previewObject != null)
+                    ESEditorPreviewUtility.DestroyObject(previewObject);
                 if (mesh != null)
-                    DestroyImmediate(mesh);
+                    ESEditorPreviewUtility.DestroyObject(mesh);
                 if (runtimeMaterial != null)
-                    DestroyImmediate(runtimeMaterial);
-                if (utility != null)
-                    utility.Cleanup();
+                    ESEditorPreviewUtility.DestroyObject(runtimeMaterial);
+                try { context?.Dispose(); }
+                catch (Exception exception) { Debug.LogException(exception); }
             }
         }
 
@@ -448,47 +471,6 @@ namespace ES.EditorInternal
             mesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
             mesh.RecalculateBounds();
             return mesh;
-        }
-
-        private static Texture2D CopyTexture(Texture source, int width, int height, bool useSrgb)
-        {
-            if (source == null)
-                return null;
-
-            RenderTexture temporary = RenderTexture.GetTemporary(
-                width,
-                height,
-                0,
-                RenderTextureFormat.ARGB32,
-                useSrgb ? RenderTextureReadWrite.sRGB : RenderTextureReadWrite.Linear);
-            RenderTexture previous = RenderTexture.active;
-            Texture2D result = null;
-            try
-            {
-                if (temporary == null)
-                    return null;
-                Graphics.Blit(source, temporary);
-                RenderTexture.active = temporary;
-                result = new Texture2D(width, height, UnityEngine.TextureFormat.RGBA32, false, !useSrgb)
-                {
-                    hideFlags = HideFlags.HideAndDontSave
-                };
-                result.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, false);
-                result.Apply(false, false);
-                return result;
-            }
-            catch
-            {
-                if (result != null)
-                    UnityEngine.Object.DestroyImmediate(result);
-                throw;
-            }
-            finally
-            {
-                RenderTexture.active = previous;
-                if (temporary != null)
-                    RenderTexture.ReleaseTemporary(temporary);
-            }
         }
 
         private void PopulateFromSelection()

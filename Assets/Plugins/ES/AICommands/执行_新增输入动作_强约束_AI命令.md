@@ -32,6 +32,18 @@ Assets/Plugins/ES/1_Design/RuntimeMode/
 强约束新增输入动作，确保分类、显示名、绑定、RuntimeMode 过滤一致。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: input-action.add.strict
+cancellation: before action enum/metadata/binding commit may cancel; after commit preserve existing profile bindings and report partial state.
+recovery: retain prior action/profile state, retry with a new invocationId and CAS; stable-ID or profile drift requires NeedsReissue, never remap by guess.
+validation: category/display-name/binding/RuntimeMode alignment, profile references, no hard-coded keys, duplicate identity and ES_Logic.csproj compile.
+evidenceRef: planHash, commandBodyHash, changed-file SHA-256, action/profile diff, validator output, negative probes and Runtime-not-run marker.
+allowRoots: Assets/Plugins/ES/1_Design/Input, Assets/Plugins/ES/1_Design/RuntimeMode and explicitly required input tests/docs only.
+denyPaths: hard-coded key injection, unrelated runtime/gameplay files, AIWarnings, AICommands Catalog, ProjectSettings, Packages, release, Library and Git/.git; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

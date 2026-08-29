@@ -31,6 +31,18 @@ Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPac
 修复导出链路显示、重复判断、目标丢失判断。禁止改成自动 _1，禁止只看目标文件存在。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: asset-package.export.fix
+cancellation: before-export commit only; after commit returns RecoveryRequired and retains the prior export state.
+recovery: reread target manifest and hashes, use a new idempotencyKey; no automatic _1 target or blind replay.
+validation: required source/target checks, duplicate and missing-target checks, Assembly-CSharp-Editor build and receipt.
+evidenceRef: commandId, commandBodyHash, planHash, invocationId, target manifest/hash, build output and per-item receipt.
+allowRoots: explicitly named AssetPackage export target and required editor source/test files only.
+denyPaths: unrelated Assets, source modules, AIWarnings, AICommands, ProjectSettings, Packages, Git, release, Runtime and cache; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

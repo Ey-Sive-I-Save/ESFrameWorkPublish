@@ -56,6 +56,17 @@ userInstructionHash: 当前用户运行指令的 SHA-256
 - 禁止把 placeholder、静态校验或 Materializer Completed 写成商业视觉验收通过。
 ```
 
+## ContractCompleteness
+
+```text
+cancellation: before planTask/runTask commit may cancel; after Unity dispatch report Unknown and stop follow-up writes.
+recovery: retain the invocation and evidence directory, use a new invocationId for retry, never replay an uncertain materialization blindly.
+validation: ScreenSpec v3 schema, fixed input roots, PlanHash/TaskContractHash, idempotency, Unity response and separate visual-evidence status.
+evidenceRef: planHash, taskContractHash, commandBodyHash, RunId, ScreenSpec SHA-256, generated paths and snapshot/PNG hashes; visualAcceptance remains not-claimed unless separately evidenced.
+allowRoots: Assets/UI/Contracts ScreenSpec inputs and the declared ES/UIEvidence plus Materializer Generated UI roots only.
+denyPaths: arbitrary scripts/commands, absolute paths, business data, sourceAbsolutePath, Git/.git, AIWarnings, AICommands, ProjectSettings, Packages, release, Runtime and Library; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

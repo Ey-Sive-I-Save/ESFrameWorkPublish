@@ -31,6 +31,18 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 新增中文友好 AIWarning 文件，包含负责范围、当前有效设计、过时设计、高风险误区、入口文件、下一步。
 ```
 
+命令 ID：`handover.add-aiwarning`
+
+## ContractCompleteness
+
+```text
+cancellation: before-commit only; after-commit returns RecoveryRequired.
+recovery: reread target/hash, new idempotencyKey; no automatic replay.
+validation: Test-ESAICommands.ps1 and Test-ESUtf8.ps1 with per-item result.
+evidenceRef: commandBodyHash, planHash, writeScope, receipt and source SHA-256.
+writeScope: AIWarnings/AICommands documentation only; deny source, Assets, Git, release and Runtime.
+```
+
 ## 交付格式
 
 ```text

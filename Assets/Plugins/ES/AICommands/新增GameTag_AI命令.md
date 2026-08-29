@@ -39,6 +39,18 @@ P1：禁止为一份 Tag 列表创建无职责 Config/Data/Info 包装。写入�
 `ESTagGrantConfig` 已移除：禁止恢复、兼容或复制该模式。
 ```
 
+## ContractCompleteness
+
+```text
+commandId: tag.add
+cancellation: before tag identity/config commit may cancel; after commit stop and report partial state, never delete or rename an existing tag implicitly.
+recovery: retain prior catalog/index state, retry with a new invocationId and CAS on stable identity; conflicting identity requires NeedsReissue.
+validation: stable-reference uniqueness, Reserved-bit availability, group/ownership/mutual-exclusion checks, source-reference scan and ES_Logic.csproj compile.
+evidenceRef: planHash, commandBodyHash, changed-file SHA-256, tag/index diff, validator output and Runtime-not-run marker where applicable.
+allowRoots: the existing GameTag/ESTag definition, catalog and explicitly required tag tests/docs only.
+denyPaths: ESTagGrantConfig restoration, Buff/State/Skill substitutes, unrelated Config/Data/Info wrappers, AIWarnings, AICommands Catalog, ProjectSettings, Packages, release, Runtime and Git/.git; deny-overrides.
+```
+
 ## 交付格式
 
 ```text

@@ -11,10 +11,15 @@
     "record": ["taskKey", "planHash", "selection", "readSet", "sourceHashes", "stale", "nonClaims"]
   },
   "rules": [
+    { "id": "advance-minimal-forward-action", "priority": 120, "when": { "forwardActionEligible": true }, "label": "执行最小可逆推进并回报结果", "reason": "目标、对象和路由已明确，优先推动一个可观察、可回退的实际进展", "risk": "low", "requiresUserChoice": true },
+    { "id": "verify-explicit-target", "priority": 115, "when": { "explicitVerificationIntent": true, "targetDetected": true }, "label": "对明确目标执行针对性验证", "reason": "用户明确要求确认是否解决，验证应优先于泛化澄清或上下文收集", "risk": "low", "requiresUserChoice": true },
+    { "id": "confirm-user-intent", "priority": 110, "when": { "intentAlignmentBelow": true, "currentIntentConfirmed": false }, "label": "确认当前目标、期望结果与禁止项", "reason": "当前意图证据不足，先让用户确认实际想推进的方向", "risk": "low", "requiresUserChoice": true },
     { "id": "clarify-objective", "priority": 100, "when": { "objectiveClarity": "unclear" }, "label": "澄清目标与范围", "reason": "目标或边界不足，先确认再行动", "risk": "low", "requiresUserChoice": true },
     { "id": "offer-context-collection", "priority": 95, "when": { "taskStarted": true, "contextCollectionRecommended": true }, "label": "收集本任务所需的 Skill、Knowledge 与 AIWarnings", "reason": "当前任务存在路由不确定、知识缺口或高风险边界；只做定向收集并等待选择", "risk": "low", "requiresUserChoice": true, "optionsRef": "#/contextCollection/options" },
     { "id": "inspect-before-change", "priority": 90, "when": { "objectiveClarity": "partial", "writesRequested": true }, "label": "先做静态检查", "reason": "写入前确认目标文件和现状", "risk": "low", "requiresUserChoice": true },
     { "id": "refresh-understanding", "priority": 80, "when": { "goalDrift": "possible" }, "label": "刷新当前理解", "reason": "任务上下文可能已变化", "risk": "low", "requiresUserChoice": true },
+    { "id": "define-acceptance-signal", "priority": 75, "when": { "acceptanceSignalMissing": true, "taskStarted": true }, "label": "补充可观察验收信号", "reason": "没有明确的完成判据，下一步方向无法可靠收敛", "risk": "low", "requiresUserChoice": true },
+    { "id": "surface-risk-boundary", "priority": 72, "when": { "riskDetected": true }, "label": "先确认风险边界与不可逆项", "reason": "当前请求涉及写入、运行、交接或高风险动作，先明确风险和回退条件", "risk": "high", "requiresUserChoice": true },
     { "id": "run-static-validation", "priority": 70, "when": { "verificationScoreBelow": 7 }, "label": "补充静态验证", "reason": "现有证据不足以支撑当前结论", "risk": "low", "requiresUserChoice": true },
     { "id": "prepare-handoff", "priority": 60, "when": { "handoffIntent": true }, "label": "准备交接摘要", "reason": "交接需要职责、证据和未证实项", "risk": "medium", "requiresUserChoice": true },
     { "id": "request-runtime", "priority": 40, "when": { "runtimeRequired": true, "runtimeStatus": "not-run" }, "label": "申请运行时验收", "reason": "仅静态证据无法证明运行行为", "risk": "high", "requiresUserChoice": true }

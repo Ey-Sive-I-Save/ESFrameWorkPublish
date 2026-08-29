@@ -34,6 +34,22 @@ $profiles=Get-Content (Join-Path $base 'references/evaluation-profiles.json') -R
 $tree=Get-Content (Join-Path $base 'references/next-step-behavior-tree.json') -Raw -Encoding utf8|ConvertFrom-Json
 $text=if($null -eq $PromptText){''}else{$PromptText.Trim()}
 $evidence=if($null -eq $EvidenceText){''}else{$EvidenceText.Trim()}
+$verificationTokenPattern = @(
+  ([string][char]0x9A8C + [char]0x8BC1),
+  ([string][char]0x786E + [char]0x8BA4 + [char]0x662F + [char]0x5426),
+  ([string][char]0x662F + [char]0x5426 + [char]0x89E3 + [char]0x51B3),
+  ([string][char]0x662F + [char]0x5426 + [char]0x4FEE + [char]0x597D),
+  ([string][char]0x9A8C + [char]0x6536), 'verify', 'validate', 'confirm'
+) -join '|'
+$targetTokenPattern = @(
+  ([string][char]0x8D44 + [char]0x6E90), 'Provider', 'Manifest',
+  ([string][char]0x8DEF + [char]0x7531), ([string][char]0x8BED + [char]0x4E49), 'P0', 'UI',
+  ([string][char]0x754C + [char]0x9762), ([string][char]0x7F16 + [char]0x8BD1), 'C#', 'Skill',
+  ([string][char]0x7A97 + [char]0x53E3), ([string][char]0x4F1A + [char]0x8BDD),
+  'resource', 'route', 'provider', 'manifest', 'compile'
+) -join '|'
+$explicitVerificationIntent=[bool]($text -match "(?i)$verificationTokenPattern")
+$targetDetected=[bool]($text -match "(?i)$targetTokenPattern")
 $weights=$profiles.profiles.$Profile.promptWeights
 $dimensionWeights=$profiles.profiles.$Profile.dimensionWeights
 $signals=[ordered]@{
@@ -86,13 +102,15 @@ if($AlreadyCollected){[void]$suppressedBy.Add('already-collected')}
 $derivedRecommendation=([bool]$TaskStarted -and !$AlreadyCollected -and $recommendationReasons.Count -gt 0)
 $decisionSource='derived'
 if($AllowTestOverride){$derivedRecommendation=[bool]$ContextCollectionRecommended;$decisionSource='test-override'}
-$ctx=[ordered]@{objectiveClarity=$objectiveClarity;goalDrift=$goalDrift;writesRequested=[bool]$WritesRequested;runtimeRequired=[bool]$RuntimeRequired;runtimeStatus=$runtimeStatus;handoffIntent=[bool]$HandoffIntent;taskStarted=[bool]$TaskStarted;contextCollectionRecommended=$derivedRecommendation;verificationScoreBelow=($verificationScore -lt 7)}
+$forwardActionEligible=[bool]($TaskStarted -and $CurrentIntentConfirmed -and $RouteStatus -eq 'resolved' -and $targetDetected)
+$riskDetected=[bool]($RiskLevel -eq 'high' -or $WritesRequested -or $RuntimeRequired -or $HandoffIntent)
+$ctx=[ordered]@{objectiveClarity=$objectiveClarity;goalDrift=$goalDrift;writesRequested=[bool]$WritesRequested;runtimeRequired=[bool]$RuntimeRequired;runtimeStatus=$runtimeStatus;handoffIntent=[bool]$HandoffIntent;taskStarted=[bool]$TaskStarted;contextCollectionRecommended=$derivedRecommendation;verificationScoreBelow=($verificationScore -lt 7);intentAlignmentBelow=($intentAlignmentScore -lt 7);confidenceBelow=($confidenceScore -lt 6);acceptanceSignalMissing=(!$signals.acceptance);priorMisalignment=[bool]$PriorMisalignment;currentIntentConfirmed=[bool]$CurrentIntentConfirmed;explicitVerificationIntent=$explicitVerificationIntent;targetDetected=$targetDetected;forwardActionEligible=$forwardActionEligible;riskDetected=$riskDetected}
 $next=@($tree.rules|Sort-Object priority -Descending|Where-Object{
   $w=$_.when; $ok=$true
   foreach($prop in $w.PSObject.Properties){$key=$prop.Name;$expected=$prop.Value;if($key -eq 'verificationScoreBelow'){$ok=$ok -and ($ctx.verificationScoreBelow -eq [bool]$expected)}else{$ok=$ok -and ($ctx[$key] -eq $expected)}}
   $ok
 }|Select-Object -First ([int]$tree.maxSuggestions)|ForEach-Object -Begin {$option=0} -Process {$option++;[ordered]@{number=$option;id=$_.id;label=$_.label;reason=$_.reason;risk=$_.risk;requiresUserChoice=[bool]$_.requiresUserChoice;userInput=[string]$option}})
-$result=[ordered]@{schemaVersion=1;skill='es-ai-interaction-governance';profile=$Profile;promptScore=$promptScore;verificationScore=$verificationScore;intentAlignmentScore=$intentAlignmentScore;evidenceQualityScore=$evidenceQualityScore;calibrationScore=$calibrationScore;confidenceScore=$confidenceScore;overallScore=$overallScore;scoreSource='deterministic-assessment';riskNotice=$riskNotice;diagnosticReasons=$diagnosticReasons;objectiveClarity=$objectiveClarity;goalDrift=$goalDrift;runtimeStatus=$runtimeStatus;taskStarted=[bool]$TaskStarted;taskKind=$TaskKind;routeStatus=$RouteStatus;contextFreshness=$ContextFreshness;riskLevel=$RiskLevel;alreadyCollected=[bool]$AlreadyCollected;contextCollectionRecommended=$derivedRecommendation;recommendationReasons=@($recommendationReasons);suppressedBy=@($suppressedBy);decisionSource=$decisionSource;claimsNotProven=@(if($RuntimeRequired){'Runtime behavior not proven'});nextSteps=$next;nonClaims=@('Scores are advisory','Suggestions are not executed')}
+$result=[ordered]@{schemaVersion=1;skill='es-ai-interaction-governance';profile=$Profile;promptScore=$promptScore;verificationScore=$verificationScore;intentAlignmentScore=$intentAlignmentScore;evidenceQualityScore=$evidenceQualityScore;calibrationScore=$calibrationScore;confidenceScore=$confidenceScore;overallScore=$overallScore;scoreSource='deterministic-assessment';riskNotice=$riskNotice;diagnosticReasons=$diagnosticReasons;objectiveClarity=$objectiveClarity;goalDrift=$goalDrift;runtimeStatus=$runtimeStatus;taskStarted=[bool]$TaskStarted;taskKind=$TaskKind;routeStatus=$RouteStatus;contextFreshness=$ContextFreshness;riskLevel=$RiskLevel;alreadyCollected=[bool]$AlreadyCollected;contextCollectionRecommended=$derivedRecommendation;explicitVerificationIntent=$explicitVerificationIntent;targetDetected=$targetDetected;riskDetected=$riskDetected;forwardActionEligible=$forwardActionEligible;recommendationReasons=@($recommendationReasons);suppressedBy=@($suppressedBy);decisionSource=$decisionSource;claimsNotProven=@(if($RuntimeRequired){'Runtime behavior not proven'});nextSteps=$next;nonClaims=@('Scores are advisory','Suggestions are not executed')}
 $json=$result|ConvertTo-Json -Depth 8
 if($ReportPath){$full=Resolve-ESInteractionReportPath -Candidate $ReportPath;$dir=Split-Path $full -Parent;if(!(Test-Path $dir)){New-Item -ItemType Directory -Path $dir -Force|Out-Null};$full=Resolve-ESInteractionReportPath -Candidate $full;[IO.File]::WriteAllText($full,$json,(New-Object Text.UTF8Encoding($false)))}
 $json

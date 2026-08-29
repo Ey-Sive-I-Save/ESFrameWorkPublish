@@ -1,5 +1,22 @@
 #!/bin/sh
 
+# The document ledger is a scoped gate.  Source-only commits must not be
+# blocked by an unrelated or stale documentation batch.  Invoke the verifier
+# only when a staged path belongs to the document static-site surface.
+document_staged=false
+for staged_path in $(git diff --cached --name-only --diff-filter=ACDMRTUXB); do
+  case "$staged_path" in
+    ES/Documentation/StaticSite/*)
+      document_staged=true
+      break
+      ;;
+  esac
+done
+
+if [ "$document_staged" != "true" ]; then
+  exit 0
+fi
+
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "ES/Documentation/StaticSite/Verify-DocumentStagedBatch.ps1" -Quiet
 status=$?
 

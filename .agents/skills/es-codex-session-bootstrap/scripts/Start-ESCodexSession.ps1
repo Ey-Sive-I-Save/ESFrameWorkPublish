@@ -26,9 +26,18 @@ param(
 
     [string[]]$HandoffPath = @(),
 
+    # A bounded, read-only context packet created by New-ESCodexReadOnlyContext.ps1.
+    # This is never a Resume/Fork source and is accepted only from the private
+    # per-user read-only context store.
+    [string]$ReadOnlyContextPath = '',
+
     # Only Complete-ESCodexHandoff.ps1 may set this for a handoff-intent New.
     # Direct callers must not bypass timeline coverage and handoff receipts.
     [switch]$HandoffMode,
+
+    # When set, the launch carries only bootstrap instructions. The task
+    # prompt must be delivered by the caller after ContextAccepted=true.
+    [switch]$DeferTaskPrompt,
 
     # Internal capability set by Complete-ESCodexHandoff.ps1 for the duration
     # of its Validate/New calls. A public switch alone must never authorize a
@@ -262,8 +271,49 @@ function Get-ResponsibilityTitleLabel([string]$Key, [string]$ContextText) {
     return (New-TextFromCodePoints @(0x804C,0x8D23,0x00B7)) + $fallback.Trim()
 }
 
+function Get-ContextDomainTitle([string]$ContextText) {
+    if ([string]::IsNullOrWhiteSpace($ContextText)) { return '' }
+    $middleDot = [string][char]0x00B7
+    $rules = @(
+        @{ token = 'Manifest|Provider|AssetBook|catalog|' + (New-TextFromCodePoints @(0x8D44,0x6E90)) + '|' + (New-TextFromCodePoints @(0x6E05,0x5355)); label = (New-TextFromCodePoints @(0x8D44,0x6E90,0x7BA1,0x7EBF)) },
+        @{ token = (New-TextFromCodePoints @(0x8BED,0x4E49)) + '|' + (New-TextFromCodePoints @(0x8DEF,0x7531)) + '|P0'; label = (New-TextFromCodePoints @(0x8BED,0x4E49,0x8DEF,0x7531)) },
+        @{ token = 'UI|' + (New-TextFromCodePoints @(0x754C,0x9762)); label = 'UI' },
+        @{ token = (New-TextFromCodePoints @(0x4F1A,0x8BDD)) + '|' + (New-TextFromCodePoints @(0x4EA4,0x63A5)) + '|' + (New-TextFromCodePoints @(0x7A97,0x53E3)); label = (New-TextFromCodePoints @(0x4F1A,0x8BDD,0x4EA4,0x63A5)) },
+        @{ token = (New-TextFromCodePoints @(0x7F16,0x8BD1)) + '|C#|compile|architecture'; label = (New-TextFromCodePoints @(0x7F16,0x8BD1)) },
+        @{ token = 'Knowledge|KnowledgeIndex'; label = (New-TextFromCodePoints @(0x77E5,0x8BC6)) },
+        @{ token = 'Weapon'; label = (New-TextFromCodePoints @(0x6B66,0x5668)) },
+        @{ token = 'Entity|Prefab|prefab'; label = (New-TextFromCodePoints @(0x5B9E,0x4F53)) },
+        @{ token = 'GameCore'; label = 'GameCore' },
+        @{ token = 'Graph'; label = 'Graph' },
+        @{ token = 'Performance|性能'; label = (New-TextFromCodePoints @(0x6027,0x80FD)) },
+        @{ token = 'Security|安全'; label = (New-TextFromCodePoints @(0x5B89,0x5168)) }
+    )
+    $scored = @($rules | ForEach-Object {
+        $score = @([regex]::Matches($ContextText, $_.token, [Text.RegularExpressions.RegexOptions]::IgnoreCase)).Count
+        if ($score -gt 0) { [pscustomobject]@{ label = [string]$_.label; score = $score } }
+    } | Sort-Object score -Descending)
+    if ($scored.Count -eq 0) { return '' }
+    if ($scored.Count -gt 1 -and $scored[0].score -eq $scored[1].score -and $scored[0].label -ne $scored[1].label) { return (New-TextFromCodePoints @(0x591A,0x9886,0x57DF,0x5F85,0x786E,0x8BA4)) }
+    return [string]$scored[0].label
+}
+
 function Get-DefaultTabTitle([string]$Key, [string]$LaunchMode, [string]$ContextText = '') {
     $middleDot = [string][char]0x00B7
+    # Context is the highest-authority naming input. Responsibility keys are
+    # only fallback metadata and may never override a clear task context.
+    $contextLabel = Get-ContextDomainTitle -ContextText $ContextText
+    if (-not [string]::IsNullOrWhiteSpace($contextLabel)) { return 'ES' + $middleDot + $contextLabel }
+    $knownTitles = @{
+        'semantic-routing-governance' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x8BED,0x4E49,0x8DEF,0x7531,0x6CBB,0x7406))
+        'prompt-engineering' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x63D0,0x793A,0x8BCD,0x5305,0x88C5))
+        'prompt-wrapper' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x63D0,0x793A,0x8BCD,0x5305,0x88C5))
+        'es-codex-multilaunch' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x591A,0x7A97,0x53E3,0x7F16,0x6392))
+        'session-bootstrap-maintenance' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x4F1A,0x8BDD,0x5F15,0x5BFC,0x7EF4,0x62A4))
+        'aibrain-architecture' = 'ES' + $middleDot + 'AIBrain' + (New-TextFromCodePoints @(0x67B6,0x6784))
+        'session-context-review' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x4E0A,0x4E0B,0x6587,0x672C,0x5BA1,0x67E5))
+        'context-recycle' = 'ES' + $middleDot + (New-TextFromCodePoints @(0x4F1A,0x8BDD,0x518D,0x751F))
+    }
+    if ($knownTitles.ContainsKey($Key.ToLowerInvariant())) { return [string]$knownTitles[$Key.ToLowerInvariant()] }
     switch ($Key.ToLowerInvariant()) {
         'release-acceptance' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5DE5, 0x7A0B, 0x9A8C, 0x6536)) }
         'engineering-acceptance' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5DE5, 0x7A0B, 0x9A8C, 0x6536)) }
@@ -272,14 +322,81 @@ function Get-DefaultTabTitle([string]$Key, [string]$LaunchMode, [string]$Context
         'resource-pipeline' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x8D44, 0x6E90, 0x7BA1, 0x7EBF)) }
         'graph-audit' { return 'ES' + $middleDot + 'Graph' + (New-TextFromCodePoints @(0x5BA1, 0x8BA1)) }
     }
+    if ($Key -and $Key -ne 'default' -and (Test-ActionResponsibilityKey $Key)) {
+        return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5F85,0x5206,0x914D,0x804C,0x8D23))
+    }
     if ($Key -and $Key -ne 'default') {
         return 'ES' + $middleDot + (Get-ResponsibilityTitleLabel -Key $Key -ContextText $ContextText)
     }
-    switch ($LaunchMode) {
-        'Resume' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x6062, 0x590D)) }
-        'Fork' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5206, 0x53C9)) }
-        default { return 'ES' + $middleDot + 'Codex' }
+    if ($Key -and $Key -ne 'default') {
+        switch ($LaunchMode) {
+            'Resume' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5F85,0x8BC6,0x522B,0x804C,0x8D23)) }
+            'Fork' { return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5F85,0x8BC6,0x522B,0x804C,0x8D23)) }
+        }
     }
+    if ($Key -eq 'default') {
+        if (-not [string]::IsNullOrWhiteSpace($ContextText)) {
+            $contextRules = @(
+                @{ token = 'Manifest|Provider|' + (New-TextFromCodePoints @(0x8D44,0x6E90)) + '|' + (New-TextFromCodePoints @(0x6E05,0x5355)); label = (New-TextFromCodePoints @(0x8D44,0x6E90,0x7BA1,0x7EBF)) },
+                @{ token = (New-TextFromCodePoints @(0x8BED,0x4E49)) + '|' + (New-TextFromCodePoints @(0x8DEF,0x7531)) + '|P0'; label = (New-TextFromCodePoints @(0x8BED,0x4E49,0x8DEF,0x7531)) },
+                @{ token = 'UI|' + (New-TextFromCodePoints @(0x754C,0x9762)); label = 'UI' },
+                @{ token = (New-TextFromCodePoints @(0x4F1A,0x8BDD)) + '|' + (New-TextFromCodePoints @(0x4EA4,0x63A5)) + '|' + (New-TextFromCodePoints @(0x7A97,0x53E3)); label = (New-TextFromCodePoints @(0x4F1A,0x8BDD,0x4EA4,0x63A5)) },
+                @{ token = (New-TextFromCodePoints @(0x7F16,0x8BD1)) + '|C#'; label = (New-TextFromCodePoints @(0x7F16,0x8BD1)) }
+            )
+            $scored = @(
+                foreach ($contextRule in $contextRules) {
+                    $score = @([regex]::Matches($ContextText, $contextRule.token, [Text.RegularExpressions.RegexOptions]::IgnoreCase)).Count
+                    if ($score -gt 0) { [pscustomobject]@{ label = [string]$contextRule.label; score = $score } }
+                }
+            ) | Sort-Object score -Descending
+            $scored = @($scored)
+            if ($scored.Count -gt 0) {
+                $top = $scored[0]
+                $second = if ($scored.Count -gt 1) { $scored[1] } else { $null }
+                if ($second -and [int]$top.score -eq [int]$second.score -and [string]$top.label -ne [string]$second.label) {
+                    return 'ES' + $middleDot + (New-TextFromCodePoints @(0x591A,0x9886,0x57DF,0x5F85,0x786E,0x8BA4))
+                }
+                return 'ES' + $middleDot + [string]$top.label
+            }
+            $contextLabel = Get-ResponsibilityTitleLabel -Key '' -ContextText $ContextText
+            if (-not [string]::IsNullOrWhiteSpace($contextLabel) -and $contextLabel -ne (New-TextFromCodePoints @(0x804C,0x8D23))) {
+                return 'ES' + $middleDot + $contextLabel
+            }
+        }
+        return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5F85,0x5206,0x914D,0x804C,0x8D23))
+    }
+    return 'ES' + $middleDot + (New-TextFromCodePoints @(0x5F85,0x8BC6,0x522B,0x804C,0x8D23))
+}
+
+function Test-AbstractTabTitle([string]$Value) {
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $true }
+    $middleDot = [string][char]0x00B7
+    $bullet = [string][char]0x2022
+    $normalized = ($Value.Trim() -replace '\s+', '').Replace('.', '-').Replace($middleDot, '-').Replace($bullet, '-')
+    # Operation words describe the launch action, not the receiving duty. They
+    # must not survive as a tab title, even when explicitly supplied.
+    if ($normalized -match '^(?i:ES-?Codex|ES-?Framework|Codex|ES|Resume|Fork|Handoff|Handover|Close|Bootstrap)$') { return $true }
+    $operationTitles = @(
+        (New-TextFromCodePoints @(0x542F,0x52A8)),
+        (New-TextFromCodePoints @(0x6062,0x590D)),
+        (New-TextFromCodePoints @(0x5206,0x53C9)),
+        (New-TextFromCodePoints @(0x4EA4,0x63A5)),
+        (New-TextFromCodePoints @(0x5173,0x95ED))
+    )
+    return $operationTitles -contains $normalized
+}
+
+function Test-ActionResponsibilityKey([string]$Value) {
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    $normalized = ($Value.Trim() -replace '[\s_.-]+', '').ToLowerInvariant()
+    if ($normalized -match '^(handoff|handover|resume|fork|close|bootstrap|launch|start|restore|recycle|focus)$') { return $true }
+    return $normalized -in @(
+        (New-TextFromCodePoints @(0x542F,0x52A8)),
+        (New-TextFromCodePoints @(0x6062,0x590D)),
+        (New-TextFromCodePoints @(0x5206,0x53C9)),
+        (New-TextFromCodePoints @(0x4EA4,0x63A5)),
+        (New-TextFromCodePoints @(0x5173,0x95ED))
+    )
 }
 
 function Get-SafeTabTitle([string]$Value) {
@@ -938,13 +1055,32 @@ $effectiveTabTitle = $TabTitle.Trim()
 if ([string]::IsNullOrWhiteSpace($effectiveTabTitle) -and $null -ne $restoredEntry) {
     $effectiveTabTitle = [string]$restoredEntry.tabTitle
 }
-if ([string]::IsNullOrWhiteSpace($effectiveTabTitle)) {
-    $effectiveTabTitle = Get-DefaultTabTitle -Key $effectiveResponsibilityKey -LaunchMode $Mode -ContextText ($TaskPrompt + ' ' + $effectiveTaskKey)
+$normalizedTitle = (($effectiveTabTitle.Trim() -replace '\.', '-') -replace '\s+', '').Replace([string][char]0x00B7, '-')
+$abstractTitle = Test-AbstractTabTitle $effectiveTabTitle
+if ($abstractTitle) {
+    $handoffTitleContext = @($HandoffPath | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | ForEach-Object { Get-Content -LiteralPath $_ -Encoding UTF8 -TotalCount 40 -ErrorAction SilentlyContinue }) -join ' '
+    $effectiveTabTitle = Get-DefaultTabTitle -Key $effectiveResponsibilityKey -LaunchMode $Mode -ContextText ($TaskPrompt + ' ' + $effectiveTaskKey + ' ' + (@($HandoffPath) -join ' ') + ' ' + $handoffTitleContext)
 }
 $effectiveTabTitle = Get-SafeTabTitle $effectiveTabTitle
 $effectiveWindowName = Get-SafeWindowName $TerminalWindowName
 
 $handoffFiles = @(Resolve-HandoffFiles $resolvedProjectRoot $HandoffPath)
+$readOnlyContext = $null
+if (-not [string]::IsNullOrWhiteSpace($ReadOnlyContextPath)) {
+    $readOnlyRoot = Join-Path $localStateBase 'read-only-contexts'
+    $readOnlyFull = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $ReadOnlyContextPath -ErrorAction Stop).Path)
+    if (-not $readOnlyFull.StartsWith(([IO.Path]::GetFullPath($readOnlyRoot)).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'ReadOnlyContextPath must stay inside the private read-only context store.'
+    }
+    if (-not (Test-Path -LiteralPath $readOnlyFull -PathType Leaf)) { throw "Read-only context packet was not found: $readOnlyFull" }
+    $readOnlyContext = [pscustomobject]@{
+        relativePath = 'ES/AIReadOnlyContext/' + [IO.Path]::GetFileName($readOnlyFull)
+        absolutePath = $readOnlyFull
+        sha256 = Get-FileSha256 $readOnlyFull
+        length = (Get-Item -LiteralPath $readOnlyFull).Length
+    }
+}
+if ($null -ne $readOnlyContext) { $handoffFiles += $readOnlyContext }
 if ($HandoffMode -and $Mode -eq 'New') {
     Assert-HandoffResponsibility $effectiveResponsibilityKey $effectiveTabTitle $handoffFiles
 }
@@ -980,7 +1116,12 @@ $result = [ordered]@{
     taskKey = $effectiveTaskKey
     taskFingerprint = $taskFingerprint
     launchToken = $launchToken
+    contextAuthority = 'highest'
+    contextInjectionRequired = $true
     handoffFiles = $handoffFiles
+    readOnlyContext = $null -ne $readOnlyContext
+    resumeUsed = $Mode -in @('Resume', 'Fork')
+    crossAiResume = $false
     gitBranch = $gitSnapshot.branch
     gitHead = $gitSnapshot.head
     envelopePath = ''
@@ -1139,6 +1280,20 @@ try {
     $snapshotDirectoryName = [IO.Path]::GetFileNameWithoutExtension($envelopeName)
     $handoffSnapshotDirectory = Join-Path $handoffSnapshotRoot $snapshotDirectoryName
     $handoffFiles = @(New-HandoffSnapshots $handoffFiles $handoffSnapshotDirectory)
+    if ($null -ne $readOnlyContext) {
+        # A read-only restore must not expose its mutable source locator to the
+        # receiving AI. The private snapshot absolutePath is the sole consumable
+        # context source; sourceAbsolutePath is intentionally dropped.
+        $handoffFiles = @($handoffFiles | ForEach-Object {
+                [pscustomobject][ordered]@{
+                    relativePath = [string]$_.relativePath
+                    absolutePath = [string]$_.absolutePath
+                    sha256 = [string]$_.sha256
+                    length = [long]$_.length
+                    snapshot = $true
+                }
+            })
+    }
     $result.handoffFiles = $handoffFiles
     $result.handoffSnapshotDirectory = $handoffSnapshotDirectory
     $envelope = [ordered]@{
@@ -1155,9 +1310,16 @@ try {
         tabTitle = $effectiveTabTitle
         requestedSessionId = $SessionId
         taskPrompt = $TaskPrompt.Trim()
+        contextAuthority = 'highest'
+        contextInjectionRequired = $true
+        contextSources = @('taskPrompt','taskKey','responsibilityContext','handoffFiles.absolutePath')
+        taskDeliveryMode = if ($DeferTaskPrompt) { 'post-acceptance' } else { 'bootstrap-inline' }
         handoffMode = 'PerLaunchSnapshot'
         handoffSnapshotDirectory = $handoffSnapshotDirectory
         handoffFiles = $handoffFiles
+        readOnlyContext = $null -ne $readOnlyContext
+        resumeUsed = $Mode -in @('Resume', 'Fork')
+        crossAiResume = $false
         git = $gitSnapshot
         authorizationBoundary = 'Read initialization context first. Do not write history, audit state, Git, release, or delete without current explicit authorization.'
     }
@@ -1173,7 +1335,8 @@ try {
     }
     $result.envelopePath = $envelopePath
 
-    $initialPrompt = 'Run the ES launch-envelope validator at ' + $envelopeValidatorPath + ' against ' + $envelopePath + ' with LaunchToken ' + $launchToken + ' before using any handoff. A first-acceptance non-zero result is a hard context-drift failure; report it instead of silently switching context. This is a one-time acceptance gate, not a continuous runtime lease. After successful acceptance, later envelope loss does not stop the current conversation; continue only from already accepted transcript/context and never substitute another handoff source or claim fresh artifact verification. Consume only envelope.handoffFiles absolutePath values, which are private per-launch snapshots; never substitute their mutable sourceAbsolutePath values. Project Skills are rooted at ' + $projectSkillsRoot + '; for any handoff or Codex session operation, read ' + $sessionBootstrapSkillPath + ' before claiming no matching Skill exists, and do not treat global skill directories as authoritative for project Skill absence. Then read the project AGENTS.md first, followed by ES/AISpace/README.md for AI-content placement, the immutable envelope, AIWarnings README, CurrentStatus, RuleIndex, and matched task rules; do not claim a project concept is absent before checking AGENTS.md and its referenced authoritative README. Inspect branch, HEAD, and worktree read-only; report initialization and execute envelope.taskPrompt in Chinese. Before concluding that Unity is unavailable, inspect currently running Unity/UnityHub processes (including their executable paths, command lines, and window titles) and match the project path; an installed-path/PATH lookup alone is insufficient. Do not write history, audit state, Git, release, or delete without current explicit authorization. Launch token ' + $launchToken + '.'
+    $taskInstruction = if ($DeferTaskPrompt) { 'Do not execute envelope.taskPrompt during bootstrap. Wait for a post-acceptance task message from the orchestrator.' } else { 'Report initialization and execute envelope.taskPrompt in Chinese.' }
+    $initialPrompt = 'Run the ES launch-envelope validator at ' + $envelopeValidatorPath + ' against ' + $envelopePath + ' with LaunchToken ' + $launchToken + ' before using any handoff. A first-acceptance non-zero result is a hard context-drift failure; report it instead of silently switching context. This is a one-time acceptance gate, not a continuous runtime lease. After successful acceptance, later envelope loss does not stop the current conversation; continue only from already accepted transcript/context and never substitute another handoff source or claim fresh artifact verification. Consume only envelope.handoffFiles absolutePath values, which are private per-launch snapshots; never substitute their mutable sourceAbsolutePath values. Project Skills are rooted at ' + $projectSkillsRoot + '; for any handoff or Codex session operation, read ' + $sessionBootstrapSkillPath + ' before claiming no matching Skill exists, and do not treat global skill directories as authoritative for project Skill absence. Then read the project AGENTS.md first, followed by ES/AISpace/README.md for AI-content placement, the immutable envelope, AIWarnings README, CurrentStatus, RuleIndex, and matched task rules; do not claim a project concept is absent before checking AGENTS.md and its referenced authoritative README. Inspect branch, HEAD, and worktree read-only; ' + $taskInstruction + ' Before concluding that Unity is unavailable, inspect currently running Unity/UnityHub processes (including their executable paths, command lines, and window titles) and match the project path; an installed-path/PATH lookup alone is insufficient evidence of absence. Do not write history, audit state, Git, release, or delete without current explicit authorization. Launch token ' + $launchToken + '.'
 
     $codexArguments = [Collections.Generic.List[string]]::new()
     switch ($Mode) {

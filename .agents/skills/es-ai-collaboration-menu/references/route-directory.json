@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "directoryId": "es-ai-route-directory.v1",
+  "title": "ES AI 菜单分类目录",
+  "categories": [
+    {
+      "id": "super-semantics",
+      "label": "超级语义",
+      "description": "触发词、意图识别与复合任务分段",
+      "items": [
+        {"id":"super-semantics-trigger","label":"超级语义触发器","routeKey":"super-semantics","relatedSkills":["es-ai-interaction-governance"]},
+        {"id":"intent-routing","label":"意图识别与推荐","routeKey":"intent-routing","relatedSkills":["es-ai-collaboration-menu","es-aibrain-route-authoring"]},
+        {"id":"compound-routing","label":"复合任务分段","routeKey":"compound-intent","relatedSkills":["es-ai-interaction-governance"]}
+      ]
+    },
+    {
+      "id": "routes",
+      "label": "路由目录",
+      "description": "按目标选择 Skill、Knowledge 与 AIWarnings 入口",
+      "items": [
+        {"id":"route-create","label":"制作内容","routeKey":"creation","relatedSkills":["es-gamecore-integration","es-entity-authoring","es-ui-prefab-authoring"]},
+        {"id":"route-iterate","label":"迭代修复","routeKey":"iteration","relatedSkills":["es-first-principles-analysis","es-adversarial-review"]},
+        {"id":"route-govern","label":"框架治理","routeKey":"framework-governance","relatedSkills":["es-skill-governance","es-api-contract-review"]},
+        {"id":"route-validate","label":"验证验收","routeKey":"evidence","relatedSkills":["es-unity-compile","es-release-acceptance"]},
+        {"id":"route-discover","label":"发现上下文","routeKey":"context-discovery","relatedSkills":["es-knowledge-validator","es-aiwarning-authoring"]},
+        {"id":"route-session","label":"会话协作","routeKey":"session-coordination","relatedSkills":["es-codex-session-bootstrap"]}
+      ]
+    },
+    {
+      "id": "capabilities",
+      "label": "能力与边界",
+      "description": "查看可用 Skill、权限和证据边界",
+      "items": [
+        {"id":"capability-skills","label":"可用能力与 Skill","routeKey":"capability-discovery","relatedSkills":["es-skill-governance","es-skill-validator"]},
+        {"id":"capability-permissions","label":"权限与副作用边界","routeKey":"permission-boundary","relatedSkills":["es-ai-interaction-governance"]},
+        {"id":"capability-evidence","label":"证据等级与未证实项","routeKey":"evidence-boundary","relatedSkills":["es-release-acceptance"]}
+      ]
+    }
+  ]
+}

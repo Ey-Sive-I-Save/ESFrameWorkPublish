@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES AI Space Organization"
+  short_description: "统一 AI 生成内容的 Local/Public 目录归属"
+  default_prompt: "使用 es-ai-space-organization，按 ES/AISpace 与 Assets/ES/Space 规则整理 AI 生成内容"

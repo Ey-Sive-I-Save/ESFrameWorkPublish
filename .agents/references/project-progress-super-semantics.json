@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es.project-progress-super-semantics.v1",
+  "skillName": "es-ai-interaction-governance",
+  "purpose": "在项目推进分叉口强制重新确立用户指导，防止 AI 将否定、迭代或兼容请求自由扩展成未经确认的改动。",
+  "triggers": [
+    {
+      "id": "zero-score-realignment",
+      "label": "0分结果重对齐",
+      "triggerPhrases": ["0分", "零分"],
+      "operation": "DeepUserRealignment",
+      "requiresUserChoice": true,
+      "routeKeys": ["feedback-zero", "goal-realignment", "user-guidance"],
+      "nextStage": "user-guidance-confirmation",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": ["当前结果哪里不合格？", "下一步必须达到什么可观察结果？", "哪些范围明确禁止 AI 自由发挥？"]
+    },
+    {
+      "id": "iteration-fork",
+      "label": "迭代推进分叉",
+      "triggerPhrases": ["迭代", "迭代一下", "继续迭代"],
+      "operation": "DeepUserRealignment",
+      "requiresUserChoice": true,
+      "excludePhrases": ["迭代器"],
+      "routeKeys": ["iteration", "goal-realignment", "user-guidance"],
+      "nextStage": "iteration-scope-confirmation",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": ["本轮迭代目标是什么？", "只允许改动哪些范围？", "本轮验收信号是什么？"]
+    },
+    {
+      "id": "compatibility-fork",
+      "label": "兼容性推进分叉",
+      "triggerPhrases": ["兼容", "兼容一下", "兼容性"],
+      "excludePhrases": ["兼容性是什么意思", "兼容性是什么", "兼容是什么意思", "兼容性概念"],
+      "operation": "DeepUserRealignment",
+      "requiresUserChoice": true,
+      "routeKeys": ["compatibility", "goal-realignment", "user-guidance"],
+      "nextStage": "compatibility-scope-confirmation",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": ["需要兼容哪个对象、版本或宿主？", "兼容范围和不兼容范围是什么？", "如何验收兼容结果？"]
+    }
+  ]
+}

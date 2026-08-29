@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Mechanism Replication"
+  short_description: "Map six Agent mechanisms into a gated ES contract loop"
+  default_prompt: "Use $es-agent-mechanism-replication to map a public Agent mechanism into an evidence-gated ES RoutePlan and closed-loop acceptance."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Weapon ABC Part"
+  short_description: "Build a bounded weapon ABC domain part"
+  default_prompt: "Use es-weapon-abc-part to compose a bounded Weapon ABCP from the ABCC Core contract."

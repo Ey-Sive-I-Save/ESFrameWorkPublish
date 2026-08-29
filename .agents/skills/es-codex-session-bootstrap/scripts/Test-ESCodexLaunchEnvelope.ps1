@@ -122,7 +122,10 @@ foreach ($handoff in @($envelope.handoffFiles)) {
     $sourcePath = [string]$handoff.sourceAbsolutePath
     $sourceExists = -not [string]::IsNullOrWhiteSpace($sourcePath) -and (Test-Path -LiteralPath $sourcePath -PathType Leaf)
     $currentSourceHash = if ($sourceExists) { Get-FileSha256 $sourcePath } else { '' }
-    $sourceDrift = (-not $sourceExists) -or $currentSourceHash -ne [string]$handoff.sourceSha256AtSnapshot
+    # Read-only context envelopes intentionally omit sourceAbsolutePath so the
+    # receiver cannot fall back to a mutable source. No locator means drift is
+    # not assessed, rather than falsely reporting drift.
+    $sourceDrift = if ([string]::IsNullOrWhiteSpace($sourcePath)) { $false } else { (-not $sourceExists) -or $currentSourceHash -ne [string]$handoff.sourceSha256AtSnapshot }
     $handoffResults += [pscustomobject]@{
         relativePath = [string]$handoff.relativePath
         absolutePath = $path

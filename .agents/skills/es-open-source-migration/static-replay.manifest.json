@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-open-source-migration",
+  "sourceRoots": [".agents/skills/es-open-source-migration", "ES/AISpace/Public/es-open-source-migration"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["structure", "governance", "mapping-schema", "isolation-boundary", "deterministic-replay", "evidence-contract"],
+  "runtimeClaimsNotProven": ["network checkout", "Unity/editor behavior", "timing and process behavior", "Player/IL2CPP/release behavior"],
+  "runtimeEscalation": {"required": false, "reason": "External checkout and Unity behavior require separate explicit authorization."},
+  "caseAssertions": {
+    "normal-input": "required Skill files and persistent map are present",
+    "invalid-input": "missing or malformed source inputs are rejected",
+    "denied-expansion": "protected target and external side effects remain denied",
+    "repeat-idempotency": "same map revision yields stable output",
+    "hash-change-cache-invalidation": "source or target drift marks mapping stale",
+    "interruption-recovery": "interrupted batch preserves target and recovery state",
+    "deterministic-output": "stable sorting and partitioning are declared"
+  },
+  "responsibilityProfile": "engineering",
+  "responsibilityChecks": ["input-boundary", "recovery-cache", "deterministic-replay", "evidence-contract"],
+  "responsibilityScope": "Static acceptance for isolated external-source migration planning: input and permission boundaries, deterministic mapping replay, interruption recovery, and evidence receipts. It does not authorize checkout, target mutation, Unity execution, or release behavior.",
+  "specializedAcceptance": {
+    "id": "external-migration-static",
+    "title": "isolated external migration static gate",
+    "requiredStaticCases": ["path-containment", "mapping-schema", "permission-denial", "partition-determinism", "recovery-state"],
+    "evidenceArtifacts": ["SKILL.md", "governance.json", "references/migration-map.schema.json", "references/static-replay-adapter.md"],
+    "sourceAssertions": ["external-only", "protected-target", "mapping", "deterministic", "recovery"],
+    "runtimeBoundary": "Static acceptance proves contracts and deterministic checks only; checkout, Unity and release behavior remain unverified."
+  },
+  "specializedGuidanceRef": "references/static-replay-adapter.md"
+}

@@ -123,10 +123,26 @@ each declared focal asset. Each pair must declare the same non-empty `rootPath`,
 finite `scaler.match` in `[0, 1]`),
 the exact profile `viewport`, matching runtime `screenWidth/screenHeight`, and an equal set of unique
 semantic paths below the declared root. For every shared path, both snapshots must declare boolean
-`active` values that agree, and the editor `screenRect` must equal the UI `screenX`, `screenY`,
-`screenWidth` and `screenHeight` within 0.01 pixels; missing, non-finite or negative geometry blocks
-the pair. Its receipt validates serialized JSON consistency only; it does not prove the Unity process,
-persisted assets, final UGUI rebuild, PNG pixels or rendered visual quality.
+`active` values that agree, matching `parentPath`, `siblingIndex`, `anchorMin`, `anchorMax` and `pivot`,
+and editor `screenRect` must equal UI `screenX`, `screenY`, `screenWidth` and `screenHeight` within
+0.01 pixels. Every element serializes matching `layoutGroup`/`contentSizeFitter` controller state;
+the gate rejects a parent LayoutGroup and child ContentSizeFitter that actively control the same
+width or height axis. Every runtime rectangle must remain inside the declared profile viewport. An active
+`hasButton` node with an `interactionTarget` must meet that declared minimum width and height in its
+resolved runtime rectangle. Every element also serializes matching `visibility` and
+`inputReachability`: the active Mask/RectMask2D ancestor path, RectMask2D-visible intersection and
+fraction, non-rectangular Mask uncertainty, CanvasGroup chain, and a conservative same-parent opaque
+Graphic blocker. An active, interactable Button with an interaction target must retain that target's
+minimum dimensions in the visible RectMask2D intersection, pass its CanvasGroup chain, and have no
+same-parent raycast blocker. A decorative Graphic with `raycastTarget: false` is not a blocker.
+An active non-rectangular Mask ancestor is intentionally `runtime-not-proven`, because snapshot
+geometry cannot prove its stencil pixels or EventSystem hit result. Parent containment is not universal:
+tooltips, overlays and intentional clipped effects may exceed their parent bounds when their own
+viewport constraint still holds. Missing, non-finite or negative geometry blocks the pair. Its receipt
+validates serialized JSON consistency only; it does not prove the Unity process,
+it does not prove the Unity process,
+persisted assets, final UGUI rebuild, PNG pixels or rendered visual quality. Axis ownership is a
+serialized controller check, not proof of a stable final UGUI rebuild.
 `scripts/validate_ui_gpu_evidence.py` then re-reads each PNG and requires it to match both snapshot
 `capture` objects: file name, SHA-256, byte length, dimensions, alpha coverage, sampled color buckets,
 edge transitions and RGBA extrema. Transparent, uniform and zero-edge frames are blocked. This is an

@@ -24,6 +24,10 @@ Knowledge/Skills, or managing collaboration.
   mark the matching option as recommended; do not silently execute that domain.
 - Numeric replies are selections only. Resolve them through the current menu output;
   never infer a missing number or dispatch an action in this Skill.
+- The output also exposes `routeDirectory`, a stable categorized directory for
+  超级语义、路由、能力与边界. Users may select a visible main/submenu number, or
+  an `Rcategory.item` directory number (for example `R2.4`); selection only returns
+  a route descriptor and never executes it.
 
 ## Inputs
 
@@ -54,18 +58,28 @@ The current context can change labels/reasons and ordering only through the decl
 deterministic rules. Every item includes a stable `id`, number, label, reason, risk,
 required Skill/Knowledge route, and `requiresUserChoice=true`.
 
-The six options are:
+The seven options are:
 
 1. `create-content` — create ES content or an asset-facing feature;
 2. `iterate-feature` — diagnose and improve an existing implementation;
 3. `govern-framework` — review architecture, contracts, lifecycle, or boundaries;
 4. `validate-evidence` — compile, static, runtime, acceptance, or release evidence;
 5. `discover-context` — select bounded Skills, Knowledge, and AIWarnings routes;
-6. `coordinate-session` — session, window handoff, mailbox, or collaboration routing.
+6. `coordinate-session` — session, window handoff, mailbox, or collaboration routing;
+7. `ai-mechanism-atlas` — super-semantics, available capabilities, permission boundaries,
+   evidence levels, and public Agent mechanism adapters.
+
+The `ai-mechanism-atlas` submenu is a read-only guide. It may explain trigger phrases,
+route to a Skill, or describe evidence and permission boundaries, but it never executes
+the described capability. Its entries are defined in `references/menu-submenus.json`.
 
 Every visible sequence number uses the full-width bracket form `【n】`. This applies
 to both the main menu and the coordination submenu; numeric replies remain choices,
 never direct execution commands.
+
+The categorized route directory is always emitted, including when the user only
+says `菜单`; this makes the AI menu discoverable instead of requiring the user to
+know the hidden atlas submenu first.
 
 The coordination submenu must keep these capabilities separate: `Fork` copies a
 confirmed session context; `Handoff` transfers a bounded task to a new window through

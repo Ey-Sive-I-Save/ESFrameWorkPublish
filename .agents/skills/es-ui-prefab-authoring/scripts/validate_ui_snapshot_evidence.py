@@ -176,8 +176,205 @@ def validate_runtime_viewport_and_interaction(target: dict[str, Any], target_rec
     return valid
 
 
+def intersect_rects(left: tuple[float, float, float, float], right: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    min_x, min_y = max(left[0], right[0]), max(left[1], right[1])
+    max_x, max_y = min(left[0] + left[2], right[0] + right[2]), min(left[1] + left[3], right[1] + right[3])
+    return min_x, min_y, max(0.0, max_x - min_x), max(0.0, max_y - min_y)
+
+
+def rects_match(left: tuple[float, float, float, float], right: tuple[float, float, float, float], tolerance: float = 0.01) -> bool:
+    return all(abs(source - target) <= tolerance for source, target in zip(left, right))
+
+
+def validate_visibility_snapshot(element: dict[str, Any], target_rect: tuple[float, float, float, float], path: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if "visibility" not in element or not isinstance(element.get("visibility"), dict):
+        issues.append({"code": "snapshot-visibility-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "visibility"})
+        return None
+    visibility = element["visibility"]
+    clips = visibility.get("clipAncestors")
+    visible_rect = finite_rect(visibility.get("visibleRect"), ("x", "y", "width", "height"))
+    fraction = visibility.get("visibleFraction")
+    has_non_rect_mask = visibility.get("hasNonRectMaskAncestor")
+    if not isinstance(clips, list) or visible_rect is None or visible_rect[2] < 0 or visible_rect[3] < 0 or isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not math.isfinite(float(fraction)) or float(fraction) < 0.0 or float(fraction) > 1.0 or not isinstance(has_non_rect_mask, bool):
+        issues.append({"code": "snapshot-visibility-invalid", "profileId": profile_id, "stateId": state_id, "path": path})
+        return None
+    expected_visible = target_rect
+    active_non_rect_mask = False
+    clip_paths: set[tuple[str, str]] = set()
+    for index, clip in enumerate(clips):
+        clip_path = f"visibility.clipAncestors[{index}]"
+        if not isinstance(clip, dict) or not isinstance(clip.get("path"), str) or not clip["path"] or clip.get("type") not in {"Mask", "RectMask2D"} or not isinstance(clip.get("enabled"), bool):
+            issues.append({"code": "snapshot-visibility-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": clip_path})
+            continue
+        key = (clip["path"], clip["type"])
+        if key in clip_paths:
+            issues.append({"code": "snapshot-visibility-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": clip_path, "message": "duplicate clipping ancestor"})
+        clip_paths.add(key)
+        clip_rect = finite_rect(clip.get("screenRect"), ("x", "y", "width", "height"))
+        if clip_rect is None or clip_rect[2] < 0 or clip_rect[3] < 0:
+            issues.append({"code": "snapshot-visibility-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": clip_path + ".screenRect"})
+            continue
+        if clip["type"] == "RectMask2D" and clip["enabled"] is True:
+            expected_visible = intersect_rects(expected_visible, clip_rect)
+        if clip["type"] == "Mask" and clip["enabled"] is True:
+            active_non_rect_mask = True
+    if active_non_rect_mask != has_non_rect_mask:
+        issues.append({"code": "snapshot-visibility-mask-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "declared": has_non_rect_mask, "expected": active_non_rect_mask})
+    if visible_rect[0] < target_rect[0] - 0.01 or visible_rect[1] < target_rect[1] - 0.01 or visible_rect[0] + visible_rect[2] > target_rect[0] + target_rect[2] + 0.01 or visible_rect[1] + visible_rect[3] > target_rect[1] + target_rect[3] + 0.01 or not rects_match(visible_rect, expected_visible):
+        issues.append({"code": "snapshot-visible-rect-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "declared": visible_rect, "expected": expected_visible})
+    target_area = max(0.0, target_rect[2]) * max(0.0, target_rect[3])
+    expected_fraction = 0.0 if target_area <= 0.0001 else max(0.0, expected_visible[2]) * max(0.0, expected_visible[3]) / target_area
+    if abs(float(fraction) - expected_fraction) > 0.0001:
+        issues.append({"code": "snapshot-visible-fraction-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "declared": float(fraction), "expected": expected_fraction})
+    return {"visibleRect": visible_rect, "visibleFraction": float(fraction), "hasNonRectMaskAncestor": has_non_rect_mask}
+
+
+def validate_input_reachability_snapshot(element: dict[str, Any], visibility: dict[str, Any] | None, path: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> dict[str, Any] | None:
+    reachability = element.get("inputReachability")
+    if not isinstance(reachability, dict):
+        issues.append({"code": "snapshot-input-reachability-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "inputReachability"})
+        return None
+    groups = reachability.get("canvasGroupChain")
+    required_bools = ("inputAllowedByCanvasGroups", "visibleByCanvasGroups", "reachable")
+    if not isinstance(groups, list) or any(not isinstance(reachability.get(field), bool) for field in required_bools) or (reachability.get("raycastBlocker") is not None and not isinstance(reachability.get("raycastBlocker"), dict)):
+        issues.append({"code": "snapshot-input-reachability-invalid", "profileId": profile_id, "stateId": state_id, "path": path})
+        return None
+    input_allowed, visible_by_groups = True, True
+    stop_ancestors = False
+    for index, group in enumerate(groups):
+        group_path = f"inputReachability.canvasGroupChain[{index}]"
+        if not isinstance(group, dict) or not isinstance(group.get("path"), str) or not group["path"] or any(not isinstance(group.get(field), bool) for field in ("enabled", "interactable", "blocksRaycasts", "ignoreParentGroups")):
+            issues.append({"code": "snapshot-input-reachability-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": group_path})
+            continue
+        alpha = group.get("alpha")
+        if isinstance(alpha, bool) or not isinstance(alpha, (int, float)) or not math.isfinite(float(alpha)) or float(alpha) < 0.0 or float(alpha) > 1.0:
+            issues.append({"code": "snapshot-input-reachability-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": group_path + ".alpha"})
+            continue
+        if stop_ancestors:
+            issues.append({"code": "snapshot-input-reachability-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": group_path, "message": "CanvasGroup chain continues after ignoreParentGroups"})
+        if group["enabled"]:
+            input_allowed &= group["interactable"] and group["blocksRaycasts"]
+            visible_by_groups &= float(alpha) > 0.001
+            stop_ancestors = group["ignoreParentGroups"]
+    blocker = reachability.get("raycastBlocker")
+    if isinstance(blocker, dict):
+        blocker_rect = finite_rect(blocker.get("screenRect"), ("x", "y", "width", "height"))
+        if not isinstance(blocker.get("path"), str) or not blocker["path"] or isinstance(blocker.get("siblingIndex"), bool) or not isinstance(blocker.get("siblingIndex"), int) or blocker["siblingIndex"] < 0 or blocker.get("reason") != "same-parent-opaque-graphic" or blocker_rect is None or blocker_rect[2] < 0 or blocker_rect[3] < 0:
+            issues.append({"code": "snapshot-input-reachability-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "inputReachability.raycastBlocker"})
+    expected_reachable = input_allowed and visible_by_groups and visibility is not None and visibility["visibleFraction"] > 0.001 and blocker is None
+    if reachability["inputAllowedByCanvasGroups"] != input_allowed or reachability["visibleByCanvasGroups"] != visible_by_groups or reachability["reachable"] != expected_reachable:
+        issues.append({"code": "snapshot-input-reachability-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "declared": {field: reachability[field] for field in required_bools}, "expected": {"inputAllowedByCanvasGroups": input_allowed, "visibleByCanvasGroups": visible_by_groups, "reachable": expected_reachable}})
+    return reachability
+
+
+def validate_interactive_visibility(target: dict[str, Any], visibility: dict[str, Any] | None, reachability: dict[str, Any] | None, path: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> bool:
+    if target.get("active") is not True or target.get("hasButton") is not True or target.get("interactable") is not True or target.get("interactionTarget") is None:
+        return True
+    minimum = finite_pair(target.get("interactionTarget"))
+    if minimum is None or visibility is None or reachability is None:
+        return False
+    visible_rect = visibility["visibleRect"]
+    valid = True
+    if visible_rect[2] + 0.01 < minimum[0] or visible_rect[3] + 0.01 < minimum[1]:
+        issues.append({"code": "snapshot-interaction-visible-size", "profileId": profile_id, "stateId": state_id, "path": path, "actualVisible": [visible_rect[2], visible_rect[3]], "minimum": minimum})
+        valid = False
+    if visibility["hasNonRectMaskAncestor"]:
+        issues.append({"code": "snapshot-interaction-nonrect-mask-unproven", "profileId": profile_id, "stateId": state_id, "path": path, "message": "an interactive target under Mask needs runtime raycast evidence"})
+        valid = False
+    if reachability.get("raycastBlocker") is not None:
+        issues.append({"code": "snapshot-interaction-raycast-blocked", "profileId": profile_id, "stateId": state_id, "path": path, "blocker": reachability.get("raycastBlocker")})
+        valid = False
+    if reachability.get("reachable") is not True:
+        issues.append({"code": "snapshot-interaction-unreachable", "profileId": profile_id, "stateId": state_id, "path": path})
+        valid = False
+    return valid
+
+
+def validate_snapshot_tree_integrity(elements_by_path: dict[str, dict[str, Any]], root_path: str, kind: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> None:
+    sibling_paths: dict[tuple[str, int], list[str]] = {}
+    for path, element in elements_by_path.items():
+        parent_path, sibling_index = element.get("parentPath"), element.get("siblingIndex")
+        if not isinstance(parent_path, str) or not parent_path or isinstance(sibling_index, bool) or not isinstance(sibling_index, int) or sibling_index < 0:
+            continue
+        if path != root_path and parent_path != root_path and parent_path not in elements_by_path:
+            issues.append({"code": "snapshot-parent-path-missing", "profileId": profile_id, "stateId": state_id, "snapshot": kind, "path": path, "parentPath": parent_path})
+        sibling_paths.setdefault((parent_path, sibling_index), []).append(path)
+    for (parent_path, sibling_index), paths in sorted(sibling_paths.items()):
+        if len(paths) > 1:
+            issues.append({"code": "snapshot-sibling-index-duplicate", "profileId": profile_id, "stateId": state_id, "snapshot": kind, "parentPath": parent_path, "siblingIndex": sibling_index, "paths": sorted(paths)})
+
+
+def layout_axis_control(value: Any, path: str, field: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> tuple[bool, bool] | None:
+    if not isinstance(value, dict) or not isinstance(value.get("x"), bool) or not isinstance(value.get("y"), bool):
+        issues.append({"code": "snapshot-layout-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": field})
+        return None
+    return value["x"], value["y"]
+
+
+def validate_layout_snapshot(element: dict[str, Any], path: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> tuple[bool, bool] | None:
+    """Return the axes actively sized by this node's ContentSizeFitter."""
+    if "layout" not in element:
+        issues.append({"code": "snapshot-layout-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "layout", "message": "controller evidence is required for every snapshot element"})
+        return None
+    layout = element.get("layout")
+    if layout is None:
+        return False, False
+    if not isinstance(layout, dict) or set(("layoutGroup", "contentSizeFitter")) - set(layout):
+        issues.append({"code": "snapshot-layout-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "layout"})
+        return None
+    group = layout.get("layoutGroup")
+    if group is not None:
+        if not isinstance(group, dict) or not isinstance(group.get("type"), str) or not group["type"] or not isinstance(group.get("enabled"), bool):
+            issues.append({"code": "snapshot-layout-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "layout.layoutGroup"})
+        else:
+            child_axes = layout_axis_control(group.get("childAxisControl"), path, "layout.layoutGroup.childAxisControl", profile_id, state_id, issues)
+            if child_axes is not None and not group["enabled"] and any(child_axes):
+                issues.append({"code": "snapshot-layout-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "layout.layoutGroup.childAxisControl", "message": "disabled LayoutGroup cannot control a child axis"})
+    fitter = layout.get("contentSizeFitter")
+    if fitter is None:
+        return False, False
+    if not isinstance(fitter, dict) or not isinstance(fitter.get("enabled"), bool) or fitter.get("horizontalFit") not in {"Unconstrained", "MinSize", "PreferredSize"} or fitter.get("verticalFit") not in {"Unconstrained", "MinSize", "PreferredSize"}:
+        issues.append({"code": "snapshot-layout-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": "layout.contentSizeFitter"})
+        return None
+    self_axes = layout_axis_control(fitter.get("selfAxisControl"), path, "layout.contentSizeFitter.selfAxisControl", profile_id, state_id, issues)
+    if self_axes is None:
+        return None
+    expected_axes = (
+        fitter["enabled"] and fitter["horizontalFit"] != "Unconstrained",
+        fitter["enabled"] and fitter["verticalFit"] != "Unconstrained",
+    )
+    if self_axes != expected_axes:
+        issues.append({"code": "snapshot-layout-fitter-axis-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "declared": self_axes, "expected": expected_axes})
+    return self_axes
+
+
+def validate_snapshot_layout_ownership(elements_by_path: dict[str, dict[str, Any]], kind: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> int:
+    """Reject two active UGUI layout controllers for the same child RectTransform axis."""
+    fitter_axes: dict[str, tuple[bool, bool]] = {}
+    for path, element in elements_by_path.items():
+        axes = validate_layout_snapshot(element, path, profile_id, state_id, issues)
+        if axes is not None:
+            fitter_axes[path] = axes
+    checked = 0
+    for path, (fitter_x, fitter_y) in fitter_axes.items():
+        parent_path = elements_by_path[path].get("parentPath")
+        parent = elements_by_path.get(parent_path) if isinstance(parent_path, str) else None
+        parent_layout = parent.get("layout") if isinstance(parent, dict) else None
+        group = parent_layout.get("layoutGroup") if isinstance(parent_layout, dict) else None
+        if not isinstance(group, dict) or group.get("enabled") is not True:
+            continue
+        child_axes = layout_axis_control(group.get("childAxisControl"), parent_path, "layout.layoutGroup.childAxisControl", profile_id, state_id, issues)
+        if child_axes is None:
+            continue
+        checked += 1
+        for axis, parent_controls, fitter_controls in (("x", child_axes[0], fitter_x), ("y", child_axes[1], fitter_y)):
+            if parent_controls and fitter_controls:
+                issues.append({"code": "snapshot-layout-axis-conflict", "profileId": profile_id, "stateId": state_id, "snapshot": kind, "path": path, "parentPath": parent_path, "axis": axis, "controllers": ["parent-layout-group", "self-content-size-fitter"]})
+    return checked
+
+
 def validate_snapshot_geometry_pair(editor: dict[str, Any], runtime: dict[str, Any], profile_id: str, state_id: str, expected: tuple[int, int] | None, issues: list[dict[str, Any]]) -> dict[str, Any]:
-    evidence: dict[str, Any] = {"checkedElementCount": 0, "checkedStructuralElementCount": 0, "checkedInteractionTargetCount": 0, "status": "passed"}
+    evidence: dict[str, Any] = {"checkedElementCount": 0, "checkedStructuralElementCount": 0, "checkedInteractionTargetCount": 0, "checkedVisibleInteractionTargetCount": 0, "checkedLayoutOwnershipCount": 0, "checkedVisibilityCount": 0, "checkedInputReachabilityCount": 0, "status": "passed"}
     issue_count_before_geometry = len(issues)
     if expected is None:
         issues.append({"code": "snapshot-profile-viewport", "profileId": profile_id, "stateId": state_id, "message": "profile must provide positive integer width and height"})
@@ -203,6 +400,11 @@ def validate_snapshot_geometry_pair(editor: dict[str, Any], runtime: dict[str, A
     editor_paths, runtime_paths = set(editor_by_path), set(runtime_by_path)
     if editor_paths != runtime_paths:
         issues.append({"code": "snapshot-element-path-set", "profileId": profile_id, "stateId": state_id, "missingFromUi": sorted(editor_paths - runtime_paths), "missingFromEditor": sorted(runtime_paths - editor_paths)})
+    if isinstance(editor_root_path, str) and editor_root_path:
+        validate_snapshot_tree_integrity(editor_by_path, editor_root_path, "editor", profile_id, state_id, issues)
+    if isinstance(runtime_root_path, str) and runtime_root_path:
+        validate_snapshot_tree_integrity(runtime_by_path, runtime_root_path, "ui", profile_id, state_id, issues)
+    evidence["checkedLayoutOwnershipCount"] = validate_snapshot_layout_ownership(runtime_by_path, "ui", profile_id, state_id, issues)
     for path in sorted(editor_paths & runtime_paths):
         source, target = editor_by_path[path], runtime_by_path[path]
         if not isinstance(editor_root_path, str) or not editor_root_path or path != editor_root_path and not path.startswith(editor_root_path + "/"):
@@ -220,11 +422,29 @@ def validate_snapshot_geometry_pair(editor: dict[str, Any], runtime: dict[str, A
             issues.append({"code": "snapshot-active-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("active"), "ui": target.get("active")})
         if source.get("interactionTarget") != target.get("interactionTarget"):
             issues.append({"code": "snapshot-interaction-target-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("interactionTarget"), "ui": target.get("interactionTarget")})
+        if source.get("layout") != target.get("layout"):
+            issues.append({"code": "snapshot-layout-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("layout"), "ui": target.get("layout")})
+        validate_layout_snapshot(source, path, profile_id, state_id, issues)
+        if source.get("visibility") != target.get("visibility"):
+            issues.append({"code": "snapshot-visibility-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("visibility"), "ui": target.get("visibility")})
+        source_visibility = validate_visibility_snapshot(source, source_rect, path, profile_id, state_id, issues)
+        target_visibility = validate_visibility_snapshot(target, target_rect, path, profile_id, state_id, issues)
+        if source_visibility is not None and target_visibility is not None:
+            evidence["checkedVisibilityCount"] += 1
+        if source.get("inputReachability") != target.get("inputReachability"):
+            issues.append({"code": "snapshot-input-reachability-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("inputReachability"), "ui": target.get("inputReachability")})
+        validate_input_reachability_snapshot(source, source_visibility, path, profile_id, state_id, issues)
+        target_reachability = validate_input_reachability_snapshot(target, target_visibility, path, profile_id, state_id, issues)
+        if target_reachability is not None:
+            evidence["checkedInputReachabilityCount"] += 1
         if isinstance(editor_root_path, str) and editor_root_path and validate_snapshot_structure_pair(source, target, path, editor_root_path, profile_id, state_id, issues):
             evidence["checkedStructuralElementCount"] += 1
         if expected is not None and validate_runtime_viewport_and_interaction(target, target_rect, path, profile_id, state_id, expected, issues):
             if target.get("active") is True and target.get("hasButton") is True and target.get("interactionTarget") is not None:
                 evidence["checkedInteractionTargetCount"] += 1
+        if validate_interactive_visibility(target, target_visibility, target_reachability, path, profile_id, state_id, issues):
+            if target.get("active") is True and target.get("hasButton") is True and target.get("interactable") is True and target.get("interactionTarget") is not None:
+                evidence["checkedVisibleInteractionTargetCount"] += 1
         evidence["checkedElementCount"] += 1
     if len(issues) > issue_count_before_geometry:
         evidence["status"] = "blocked"

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$ProjectRoot,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$StrictCompleteness
 )
 
 $ErrorActionPreference = 'Stop'
@@ -238,6 +239,30 @@ else {
         }
         else {
             $catalogEntries = @($catalog.commands)
+            $abc = $catalog.contractStandard.abcBindingProjection
+            $requiredAbcCapabilities = @('bounded-tool-action','failure-recovery','branch-evaluation','state-transition-guard','environment-trust-gate','audit-evidence-chain')
+            if ($null -eq $abc -or [string]$abc.providerId -ne 'es-ai-command' -or [string]$abc.fallback -ne 'explicit-only') {
+                $catalogErrors.Add('Catalog abcBindingProjection is missing or has an unsafe provider/fallback.')
+            }
+            else {
+                foreach ($capability in $requiredAbcCapabilities) {
+                    if (@($abc.allowedCapabilities) -notcontains $capability) {
+                        $catalogErrors.Add("Catalog abcBindingProjection is missing capability: $capability")
+                    }
+                }
+                if ([string]$abc.missingCapabilityDisposition -ne 'blocked' -or
+                    [string]$abc.semanticMismatchDisposition -ne 'replan' -or
+                    [string]$abc.missingEvidenceDisposition -ne 'claim-cap') {
+                    $catalogErrors.Add('Catalog abcBindingProjection dispositions must be blocked/replan/claim-cap.')
+                }
+                $profileModes = @('read-only','candidate-only','documentation-write','scoped-write','external-run')
+                foreach ($mode in $profileModes) {
+                    $binding = @($abc.profileBindings | Where-Object { [string]$_.writeMode -eq $mode })
+                    if ($binding.Count -ne 1 -or @($binding[0].requiredCapabilities).Count -eq 0) {
+                        $catalogErrors.Add("Catalog abcBindingProjection is missing profile binding: $mode")
+                    }
+                }
+            }
         }
     }
     catch {
@@ -291,7 +316,62 @@ foreach ($entry in $catalogEntries) {
     }
 }
 
+# Keep the human navigation index closed over the machine catalog. Read complete lines
+# so filenames containing spaces remain intact.
+$navigationFileName = [string]::Concat(([int[]](21629,20196,21512,38598,32034,24341,95,65,73,21629,20196,46,109,100) | ForEach-Object { [char]$_ }))
+$navigationRelativePath = 'Assets/Plugins/ES/AICommands/' + $navigationFileName
+$navigationPath = Join-Path $ProjectRoot ($navigationRelativePath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+if (-not (Test-Path -LiteralPath $navigationPath -PathType Leaf)) {
+    $catalogErrors.Add("Navigation index does not exist: $navigationRelativePath")
+}
+else {
+    try {
+        $navigationText = $strictUtf8.GetString([IO.File]::ReadAllBytes($navigationPath))
+        $navigationPaths = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+        foreach ($line in ($navigationText -split "`r?`n")) {
+            $candidate = $line.Trim()
+            if ($candidate -match '^Assets/Plugins/ES/AICommands/.+\.md$' -and
+                $candidate -ne 'Assets/Plugins/ES/AICommands/README.md' -and
+                $candidate -ne $navigationRelativePath) {
+                if (-not $navigationPaths.Add($candidate)) {
+                    $catalogErrors.Add("Navigation index contains a duplicate contract path: $candidate")
+                }
+            }
+        }
+        foreach ($catalogPathEntry in $catalogPaths) {
+            if (-not $navigationPaths.Contains($catalogPathEntry)) {
+                $catalogErrors.Add("Navigation index is missing catalog contract: $catalogPathEntry")
+            }
+        }
+        foreach ($navigationPathEntry in $navigationPaths) {
+            if (-not $catalogPaths.Contains($navigationPathEntry)) {
+                $catalogErrors.Add("Navigation index references a non-catalog contract: $navigationPathEntry")
+            }
+        }
+        if ($catalogPaths.Count -gt 0) {
+            $probePath = @($catalogPaths)[0]
+            $probeMissing = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            foreach ($pathEntry in $navigationPaths) {
+                if ($pathEntry -ne $probePath) { [void]$probeMissing.Add($pathEntry) }
+            }
+            if (@($catalogPaths | Where-Object { -not $probeMissing.Contains($_) }).Count -eq 0) {
+                $catalogErrors.Add('Navigation index negative probe failed to detect a missing catalog contract.')
+            }
+            $probeExtra = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            foreach ($pathEntry in $navigationPaths) { [void]$probeExtra.Add($pathEntry) }
+            [void]$probeExtra.Add('Assets/Plugins/ES/AICommands/__negative_probe__.md')
+            if (@($probeExtra | Where-Object { -not $catalogPaths.Contains($_) }).Count -eq 0) {
+                $catalogErrors.Add('Navigation index negative probe failed to detect a non-catalog contract.')
+            }
+        }
+    }
+    catch {
+        $catalogErrors.Add("Navigation index strict UTF-8 read failed: $($_.Exception.Message)")
+    }
+}
+
 $results = New-Object Collections.Generic.List[object]
+$completenessDiagnostics = New-Object Collections.Generic.List[object]
 $files = Get-ChildItem -LiteralPath $commandRoot -Filter '*.md' -File -Recurse | Sort-Object FullName
 
 foreach ($file in $files) {
@@ -323,6 +403,10 @@ foreach ($file in $files) {
         elseif ($catalogByPath.ContainsKey($relativeFile)) {
             try {
                 $catalogEntry = $catalogByPath[$relativeFile]
+                $declaredIdMatch = [regex]::Match($text, '(?im)^(?:\u547D\u4EE4\s*ID|commandId)\s*[\u003A\uFF1A]\s*`?([a-z0-9][a-z0-9.-]*)`?\s*$')
+                if ($declaredIdMatch.Success -and $declaredIdMatch.Groups[1].Value -ne [string]$catalogEntry.id) {
+                    Add-UniqueError $validationErrors 'Catalog id differs from the command ID declared in the contract body.'
+                }
                 $commandType = Get-ContractMetadataValue $text (Get-UnicodeText @(21629,20196,31867,22411))
                 $defaultWrite = Get-ContractMetadataValue $text (Get-UnicodeText @(40664,35748,25913,25991,20214))
                 $bodyRisk = Get-ContractMetadataValue $text (Get-UnicodeText @(39118,38505,31561,32423))
@@ -338,6 +422,65 @@ foreach ($file in $files) {
                 }
                 if ([string]$catalogEntry.writeMode -ne $expected.writeMode) {
                     Add-UniqueError $validationErrors 'Catalog writeMode differs from the contract body semantics.'
+                }
+
+                # Report-only contract completeness baseline. These observations intentionally do
+                # not change valid/invalid status: migration must be staged before strict gating.
+                # Completeness fields require an explicit section/field marker. Incidental prose
+                # (for example, a sentence mentioning failure) is retained only as a hint and
+                # must not satisfy StrictCompleteness.
+                $hasCancellation = [regex]::IsMatch($text, '(?im)^##\s+.*(?:cancellation|取消)|^cancellation\s*:')
+                $hasRecovery = [regex]::IsMatch($text, '(?im)^##\s+.*(?:recovery|恢复)|^recovery\s*:')
+                $hasEvidence = [regex]::IsMatch($text, '(?im)^##\s+.*(?:evidenceRef|证据)|^evidenceRef\s*:')
+                $hasValidation = [regex]::IsMatch($text, '(?im)^##\s+.*(?:validation|验证)|^validation\s*:')
+                $riskRange = [regex]::IsMatch($bodyRisk, '(?i)L[123]\s*(?:/|至|到|和|-)\s*L[123]')
+                $scopeAllow = [regex]::IsMatch($text, '(?im)allowRoots|allowPaths|允许根|允许路径')
+                $scopeDeny = [regex]::IsMatch($text, '(?im)denyPaths|拒绝路径|禁止目录|禁止路径')
+                $requiredCapabilities = switch ([string]$catalogEntry.writeMode) {
+                    'read-only' { @('branch-evaluation', 'audit-evidence-chain') }
+                    'candidate-only' { @('bounded-tool-action', 'failure-recovery', 'audit-evidence-chain') }
+                    'scoped-write' { @('bounded-tool-action', 'state-transition-guard', 'failure-recovery', 'audit-evidence-chain') }
+                    'external-run' { @('environment-trust-gate', 'state-transition-guard', 'failure-recovery', 'audit-evidence-chain') }
+                    'documentation-write' { @('state-transition-guard', 'failure-recovery', 'audit-evidence-chain') }
+                    default { @() }
+                }
+                $diagnostic = [pscustomobject]@{
+                    id = [string]$catalogEntry.id
+                    path = $relativeFile
+                    role = [string]$catalogEntry.role
+                    writeMode = [string]$catalogEntry.writeMode
+                    riskLevel = [string]$catalogEntry.riskLevel
+                    riskRange = $riskRange
+                    fields = [pscustomobject]@{
+                        cancellation = $hasCancellation
+                        recovery = $hasRecovery
+                        validation = $hasValidation
+                        evidence = $hasEvidence
+                    }
+                    scope = [pscustomobject]@{ allow = $scopeAllow; deny = $scopeDeny; symmetric = ($scopeAllow -and $scopeDeny) }
+                    requiredCapabilities = @($requiredCapabilities)
+                    abcBindingPresent = ((@($abc.profileBindings | Where-Object { [string]$_.writeMode -eq [string]$catalogEntry.writeMode }).Count -eq 1) -or [regex]::IsMatch($text, '(?im)abcBinding|bounded-tool-action|audit-evidence-chain'))
+                    mode = 'report-only'
+                }
+                $completenessDiagnostics.Add($diagnostic)
+                if ($StrictCompleteness) {
+                    if ($riskRange) { Add-UniqueError $validationErrors 'Strict completeness: contract risk level must be a single L1/L2/L3 value.' }
+                    if ($catalogEntry.writeMode -eq 'scoped-write' -and -not $diagnostic.scope.symmetric) {
+                        Add-UniqueError $validationErrors 'Strict completeness: scoped-write requires symmetric allow and deny path declarations.'
+                    }
+                    $requiredFieldNames = switch ([string]$catalogEntry.writeMode) {
+                        'read-only' { @('validation', 'evidence') }
+                        'candidate-only' { @('cancellation', 'recovery', 'validation', 'evidence') }
+                        'documentation-write' { @('cancellation', 'recovery', 'validation', 'evidence') }
+                        'scoped-write' { @('cancellation', 'recovery', 'validation', 'evidence') }
+                        'external-run' { @('cancellation', 'recovery', 'validation', 'evidence') }
+                        default { @() }
+                    }
+                    foreach ($fieldName in $requiredFieldNames) {
+                        if (-not [bool]$diagnostic.fields.$fieldName) {
+                            Add-UniqueError $validationErrors "Strict completeness: missing required field marker '$fieldName'."
+                        }
+                    }
                 }
             }
             catch {
@@ -479,6 +622,19 @@ $report = [pscustomobject]@{
     invalidCount = $invalid.Count + $catalogErrors.Count
     valid = $invalid.Count -eq 0 -and $catalogErrors.Count -eq 0
     catalogErrors = $catalogErrors.ToArray()
+    completeness = [pscustomobject]@{
+        mode = if ($StrictCompleteness) { 'strict' } else { 'report-only' }
+        contracts = $completenessDiagnostics.ToArray()
+        summary = [pscustomobject]@{
+            missingCancellation = @($completenessDiagnostics | Where-Object { -not $_.fields.cancellation }).Count
+            missingRecovery = @($completenessDiagnostics | Where-Object { -not $_.fields.recovery }).Count
+            missingValidation = @($completenessDiagnostics | Where-Object { -not $_.fields.validation }).Count
+            missingEvidence = @($completenessDiagnostics | Where-Object { -not $_.fields.evidence }).Count
+            riskRanges = @($completenessDiagnostics | Where-Object { $_.riskRange }).Count
+            scopeAmbiguous = @($completenessDiagnostics | Where-Object { $_.writeMode -eq 'scoped-write' -and -not $_.scope.symmetric }).Count
+            abcBindingMissing = @($completenessDiagnostics | Where-Object { -not $_.abcBindingPresent }).Count
+        }
+    }
     commands = $results.ToArray()
 }
 

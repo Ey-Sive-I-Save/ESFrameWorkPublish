@@ -9,6 +9,7 @@
     {"skillName":"es-ai-collaboration-menu","reason":"只渲染确定性协作菜单和路由候选，不分派选项、不修改项目，也不启动会话或外部执行。","allowedOutputs":["collaboration-menu","route-candidate","non-persistent-decision-receipt"]},
     {"skillName":"es-ai-interaction-governance","reason":"只评估可观察证据并生成收尾与下一步候选，不执行候选动作，也不修改业务或任务生命周期状态。","allowedOutputs":["evidence-assessment","interaction-closeout","next-step-candidate"]},
     {"skillName":"es-first-principles-analysis","reason":"只做分析和方案分解，明确禁止更新项目状态。","allowedOutputs":["analysis","design-proposal"]},
+    {"skillName":"es-agent-mechanism-replication","reason":"只编排六类机制的静态合同、路由和证据闭环；不直接执行 Runtime 或外部副作用，用户明确授权时才生成项目内候选写入。","allowedOutputs":["mechanism-design","route-candidate","knowledge-candidate","static-evidence"]},
     {"skillName":"es-migration-planning","reason":"只生成可回滚迁移计划和兼容性证据，不直接实施迁移。","allowedOutputs":["migration-plan","rollback-matrix"]},
     {"skillName":"es-ui-intent-authoring","reason":"只生成 IntentSpec 候选与静态验证证据，不写入 Unity 资产或启动 Runtime。","allowedOutputs":["intent-spec-candidate","static-evidence"]},
     {"skillName":"es-ui-prefab-authoring","reason":"静态验收只读取组件注册表并生成计划；Unity 资产物化属于独立受管阶段。","allowedOutputs":["ui-spec","static-evidence"]},

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Documented host-specific instruction locations; discovery only, never write authority.",
+  "hosts": [
+    {"host":"codex","files":["%USERPROFILE%/.codex/AGENTS.md"],"projectFiles":["AGENTS.md"]},
+    {"host":"claude-code","files":["%USERPROFILE%/.claude/CLAUDE.md"],"projectFiles":["CLAUDE.md","CLAUDE.local.md"]},
+    {"host":"cursor","files":[],"projectDirectories":[".cursor/rules"],"projectFiles":["AGENTS.md"]},
+    {"host":"windsurf","files":["%USERPROFILE%/.codeium/windsurf/memories/global_rules.md"],"projectDirectories":[".windsurf/rules"],"projectFiles":["AGENTS.md"]},
+    {"host":"gemini-cli","files":["%USERPROFILE%/.gemini/GEMINI.md"],"projectFiles":["GEMINI.md"]},
+    {"host":"github-copilot","files":["%USERPROFILE%/.copilot/copilot-instructions.md"],"projectDirectories":["%USERPROFILE%/.copilot/instructions"],"projectFiles":[".github/copilot-instructions.md","AGENTS.md","CLAUDE.md","GEMINI.md"]}
+  ],
+  "policy": "Never infer one host's path for another host. Resolve existing candidates, show the exact path, ask yes/no, then write only the confirmed file."
+}

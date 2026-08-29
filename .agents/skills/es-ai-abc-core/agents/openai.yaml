@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES AI ABC Core"
+  short_description: "Design the independent ABC adapter core"
+  default_prompt: "Use es-ai-abc-core to define and validate an independent ABCC adapter core contract."

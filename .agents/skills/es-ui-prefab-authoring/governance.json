@@ -14,7 +14,7 @@
   "owner": "ESFramework Skill maintainers",
   "acceptanceOwner": "designated ESFramework maintainer",
   "requiredCases": ["positive", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery"],
-  "routeKeys": ["skill", "screen-spec-v3", "ui", "prefab", "fixture-scene", "visual-qa"],
+  "routeKeys": ["skill", "screen-spec-v3", "ui-automation", "ui", "prefab", "fixture-scene", "layout", "responsive", "ui-clipping", "ui-interaction", "visual-qa"],
   "controlRefs": ["SKILL.md#scope-boundary", "SKILL.md#ai-production-loop", "references/game-ui-materializer-contract.md"],
   "requiredControls": ["identity", "authority", "risk", "observability", "recovery", "performance", "compatibility", "supply-chain"],
   "commandRequirement": "none",

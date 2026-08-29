@@ -32,7 +32,7 @@ ambiguous language falls back to `discover-context` rather than guessing executi
    recommends `discover-context` so the short `菜单` trigger remains useful and
    does not pretend that project facts are fresh.
 
-Only one option can be recommended. All six options remain visible. The
+Only one option can be recommended. All seven options remain visible. The
 `coordinate-session` option must expose its explicit session submenu, including
 separate `session-fork` and `window-handoff` entries. Fork copies context; it never
 means handoff. Window handoff is a route to `es-codex-session-bootstrap` and must use
@@ -46,6 +46,11 @@ the complete session submenu, one optional `recommendedOptionId`,
 `decisionSource=derived`, `requiresUserChoice=true`, and `nonClaims`. No output
 action is executed. The renderer must not read or write project files beyond its
 bundled menu data.
+
+Output also contains `routeDirectory.categories`. Each category and item has a
+stable number and route key. `-Selection Rcategory.item` resolves a directory item;
+`-Selection n` resolves a main option and `-Selection n.m` resolves its submenu.
+All three forms are route descriptors only and retain `requiresUserChoice=true`.
 
 All main options expose bounded submenus. Intent output reports primary intent,
 confidence, candidates, negated intents, compound stages, inferred project area,

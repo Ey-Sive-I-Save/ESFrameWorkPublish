@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Prompt Engineering"
+  short_description: "Fast prompt wrapping and validation"
+  default_prompt: "Use $es-prompt-engineering to auto-wrap and validate this prompt with the fast bounded profile."

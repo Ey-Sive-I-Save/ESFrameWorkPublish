@@ -26,6 +26,21 @@ $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $localStateRoot = $StateRoot
 $query = & (Join-Path $PSScriptRoot 'Resolve-ESCodexSessionRoute.ps1') -SessionId $SessionId -RecordId $RecordId -ResponsibilityKey $ResponsibilityKey -RequireUnique -StateRoot $localStateRoot
 $route = $query.route
+if (-not [bool]$route.contextAccepted) {
+    [pscustomobject][ordered]@{
+        sendContractVersion = 1
+        status = 'DeliveryBlocked'
+        reasonCode = 'ContextNotAccepted'
+        userMessage = 'Target window has not reached ContextAccepted. Responsibility information was not sent or queued, and no alternate window was used. Retry after initialization is accepted.'
+        target = $route
+        queued = $false
+        accepted = $false
+        completed = $false
+        externalWakeRequired = $false
+        directTuiInjectionAttempted = $false
+    } | ConvertTo-Json -Depth 20
+    exit 0
+}
 $publishArguments = @{
     RecordId = [string]$route.recordId
     Body = $Body

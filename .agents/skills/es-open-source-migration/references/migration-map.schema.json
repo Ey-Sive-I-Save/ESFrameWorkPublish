@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schemaVersion", "mapId", "status", "source", "target", "scope", "mappings", "parallelism", "verification", "rollback", "owner", "evidenceRef", "staleWhen"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "mapId": {"type": "string", "pattern": "^es-open-source-migration-map\\.v1$"},
+    "status": {"enum": ["planned", "mapping-approved", "in-progress", "stale", "blocked", "completed"]},
+    "source": {"type": "object", "required": ["repositoryUrl", "fixedRevision", "license", "isolatedRelativeLocator"], "properties": {"repositoryUrl": {"type": ["string", "null"]}, "fixedRevision": {"type": ["string", "null"]}, "license": {"type": ["string", "null"]}, "isolatedRelativeLocator": {"type": ["string", "null"], "pattern": "^(null|\\.\\./[^/].*)$"}}},
+    "target": {"type": "object", "required": ["projectRoot", "writeAllowed", "protectedPaths"], "properties": {"projectRoot": {"type": "string"}, "writeAllowed": {"const": false}, "protectedPaths": {"type": "array", "minItems": 1, "items": {"type": "string"}}}},
+    "scope": {"type": "object", "required": ["mode", "allowTargetMutation", "allowNetwork", "allowGitWrite", "allowDelete", "allowRename", "manualSubstitutionAllowed"], "properties": {"mode": {"const": "external-only"}, "allowTargetMutation": {"const": false}, "allowNetwork": {"const": false}, "allowGitWrite": {"const": false}, "allowDelete": {"const": false}, "allowRename": {"const": false}, "manualSubstitutionAllowed": {"type": "boolean"}}},
+    "mappings": {"type": "array", "items": {"type": "object", "required": ["sourceRelativePath", "targetRelativePath", "category", "status", "owner", "rollback"], "properties": {"sourceRelativePath": {"type": "string"}, "targetRelativePath": {"type": ["string", "null"]}, "category": {"enum": ["adopt", "adapt", "rewrite", "exclude", "defer"]}, "status": {"type": "string"}, "owner": {"type": ["string", "null"]}, "rollback": {"type": "string"}}}},
+    "parallelism": {"type": "object", "required": ["agentStartGate", "maxAgents", "partitionKey", "sharedWriteTargets", "mergeOwner"], "properties": {"agentStartGate": {"const": "mapping-approved"}, "maxAgents": {"type": "integer", "minimum": 0}, "partitionKey": {"enum": ["assembly-or-domain", "manual"]}, "sharedWriteTargets": {"type": "array", "maxItems": 0}, "mergeOwner": {"type": ["string", "null"]}}},
+    "verification": {"type": "object", "required": ["mode", "requiredChecks", "runtimeStatus"], "properties": {"mode": {"const": "dry-run"}, "requiredChecks": {"type": "array", "minItems": 1}, "runtimeStatus": {"enum": ["not-run", "partial", "verified"]}}},
+    "rollback": {"type": "object", "required": ["strategy", "compatibilityWindow"], "properties": {"strategy": {"type": "string"}, "compatibilityWindow": {"type": "string"}}},
+    "owner": {"type": ["string", "null"]},
+    "evidenceRef": {"type": ["string", "null"]},
+    "staleWhen": {"type": "string"}
+  }
+}

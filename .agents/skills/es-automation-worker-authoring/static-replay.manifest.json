@@ -50,7 +50,7 @@
         "id": "automation-worker-authoring-static",
         "title": "automation worker authoring responsibility static gate",
         "requiredStaticCases": ["asset-or-contract-identity", "mutation-boundary", "denied-expansion", "repeat-idempotency", "recovery-evidence"],
-        "evidenceArtifacts": ["SKILL.md", "governance.json", "references/static-replay-adapter.md", "references/evidence-receipt-contract.md"],
+        "evidenceArtifacts": ["SKILL.md", "governance.json", "references/static-replay-adapter.md", "references/evidence-receipt-contract.md", "scripts/Test-ESWorkerContractPacket.ps1", "scripts/Test-ESWorkerContractStrictness.ps1"],
         "sourceAssertions": ["boundary", "deterministic", "evidence", "static", "contract"],
         "runtimeBoundary": "Static acceptance proves source and contract structure only; external process, Unity, timing, visual, and release behavior remain Runtime claims."
     },

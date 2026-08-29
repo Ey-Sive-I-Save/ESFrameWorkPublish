@@ -237,6 +237,10 @@ $projectVersion = Get-ProjectUnityVersion -Root $projectRootResolved
 $openEditors = @(Get-OpenProjectEditors -Root $projectRootResolved)
 $lockPath = Join-Path $projectRootResolved 'Temp\UnityLockfile'
 $lockPresent = Test-Path -LiteralPath $lockPath -PathType Leaf
+$lockItem = if ($lockPresent) { Get-Item -LiteralPath $lockPath -ErrorAction SilentlyContinue } else { $null }
+$lockLastWriteUtc = if ($null -ne $lockItem) { $lockItem.LastWriteTimeUtc.ToString('o') } else { '' }
+$lockAgeSeconds = if ($null -ne $lockItem) { [Math]::Max(0, [int][Math]::Floor(((Get-Date).ToUniversalTime() - $lockItem.LastWriteTimeUtc).TotalSeconds)) } else { $null }
+$lockProcessMatch = @($openEditors | Where-Object { $_.processId -gt 0 }).Count -gt 0
 $unityExecutable = Resolve-UnityExecutable `
     -ExplicitPath $UnityPath `
     -ExpectedVersion $projectVersion `
@@ -252,6 +256,11 @@ $status = [pscustomobject]@{
     editorOpen = $openEditors.Count -gt 0
     editorProcesses = $openEditors
     lockPresent = $lockPresent
+    lockPath = $lockPath
+    lockLastWriteUtc = $lockLastWriteUtc
+    lockAgeSeconds = $lockAgeSeconds
+    lockProcessMatch = $lockProcessMatch
+    lockEvidence = if (-not $lockPresent) { 'absent' } elseif ($lockProcessMatch) { 'matching-editor-process' } else { 'present-without-matching-editor-process' }
     safeToLaunchBatchMode = $openEditors.Count -eq 0 -and -not $lockPresent
 }
 

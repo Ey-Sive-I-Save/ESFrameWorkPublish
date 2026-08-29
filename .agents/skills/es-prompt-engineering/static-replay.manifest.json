@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-prompt-engineering",
+  "sourceRoots": [".agents/skills/es-prompt-engineering"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["versioned-template", "bounded-invocation", "structured-output", "deterministic-verifier", "deterministic-replay", "regression-result", "permission-preservation", "fast-path"],
+  "runtimeClaimsNotProven": ["model semantic quality", "provider behavior", "production latency", "concurrent throughput", "Unity/runtime behavior", "release behavior"],
+  "runtimeEscalation": {"required": false, "reason": "The default wrapper is deterministic and local."},
+  "caseAssertions": {
+    "normal-input": "auto-fast emits a valid bounded envelope",
+    "invalid-input": "empty prompt is rejected",
+    "denied-expansion": "the envelope cannot grant write, Runtime, Git, release, network, or deletion authority",
+    "repeat-idempotency": "the same prompt, mode, and template version produce the same stable fields",
+    "hash-change-cache-invalidation": "a changed prompt changes rawPromptHash and cache key",
+    "interruption-recovery": "stateless rerun requires no cleanup",
+    "deterministic-output": "risk classification, assertions, and structured fields are stable"
+  },
+  "responsibilityProfile": "governance",
+  "responsibilityChecks": ["authority-routing", "permission-boundary", "deterministic-replay", "evidence-contract"],
+  "responsibilityScope": "Prompt wrapping and static validation only; no task execution authority.",
+  "specializedAcceptance": {"id": "prompt-engineering-fast-wrapper", "title": "prompt engineering fast wrapper gate", "requiredStaticCases": ["fast-wrap", "safe-upgrade", "invalid-input", "permission-denial", "idempotency", "hash-invalidation", "recovery"], "evidenceArtifacts": ["SKILL.md", "governance.json", "references/prompt-envelope.schema.json", "scripts/Invoke-ESPromptEngineering.ps1", "scripts/Test-ESPromptEngineering.ps1"], "sourceAssertions": ["original-hash", "bounded-budget", "no-execute", "determinism"], "runtimeBoundary": "No model, provider, Unity, Runtime, or release claim."},
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ai-space-organization",
+  "sourceRoots": [".agents/skills/es-ai-space-organization", "ES/AISpace"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery", "deterministic-output", "hash-change-cache-invalidation"],
+  "staticClaims": ["local-public-routing", "unity-boundary", "authority-preservation", "no-delete-by-default", "stale-marking", "deterministic-replay"],
+  "runtimeClaimsNotProven": ["Unity import behavior", "runtime asset loading", "multi-process coordination", "release behavior"],
+  "runtimeEscalation": {"required": false, "reason": "Directory guidance is static-only."},
+  "caseAssertions": {
+    "normal-input": "each generated content class maps to one canonical root",
+    "invalid-input": "unknown or ambiguous ownership is quarantined, not guessed",
+    "denied-expansion": "guidance cannot authorize delete, rename, Git, Unity, network, or release",
+    "repeat-idempotency": "re-reading the same path yields the same classification",
+    "interruption-recovery": "classification can resume without destructive cleanup",
+    "deterministic-output": "the same path and purpose produce the same root",
+    "hash-change-cache-invalidation": "changed authority guidance requires fresh classification"
+  },
+  "responsibilityProfile": "governance",
+  "responsibilityChecks": ["authority-routing", "permission-boundary", "deterministic-replay"],
+  "responsibilityScope": "AI-generated content placement and Local/Public folder guidance only.",
+  "specializedAcceptance": {
+    "id": "space-organization-static",
+    "requiredStaticCases": ["route-minimality", "authority-preservation", "denied-expansion", "deterministic-routing", "stale-guidance"],
+    "evidenceArtifacts": ["SKILL.md", "references/evidence-receipt-contract.md", "references/static-specialized-acceptance.md", "scripts/Test-es-ai-space-organization-StaticReplay.ps1"],
+    "sourceAssertions": ["local-public-routing", "unity-boundary", "authority-preservation", "no-delete-by-default", "stale-marking"],
+    "runtimeBoundary": "Runtime is not required to prove folder ownership routing or path refusal."
+  },
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

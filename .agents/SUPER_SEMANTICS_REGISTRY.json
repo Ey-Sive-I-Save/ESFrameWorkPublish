@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es.super-semantics.index.v1",
+  "presentation": {
+    "prefix": "✨✅",
+    "template": "【已触发超级语义“{label}”】",
+    "position": "first-visible-line",
+    "showOncePerUserTurn": true
+  },
+  "textSampling": {
+    "shortTextMaxChars": 200,
+    "longTextHeadChars": 100,
+    "longTextTailChars": 100,
+    "middleMarker": "...[middle omitted]..."
+  },
+  "negationMarkers": ["不要", "别", "无需", "不需要", "禁止", "不是", "并非", "没有", "未达到"],
+  "comparisonMarkers": ["以上", "以下", "超过", "低于", "高于", "大于", "小于"],
+  "cancellation": {
+    "tokens": ["取消", "C", "不用", "一般", "快速"],
+    "exactTokenOnly": true,
+    "defaultSuppressionRounds": 3,
+    "meaning": "取消本轮超级语义并在默认三轮内抑制同类自动触发；用户再次明确表达完整目标时可重新触发。"
+  },
+  "precedenceRules": [
+    {
+      "id": "p0-feedback-override",
+      "label": "P0治理反馈",
+      "priority": 10000,
+      "matchAny": ["P0", "0分", "零分", "超级语义不准", "超级语义错误", "路由不准", "语义错误", "加强权威"],
+      "requiresAny": ["P0", "0分", "零分", "超级语义", "路由", "语义", "权威", "修复", "验证", "不准", "错误"],
+      "operation": "P0Feedback",
+      "nextStage": "p0-feedback-recheck",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiresUserChoice": true,
+      "routeKeys": ["p0-feedback", "goal-realignment", "user-guidance"],
+      "evidencePolicy": "evidence-first-recheck; preserve-raw-prompt; no-action-until-scope-confirmed"
+      ,"historyMarkers": ["历史", "之前", "示例", "引用", "记录"]
+    },
+    {
+      "id": "high-risk-over-wrapper",
+      "label": "高危语义覆盖普通包装",
+      "priority": 900,
+      "whenCandidateOperations": ["DeepUserRealignment", "EvidenceReview", "RouteReview", "BoundaryReview", "StaleReplay", "StaticAcceptance", "TaskFocusContextUpdate", "ReadOnlyGuard"],
+      "overriddenOperations": ["PromptAutoWrapToggle"],
+      "operation": "HighRiskSemanticOverride",
+      "nextStage": "high-risk-review",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiresUserChoice": true,
+      "evidencePolicy": "preserve-high-risk-intent; defer-wrapper; evidence-first-review"
+    }
+  ],
+  "sources": [
+    ".agents/skills/es-agent-mechanism-replication/references/super-semantics.json",
+    ".agents/references/project-progress-super-semantics.json",
+    ".agents/references/interaction-super-semantics.json"
+  ],
+  "nonClaims": [
+    "超级语义命中不是常规路由推荐",
+    "命中不授予写入、Runtime、网络、Git 或外部进程权限",
+    "未唯一命中时不得显示已触发回执"
+  ]
+}

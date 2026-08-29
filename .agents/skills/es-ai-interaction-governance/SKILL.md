@@ -5,6 +5,14 @@ description: "Evaluate user prompts and task closeout quality, classify objectiv
 
 # ES AI Interaction Governance
 
+## 项目推进分叉口超级语义
+
+项目中央索引 `.agents/SUPER_SEMANTICS_REGISTRY.json` 还包含 `0分`/`零分`、`迭代`、`兼容` 三类推进分叉口语义。它们不是普通路由：命中后必须在第一条可见文本显示 `✨✅【已触发超级语义“XXX”】`，并先完成深度用户指导确认（目标、范围、禁止自由发挥项、验收信号），不得直接替用户扩大任务或修改方向。具体问题由 `.agents/references/project-progress-super-semantics.json` 提供。
+
+每轮解析还必须执行文本采样：短文本全文扫描；超过中央索引 `textSampling.shortTextMaxChars` 的长文本只扫描开头和末尾，中间内容不参与超级语义触发，并在回执中记录扫描模式与字符计数。
+
+当前交互超级语义由中央注册表统一发现（不得在本 Skill 另建触发词表）：`包装`（PromptAutoWrapToggle，当前职责内可处理；“帮我包装/包装给我/负责包装/让你包装”产生 `delegated-current-window`）、`给我看`（证据展示，命令行回退到绝对路径/文件夹）、`只读`（仅明确只读场景触发，必须一次确认，默认仍为 normal）、`聚焦/注意`（TaskFocusContext Proposal，确认前 pending），以及取消 Token `取消/C/不用/一般/快速`（仅取消当前活动超级语义并默认抑制三轮）。P0 和高危语义优先覆盖普通包装；同层多个高危语义必须进入澄清，不得静默择一。
+
 Use this Skill for the interaction-control plane, not for business implementation. It owns prompt quality, objective clarity, verification sufficiency, uncertainty disclosure, goal drift, handoff summaries, and bounded next-step suggestions.
 
 All persistent reports are restricted to `ES/Output/Interaction`. Transcript conversion may use only that report root or the operating system Temp directory for a short-lived intermediate file. Hook execution accepts only the built-in `Invoke-ESInteractionCloseout.ps1`; a caller-supplied script path cannot select another executable.

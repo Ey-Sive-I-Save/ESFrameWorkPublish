@@ -319,7 +319,7 @@ foreach($target in $targets){
                     $declared=@(); $routeMatch=[regex]::Match($block,'(?m)^\s*routeKeys:\s*\[([^\]]+)\]'); if($routeMatch.Success){$declared=Get-InlineYamlList $routeMatch.Groups[1].Value}
                     if(@($declared|Where-Object {$routeKeys -contains $_}).Count -gt 0){$routeMatched=$true}
                     $entryMatch=[regex]::Match($block,'(?m)^\s*file:\s*(.+)$'); $hashMatch=[regex]::Match($block,'(?m)^\s*contentHash:\s*([0-9a-fA-F]{64})\s*$')
-                    if(-not $entryMatch.Success -or -not $hashMatch.Success){[void]$issues.Add('Knowledge binding lacks file/contentHash');continue}
+                    if(-not $entryMatch.Success -or -not $hashMatch.Success){$bindingId=[regex]::Match($block,'(?m)^\s*-\s+knowledgeId:\s*([^\r\n]+)').Groups[1].Value.Trim();[void]$issues.Add("Knowledge binding lacks file/contentHash: $bindingId");continue}
                     $entryRelative=$entryMatch.Groups[1].Value.Trim().Trim([char]39,[char]34); $entryPath=Join-Path $root ('Documentation/AIKnowledge/'+$entryRelative.Replace('/','\'))
                     if(-not (Test-Path -LiteralPath $entryPath -PathType Leaf)){[void]$issues.Add("Knowledge entry missing: $entryRelative");continue}
                     try{$entryText=Read-StrictText $entryPath}catch{[void]$issues.Add("Knowledge entry invalid UTF-8: $entryRelative");continue}

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "requestId": "weapon-abc-part-authoring-v1",
+  "partId": "es.weapon.abc.part.v1",
+  "domain": "weapon",
+  "capabilityRefs": [
+    "bounded-tool-action",
+    "failure-recovery",
+    "branch-evaluation",
+    "state-transition-guard",
+    "environment-trust-gate",
+    "audit-evidence-chain"
+  ],
+  "aProfile": {
+    "responsibility": "表达武器定义、装配、平衡、恢复与验收意图，不直接决定 B 的实现",
+    "intentKinds": [
+      "weapon.attack.lifecycle",
+      "weapon.damage.balance",
+      "weapon.prefab.binding",
+      "weapon.resource.cooldown",
+      "weapon.failure.recovery",
+      "weapon.environment.trust"
+    ]
+  },
+  "bProfile": {
+    "responsibility": "声明武器机制能力的输入、前置条件、效果、失败码和证据",
+    "providers": [
+      "es-entity-authoring",
+      "es-entity-prefab-validation",
+      "es-input-action",
+      "es-command-authoring",
+      "es-gamecore-integration",
+      "weapon-definition-provider"
+    ]
+  },
+  "cProfile": {
+    "collaboratorKinds": ["human", "ai"],
+    "acceptanceInputs": ["goal", "authorization", "constraints", "evidence-expectations", "acceptance-decision"]
+  },
+  "aToBMappings": [
+    { "intentId": "weapon.attack.lifecycle", "bCapability": "state-transition-guard", "input": "weaponKey, action, lifecycle state", "output": "legal transition and receipt" },
+    { "intentId": "weapon.damage.balance", "bCapability": "branch-evaluation", "input": "finite balance candidates and criteria", "output": "ranked candidate with evidence" },
+    { "intentId": "weapon.prefab.binding", "bCapability": "bounded-tool-action", "input": "Prefab/DataInfo scope", "output": "binding diff and validation" },
+    { "intentId": "weapon.resource.cooldown", "bCapability": "audit-evidence-chain", "input": "cooldown/resource definition", "output": "source-backed decision" },
+    { "intentId": "weapon.failure.recovery", "bCapability": "failure-recovery", "input": "observable weapon failure and bounded retry budget", "output": "revised plan or bounded stop with receipt" },
+    { "intentId": "weapon.environment.trust", "bCapability": "environment-trust-gate", "input": "source/runtime environment identity", "output": "trusted, degraded or blocked decision" }
+  ],
+  "routePlanTemplate": [
+    { "stage": "weapon-abc-intent", "requires": ["goal-revision", "authorization"], "produces": ["a-intent"] },
+    { "stage": "weapon-abc-negotiation", "requires": ["a-intent", "coreRef"], "produces": ["b-capability-request", "b-result"] },
+    { "stage": "weapon-abc-evidence", "requires": ["b-result"], "produces": ["normalized-evidence"] },
+    { "stage": "weapon-abc-acceptance", "requires": ["normalized-evidence", "collaborator-choice"], "produces": ["weapon-abc-completion"] }
+  ],
+  "evidenceProfile": {
+    "required": ["source-snapshot", "capability-offer", "normalized-result", "receipt", "non-claims"],
+    "runtimeClaimsNotProven": ["Unity Prefab import", "PlayMode firing", "runtime damage, input, performance or release behavior"]
+  }
+}

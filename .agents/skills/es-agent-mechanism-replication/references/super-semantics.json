@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-agent-mechanism-replication.super-semantics.v1",
+  "authority": "Skill-local read-only discovery projection",
+  "skillName": "es-agent-mechanism-replication",
+  "routeKey": "agent-mechanism-replication",
+  "purpose": "将高层中文目标稳定映射到六类 Agent 机制的 ES 适配阶段；命中只提供发现与计划输入，不授予执行权限。",
+  "entryAliases": [
+    "帮我做机制复刻",
+    "我想做机制复刻"
+  ],
+  "entryAliasSemantics": "Umbrella discovery aliases open the six choices below and do not select or execute an operation.",
+  "permission": "discover-only",
+  "requiresUserChoice": true,
+  "nonClaims": [
+    "不证明 Unity、Player、Profiler、网络或 Release 行为",
+    "不自动写入 Skill、Knowledge、RouteProbe 或 Git",
+    "不把外部论文、仓库或模型自评升级为 ES 事实"
+  ],
+  "triggers": [
+    {
+      "id": "research-to-contract",
+      "label": "把机制研究接到 ES",
+      "triggerPhrases": ["把这个机制研究接到ES", "机制研究转ES合同", "六类机制ES设计"],
+      "operation": "Design",
+      "routeKeys": ["agent-mechanism-replication", "research-to-contract", "es-adaptation"],
+      "nextStage": "analysis",
+      "requiredEvidence": ["GoalRevision", "bounded source snapshot"],
+      "failureConditions": ["goal-revision-missing", "external-source-not-bound", "source-snapshot-stale"]
+    },
+    {
+      "id": "route-chain-review",
+      "label": "看看机制流程怎么走",
+      "triggerPhrases": ["看看机制流程怎么走", "机制路由探针同步", "机制RouteStage链审查"],
+      "operation": "RouteReview",
+      "routeKeys": ["agent-mechanism-replication", "route-probe", "route-stage", "closed-loop"],
+      "nextStage": "review",
+      "requiredEvidence": ["KnowledgeIndex", "RouteProbeRegistry", "RouteStage registry"],
+      "failureConditions": ["route-required-reads-mismatch", "route-top3-mismatch", "route-stage-unregistered"]
+    },
+    {
+      "id": "evidence-receipt-review",
+      "label": "检查机制证据够不够",
+      "triggerPhrases": ["检查机制证据够不够", "机制证据回执复核", "机制EvidenceSet验收"],
+      "operation": "EvidenceReview",
+      "routeKeys": ["agent-mechanism-replication", "evidence-set", "receipt", "completion-decision"],
+      "nextStage": "knowledge-validation",
+      "requiredEvidence": ["Verifier result", "EvidenceSet", "immutable Receipt"],
+      "failureConditions": ["evidence-missing", "receipt-mutable", "completion-delivery-conflated"]
+    },
+    {
+      "id": "source-drift-replay",
+      "label": "源文件变了，重查机制",
+      "triggerPhrases": ["源文件变了重查机制", "机制源漂移重放", "机制SourceRef漂移复核"],
+      "operation": "StaleReplay",
+      "routeKeys": ["agent-mechanism-replication", "source-ref", "stale", "static-replay"],
+      "nextStage": "knowledge-validation",
+      "requiredEvidence": ["current SourceRefs", "SourceSetHash", "EntryBodyHash"],
+      "failureConditions": ["source-hash-drift", "entry-body-hash-mismatch", "source-set-hash-mismatch"]
+    },
+    {
+      "id": "permission-boundary-review",
+      "label": "这套机制会不会越权",
+      "triggerPhrases": ["这套机制会不会越权", "机制权限扩展审查", "机制副作用边界复核"],
+      "operation": "BoundaryReview",
+      "routeKeys": ["agent-mechanism-replication", "permission-boundary", "external-authority"],
+      "nextStage": "review",
+      "requiredEvidence": ["operation allowlist", "authorization lane", "runtime escalation policy"],
+      "failureConditions": ["unauthorized-write", "network-expansion", "runtime-not-authorized", "handoff-source-substitution"]
+    },
+    {
+      "id": "closed-loop-acceptance",
+      "label": "验收这套机制闭环",
+      "triggerPhrases": ["验收这套机制闭环", "六类机制闭环静态验收", "机制研究闭环验收"],
+      "operation": "StaticAcceptance",
+      "routeKeys": ["agent-mechanism-replication", "closed-loop", "static-replay", "discoverability"],
+      "nextStage": "knowledge-validation",
+      "requiredEvidence": ["StaticDeepReplay", "positive receipt", "invalid-input receipt", "denied-expansion receipt"],
+      "failureConditions": ["static-replay-blocked", "evidence-receipt-stale", "discoverability-missing"]
+    }
+  ]
+}

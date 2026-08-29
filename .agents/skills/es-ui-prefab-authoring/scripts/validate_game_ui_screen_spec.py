@@ -7,7 +7,6 @@ import argparse
 import hashlib
 import json
 import math
-import math
 import re
 from pathlib import Path
 from typing import Any
@@ -16,8 +15,12 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 SCREEN_TYPES = {"hud", "navigation", "modal", "conversation", "progression", "collection", "combat", "world", "system", "result"}
 LAYOUT_MODES = {"stretch", "center", "edge-docked", "flow", "grid", "list", "overlay", "absolute", "content"}
 LAYOUT_GROUP_MODES = {"grid", "list", "flow"}
-STATE_IDS = {"default", "selected", "empty", "loading", "disabled", "error", "long-content"}
-FEEDBACK_RULE_IDS = {"UI-FB-001", "UI-FB-002", "UI-FB-003", "UI-FB-004", "UI-FB-005", "UI-FB-006"}
+STATE_IDS = {"default", "selected", "empty", "loading", "disabled", "error", "long-content", "missing-art"}
+FEEDBACK_RULE_IDS = {
+    "UI-FB-001", "UI-FB-002", "UI-FB-003", "UI-FB-004", "UI-FB-005",
+    "UI-FB-006", "UI-FB-007", "UI-FB-008", "UI-FB-009", "UI-FB-010",
+    "UI-FB-011", "UI-FB-012", "UI-FB-013", "UI-FB-014", "UI-FB-015",
+}
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 STATE_EFFECT_FIELDS = {"visible", "interactable", "graphicAlpha", "graphicColor", "wrapText", "text", "outline"}
 FIXTURE_TEXT_OVERFLOW_POLICIES = {"wrap", "ellipsis", "scroll"}
@@ -566,8 +569,54 @@ def validate_feedback(spec: dict[str, Any], issues: list[dict[str, str]], requir
             if profile_id != "all" and profile_id not in profile_ids:
                 fail(issues, f"{path}.profileIds[{index}]", "profile id is not declared", "feedback")
         for index, state_id in enumerate(binding.get("stateIds", [])):
-                if state_id != "all" and state_id not in state_ids:
-                    fail(issues, f"{path}.stateIds[{index}]", "state id is not declared", "feedback")
+            if state_id != "all" and state_id not in state_ids:
+                fail(issues, f"{path}.stateIds[{index}]", "state id is not declared", "feedback")
+        next_fields = {item for item in binding.get("nextArtifactFields", []) if isinstance(item, str)}
+        evidence_requirements = {item for item in binding.get("evidenceRequirements", []) if isinstance(item, str)}
+        if rule_id == "UI-FB-010":
+            required_fields = {
+                "designContract.advancedComposition.contentRequirements",
+                "designContract.advancedComposition.contentRequirements.profiles",
+            }
+            if not required_fields.issubset(next_fields):
+                fail(issues, f"{path}.nextArtifactFields", "UI-FB-010 must bind contentRequirements and profile requirements", "feedback")
+            if not any("profile" in value.lower() and ("count" in value.lower() or "zone" in value.lower()) for value in evidence_requirements):
+                fail(issues, f"{path}.evidenceRequirements", "UI-FB-010 must require deterministic profile counts and zone coverage evidence", "feedback")
+        elif rule_id == "UI-FB-011":
+            required_fields = {
+                "designContract.advancedComposition.contentRequirements.requiredTokenConsumers",
+                "designContract.advancedComposition.contentRequirements.stateTokenBindings",
+                "designContract.advancedComposition.contentRequirements.spacingScalePx",
+            }
+            if not required_fields.issubset(next_fields):
+                fail(issues, f"{path}.nextArtifactFields", "UI-FB-011 must bind token consumers, state token bindings and spacing scale", "feedback")
+            if not any("token" in value.lower() and ("consumer" in value.lower() or "effect" in value.lower()) for value in evidence_requirements):
+                fail(issues, f"{path}.evidenceRequirements", "UI-FB-011 must require token consumer/effect evidence", "feedback")
+        elif rule_id == "UI-FB-012":
+            if "designContract.advancedComposition.visualHierarchy" not in next_fields:
+                fail(issues, f"{path}.nextArtifactFields", "UI-FB-012 must bind the visual hierarchy contract", "feedback")
+            if not any("hierarchy" in value.lower() or "band" in value.lower() for value in evidence_requirements):
+                fail(issues, f"{path}.evidenceRequirements", "UI-FB-012 must require hierarchy-band evidence", "feedback")
+        elif rule_id == "UI-FB-013":
+            required_fields = {
+                "designContract.advancedComposition.interactionContract",
+                "stateSemantics.disabled",
+                "stateSemantics.loading",
+            }
+            if not required_fields.issubset(next_fields):
+                fail(issues, f"{path}.nextArtifactFields", "UI-FB-013 must bind focus and disabled/loading intent behavior", "feedback")
+            if not any("focus" in value.lower() or "input" in value.lower() for value in evidence_requirements):
+                fail(issues, f"{path}.evidenceRequirements", "UI-FB-013 must require focus/input evidence", "feedback")
+        elif rule_id == "UI-FB-014":
+            if "designContract.advancedComposition.stateImpactPolicy" not in next_fields:
+                fail(issues, f"{path}.nextArtifactFields", "UI-FB-014 must bind the state impact policy", "feedback")
+            if not any("affected" in value.lower() or "impact" in value.lower() for value in evidence_requirements):
+                fail(issues, f"{path}.evidenceRequirements", "UI-FB-014 must require affected-component evidence", "feedback")
+        elif rule_id == "UI-FB-015":
+            if "designContract.advancedComposition.anchorContract" not in next_fields:
+                fail(issues, f"{path}.nextArtifactFields", "UI-FB-015 must bind the numeric anchor contract", "feedback")
+            if not any("anchor" in value.lower() or "recttransform" in value.lower() for value in evidence_requirements):
+                fail(issues, f"{path}.evidenceRequirements", "UI-FB-015 must require RectTransform anchor evidence", "feedback")
 
 
 def relative_luminance(hex_color: str) -> float:
@@ -927,6 +976,11 @@ def validate_advanced_composition(spec: dict[str, Any], profiles: list[Any], com
         fail(issues, "designContract.advancedComposition", "high-fidelity validation requires an explicit composition contract", "advanced-composition")
         return
     profile_ids = [str(profile.get("id")).lower() for profile in profiles if isinstance(profile, dict) and isinstance(profile.get("id"), str)]
+    state_ids = {
+        str(state.get("id"))
+        for state in spec.get("states", [])
+        if isinstance(state, dict) and isinstance(state.get("id"), str)
+    }
     profile_sizes = {
         str(profile.get("id")).lower(): (float(profile.get("width", 0)), float(profile.get("height", 0)))
         for profile in profiles if isinstance(profile, dict) and isinstance(profile.get("id"), str)
@@ -936,6 +990,223 @@ def validate_advanced_composition(spec: dict[str, Any], profiles: list[Any], com
     color_roles = contract.get("colorRoles") if isinstance(contract.get("colorRoles"), dict) else {}
     primary_token = color_roles.get("primaryAction")
     primary_intent = spec.get("intentContract", {}).get("requestedPrimaryIntent") if isinstance(spec.get("intentContract"), dict) else None
+    declared_primary_mappings = {
+        str(entry.get("logicalId")): entry.get("componentIdsByProfile")
+        for entry in advanced.get("primaryActions", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("logicalId"), str)
+        and isinstance(entry.get("componentIdsByProfile"), dict)
+    }
+
+    # A high-fidelity packet must describe more than a primary button. These
+    # contracts make hierarchy, focus reachability, state blast radius and
+    # numeric anchor ownership explicit so an otherwise valid component tree
+    # cannot silently degrade into a flat collage.
+    visual_hierarchy = advanced.get("visualHierarchy")
+    if not isinstance(visual_hierarchy, dict):
+        fail(issues, "designContract.advancedComposition.visualHierarchy", "must declare ranked visual bands and coverage policy", "visual-hierarchy")
+    else:
+        bands = visual_hierarchy.get("bands")
+        if not isinstance(bands, list) or len(bands) < 3:
+            fail(issues, "designContract.advancedComposition.visualHierarchy.bands", "must declare at least three visual bands", "visual-hierarchy")
+            bands = []
+        coverage = visual_hierarchy.get("coveragePolicy")
+        if coverage not in {"all-non-background", "declared-key-components"}:
+            fail(issues, "designContract.advancedComposition.visualHierarchy.coveragePolicy", "must be all-non-background or declared-key-components", "visual-hierarchy")
+        seen_band_ids: set[str] = set()
+        seen_component_ids: set[str] = set()
+        ranked: list[tuple[int, int, str]] = []
+        for index, band in enumerate(bands):
+            path = f"designContract.advancedComposition.visualHierarchy.bands[{index}]"
+            if not isinstance(band, dict):
+                fail(issues, path, "must be an object", "visual-hierarchy")
+                continue
+            band_id, rank, emphasis = band.get("id"), band.get("rank"), band.get("emphasis")
+            component_ids = band.get("componentIds")
+            if not isinstance(band_id, str) or not band_id.strip() or band_id in seen_band_ids:
+                fail(issues, f"{path}.id", "must be a unique stable band id", "visual-hierarchy")
+            else:
+                seen_band_ids.add(band_id)
+            if isinstance(rank, bool) or not isinstance(rank, int) or rank < 0:
+                fail(issues, f"{path}.rank", "must be a non-negative integer", "visual-hierarchy")
+            if isinstance(emphasis, bool) or not isinstance(emphasis, int) or not 1 <= emphasis <= 5:
+                fail(issues, f"{path}.emphasis", "must be an integer from 1 to 5", "visual-hierarchy")
+            if isinstance(rank, int) and isinstance(emphasis, int) and isinstance(band_id, str):
+                ranked.append((rank, emphasis, band_id))
+            if not isinstance(component_ids, list) or not component_ids:
+                fail(issues, f"{path}.componentIds", "must list one or more components", "visual-hierarchy")
+                continue
+            for component_id in component_ids:
+                if not isinstance(component_id, str) or component_id not in by_id:
+                    fail(issues, f"{path}.componentIds", "must reference declared components", "visual-hierarchy")
+                elif component_id in seen_component_ids:
+                    fail(issues, f"{path}.componentIds", f"component '{component_id}' must belong to only one visual band", "visual-hierarchy")
+                else:
+                    seen_component_ids.add(component_id)
+        ordered = sorted(ranked)
+        for previous, current in zip(ordered, ordered[1:]):
+            if current[0] <= previous[0]:
+                fail(issues, "designContract.advancedComposition.visualHierarchy.bands", "band ranks must be strictly increasing", "visual-hierarchy")
+            if current[1] <= previous[1]:
+                fail(issues, "designContract.advancedComposition.visualHierarchy.bands", "band emphasis must increase with rank", "visual-hierarchy")
+        if coverage == "all-non-background":
+            expected = {component_id for component_id, component in by_id.items() if component.get("layerRole") != "background"}
+            missing = sorted(expected - seen_component_ids)
+            if missing:
+                fail(issues, "designContract.advancedComposition.visualHierarchy.bands", f"all non-background components must be assigned to a band: {missing}", "visual-hierarchy")
+        elif coverage == "declared-key-components":
+            key_component_ids = visual_hierarchy.get("keyComponentIds")
+            if not isinstance(key_component_ids, list) or not key_component_ids:
+                fail(issues, "designContract.advancedComposition.visualHierarchy.keyComponentIds", "declared-key-components coverage requires a non-empty key component list", "visual-hierarchy")
+            else:
+                invalid_keys = sorted({component_id for component_id in key_component_ids if not isinstance(component_id, str) or component_id not in by_id})
+                missing_keys = sorted(set(key_component_ids) - seen_component_ids)
+                if invalid_keys:
+                    fail(issues, "designContract.advancedComposition.visualHierarchy.keyComponentIds", f"must reference declared components: {invalid_keys}", "visual-hierarchy")
+                if missing_keys:
+                    fail(issues, "designContract.advancedComposition.visualHierarchy.bands", f"every key component must be assigned to a band: {missing_keys}", "visual-hierarchy")
+        primary_band_id = visual_hierarchy.get("primaryActionBandId")
+        primary_band = next((band for band in bands if isinstance(band, dict) and band.get("id") == primary_band_id), None)
+        primary_band_components = set(primary_band.get("componentIds", [])) if isinstance(primary_band, dict) else set()
+        if not isinstance(primary_band_id, str) or not isinstance(primary_band, dict):
+            fail(issues, "designContract.advancedComposition.visualHierarchy.primaryActionBandId", "must identify one declared band", "visual-hierarchy")
+        for mapping in declared_primary_mappings.values():
+            for profile_id, component_id in mapping.items():
+                if component_id not in primary_band_components:
+                    fail(issues, "designContract.advancedComposition.visualHierarchy.primaryActionBandId", f"primary action '{component_id}' must be in the primary action band for profile '{profile_id}'", "visual-hierarchy")
+
+    interaction_contract = advanced.get("interactionContract")
+    if not isinstance(interaction_contract, dict):
+        fail(issues, "designContract.advancedComposition.interactionContract", "must declare input modes, focus order and state input policies", "interaction-contract")
+    else:
+        input_modes = interaction_contract.get("inputModes")
+        if not isinstance(input_modes, list) or not input_modes or any(mode not in {"pointer", "keyboard", "gamepad", "touch"} for mode in input_modes):
+            fail(issues, "designContract.advancedComposition.interactionContract.inputModes", "must list supported pointer/keyboard/gamepad/touch modes", "interaction-contract")
+        if interaction_contract.get("focusPolicy") != "explicit-order":
+            fail(issues, "designContract.advancedComposition.interactionContract.focusPolicy", "high-fidelity screens require explicit-order focus policy", "interaction-contract")
+        if interaction_contract.get("defaultFocusIntent") != primary_intent:
+            fail(issues, "designContract.advancedComposition.interactionContract.defaultFocusIntent", "must equal the requested primary intent", "interaction-contract")
+        focus_orders = interaction_contract.get("focusOrderByProfile")
+        if not isinstance(focus_orders, dict):
+            fail(issues, "designContract.advancedComposition.interactionContract.focusOrderByProfile", "must map every profile to a focus order", "interaction-contract")
+            focus_orders = {}
+        all_focusable = interaction_contract.get("allInteractiveComponentsFocusable")
+        if not isinstance(all_focusable, bool):
+            fail(issues, "designContract.advancedComposition.interactionContract.allInteractiveComponentsFocusable", "must be a boolean", "interaction-contract")
+            all_focusable = True
+        for profile_id in profile_ids:
+            path = f"designContract.advancedComposition.interactionContract.focusOrderByProfile.{profile_id}"
+            order = focus_orders.get(profile_id)
+            if not isinstance(order, list) or not order or any(not isinstance(component_id, str) for component_id in order) or len(set(order)) != len(order):
+                fail(issues, path, "must be a non-empty unique component-id order", "interaction-contract")
+                continue
+            active_interactive = {
+                component_id
+                for component_id, component in by_id.items()
+                if component_id in geometry.get(profile_id, {})
+                and isinstance(component.get("interaction"), dict)
+                and isinstance(component["interaction"].get("intent"), str)
+                and component["interaction"]["intent"].strip()
+            }
+            if any(component_id not in geometry.get(profile_id, {}) for component_id in order):
+                fail(issues, path, "focus order must reference active components in the selected profile", "interaction-contract")
+            if any(not isinstance(by_id.get(component_id, {}).get("interaction"), dict) for component_id in order):
+                fail(issues, path, "focus order entries must be interactive components", "interaction-contract")
+            if all_focusable and set(order) != active_interactive:
+                fail(issues, path, f"must include every active interactive component: {sorted(active_interactive)}", "interaction-contract")
+            if order and isinstance(primary_intent, str):
+                first_interaction = by_id.get(order[0], {}).get("interaction") if isinstance(by_id.get(order[0]), dict) else None
+                if not isinstance(first_interaction, dict) or first_interaction.get("intent") != primary_intent:
+                    fail(issues, path, "first focus target must carry the requested primary intent", "interaction-contract")
+        for policy_name in ("disabledIntentPolicy", "loadingIntentPolicy"):
+            if not isinstance(interaction_contract.get(policy_name), str) or not interaction_contract[policy_name].strip():
+                fail(issues, f"designContract.advancedComposition.interactionContract.{policy_name}", "must declare what happens to the primary intent", "interaction-contract")
+        semantics = spec.get("stateSemantics") if isinstance(spec.get("stateSemantics"), dict) else {}
+        for state_id, required_change in (("disabled", "interactable"), ("loading", "interactable")):
+            state_entry = semantics.get(state_id) if isinstance(semantics, dict) else None
+            effects = state_entry.get("effects", []) if isinstance(state_entry, dict) else []
+            effect_by_id = {effect.get("componentId"): effect.get("changes", {}) for effect in effects if isinstance(effect, dict)}
+            for mapping in declared_primary_mappings.values():
+                for profile_id, component_id in mapping.items():
+                    changes = effect_by_id.get(component_id, {})
+                    if changes.get(required_change) is not False:
+                        fail(issues, f"stateSemantics.{state_id}.effects", f"primary action '{component_id}' must set interactable=false under {state_id}", "interaction-contract")
+
+    state_impact = advanced.get("stateImpactPolicy")
+    if not isinstance(state_impact, dict):
+        fail(issues, "designContract.advancedComposition.stateImpactPolicy", "must cap affected-component ratio per state", "state-impact")
+    else:
+        ratios = state_impact.get("maxAffectedComponentRatio")
+        if not isinstance(ratios, dict):
+            fail(issues, "designContract.advancedComposition.stateImpactPolicy.maxAffectedComponentRatio", "must map every state to a ratio", "state-impact")
+            ratios = {}
+        semantics = spec.get("stateSemantics") if isinstance(spec.get("stateSemantics"), dict) else {}
+        for state_id in state_ids:
+            ratio = ratios.get(state_id)
+            if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 < float(ratio) <= 1:
+                fail(issues, f"designContract.advancedComposition.stateImpactPolicy.maxAffectedComponentRatio.{state_id}", "must be a ratio in (0,1]", "state-impact")
+                continue
+            affected = semantics.get(state_id, {}).get("affectedComponentIds", []) if isinstance(semantics.get(state_id), dict) else []
+            if not isinstance(affected, list):
+                continue
+            for profile_id in profile_ids:
+                active_ids = set(geometry.get(profile_id, {}))
+                active_affected = {component_id for component_id in affected if component_id in active_ids}
+                actual_ratio = len(active_affected) / max(len(active_ids), 1)
+                if actual_ratio > float(ratio) + 1e-9:
+                    fail(issues, f"stateSemantics.{state_id}.affectedComponentIds", f"profile '{profile_id}' affected ratio {actual_ratio:.3f} exceeds {float(ratio):.3f}", "state-impact")
+
+    anchor_contract = advanced.get("anchorContract")
+    if not isinstance(anchor_contract, dict):
+        fail(issues, "designContract.advancedComposition.anchorContract", "must declare numeric anchorMin/anchorMax/pivot for key profile components", "anchor-contract")
+    else:
+        if anchor_contract.get("coordinateSpace") != "unity-rect-transform-bottom-left":
+            fail(issues, "designContract.advancedComposition.anchorContract.coordinateSpace", "must declare final Unity RectTransform bottom-left coordinates", "anchor-contract")
+        required_by_profile = anchor_contract.get("requiredComponentIdsByProfile")
+        values_by_profile = anchor_contract.get("componentsByProfile")
+        if not isinstance(required_by_profile, dict) or not isinstance(values_by_profile, dict):
+            fail(issues, "designContract.advancedComposition.anchorContract", "must declare required components and numeric values by profile", "anchor-contract")
+            required_by_profile, values_by_profile = {}, {}
+        for profile_id in profile_ids:
+            path = f"designContract.advancedComposition.anchorContract.componentsByProfile.{profile_id}"
+            required_ids = required_by_profile.get(profile_id)
+            records = values_by_profile.get(profile_id)
+            if not isinstance(required_ids, list) or not required_ids:
+                fail(issues, f"designContract.advancedComposition.anchorContract.requiredComponentIdsByProfile.{profile_id}", "must list key active components", "anchor-contract")
+                required_ids = []
+            if not isinstance(records, dict):
+                fail(issues, path, "must map component ids to numeric anchor records", "anchor-contract")
+                records = {}
+            for component_id in required_ids:
+                record = records.get(component_id)
+                component = by_id.get(component_id)
+                if component is None or component_id not in geometry.get(profile_id, {}):
+                    fail(issues, path, f"component '{component_id}' must be active in profile '{profile_id}'", "anchor-contract")
+                    continue
+                if not isinstance(record, dict):
+                    fail(issues, f"{path}.{component_id}", "must declare anchorMin, anchorMax and pivot", "anchor-contract")
+                    continue
+                for field in ("anchorMin", "anchorMax", "pivot"):
+                    value = record.get(field)
+                    if not isinstance(value, list) or len(value) != 2 or any(isinstance(item, bool) or not isinstance(item, (int, float)) or not 0 <= float(item) <= 1 for item in value):
+                        fail(issues, f"{path}.{component_id}.{field}", "must be a normalized numeric [x,y] pair", "anchor-contract")
+                authored_pivot = (component.get("layout") or {}).get("anchor", {}).get("pivot") if isinstance(component.get("layout"), dict) else None
+                bounds = (component.get("layout") or {}).get("bounds") if isinstance(component.get("layout"), dict) else None
+                if isinstance(bounds, list) and len(bounds) == 4:
+                    expected_anchor_min = [float(bounds[0]), 1.0 - float(bounds[3])]
+                    expected_anchor_max = [float(bounds[2]), 1.0 - float(bounds[1])]
+                    for field, expected in (("anchorMin", expected_anchor_min), ("anchorMax", expected_anchor_max)):
+                        actual = record.get(field)
+                        if isinstance(actual, list) and len(actual) == 2 and any(abs(float(actual[index]) - expected[index]) > 1e-6 for index in range(2)):
+                            fail(issues, f"{path}.{component_id}.{field}", f"must equal the final Unity RectTransform value {expected}", "anchor-contract")
+                geometry_record = geometry.get(profile_id, {}).get(component_id, {})
+                if geometry_record.get("geometryReliable") is False:
+                    fail(issues, f"{path}.{component_id}", "layout-group-managed children cannot claim deterministic authored RectTransform anchors", "anchor-contract")
+                if isinstance(authored_pivot, list) and isinstance(record.get("pivot"), list) and authored_pivot != record["pivot"]:
+                    fail(issues, f"{path}.{component_id}.pivot", "must equal the authored Unity RectTransform pivot", "anchor-contract")
+            extras = sorted(set(records) - set(required_ids))
+            if extras:
+                fail(issues, path, f"contains undeclared component anchors: {extras}", "anchor-contract")
 
     def profile_map(entry: dict[str, Any], path: str) -> dict[str, str]:
         mapping = entry.get("componentIdsByProfile")
@@ -1249,6 +1520,143 @@ def validate_advanced_composition(spec: dict[str, Any], profiles: list[Any], com
                 fail(issues, f"{path}.componentIds", f"'{component_id}' must be active in profile '{profile_id}'", "interaction-density")
             elif not isinstance(target, list) or len(target) != 2 or any(isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0 for value in target):
                 fail(issues, f"{path}.componentIds", f"'{component_id}' must declare an interaction targetSize", "interaction-density")
+
+    # High-fidelity packets must also declare the amount of content and the
+    # visual vocabulary expected in each profile. These checks prevent a
+    # technically valid but visually empty screen from passing the advanced
+    # gate, and make state colors/spacing auditable instead of subjective.
+    content_requirements = advanced.get("contentRequirements")
+    if not isinstance(content_requirements, dict):
+        fail(issues, "designContract.advancedComposition.contentRequirements", "must declare per-profile content density, token consumers and state token bindings", "content-density")
+        return
+    profile_requirements = content_requirements.get("profiles")
+    if not isinstance(profile_requirements, dict):
+        fail(issues, "designContract.advancedComposition.contentRequirements.profiles", "must map every declared profile to content requirements", "content-density")
+        profile_requirements = {}
+
+    def active_components(nodes: Any, profile_id: str) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for node in nodes if isinstance(nodes, list) else []:
+            if not isinstance(node, dict) or not _profile_active(node, profile_id):
+                continue
+            result.append(node)
+            result.extend(active_components(node.get("children"), profile_id))
+        return result
+
+    for profile_id in profile_ids:
+        path = f"designContract.advancedComposition.contentRequirements.profiles.{profile_id}"
+        requirement = profile_requirements.get(profile_id)
+        if not isinstance(requirement, dict):
+            fail(issues, path, "must declare minComponentCount, minTextCount, minInteractiveCount and requiredTypes", "content-density")
+            continue
+        nodes = active_components(components, profile_id)
+        text_count = sum(1 for node in nodes if node.get("type") in {"text", "subtitle", "nameplate"} or isinstance((node.get("content") or {}).get("text"), str))
+        interactive_count = sum(1 for node in nodes if isinstance(node.get("interaction"), dict) and isinstance(node["interaction"].get("intent"), str) and node["interaction"]["intent"].strip())
+        minimums = (("minComponentCount", len(nodes)), ("minTextCount", text_count), ("minInteractiveCount", interactive_count))
+        for field, actual in minimums:
+            expected = requirement.get(field)
+            if isinstance(expected, bool) or not isinstance(expected, int) or expected < 0:
+                fail(issues, f"{path}.{field}", "must be a non-negative integer", "content-density")
+            elif actual < expected:
+                fail(issues, f"{path}.{field}", f"profile '{profile_id}' has {actual}; requires at least {expected}", "content-density")
+        required_types = requirement.get("requiredTypes")
+        if not isinstance(required_types, list) or not required_types:
+            fail(issues, f"{path}.requiredTypes", "must list the component grammar required by the profile", "content-density")
+        else:
+            actual_types = {str(node.get("type")) for node in nodes}
+            for index, component_type in enumerate(required_types):
+                if not isinstance(component_type, str) or not component_type.strip():
+                    fail(issues, f"{path}.requiredTypes[{index}]", "must contain non-empty component types", "content-density")
+                elif component_type not in actual_types:
+                    fail(issues, f"{path}.requiredTypes[{index}]", f"profile '{profile_id}' is missing component type '{component_type}'", "content-density")
+        zones = requirement.get("zones", [])
+        if not isinstance(zones, list) or not zones:
+            fail(issues, f"{path}.zones", "must declare minimum content for each required zone", "content-density")
+        else:
+            for index, zone_rule in enumerate(zones):
+                zone_path = f"{path}.zones[{index}]"
+                if not isinstance(zone_rule, dict) or not isinstance(zone_rule.get("zone"), str) or not zone_rule["zone"].strip():
+                    fail(issues, zone_path, "must contain a non-empty zone and minimum", "content-density")
+                    continue
+                minimum = zone_rule.get("minimum")
+                if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 1:
+                    fail(issues, f"{zone_path}.minimum", "must be a positive integer", "content-density")
+                    continue
+                actual = sum(1 for node in nodes if node.get("zone") == zone_rule["zone"])
+                if actual < minimum:
+                    fail(issues, zone_path, f"profile '{profile_id}' zone '{zone_rule['zone']}' has {actual}; requires at least {minimum}", "content-density")
+
+    token_consumers = content_requirements.get("requiredTokenConsumers")
+    if not isinstance(token_consumers, dict) or not token_consumers:
+        fail(issues, "designContract.advancedComposition.contentRequirements.requiredTokenConsumers", "must declare minimum consumers for the screen's base visual tokens", "token-coverage")
+    else:
+        consumer_counts: dict[str, int] = {}
+        for node in by_id.values():
+            token = node.get("colorToken")
+            if isinstance(token, str):
+                consumer_counts[token] = consumer_counts.get(token, 0) + 1
+        for token, minimum in token_consumers.items():
+            path = f"designContract.advancedComposition.contentRequirements.requiredTokenConsumers.{token}"
+            if token not in (tokens if isinstance(tokens, dict) else {}):
+                fail(issues, path, "must reference a declared token", "token-coverage")
+            elif isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 1:
+                fail(issues, path, "must be a positive consumer count", "token-coverage")
+            elif consumer_counts.get(token, 0) < minimum:
+                fail(issues, path, f"token '{token}' has {consumer_counts.get(token, 0)} consumers; requires at least {minimum}", "token-coverage")
+
+    state_token_bindings = content_requirements.get("stateTokenBindings")
+    if not isinstance(state_token_bindings, list) or not state_token_bindings:
+        fail(issues, "designContract.advancedComposition.contentRequirements.stateTokenBindings", "must bind state signals to semantic tokens", "state-token")
+    else:
+        for index, binding in enumerate(state_token_bindings):
+            path = f"designContract.advancedComposition.contentRequirements.stateTokenBindings[{index}]"
+            if not isinstance(binding, dict):
+                fail(issues, path, "must be an object", "state-token")
+                continue
+            state_id, token, signal = binding.get("stateId"), binding.get("token"), binding.get("signal")
+            if state_id not in state_ids:
+                fail(issues, f"{path}.stateId", "must reference a declared state", "state-token")
+                continue
+            if not isinstance(token, str) or token not in (tokens if isinstance(tokens, dict) else {}):
+                fail(issues, f"{path}.token", "must reference a declared visual token", "state-token")
+            if signal not in {"outline", "graphicColor", "graphicAlpha", "text"}:
+                fail(issues, f"{path}.signal", "must be outline, graphicColor, graphicAlpha or text", "state-token")
+            component_ids = binding.get("componentIds")
+            if not isinstance(component_ids, list) or not component_ids:
+                fail(issues, f"{path}.componentIds", "must identify affected components", "state-token")
+                continue
+            semantics_entry = (spec.get("stateSemantics") or {}).get(state_id, {})
+            affected = set(semantics_entry.get("affectedComponentIds", [])) if isinstance(semantics_entry, dict) else set()
+            effects = semantics_entry.get("effects", []) if isinstance(semantics_entry, dict) else []
+            effect_by_id = {effect.get("componentId"): effect.get("changes", {}) for effect in effects if isinstance(effect, dict)}
+            for component_id in component_ids:
+                if component_id not in by_id:
+                    fail(issues, f"{path}.componentIds", f"component '{component_id}' is not declared", "state-token")
+                elif component_id not in affected:
+                    fail(issues, f"{path}.componentIds", f"component '{component_id}' is not affected by state '{state_id}'", "state-token")
+                elif signal == "outline" and (effect_by_id.get(component_id) or {}).get("outline") is not True:
+                    fail(issues, f"{path}.componentIds", f"component '{component_id}' lacks an executable outline effect", "state-token")
+                elif signal == "graphicColor":
+                    expected_color = (tokens or {}).get(token) if isinstance(tokens, dict) else None
+                    if (effect_by_id.get(component_id) or {}).get("graphicColor") != expected_color:
+                        fail(issues, f"{path}.componentIds", f"component '{component_id}' graphicColor does not resolve to token '{token}'", "state-token")
+
+    spacing_scale = content_requirements.get("spacingScalePx")
+    if not isinstance(spacing_scale, list) or not spacing_scale or any(isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0 for value in spacing_scale):
+        fail(issues, "designContract.advancedComposition.contentRequirements.spacingScalePx", "must declare positive spacing values used by layout rhythm", "spacing-rhythm")
+    else:
+        allowed_spacing = {round(float(value), 4) for value in spacing_scale}
+        for component_id, component in by_id.items():
+            layout = component.get("layout") if isinstance(component.get("layout"), dict) else {}
+            candidates: list[tuple[str, float]] = []
+            if isinstance(layout.get("gap"), (int, float)) and not isinstance(layout.get("gap"), bool):
+                candidates.append(("gap", float(layout["gap"])))
+            padding = layout.get("padding")
+            if isinstance(padding, list):
+                candidates.extend(("padding", float(value)) for value in padding if isinstance(value, (int, float)) and not isinstance(value, bool))
+            for field, value in candidates:
+                if round(value, 4) not in allowed_spacing:
+                    fail(issues, f"components[{component_id}].layout.{field}", f"spacing {value:g}px is outside the declared spacingScalePx", "spacing-rhythm")
 
 
 def _profile_active(component: dict[str, Any], profile_id: str) -> bool:

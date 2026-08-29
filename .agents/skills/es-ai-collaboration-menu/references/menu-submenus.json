@@ -51,6 +51,17 @@
         {"id":"discover-aiwarnings","label":"发现 AIWarnings 规则","routeKey":"aiwarnings","relatedSkills":["es-aiwarning-authoring"]},
         {"id":"discover-combined","label":"Skill + Knowledge + AIWarnings","routeKey":"context-collection","relatedSkills":["es-ai-interaction-governance","es-aibrain-route-authoring"]}
       ]
+    },
+    "ai-mechanism-atlas": {
+      "submenuId":"es-menu-ai-mechanism-atlas.v1",
+      "options":[
+        {"id":"atlas-super-semantics","label":"超级语义触发器","routeKey":"super-semantics","relatedSkills":["es-ai-interaction-governance"]},
+        {"id":"atlas-capabilities","label":"可用能力与 Skill","routeKey":"capability-discovery","relatedSkills":["es-ai-collaboration-menu","es-skill-governance","es-skill-validator"]},
+        {"id":"atlas-permissions","label":"权限与副作用边界","routeKey":"permission-boundary","relatedSkills":["es-ai-interaction-governance","es-use-ai-command"]},
+        {"id":"atlas-evidence","label":"证据等级与未证实项","routeKey":"evidence-boundary","relatedSkills":["es-ai-interaction-governance","es-release-acceptance"]},
+        {"id":"atlas-mechanisms","label":"公开 Agent 机制适配","routeKey":"agent-mechanism-replication","relatedSkills":["es-agent-mechanism-replication","es-first-principles-analysis"]},
+        {"id":"atlas-route-help","label":"按目标选择入口","routeKey":"routing","relatedSkills":["es-aibrain-route-authoring","es-knowledge-validator"]}
+      ]
     }
   }
 }

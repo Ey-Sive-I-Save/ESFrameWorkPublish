@@ -386,6 +386,12 @@ def assert_advanced_composition_contract(registry: dict) -> None:
     project_root = next(parent for parent in [SCRIPT_DIR, *SCRIPT_DIR.parents] if (parent / ".agents").is_dir() and (parent / "Assets").is_dir())
     source = project_root / "Assets/UI/Contracts/Generated/arena-combat-hud-proof-v1/arena-combat-hud-proof-v2-iteration.screen-spec.v3.json"
     candidate = json.loads(source.read_text(encoding="utf-8"))
+    loading = candidate["stateSemantics"]["loading"]
+    for component_id in ("wide-skill-primary", "narrow-skill-primary"):
+        if component_id not in loading["affectedComponentIds"]:
+            loading["affectedComponentIds"].append(component_id)
+            loading["effects"].append({"componentId": component_id, "changes": {"interactable": False, "graphicAlpha": 0.72}})
+    bind_state_variants(candidate)
     candidate["designContract"]["advancedComposition"] = {
         "primaryActions": [{"logicalId": "combat-primary", "intent": "cast-primary", "componentIdsByProfile": {"wide": "wide-skill-primary", "narrow": "narrow-skill-primary"}}],
         "focalTreatment": "none",
@@ -404,10 +410,91 @@ def assert_advanced_composition_contract(registry: dict) -> None:
             {"id": "combat-actions-wide", "profileId": "wide", "componentIds": ["wide-skill-primary", "wide-skill-secondary", "wide-skill-utility", "wide-settings"], "minGapPx": 8, "maxTargets": 4},
             {"id": "combat-actions-narrow", "profileId": "narrow", "componentIds": ["narrow-skill-primary", "narrow-skill-secondary", "narrow-skill-utility", "narrow-settings"], "minGapPx": 8, "maxTargets": 4},
         ]},
+        "contentRequirements": {
+            "profiles": {
+                "wide": {"minComponentCount": 10, "minTextCount": 2, "minInteractiveCount": 4, "requiredTypes": ["frame", "text", "button", "bar"], "zones": [{"zone": "safe-area", "minimum": 6}, {"zone": "action-bar", "minimum": 4}]},
+                "narrow": {"minComponentCount": 10, "minTextCount": 2, "minInteractiveCount": 4, "requiredTypes": ["frame", "text", "button", "bar"], "zones": [{"zone": "safe-area", "minimum": 6}, {"zone": "action-bar", "minimum": 4}]},
+            },
+            "requiredTokenConsumers": {"surface": 1, "text": 1, "accent": 1},
+            "stateTokenBindings": [
+                {"stateId": "selected", "token": "focus", "signal": "outline", "componentIds": ["wide-skill-primary", "narrow-skill-primary"]},
+                {"stateId": "error", "token": "danger", "signal": "graphicColor", "componentIds": ["wide-target-name", "narrow-target-name"]},
+            ],
+            "spacingScalePx": [4, 8, 10, 12, 14, 16, 20, 24],
+        },
+        "visualHierarchy": {
+            "coveragePolicy": "declared-key-components",
+            "keyComponentIds": [
+                "wide-player-panel", "wide-target-panel", "wide-quest-feed", "wide-center-status", "wide-action-bar", "wide-skill-primary",
+                "narrow-player-panel", "narrow-target-panel", "narrow-quest-feed", "narrow-center-status", "narrow-action-bar", "narrow-skill-primary",
+            ],
+            "primaryActionBandId": "action",
+            "bands": [
+                {"id": "context", "rank": 1, "emphasis": 2, "componentIds": ["wide-player-panel", "wide-target-panel", "wide-quest-feed", "narrow-player-panel", "narrow-target-panel", "narrow-quest-feed"]},
+                {"id": "feedback", "rank": 2, "emphasis": 3, "componentIds": ["wide-center-status", "narrow-center-status"]},
+                {"id": "action", "rank": 3, "emphasis": 5, "componentIds": ["wide-action-bar", "wide-skill-primary", "narrow-action-bar", "narrow-skill-primary"]},
+            ],
+        },
+        "interactionContract": {
+            "inputModes": ["pointer", "keyboard", "gamepad", "touch"],
+            "focusPolicy": "explicit-order",
+            "defaultFocusIntent": "cast-primary",
+            "focusOrderByProfile": {
+                "wide": ["wide-skill-primary", "wide-skill-secondary", "wide-skill-utility", "wide-settings"],
+                "narrow": ["narrow-skill-primary", "narrow-skill-secondary", "narrow-skill-utility", "narrow-settings"],
+            },
+            "allInteractiveComponentsFocusable": True,
+            "disabledIntentPolicy": "reject",
+            "loadingIntentPolicy": "defer",
+        },
+        "stateImpactPolicy": {"maxAffectedComponentRatio": {state["id"]: 0.3 for state in candidate["states"]}},
+        "anchorContract": {
+            "coordinateSpace": "unity-rect-transform-bottom-left",
+            "requiredComponentIdsByProfile": {
+                "wide": ["wide-player-panel", "wide-target-panel", "wide-quest-feed", "wide-center-status", "wide-action-bar"],
+                "narrow": ["narrow-player-panel", "narrow-target-panel", "narrow-quest-feed", "narrow-center-status", "narrow-action-bar"],
+            },
+            "componentsByProfile": {
+                "wide": {
+                    "wide-player-panel": {"anchorMin": [0.03, 0.78], "anchorMax": [0.31, 0.96], "pivot": [0, 1]},
+                    "wide-target-panel": {"anchorMin": [0.69, 0.78], "anchorMax": [0.97, 0.96], "pivot": [1, 1]},
+                    "wide-quest-feed": {"anchorMin": [0.03, 0.43], "anchorMax": [0.29, 0.71], "pivot": [0, 0.5]},
+                    "wide-center-status": {"anchorMin": [0.34, 0.48], "anchorMax": [0.66, 0.69], "pivot": [0.5, 0.5]},
+                    "wide-action-bar": {"anchorMin": [0.34, 0.06], "anchorMax": [0.97, 0.3], "pivot": [1, 0]},
+                },
+                "narrow": {
+                    "narrow-player-panel": {"anchorMin": [0.04, 0.84], "anchorMax": [0.96, 0.97], "pivot": [0.5, 1]},
+                    "narrow-target-panel": {"anchorMin": [0.04, 0.69], "anchorMax": [0.96, 0.82], "pivot": [0.5, 0.5]},
+                    "narrow-quest-feed": {"anchorMin": [0.04, 0.5], "anchorMax": [0.96, 0.66], "pivot": [0.5, 0.5]},
+                    "narrow-center-status": {"anchorMin": [0.04, 0.32], "anchorMax": [0.96, 0.46], "pivot": [0.5, 0.5]},
+                    "narrow-action-bar": {"anchorMin": [0.04, 0.05], "anchorMax": [0.96, 0.27], "pivot": [0.5, 0]},
+                },
+            },
+        },
     }
     issues = validate(candidate, registry, require_advanced_composition=True)
     if issues:
         raise AssertionError("valid advanced composition contract must pass: " + json.dumps(issues, ensure_ascii=False))
+    negative = json.loads(json.dumps(candidate))
+    negative["designContract"]["advancedComposition"]["visualHierarchy"]["bands"][2]["componentIds"].remove("wide-skill-primary")
+    issues = validate(negative, registry, require_advanced_composition=True)
+    if not any(issue.get("code") == "visual-hierarchy" for issue in issues):
+        raise AssertionError("a primary action outside the action hierarchy band must be rejected")
+    negative = json.loads(json.dumps(candidate))
+    negative["designContract"]["advancedComposition"]["interactionContract"]["focusOrderByProfile"]["wide"] = ["wide-settings", "wide-skill-primary", "wide-skill-secondary", "wide-skill-utility"]
+    issues = validate(negative, registry, require_advanced_composition=True)
+    if not any(issue.get("code") == "interaction-contract" for issue in issues):
+        raise AssertionError("focus order that does not start at the primary intent must be rejected")
+    negative = json.loads(json.dumps(candidate))
+    negative["designContract"]["advancedComposition"]["stateImpactPolicy"]["maxAffectedComponentRatio"]["error"] = 0.01
+    issues = validate(negative, registry, require_advanced_composition=True)
+    if not any(issue.get("code") == "state-impact" for issue in issues):
+        raise AssertionError("a state that exceeds its profile impact budget must be rejected")
+    negative = json.loads(json.dumps(candidate))
+    negative["designContract"]["advancedComposition"]["anchorContract"]["componentsByProfile"]["wide"]["wide-player-panel"]["anchorMin"] = [0.04, 0.78]
+    issues = validate(negative, registry, require_advanced_composition=True)
+    if not any(issue.get("code") == "anchor-contract" for issue in issues):
+        raise AssertionError("an anchor contract that drifts from the materialized RectTransform projection must be rejected")
     plans: list[dict] = []
     for profile in candidate["profiles"]:
         safe = profile.get("safeArea", [0, 0, 1, 1])
@@ -503,9 +590,17 @@ def assert_focal_crop_materialization_contract() -> None:
         '["graphicColor"] = graphic == null ? null : "#" + ColorUtility.ToHtmlStringRGBA(graphic.color)',
         '["wrapText"] = wrapText',
         '["descendantTextStates"] = descendantTextStates',
+        '["parentPath"] = parentPath',
+        '["siblingIndex"] = rect.GetSiblingIndex()',
+        '["anchorMin"] = new JArray(rect.anchorMin.x, rect.anchorMin.y)',
+        '["anchorMax"] = new JArray(rect.anchorMax.x, rect.anchorMax.y)',
+        '["pivot"] = new JArray(rect.pivot.x, rect.pivot.y)',
+        'rect.pivot = new Vector2(intent.pivotX, intent.pivotY)',
     )
     if any(fragment not in materializer for fragment in required_materializer_fragments):
         raise AssertionError("focal-cover policy must flow into materialization and both snapshot formats")
+    if 'rect.pivot = new Vector2(intent.pivotX, 1f - intent.pivotY)' in materializer:
+        raise AssertionError("the Materializer must preserve the authored Unity RectTransform pivot")
     required_crop_fragments = (
         "ShiftCropToContain",
         "public float SourceAspectRatio",
@@ -532,14 +627,32 @@ def assert_snapshot_evidence_gate() -> None:
         spec_hash = __import__("hashlib").sha256(spec_path.read_bytes()).hexdigest()
         evidence_root = root / "evidence"
         evidence_root.mkdir()
+        def visibility(rect: dict[str, float], clips: list[dict] | None = None, has_non_rect_mask: bool = False) -> dict:
+            return {
+                "clipAncestors": [] if clips is None else clips,
+                "visibleRect": dict(rect),
+                "visibleFraction": 1.0,
+                "hasNonRectMaskAncestor": has_non_rect_mask,
+            }
+
+        def input_reachability(*, blocker: dict | None = None, groups: list[dict] | None = None, input_allowed: bool = True, visible_by_groups: bool = True, reachable: bool = True) -> dict:
+            return {
+                "canvasGroupChain": [] if groups is None else groups,
+                "inputAllowedByCanvasGroups": input_allowed,
+                "visibleByCanvasGroups": visible_by_groups,
+                "raycastBlocker": blocker,
+                "reachable": reachable,
+            }
+
         for profile_id, width, height in (("wide", 1920, 1080), ("narrow", 1080, 1920)):
             for state_id in ("default", "selected"):
                 common = {"schemaVersion": 1, "panelId": "snapshot-proof", "profileId": profile_id, "stateId": state_id, "runId": "run-1", "specHash": spec_hash, "sceneGeneration": 1}
                 viewport = {"width": width, "height": height, "orientation": "landscape" if width >= height else "portrait"}
                 canvas = {"renderMode": "ScreenSpaceCamera", "scaler": {"uiScaleMode": "ScaleWithScreenSize", "referenceResolution": [1920, 1080], "screenMatchMode": "MatchWidthOrHeight", "match": 0.5}}
                 structure = {"parentPath": "Canvas/snapshot-proof", "siblingIndex": 0, "anchorMin": [0.0, 0.0], "anchorMax": [1.0, 1.0], "pivot": [0.5, 0.5]}
-                editor_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "screenRect": {"x": 20, "y": 20, "width": width - 40, "height": height - 40}, "focalCrop": {"safeCropSatisfied": True}, **structure}
-                runtime_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "hasButton": False, "interactionTarget": None, "screenX": 20, "screenY": 20, "screenWidth": width - 40, "screenHeight": height - 40, "focalCrop": {"safeCropSatisfied": True}, **structure}
+                element_rect = {"x": 20, "y": 20, "width": width - 40, "height": height - 40}
+                editor_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "screenRect": element_rect, "layout": None, "focalCrop": {"safeCropSatisfied": True}, "visibility": visibility(element_rect), "inputReachability": input_reachability(), **structure}
+                runtime_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "hasButton": False, "interactable": False, "interactionTarget": None, "screenX": 20, "screenY": 20, "screenWidth": width - 40, "screenHeight": height - 40, "layout": None, "focalCrop": {"safeCropSatisfied": True}, "visibility": visibility(element_rect), "inputReachability": input_reachability(), **structure}
                 editor = {**common, "command": "editor.snapshot", "captureKey": f"snapshot-proof.{profile_id}.{state_id}", "rootPath": "Canvas/snapshot-proof", "viewport": viewport, "canvas": canvas, "elements": [editor_element]}
                 runtime = {**common, "command": "ui.snapshot", "rootPath": "Canvas/snapshot-proof", "viewport": viewport, "canvas": canvas, "screenWidth": width, "screenHeight": height, "uiElements": [runtime_element]}
                 (evidence_root / f"{profile_id}__{state_id}.editor.json").write_text(json.dumps(editor), encoding="utf-8")
@@ -547,6 +660,15 @@ def assert_snapshot_evidence_gate() -> None:
         receipt = validate_snapshot_evidence(spec_path, evidence_root)
         if receipt["status"] != "passed" or receipt["issues"]:
             raise AssertionError("paired snapshot evidence with safe focal crops must pass")
+        missing_layout_path = evidence_root / "wide__default.ui.json"
+        missing_layout = json.loads(missing_layout_path.read_text(encoding="utf-8"))
+        missing_layout["uiElements"][0].pop("layout")
+        missing_layout_path.write_text(json.dumps(missing_layout), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-layout-invalid" for issue in receipt["issues"]):
+            raise AssertionError("every snapshot element must declare layout-controller evidence")
+        missing_layout["uiElements"][0]["layout"] = None
+        missing_layout_path.write_text(json.dumps(missing_layout), encoding="utf-8")
         broken_path = evidence_root / "wide__selected.ui.json"
         broken = json.loads(broken_path.read_text(encoding="utf-8"))
         broken["uiElements"][0]["screenX"] = 21
@@ -608,12 +730,34 @@ def assert_snapshot_evidence_gate() -> None:
         if not any(issue.get("code") == "snapshot-structure-mismatch" and issue.get("field") == "parentPath" for issue in receipt["issues"]):
             raise AssertionError("editor and UI element parent paths must agree")
         broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof"
+        broken_editor["elements"][0]["parentPath"] = "Canvas/snapshot-proof/missing-parent"
+        broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof/missing-parent"
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-parent-path-missing" for issue in receipt["issues"]):
+            raise AssertionError("colluding snapshots must not reference a nonexistent parent path")
+        broken_editor["elements"][0]["parentPath"] = "Canvas/snapshot-proof"
+        broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof"
         broken["uiElements"][0]["siblingIndex"] = 1
         broken_path.write_text(json.dumps(broken), encoding="utf-8")
         receipt = validate_snapshot_evidence(spec_path, evidence_root)
         if not any(issue.get("code") == "snapshot-structure-mismatch" and issue.get("field") == "siblingIndex" for issue in receipt["issues"]):
             raise AssertionError("editor and UI sibling order must agree")
         broken["uiElements"][0]["siblingIndex"] = 0
+        duplicate_editor = json.loads(json.dumps(broken_editor["elements"][0]))
+        duplicate_runtime = json.loads(json.dumps(broken["uiElements"][0]))
+        duplicate_editor["path"] = "Canvas/snapshot-proof/hero-art-duplicate"
+        duplicate_runtime["path"] = "Canvas/snapshot-proof/hero-art-duplicate"
+        broken_editor["elements"].append(duplicate_editor)
+        broken["uiElements"].append(duplicate_runtime)
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-sibling-index-duplicate" for issue in receipt["issues"]):
+            raise AssertionError("colluding snapshots must not duplicate a sibling index under one parent")
+        broken_editor["elements"].pop()
+        broken["uiElements"].pop()
         broken["uiElements"][0]["anchorMin"] = [0.1, 0.0]
         broken_path.write_text(json.dumps(broken), encoding="utf-8")
         receipt = validate_snapshot_evidence(spec_path, evidence_root)
@@ -651,11 +795,112 @@ def assert_snapshot_evidence_gate() -> None:
         receipt = validate_snapshot_evidence(spec_path, evidence_root)
         if not any(issue.get("code") == "snapshot-interaction-target-size" for issue in receipt["issues"]):
             raise AssertionError("active buttons must meet their declared interaction target dimensions")
+        broken["uiElements"][0]["layout"] = {"layoutGroup": None, "contentSizeFitter": None}
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-layout-mismatch" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI layout-controller snapshots must agree")
+        broken["uiElements"][0]["layout"] = None
+        conflict_layout = {
+            "layoutGroup": {"type": "VerticalLayoutGroup", "enabled": True, "childAxisControl": {"x": True, "y": False}},
+            "contentSizeFitter": None,
+        }
+        child_layout = {
+            "layoutGroup": None,
+            "contentSizeFitter": {"enabled": True, "horizontalFit": "PreferredSize", "verticalFit": "Unconstrained", "selfAxisControl": {"x": True, "y": False}},
+        }
+        parent_editor = json.loads(json.dumps(broken_editor["elements"][0]))
+        parent_runtime = json.loads(json.dumps(broken["uiElements"][0]))
+        parent_editor["path"] = "Canvas/snapshot-proof/layout-parent"
+        parent_runtime["path"] = "Canvas/snapshot-proof/layout-parent"
+        parent_editor["layout"] = conflict_layout
+        parent_runtime["layout"] = conflict_layout
+        broken_editor["elements"][0]["parentPath"] = "Canvas/snapshot-proof/layout-parent"
+        broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof/layout-parent"
+        broken_editor["elements"][0]["layout"] = child_layout
+        broken["uiElements"][0]["layout"] = child_layout
+        broken_editor["elements"].append(parent_editor)
+        broken["uiElements"].append(parent_runtime)
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-layout-axis-conflict" and issue.get("axis") == "x" for issue in receipt["issues"]):
+            raise AssertionError("parent LayoutGroup and child ContentSizeFitter must not control the same axis")
+        broken_editor["elements"].pop()
+        broken["uiElements"].pop()
+        broken_editor["elements"][0]["parentPath"] = "Canvas/snapshot-proof"
+        broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof"
+        broken_editor["elements"][0]["layout"] = None
+        broken["uiElements"][0]["layout"] = None
         broken["uiElements"][0]["hasButton"] = False
+        broken["uiElements"][0]["interactable"] = False
         broken["uiElements"][0]["interactionTarget"] = None
         broken_editor["elements"][0]["interactionTarget"] = None
         broken["uiElements"][0]["screenWidth"] = snapshot_width - 40
         broken_editor["elements"][0]["screenRect"]["width"] = snapshot_width - 40
+        broken["uiElements"][0].pop("visibility")
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-visibility-invalid" for issue in receipt["issues"]):
+            raise AssertionError("every snapshot element must serialize clipping visibility evidence")
+        broken["uiElements"][0]["visibility"] = json.loads(json.dumps(broken_editor["elements"][0]["visibility"]))
+        broken["uiElements"][0]["visibility"]["visibleFraction"] = 0.5
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-visibility-mismatch" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI clipping snapshots must agree")
+        visible_rect = {"x": 20, "y": 20, "width": 100, "height": 40}
+        clipped_visibility = {
+            "clipAncestors": [{"path": "Canvas/snapshot-proof/viewport", "type": "RectMask2D", "enabled": True, "screenRect": visible_rect}],
+            "visibleRect": visible_rect,
+            "visibleFraction": 4000.0 / float((snapshot_width - 40) * (snapshot_height - 40)),
+            "hasNonRectMaskAncestor": False,
+        }
+        broken_editor["elements"][0]["visibility"] = json.loads(json.dumps(clipped_visibility))
+        broken["uiElements"][0]["visibility"] = json.loads(json.dumps(clipped_visibility))
+        broken_editor["elements"][0]["inputReachability"] = input_reachability()
+        broken["uiElements"][0]["inputReachability"] = input_reachability()
+        broken_editor["elements"][0]["interactionTarget"] = [44, 44]
+        broken["uiElements"][0].update({"hasButton": True, "interactable": True, "interactionTarget": [44, 44]})
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-interaction-visible-size" for issue in receipt["issues"]):
+            raise AssertionError("interactive targets must retain their declared visible target size after RectMask2D clipping")
+        full_visibility = visibility({"x": 20, "y": 20, "width": snapshot_width - 40, "height": snapshot_height - 40})
+        broken_editor["elements"][0]["visibility"] = json.loads(json.dumps(full_visibility))
+        broken["uiElements"][0]["visibility"] = json.loads(json.dumps(full_visibility))
+        blocker = {"path": "Canvas/snapshot-proof/opaque-overlay", "siblingIndex": 1, "reason": "same-parent-opaque-graphic", "screenRect": {"x": 20, "y": 20, "width": 100, "height": 100}}
+        broken_editor["elements"][0]["inputReachability"] = input_reachability(blocker=blocker, reachable=False)
+        broken["uiElements"][0]["inputReachability"] = input_reachability(blocker=blocker, reachable=False)
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-interaction-raycast-blocked" for issue in receipt["issues"]):
+            raise AssertionError("a raycast-enabled opaque sibling overlay must block the covered active button")
+        # A decorative overlay reports no blocker because its Graphic.raycastTarget is false.
+        broken_editor["elements"][0]["inputReachability"] = input_reachability()
+        broken["uiElements"][0]["inputReachability"] = input_reachability()
+        blocked_group = [{"path": "Canvas/snapshot-proof/disabled-input-group", "enabled": True, "alpha": 1.0, "interactable": True, "blocksRaycasts": False, "ignoreParentGroups": False}]
+        broken_editor["elements"][0]["inputReachability"] = input_reachability(groups=blocked_group, input_allowed=False, reachable=False)
+        broken["uiElements"][0]["inputReachability"] = input_reachability(groups=blocked_group, input_allowed=False, reachable=False)
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-interaction-unreachable" for issue in receipt["issues"]):
+            raise AssertionError("CanvasGroup blocksRaycasts must prevent active button reachability")
+        broken_editor["elements"][0]["inputReachability"] = input_reachability()
+        broken["uiElements"][0]["inputReachability"] = input_reachability()
+        broken["uiElements"][0]["inputReachability"]["reachable"] = False
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-input-reachability-mismatch" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI reachability payloads must not drift")
+        broken_editor["elements"][0]["inputReachability"] = input_reachability()
+        broken["uiElements"][0]["inputReachability"] = input_reachability()
+        broken["uiElements"][0].update({"hasButton": False, "interactable": False, "interactionTarget": None})
+        broken_editor["elements"][0]["interactionTarget"] = None
         broken["uiElements"][0]["focalCrop"]["safeCropSatisfied"] = False
         broken_path.write_text(json.dumps(broken), encoding="utf-8")
         receipt = validate_snapshot_evidence(spec_path, evidence_root)
@@ -674,6 +919,25 @@ def assert_snapshot_evidence_gate() -> None:
         expected_codes = {"missing-profile-matrix", "missing-state-matrix"}
         if not expected_codes.issubset({str(issue.get("code")) for issue in receipt["issues"]}):
             raise AssertionError("empty profile/state matrices must block snapshot evidence")
+
+
+def assert_snapshot_layout_materializer_contract() -> None:
+    """Keep both snapshot channels bound to the same controller-state serializer."""
+    materializer = (SCRIPT_DIR.parents[3] / "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs").read_text(encoding="utf-8")
+    required_fragments = (
+        '["layout"] = BuildLayoutSnapshot(rect)',
+        'ContentSizeFitter fitter = rect == null ? null : rect.GetComponent<ContentSizeFitter>();',
+        '["childAxisControl"] = new JObject',
+        '["selfAxisControl"] = new JObject',
+        'private static bool LayoutGroupControlsChildAxis',
+        '["visibility"] = visibility',
+        '["inputReachability"] = BuildInputReachabilitySnapshot',
+        'RectMask2D rectMask = current.GetComponent<RectMask2D>();',
+        'CanvasGroup group = current.GetComponent<CanvasGroup>();',
+        'FindSameParentRaycastBlocker(instance, rect, width, height)',
+    )
+    if any(fragment not in materializer for fragment in required_fragments):
+        raise AssertionError("Materializer must serialize matching layout ownership, clipping and input reachability evidence in both snapshots")
 
 
 def assert_gpu_evidence_gate() -> None:
@@ -708,14 +972,22 @@ def assert_gpu_evidence_gate() -> None:
             "canvas": {"renderMode": "ScreenSpaceCamera", "scaler": {"uiScaleMode": "ScaleWithScreenSize", "referenceResolution": [1920, 1080], "screenMatchMode": "MatchWidthOrHeight", "match": 0.5}},
             "screenWidth": 64, "screenHeight": 48,
         }
+        root_structure = {"parentPath": "Canvas/gpu-proof", "siblingIndex": 0, "anchorMin": [0.0, 0.0], "anchorMax": [1.0, 1.0], "pivot": [0.5, 0.5]}
+        target_structure = {"parentPath": "Canvas/gpu-proof/root", "siblingIndex": 0, "anchorMin": [0.0, 0.0], "anchorMax": [1.0, 1.0], "pivot": [0.5, 0.5]}
+        def gpu_visibility(x: int, y: int, width: int, height: int) -> dict:
+            return {"clipAncestors": [], "visibleRect": {"x": x, "y": y, "width": width, "height": height}, "visibleFraction": 1.0, "hasNonRectMaskAncestor": False}
+
+        def gpu_reachability() -> dict:
+            return {"canvasGroupChain": [], "inputAllowedByCanvasGroups": True, "visibleByCanvasGroups": True, "raycastBlocker": None, "reachable": True}
+
         snapshot_elements = [
-            {"path": "Canvas/gpu-proof/root", "active": True, "screenRect": {"x": 0, "y": 0, "width": 64, "height": 48}, "focalCrop": None},
-            {"path": "Canvas/gpu-proof/root/target", "active": True, "screenRect": {"x": 12, "y": 10, "width": 40, "height": 28}, "focalCrop": None},
+            {"path": "Canvas/gpu-proof/root", "active": True, "screenRect": {"x": 0, "y": 0, "width": 64, "height": 48}, "interactionTarget": None, "layout": None, "focalCrop": None, "visibility": gpu_visibility(0, 0, 64, 48), "inputReachability": gpu_reachability(), **root_structure},
+            {"path": "Canvas/gpu-proof/root/target", "active": True, "screenRect": {"x": 12, "y": 10, "width": 40, "height": 28}, "interactionTarget": None, "layout": None, "focalCrop": None, "visibility": gpu_visibility(12, 10, 40, 28), "inputReachability": gpu_reachability(), **target_structure},
         ]
         def runtime_snapshot_elements(*, target_outline: bool, target_interactable: bool = True) -> list[dict]:
             return [
-                {"path": "Canvas/gpu-proof/root", "active": True, "hasButton": False, "interactable": False, "hasGraphic": False, "hasDescendantGraphic": False, "graphicAlpha": None, "descendantGraphicAlpha": None, "descendantGraphicAlphas": [], "graphicColor": None, "outline": False, "hasText": False, "wrapText": False, "text": None, "descendantTextStates": [], "screenX": 0, "screenY": 0, "screenWidth": 64, "screenHeight": 48, "focalCrop": None},
-                {"path": "Canvas/gpu-proof/root/target", "active": True, "hasButton": True, "interactable": target_interactable, "hasGraphic": True, "hasDescendantGraphic": True, "graphicAlpha": 1.0, "descendantGraphicAlpha": 1.0, "descendantGraphicAlphas": [{"path": "target", "alpha": 1.0}], "graphicColor": "#e0ae41ff", "outline": target_outline, "hasText": False, "wrapText": False, "text": None, "descendantTextStates": [], "screenX": 12, "screenY": 10, "screenWidth": 40, "screenHeight": 28, "focalCrop": None},
+                {"path": "Canvas/gpu-proof/root", "active": True, "hasButton": False, "interactable": False, "hasGraphic": False, "hasDescendantGraphic": False, "graphicAlpha": None, "descendantGraphicAlpha": None, "descendantGraphicAlphas": [], "graphicColor": None, "outline": False, "hasText": False, "wrapText": False, "text": None, "descendantTextStates": [], "interactionTarget": None, "layout": None, "visibility": gpu_visibility(0, 0, 64, 48), "inputReachability": gpu_reachability(), "screenX": 0, "screenY": 0, "screenWidth": 64, "screenHeight": 48, "focalCrop": None, **root_structure},
+                {"path": "Canvas/gpu-proof/root/target", "active": True, "hasButton": True, "interactable": target_interactable, "hasGraphic": True, "hasDescendantGraphic": True, "graphicAlpha": 1.0, "descendantGraphicAlpha": 1.0, "descendantGraphicAlphas": [{"path": "target", "alpha": 1.0}], "graphicColor": "#e0ae41ff", "outline": target_outline, "hasText": False, "wrapText": False, "text": None, "descendantTextStates": [], "interactionTarget": None, "layout": None, "visibility": gpu_visibility(12, 10, 40, 28), "inputReachability": gpu_reachability(), "screenX": 12, "screenY": 10, "screenWidth": 40, "screenHeight": 28, "focalCrop": None, **target_structure},
             ]
         editor = {**common, "command": "editor.snapshot", "captureKey": "gpu-proof.wide.default", "elements": snapshot_elements}
         runtime = {**common, "command": "ui.snapshot", "uiElements": runtime_snapshot_elements(target_outline=False)}
@@ -903,6 +1175,7 @@ def main() -> int:
         assert_advanced_composition_contract(registry)
         assert_focal_crop_materialization_contract()
         assert_snapshot_evidence_gate()
+        assert_snapshot_layout_materializer_contract()
         assert_gpu_evidence_gate()
     except AssertionError as error:
         print(json.dumps({"valid": False, "adapterContract": str(error)}, ensure_ascii=False, indent=2))

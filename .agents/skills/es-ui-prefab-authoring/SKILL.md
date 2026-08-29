@@ -150,14 +150,29 @@ Start from `references/game-ui-screen-spec.v3.template.json`. The spec must cont
   policies, and post-layout interaction-density groups. Focal asset policies bind every subject
   slot to one AssetManifest crop policy, normalized focal point, positive finite
   `sourceAspectRatio` and `atlasRotationPolicy: disallow-rotation`; density groups validate the
-  resolved LayoutGroup target sizes and pairwise gaps. These constraints make composition
-  decisions falsifiable; they do not turn static geometry into visual acceptance.
+  resolved LayoutGroup target sizes and pairwise gaps. `contentRequirements` must additionally
+  declare per-profile minimum component/text/interaction counts, required component grammar and
+  required zones; `requiredTokenConsumers` prevents declared color roles from becoming unused
+  decoration; `stateTokenBindings` ties selected/error signals to semantic focus/danger tokens;
+  `spacingScalePx` rejects one-off gap and padding values. Also require `visualHierarchy` with
+  ranked component bands and an explicit primary-action band; `interactionContract` with a
+  per-profile focus order whose first target carries the requested primary intent;
+  `stateImpactPolicy` with a per-profile affected-component budget; and `anchorContract` with
+  final numeric Unity `anchorMin`, `anchorMax` and `pivot` values for key components. ScreenSpec
+  bounds use top-left coordinates, but the anchor contract uses Unity bottom-left RectTransform
+  coordinates; convert the bounds Y axis and preserve the explicitly authored Unity pivot.
+  LayoutGroup-managed children cannot claim authored final anchors. Disabled and loading states
+  must set every profile-specific primary action to `interactable: false`. These constraints make
+  composition, focus, state scope and anchor projection falsifiable; they do not turn static
+  geometry into Unity, GPU or visual acceptance.
 - `behaviors` that describe visual input intent without calling runtime systems;
 - design evidence for reference regions, visual decisions, responsive decisions and assumptions.
 
 For strict feedback-gated authoring, also provide:
 
-- `stateSemantics` for every declared state. Each state needs concrete `fixtureData`,
+- `stateSemantics` for every declared state. Use `default`, `selected`, `empty`, `loading`,
+  `disabled`, `error`, `long-content` and, when artwork can be unavailable, `missing-art`.
+  Each state needs concrete `fixtureData`,
   `affectedComponentIds`, `visualChanges`, `interactionChanges`, a `geometryPolicy`, and one
   `effects` entry for every affected component. Each effect declares a component ID plus executable
   changes from `visible`, `interactable`, `graphicAlpha`, `graphicColor`, `wrapText`, `text`, or
@@ -279,9 +294,19 @@ panel/run/spec identity, empty semantic lists, missing focal-crop records for de
 or a serialized `safeCropSatisfied: false`. For every matching profile/state pair it also requires the
 same non-empty root path and complete Canvas metadata (`renderMode`, `uiScaleMode`, positive
 `referenceResolution`, `screenMatchMode`, and finite `match` in `[0, 1]`), exact profile viewport and runtime screen dimensions,
-the same unique semantic path set rooted under that root, matching boolean active state, and matching
-finite non-negative editor `screenRect` versus UI `screenX/Y/Width/Height` (0.01-pixel tolerance).
-This is a snapshot-structure and cross-channel geometry gate only: it cannot prove that the Unity
+the same unique semantic path set rooted under that root, matching boolean active state, matching
+`parentPath`, `siblingIndex`, `anchorMin`, `anchorMax` and `pivot`, and matching finite non-negative
+editor `screenRect` versus UI `screenX/Y/Width/Height` (0.01-pixel tolerance). Every runtime rectangle
+must remain inside its profile viewport. The paired snapshots also serialize and compare active
+`LayoutGroup`/`ContentSizeFitter` axis ownership; a parent group and child fitter may not actively
+control the same width or height axis. Active Buttons with a declared `interactionTarget` must meet the
+declared resolved width and height. Every pair also compares `visibility` and `inputReachability`:
+Mask/RectMask2D ancestry, RectMask2D visible intersection/fraction, CanvasGroup filtering and a
+conservative same-parent opaque raycast blocker. An active, interactable target must retain its minimum
+size in the visible rectangle and report no blocker. A non-rectangular Mask over a target is deliberately
+unproven and requires runtime raycast evidence. This does not impose parent containment: overlays,
+tooltips and intentional clipped effects may exceed parent bounds. This is a snapshot-structure and
+cross-channel geometry gate only: it cannot prove that the Unity
 process ran, that the Prefab/Scene persisted, that UGUI performed its final layout rebuild, or that
 PNG pixels are visually valid.
 

@@ -31,6 +31,9 @@ Use these cases to validate semantic routing. They are behavior examples, not a 
 | “清理过期消息” | `MessageRepair` DryRun first; require explicit `-Apply`, and require `-DeleteTerminalMessages` before deleting retained terminal pairs |
 | “检查并修复 pending、残留和孤儿会话状态” | `Repair` plan first; use `-Apply` only after explicit authorization |
 | “恢复最近 24 小时使用的 AI 独立窗口并按职责命名” | `RestoreRecent -RecentHours 24` |
+| “只读读取旧对话，然后开新窗口，不要 Resume” | `ReadOnlyRestore`; create a redacted read-only packet and launch a fresh `New` session |
+| “当前页签清掉后重建对话，再初始化” | `CurrentTabRecycle`; frozen semantics are same-window new-tab then exact-source close (`physicalTabReused=false`), never physical in-place same-tab reuse |
+| “同时开多个职责窗口/批量启动多个 AI” | `Invoke-ESCodexMultiLaunch.ps1 -PlanPath`; explicit per-target `New`/`Handoff`/`Reissue`, strict drift gate, bounded waves, per-target evidence; never collapse partial failure into one success |
 | “把 ES 对话都放进一个项目窗口的不同页签” | `ProjectWindow` terminal mode |
 | “开一个辅助窗口，和你保持同页签” | `CurrentWindow` terminal mode; target the caller's inherited `WT_SESSION` with `-w 0` |
 | “用交接 Skill 重新交接到新窗口” | Read the project `es-codex-session-bootstrap` Skill and perform the requested real session operation; do not search only global Skill roots |

@@ -24,3 +24,8 @@ Custom checks:
 - evidence-contract
 
 `runtime-not-run` leaves Unity, Worker, host adapter, timing, and release behavior unproven.
+
+The full runner accepts `-ValidatorTimeoutSeconds` and `-ProgressPath`; each
+validator is executed in an isolated external PowerShell process and progress is
+written as UTF-8 JSON. A timeout returns exit code `124` and is never promoted
+to a passing replay.

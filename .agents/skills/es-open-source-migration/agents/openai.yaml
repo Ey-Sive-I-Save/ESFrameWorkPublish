@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 开源框架迁移"
+  short_description: "隔离外部源树并生成可回滚的 ES 命名与程序集迁移映射"
+  default_prompt: "运行 es-open-source-migration：先建立隔离目录、源目标映射表和 dry-run 计划，再执行受控的 ES 化迁移"

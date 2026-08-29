@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es.interaction-super-semantics.v1",
+  "skillName": "es-ai-interaction-governance",
+  "purpose": "将证据展示、只读保护和 TaskFocusContext 注意力调整识别为需要显式治理的超级语义。",
+  "triggers": [
+    {
+      "id": "prompt-auto-wrap-toggle",
+      "label": "包装",
+      "triggerPhrases": ["包装", "提示词", "自动包装", "提示词包装", "开启包装", "启用包装", "关闭包装", "停用包装"],
+      "contextualPhrases": ["先包装再读", "自动提示词", "包装后执行", "包装模式"],
+      "operation": "PromptAutoWrapToggle",
+      "allowedResponsibilities": ["semantic-routing-governance"],
+      "outOfScopeState": "review",
+      "executionPolicy": "direct-when-in-scope",
+      "responsibilityGate": "required",
+      "delegationMarkers": ["帮我包装", "包装给我", "负责包装", "让你包装", "由你包装"],
+      "bareTriggerPolicy": "current-turn-context",
+      "priority": 110,
+      "composable": true,
+      "routeKeys": ["prompt-engineering", "prompt-expansion", "prompt-wrapper", "prompt-template"],
+      "nextStage": "prompt-wrap-state-proposal",
+      "requiresDeepUserGuidance": false,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": [],
+      "evidencePolicy": "preserve-raw-prompt; explicit-enable-or-disable-only; no-authorization-expansion",
+      "focusAction": "propose",
+      "stateModel": {
+        "defaultState": "enabled",
+        "enableMarkers": ["开启", "启用", "打开", "默认包装"],
+        "disableMarkers": ["关闭", "停用", "禁用", "取消包装", "不要包装"],
+        "bareTrigger": "confirm-current-turn",
+        "suppressionRounds": 3
+      },
+      "longTextPolicy": {
+        "maxCharsWithoutMarker": 200,
+        "sampleHeadChars": 100,
+        "sampleTailChars": 100,
+        "requiredBoundarySignal": ["【包裹文字】", "explicit prompt marker", "visually separated line block"],
+        "onMissingSignal": "blocked"
+      }
+    },
+    {
+      "id": "show-me-evidence",
+      "label": "给我看",
+      "triggerPhrases": ["给我看", "展示一下", "截图给我", "打开给我看", "我想看实际效果"],
+      "operation": "EvidencePresentation",
+      "priority": 30,
+      "composable": true,
+      "routeKeys": ["evidence-presentation", "visual-or-filesystem-fallback"],
+      "nextStage": "evidence-delivery",
+      "requiresDeepUserGuidance": false,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": [],
+      "evidencePolicy": "prefer-window-or-screenshot; cli-fallback-to-absolute-file-and-folder-path",
+      "focusAction": "preserve"
+    },
+    {
+      "id": "read-only-guard",
+      "label": "只读",
+      "triggerPhrases": ["只读检查", "只读模式", "仅查看不修改", "只分析不改", "进入只读"],
+      "contextualPhrases": ["不要修改", "不要写入", "不做任何修改"],
+      "operation": "ReadOnlyGuard",
+      "priority": 90,
+      "composable": true,
+      "routeKeys": ["read-only", "no-write", "diagnostic"],
+      "nextStage": "read-only-analysis",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": ["只读范围是否覆盖整个项目？", "是否允许运行可能产生持久化修改的工具？"],
+      "evidencePolicy": "no-project-write; report-blocked-actions",
+      "focusAction": "lock",
+      "matchMode": "explicit-or-contextual",
+      "requiresUserChoice": true,
+      "activationMode": "confirm-once",
+      "defaultState": "normal"
+    },
+    {
+      "id": "task-focus-attention",
+      "label": "聚焦/注意",
+      "triggerPhrases": ["聚焦", "注意当前", "注意本轮", "注意重点", "注意力", "集中注意力", "把注意力放在", "当前重点是"],
+      "contextualPhrases": ["注意当前", "注意本轮", "注意重点", "注意力", "注意范围", "注意目标"],
+      "operation": "TaskFocusContextUpdate",
+      "priority": 100,
+      "composable": true,
+      "routeKeys": ["task-focus-context", "focus-arbiter", "goal-revision", "route-plan"],
+      "nextStage": "focus-proposal-pending",
+      "requiresDeepUserGuidance": true,
+      "allowAutonomousExpansion": false,
+      "requiredQuestions": ["本轮唯一工作重心是什么？", "哪些范围明确不纳入本轮？", "用户确认后才能推进哪些动作？"],
+      "evidencePolicy": "create-focus-proposal; default-confirm-latest-message; pending-on-explicit-opt-out-or-scope-conflict",
+      "focusAction": "propose",
+      "focusActivation": {
+        "prompt": "是否开启聚焦玩家最新消息？",
+        "defaultDecision": "confirm",
+        "decisionPolicy": "non-blocking-default-confirm",
+        "appliesTo": "latest-user-message",
+        "explicitOptOutTokens": ["取消", "不用", "关闭聚焦"],
+        "scopeExpansionRequiresGuidance": true
+      }
+    }
+  ]
+}

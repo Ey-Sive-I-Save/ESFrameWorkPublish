@@ -10,7 +10,7 @@ registryManifest: .agents/SKILL_REGISTRY.manifest.json
 registrationRule: Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.
 hashRule: skillHash covers SKILL.md and governanceHash covers governance.json; lastModifiedUtc changes only when the generated
   catalog record projection changes. Other Skill resources are outside this hash projection.
-generatedAtUtc: '2026-08-26T13:14:03Z'
+generatedAtUtc: '2026-08-29T05:59:58Z'
 skills:
   es-adversarial-review:
     name: es-adversarial-review
@@ -40,6 +40,85 @@ skills:
     lastReviewedUtc: '2026-08-22T01:05:21Z'
     skillHash: aec90c6d07a91b160c68a330dd02f194a0b2903708956f8f4c015f8205a443be
     governanceHash: 7fcfdc02d1ddd3dbdcdc048f23336d0e81c8b00ffa7fca9698ada3ac6764fafa
+    statusNote: Initial catalog registration
+  es-agent-mechanism-replication:
+    name: es-agent-mechanism-replication
+    displayName: es-agent-mechanism-replication
+    skillPath: .agents/skills/es-agent-mechanism-replication
+    family: governance
+    routeKeys:
+    - agent-mechanism-replication
+    - research-to-contract
+    - es-adaptation
+    - failure-surface
+    - external-authority
+    - route-plan
+    - route-probe
+    - route-stage
+    - knowledge-output
+    - evidence-set
+    - source-ref
+    - static-replay
+    - task-context-runtime
+    - receipt
+    - cas
+    - stale
+    - closed-loop
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: cross-system-governance
+    owner: ESFramework AI architecture maintainers
+    acceptanceOwner: ESFramework governance owner
+    firstRegisteredUtc: '2026-08-27T13:24:24Z'
+    lastModifiedUtc: '2026-08-29T05:07:22Z'
+    lastReviewedUtc: '2026-08-27T13:24:24Z'
+    skillHash: 2bb473b0b92edd214da22a0d15a7abdfb21ad1c83dd02e200d1e63aed8a24f08
+    governanceHash: 329dfae3d67974cdf4ef984027181231c85a1f3187deec003c9370ff40135a20
+    statusNote: Initial catalog registration
+  es-ai-abc-core:
+    name: es-ai-abc-core
+    displayName: es-ai-abc-core
+    skillPath: .agents/skills/es-ai-abc-core
+    family: governance
+    routeKeys:
+    - ai-abc
+    - abc-core
+    - semantic-adapter
+    - analysis
+    - design
+    - evidence
+    - closed-loop
+    - static-replay
+    - route-stage
+    - knowledge
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: cross-system-semantic-adapter
+    owner: ESFramework AI architecture maintainers
+    acceptanceOwner: ESFramework governance owner
+    firstRegisteredUtc: '2026-08-27T15:46:15Z'
+    lastModifiedUtc: '2026-08-28T01:00:15Z'
+    lastReviewedUtc: '2026-08-27T15:46:15Z'
+    skillHash: b2dcf4c76cfb8e5abaf1832b4d46cccb99a9d54e931224a09de3abad8e2a4e29
+    governanceHash: a9eae44527cfd418f812b354d4180fa2ec85c09075a4e279ad317da3a8b7ba92
     statusNote: Initial catalog registration
   es-ai-collaboration-menu:
     name: es-ai-collaboration-menu
@@ -71,9 +150,9 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T18:42:24Z'
-    lastModifiedUtc: '2026-08-26T04:26:10Z'
+    lastModifiedUtc: '2026-08-27T15:46:15Z'
     lastReviewedUtc: '2026-08-24T18:42:24Z'
-    skillHash: d67b94d06759e8e0cd39c39e82b6ba76f5098b47ab2efe7a789047a78f496bf8
+    skillHash: 63c986d43d7a4622657cc4428ca95a696775b55bd4d799c575f4304f2bb91a29
     governanceHash: f9001d6a521844c868c121e259cf0884f0892ae8d6d915a7969a1fc84b10f4b3
     statusNote: Initial catalog registration
   es-ai-interaction-governance:
@@ -116,9 +195,9 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T13:55:00Z'
-    lastModifiedUtc: '2026-08-26T04:26:10Z'
+    lastModifiedUtc: '2026-08-29T05:07:22Z'
     lastReviewedUtc: '2026-08-24T13:55:00Z'
-    skillHash: 48b5da102aacbe550065550f16179f746edf5f97ef7c7a0dba674ad29238c949
+    skillHash: f638da6a676a0c2c9016d14096d8ded5b2553ba7f2e8cc7c431919913dfe0c9c
     governanceHash: d59fb438cf1eb97b111c860e0dc0ff9447a35d60cde859bd53c28e6434462d21
     statusNote: Initial catalog registration
   es-ai-knowledge-curation:
@@ -151,6 +230,39 @@ skills:
     lastReviewedUtc: '2026-08-22T01:05:22Z'
     skillHash: 6c259fe2f8193b7d6de7544017815b7b13aee55e4f28b5fa51b56272e820b30f
     governanceHash: 013d7456141ce344a4c02738839689c30e22161edb1e5721ec3ce2c65be866e8
+    statusNote: Initial catalog registration
+  es-ai-space-organization:
+    name: es-ai-space-organization
+    displayName: es-ai-space-organization
+    skillPath: .agents/skills/es-ai-space-organization
+    family: governance
+    routeKeys:
+    - governance
+    - ai-space
+    - folder-organization
+    - file-placement
+    - local-public
+    - generated-content
+    - stale
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Proposed
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S1
+    riskClass: file-organization
+    owner: ESFramework AI governance maintainers
+    acceptanceOwner: designated ESFramework maintainer
+    firstRegisteredUtc: '2026-08-27T13:36:39Z'
+    lastModifiedUtc: '2026-08-28T18:23:03Z'
+    lastReviewedUtc: '2026-08-27T13:36:39Z'
+    skillHash: af53d93f3a6cc969e4d1bff7353bc331813db88416611fcdd47b4636012d7eae
+    governanceHash: 25e9c79bf39711c4c43847d3da81001c11b9031256b7b59f5adab4c686fe3341
     statusNote: Initial catalog registration
   es-aibrain-route-authoring:
     name: es-aibrain-route-authoring
@@ -361,9 +473,9 @@ skills:
     owner: ESFramework es-codex-session-bootstrap maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-25T16:43:08Z'
+    lastModifiedUtc: '2026-08-29T05:07:22Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: 7262a4cc3d79122fb127c0327d210ec9b5a28a12a1cfc10badd43da877c02913
+    skillHash: a318b1a9216c34fbe30484e497248e8d83e8a2273ff2faa567e38965cbf05f59
     governanceHash: dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd
     statusNote: Catalog hashes synchronized after session-bootstrap governance update
   es-command-authoring:
@@ -926,6 +1038,41 @@ skills:
     skillHash: ff1729ca2eef8cb62a0db22ca6efc610bf9922b1644181eb2f8dd6dd3afc5de7
     governanceHash: b357f263fc8556b93bbbf41ee8aa54d43f1172e38eb7a43a437ab6386ea2ecf8
     statusNote: Initial catalog registration
+  es-open-source-migration:
+    name: es-open-source-migration
+    displayName: es-open-source-migration
+    skillPath: .agents/skills/es-open-source-migration
+    family: unclassified
+    routeKeys:
+    - migration
+    - compatibility
+    - rollback
+    - preservation
+    - external-source
+    - namespace
+    - assembly
+    - mapping
+    - parallelism
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: external-migration
+    owner: ESFramework migration maintainers
+    acceptanceOwner: migration owner
+    firstRegisteredUtc: '2026-08-28T19:03:17Z'
+    lastModifiedUtc: '2026-08-29T05:59:58Z'
+    lastReviewedUtc: '2026-08-28T19:03:17Z'
+    skillHash: 306f99614fe2c4fa35ab6efa90c0179a061d514c007caa536743dffdd6134d36
+    governanceHash: 9eef14e1470af123596e1cd40037d22fea5d7947e762e213ec940241e905f7cd
+    statusNote: Initial catalog registration
   es-performance-budgeting:
     name: es-performance-budgeting
     displayName: es-performance-budgeting
@@ -956,6 +1103,40 @@ skills:
     lastReviewedUtc: '2026-08-22T01:05:22Z'
     skillHash: 8324c45aed2fd40770e34ec8f21b01f10e2b18ce518013568ca96e97547e9e15
     governanceHash: 9fdf2cb2888babb8b5f8063e0dfbf68845e3bca0a34879204e6313d7a2bf19c3
+    statusNote: Initial catalog registration
+  es-prompt-engineering:
+    name: es-prompt-engineering
+    displayName: es-prompt-engineering
+    skillPath: .agents/skills/es-prompt-engineering
+    family: unclassified
+    routeKeys:
+    - prompt-engineering
+    - prompt-expansion
+    - prompt-template
+    - prompt-wrapper
+    - prompt-evaluation
+    - prompt-regression
+    - structured-output
+    - guardrails
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: interaction-governance
+    owner: ESFramework AI governance maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-28T18:23:03Z'
+    lastModifiedUtc: '2026-08-28T19:38:08Z'
+    lastReviewedUtc: '2026-08-28T18:23:03Z'
+    skillHash: b04e55acfb9375871d50818b005f350fd83115822e6e9e8be395118cbd361e7c
+    governanceHash: 7588aa1814b3a5a374d539ead1292aa604bec47268041d6f0e39f2ab898ccd3e
     statusNote: Initial catalog registration
   es-publish-aitest-prompt:
     name: es-publish-aitest-prompt
@@ -1471,9 +1652,9 @@ skills:
     owner: ESFramework Automation maintainers
     acceptanceOwner: task requester
     firstRegisteredUtc: '2026-08-25T16:43:08Z'
-    lastModifiedUtc: '2026-08-26T12:56:36Z'
+    lastModifiedUtc: '2026-08-28T18:23:03Z'
     lastReviewedUtc: '2026-08-25T16:43:08Z'
-    skillHash: c453e12a2b2f863487e86dc6207ece72fc594b2a2d7a96033ca113f00979c6c5
+    skillHash: 26df2239cf7b254b1f53c3805e669810300de7e00b1b7c9841585dcce592bb13
     governanceHash: ba5ca259af3c4415d8ddbf26c6fddf2ec386f8a72f1f213985f74713634171af
     statusNote: Advisory /eval source route and isolation replay statically passed; Unity Runtime, production execution, and
       global P0 remain unverified
@@ -1583,9 +1764,14 @@ skills:
     routeKeys:
     - skill
     - screen-spec-v3
+    - ui-automation
     - ui
     - prefab
     - fixture-scene
+    - layout
+    - responsive
+    - ui-clipping
+    - ui-interaction
     - visual-qa
     mcp:
     - unity-editor
@@ -1602,10 +1788,10 @@ skills:
     owner: ESFramework Skill maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-26T13:14:03Z'
+    lastModifiedUtc: '2026-08-27T13:24:24Z'
     lastReviewedUtc: '2026-08-25T03:20:00Z'
-    skillHash: 29e69de5b5d3adc6b8e53ebbad05d9a1e3ccede1b05d699d681fa24ca256b9c8
-    governanceHash: 9aa4d91989aac6d900a214fa02485d2f8d07fc5669081836d0a4f5485f55b5ba
+    skillHash: d19f224ad40646a2820019a16b42ea0ecc0c35d2ae97d753f79afe8be42ebfd1
+    governanceHash: a6168ba42dccdc45cef6ea8005e06cead4dbc0855e6e988769a36b18b0296526
     statusNote: StaticDeepReplay and user-directed materialization authorization accepted
   es-unity-compile:
     name: es-unity-compile
@@ -1706,6 +1892,42 @@ skills:
     lastReviewedUtc: '2026-08-22T01:05:22Z'
     skillHash: 6426eea31416547e1fcc54e36b059d26c0d15c71a16743e67c2c3f061b9462c8
     governanceHash: b375728e9a8bd7d6fab5511870bdbdf2e7343d10dd8065b7632164cad622ab0b
+    statusNote: Initial catalog registration
+  es-weapon-abc-part:
+    name: es-weapon-abc-part
+    displayName: es-weapon-abc-part
+    skillPath: .agents/skills/es-weapon-abc-part
+    family: project-weapon
+    routeKeys:
+    - ai-abc
+    - abc-part
+    - weapon
+    - weapon-definition
+    - prefab
+    - input
+    - evidence
+    - static-replay
+    - route-stage
+    - knowledge
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: weapon-domain-adapter
+    owner: ESFramework weapon domain maintainers
+    acceptanceOwner: ESFramework governance owner
+    firstRegisteredUtc: '2026-08-27T15:46:15Z'
+    lastModifiedUtc: '2026-08-28T01:24:00Z'
+    lastReviewedUtc: '2026-08-27T15:46:15Z'
+    skillHash: 3b821c303da99f48cdf28061287e17be02f467cd7bd1deca01bff322d0077fb0
+    governanceHash: 2fc2fd5ef1cef3fe4cf7074e3c7e49b0f07956001cb2d9a8cd103acf12d12cc6
     statusNote: Initial catalog registration
   es-worktree-audit:
     name: es-worktree-audit

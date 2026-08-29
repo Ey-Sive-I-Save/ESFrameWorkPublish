@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
   "menuId": "es-ai-collaboration-menu.v1",
-  "maxOptions": 6,
+  "maxOptions": 7,
   "options": [
     {"id":"create-content","label":"制作 ES 内容","routeKeys":["creation"],"relatedSkills":["es-gamecore-integration","es-entity-authoring","es-editor-tooling","es-ui-prefab-authoring"],"risk":"medium","reason":"从目标内容、所有权和最小验证入口开始制作。"},
     {"id":"iterate-feature","label":"迭代已有功能","routeKeys":["iteration"],"relatedSkills":["es-first-principles-analysis","es-adversarial-review"],"risk":"medium","reason":"先定位根因和真实需求，再做有界修改与回归。"},
     {"id":"govern-framework","label":"治理框架与边界","routeKeys":["framework-governance"],"relatedSkills":["es-skill-governance","es-api-contract-review","es-dependency-boundary-audit"],"risk":"high","reason":"检查权威、生命周期、兼容性、权限和恢复边界。"},
     {"id":"validate-evidence","label":"验证与验收","routeKeys":["evidence"],"relatedSkills":["es-unity-compile","es-release-acceptance","es-adversarial-review"],"risk":"high","reason":"选择静态、编译、Runtime 或发布证据路径，区分未运行与失败。"},
     {"id":"discover-context","label":"发现上下文","routeKeys":["context-discovery"],"relatedSkills":["es-ai-knowledge-creator","es-knowledge-validator","es-aiwarning-authoring"],"risk":"low","reason":"在路由不清或事实过期时选择最小 Skill、Knowledge 和规则集合。"},
-    {"id":"coordinate-session","label":"协作与会话","routeKeys":["session-coordination"],"relatedSkills":["es-codex-session-bootstrap","es-ai-interaction-governance"],"risk":"medium","reason":"处理职责、会话、窗口交接、消息和收尾边界；不会伪造新会话。","submenuRef":"references/session-submenu.json"}
+    {"id":"coordinate-session","label":"协作与会话","routeKeys":["session-coordination"],"relatedSkills":["es-codex-session-bootstrap","es-ai-interaction-governance"],"risk":"medium","reason":"处理职责、会话、窗口交接、消息和收尾边界；不会伪造新会话。","submenuRef":"references/session-submenu.json"},
+    {"id":"ai-mechanism-atlas","label":"AI机制图鉴","routeKeys":["ai-mechanism-atlas","super-semantics","capability-discovery"],"relatedSkills":["es-ai-interaction-governance","es-agent-mechanism-replication","es-use-ai-command","es-knowledge-validator"],"risk":"low","reason":"查看超级语义、可用能力、权限边界和证据等级；只提供说明与路由。","submenuRef":"references/menu-submenus.json","submenuKey":"ai-mechanism-atlas"}
   ]
 }

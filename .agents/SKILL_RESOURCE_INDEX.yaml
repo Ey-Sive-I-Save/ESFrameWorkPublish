@@ -48,6 +48,10 @@ rules:
     statement: Every direct Skill must be discoverable through AIBRAIN_ENTRY, appear in at least one KnowledgeIndex relatedSkills binding with an overlapping routeKey, exist in SKILL_RESOURCE_INDEX and have matching Catalog skillHash/governanceHash; missing bindings block acceptance.
 currentSkills:
   - {name: es-adversarial-review, family: governance, routeKeys: [review, risk, validation], mcp: [none-required]}
+  - {name: es-agent-mechanism-replication, family: governance, routeKeys: [agent-mechanism-replication, research-to-contract, es-adaptation, route-plan, route-stage, evidence-set, closed-loop], mcp: [none-required]}
+  - {name: es-ai-abc-core, family: governance, routeKeys: [ai-abc, abc-core, semantic-adapter, analysis, design, evidence, closed-loop, static-replay, route-stage, knowledge], mcp: [none-required]}
+  - {name: es-ai-space-organization, family: governance, routeKeys: [governance, ai-space, folder-organization, file-placement, local-public, generated-content, stale], mcp: [none-required]}
+  - {name: es-weapon-abc-part, family: project-weapon, routeKeys: [ai-abc, abc-part, weapon, weapon-definition, prefab, input, evidence, static-replay, route-stage, knowledge], mcp: [none-required]}
   - {name: es-ai-collaboration-menu, family: governance, routeKeys: [menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination], mcp: [none-required]}
   - {name: es-ai-interaction-governance, family: governance, routeKeys: [interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, goal-drift, handover, closeout, evaluation, dialogue-quality], mcp: [none-required]}
   - {name: es-codex-session-bootstrap, family: session, routeKeys: [startup, session, handover], mcp: [session-host]}

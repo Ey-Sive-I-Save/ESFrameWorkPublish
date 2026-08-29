@@ -24,6 +24,11 @@ Use the platform core under `ES/Automation/TaskContextRuntime/`. This Skill is a
 
 ## Entry points
 
+- Quick attention/focus integration: [TaskFocusContext README](../../../ES/Automation/TaskFocusContext/README.md) (`ESTaskFocusContext.psm1`; proposal/confirmation/projection)
+- Focus-to-runtime request adapter: `ES/Automation/TaskFocusContext/ESTaskFocusRuntimeAdapter.psm1` (`New-ESTaskContextRuntimeRequestFromFocus`, `New-ESTaskContextRuntimeRequestFromFocusSpec`, checkpoint recovery variant; pure mapping, scope containment enforced, no implicit mutation)
+- Focus integration checks: `ES/Automation/TaskFocusContext/Test-ESTaskFocusRuntimeAdapter.ps1`, `Test-ESTaskFocusRuntimeIntegration.ps1`
+- Runtime command integration: `Invoke-ESTaskContextRuntime.ps1 -Action Create` optionally validates an input `focusContext` before task creation.
+- Focus bounded aggregate replay: `ES/Automation/TaskFocusContext/Test-ESTaskFocusStaticReplay.ps1`
 - Managed contract: `Assets/Plugins/ES/AICommands/任务上下文运行时_受控生命周期_AI命令.md` (`task.context-runtime.mutate`)
 - Platform module: `ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1`
 - Platform CLI: `ES/Automation/TaskContextRuntime/Invoke-ESTaskContextRuntime.ps1`

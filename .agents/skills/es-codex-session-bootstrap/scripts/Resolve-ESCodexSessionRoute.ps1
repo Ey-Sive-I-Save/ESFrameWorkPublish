@@ -143,6 +143,7 @@ $routes = foreach ($candidate in $candidates) {
         taskKey = [string]$candidate.taskKey
         tabTitle = [string]$candidate.tabTitle
         status = [string]$candidate.status
+        contextAccepted = [bool]$candidate.contextAccepted
         processId = [int]$candidate.processId
         processAlive = [bool]$candidate.processAlive
         isTerminal = $isTerminal

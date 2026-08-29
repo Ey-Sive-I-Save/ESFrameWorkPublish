@@ -1,0 +1,4 @@
+interface:
+  display_name: "AIWarnings 迁移"
+  short_description: "按目标项目适配并迁移 AIWarnings 治理框架"
+  default_prompt: "Use $es-aiwarnings-migration to assess and migrate AIWarnings governance into a target project."

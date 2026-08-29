@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/ai-abc/interface/v1",
+  "title": "ES AI ABC A-to-B Semantic Adapter Interface V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "aIntentEnvelope", "bCapabilityOffer", "adapterExchange", "cCollaboratorEnvelope"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/ai-abc/interface/v1" },
+    "aIntentEnvelope": { "$ref": "#/$defs/aIntentEnvelope" },
+    "bCapabilityOffer": { "$ref": "#/$defs/bCapabilityOffer" },
+    "adapterExchange": { "$ref": "#/$defs/adapterExchange" },
+    "cCollaboratorEnvelope": { "$ref": "#/$defs/cCollaboratorEnvelope" }
+  },
+  "$defs": {
+    "token": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "ref": { "type": "string", "minLength": 1, "pattern": "^(es://|[A-Za-z0-9_.-]+/).+" },
+    "aIntentEnvelope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractId", "version", "intentId", "goalRevision", "semanticGoal", "constraints", "requestedCapabilities", "evidenceExpectations", "authorization", "sourceSnapshot", "adapterState"],
+      "properties": {
+        "contractId": { "const": "es://automation/contracts/ai-abc/interface/v1" },
+        "version": { "const": "v1" },
+        "intentId": { "$ref": "#/$defs/id" },
+        "goalRevision": { "type": "string", "pattern": "^r[1-9][0-9]{0,8}$" },
+        "semanticGoal": { "type": "string", "minLength": 1 },
+        "constraints": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "requestedCapabilities": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+        "evidenceExpectations": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "authorization": { "type": "object", "additionalProperties": false, "required": ["kind", "scope", "executionEnabled"], "properties": { "kind": { "enum": ["read-only", "user-directed" ] }, "scope": { "type": "string", "minLength": 1 }, "executionEnabled": { "const": false } } },
+        "sourceSnapshot": { "type": "object", "additionalProperties": false, "required": ["projectRootRelative", "head", "sourceSetHash"], "properties": { "projectRootRelative": { "type": "string", "pattern": "^(?![A-Za-z]:|/|\\\\).+" }, "head": { "type": "string", "pattern": "^[a-f0-9]{40}$" }, "sourceSetHash": { "$ref": "#/$defs/hash" } } },
+        "adapterState": { "enum": ["draft", "negotiating", "accepted", "replan", "blocked"] }
+      }
+    },
+    "bCapabilityOffer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capabilityId", "providerId", "semanticDescription", "inputSchemaRef", "outputSchemaRef", "preconditions", "effects", "evidenceProduced", "failureCodes", "version", "compatibility"],
+      "properties": {
+        "capabilityId": { "$ref": "#/$defs/token" }, "providerId": { "$ref": "#/$defs/id" }, "semanticDescription": { "type": "string", "minLength": 1 }, "inputSchemaRef": { "$ref": "#/$defs/ref" }, "outputSchemaRef": { "$ref": "#/$defs/ref" }, "preconditions": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "effects": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "evidenceProduced": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "failureCodes": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$" } }, "version": { "type": "string", "pattern": "^v[1-9][0-9]*$" }, "compatibility": { "type": "object", "additionalProperties": false, "required": ["acceptsIntentVersion", "resultVersion", "breakingChangePolicy"], "properties": { "acceptsIntentVersion": { "const": "v1" }, "resultVersion": { "type": "string", "pattern": "^v[1-9][0-9]*$" }, "breakingChangePolicy": { "enum": ["reoffer", "replan", "reject"] } } }
+      }
+    },
+    "adapterExchange": {
+      "type": "object", "additionalProperties": false,
+      "required": ["exchangeId", "aIntentRef", "bOfferRef", "mapping", "normalizedResult", "evidenceSetRef", "receiptRef", "status"],
+      "properties": {
+        "exchangeId": { "$ref": "#/$defs/id" }, "aIntentRef": { "$ref": "#/$defs/ref" }, "bOfferRef": { "$ref": "#/$defs/ref" }, "mapping": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["aField", "bField", "transformation", "lossPolicy"], "properties": { "aField": { "type": "string", "minLength": 1 }, "bField": { "type": "string", "minLength": 1 }, "transformation": { "type": "string", "minLength": 1 }, "lossPolicy": { "enum": ["none", "claim-cap", "replan", "reject"] } } } }, "normalizedResult": { "type": "object", "additionalProperties": false, "required": ["status", "summary", "outputs", "failureCode"], "properties": { "status": { "enum": ["accepted", "partial", "replan", "blocked"] }, "summary": { "type": "string", "minLength": 1 }, "outputs": { "type": "object" }, "failureCode": { "type": ["string", "null"] } } }, "evidenceSetRef": { "$ref": "#/$defs/ref" }, "receiptRef": { "$ref": "#/$defs/ref" }, "status": { "enum": ["negotiating", "accepted", "replan", "blocked"] }
+      }
+    },
+    "cCollaboratorEnvelope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["collaboratorId", "kind", "goal", "authorization", "choices", "acceptance"],
+      "properties": { "collaboratorId": { "$ref": "#/$defs/id" }, "kind": { "enum": ["human", "ai"] }, "goal": { "type": "string", "minLength": 1 }, "authorization": { "type": "string", "minLength": 1 }, "choices": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "acceptance": { "enum": ["pending", "accepted", "rejected"] } }
+    }
+  }
+}

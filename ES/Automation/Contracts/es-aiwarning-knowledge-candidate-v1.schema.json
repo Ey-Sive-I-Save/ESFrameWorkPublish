@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/aiwarning-knowledge-candidate/v1",
+  "title": "ES AIWarning Knowledge Candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "recordType",
+    "candidateId",
+    "status",
+    "idempotencyKey",
+    "createdAtUtc",
+    "sourceSnapshot",
+    "match",
+    "proposedEntry",
+    "validation",
+    "replay",
+    "nonClaims"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/aiwarning-knowledge-candidate/v1" },
+    "recordType": { "const": "AIWarningKnowledgeCandidate" },
+    "candidateId": { "$ref": "#/$defs/id" },
+    "status": {
+      "enum": ["attached", "candidate-created", "review", "blocked", "stale/retry-required"]
+    },
+    "idempotencyKey": { "$ref": "#/$defs/hash" },
+    "idempotencyKeyKind": { "const": "stableId+warningHash-sha256" },
+    "createdAtUtc": { "type": "string", "format": "date-time" },
+    "sourceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "warningPath",
+        "warningHash",
+        "stableId",
+        "status",
+        "authority",
+        "routeKeys",
+        "applicability",
+        "evidenceRef",
+        "staleWhen",
+        "capturedAtUtc"
+      ],
+      "properties": {
+        "warningPath": { "$ref": "#/$defs/projectPath" },
+        "warningHash": { "$ref": "#/$defs/hash" },
+        "stableId": { "$ref": "#/$defs/id" },
+        "status": { "type": "string", "minLength": 1 },
+        "authority": { "type": "string", "minLength": 1 },
+        "routeKeys": { "$ref": "#/$defs/routeKeys" },
+        "applicability": { "type": "string", "minLength": 1 },
+        "evidenceRef": { "type": "string", "minLength": 1 },
+        "staleWhen": { "type": "string", "minLength": 1 },
+        "capturedAtUtc": { "type": "string", "format": "date-time" }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "candidateKnowledgeIds", "signals", "conflicts", "rationale"],
+      "properties": {
+        "decision": { "enum": ["existing", "new", "ambiguous", "blocked", "stale"] },
+        "candidateKnowledgeIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "signals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stableId", "knowledgePointer", "authority", "routeKeys", "applicability", "evidenceRef"],
+          "properties": {
+            "stableId": { "type": "boolean" },
+            "knowledgePointer": { "type": "boolean" },
+            "authority": { "type": "boolean" },
+            "routeKeys": { "type": "boolean" },
+            "applicability": { "type": "boolean" },
+            "evidenceRef": { "type": "boolean" }
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/conflict" }
+        },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "proposedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledgeId",
+        "targetPath",
+        "routeKeys",
+        "sourceRefs",
+        "requiredReads",
+        "expectedHashes"
+      ],
+      "properties": {
+        "knowledgeId": { "$ref": "#/$defs/id" },
+        "targetPath": { "$ref": "#/$defs/projectPath" },
+        "routeKeys": { "$ref": "#/$defs/routeKeys" },
+        "sourceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceRef" }
+        },
+        "requiredReads": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/projectPath" }
+        },
+        "expectedHashes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contentHash", "sourceSetHash", "entryBodyHash"],
+          "properties": {
+            "contentHash": { "$ref": "#/$defs/hash" },
+            "sourceSetHash": { "$ref": "#/$defs/hash" },
+            "entryBodyHash": {
+              "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }]
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "checks", "conflicts", "sourceStableAtEnd"],
+      "properties": {
+        "state": { "enum": ["pending", "passed", "review", "blocked", "stale"] },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["utf8", "sourceRefs", "contentHash", "indexBinding", "route", "evidenceRef"],
+          "properties": {
+            "utf8": { "$ref": "#/$defs/checkState" },
+            "sourceRefs": { "$ref": "#/$defs/checkState" },
+            "contentHash": { "$ref": "#/$defs/checkState" },
+            "indexBinding": { "$ref": "#/$defs/checkState" },
+            "route": { "$ref": "#/$defs/checkState" },
+            "evidenceRef": { "$ref": "#/$defs/checkState" }
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/conflict" }
+        },
+        "sourceStableAtEnd": { "type": "boolean" },
+        "matchMode": { "type": "string", "enum": ["reverse-index-hit", "knowledge-pointer-hit", "reverse-index-miss-fallback", "reverse-index-stale-fallback", "reverse-index-missing-fallback", "reverse-index-invalid-fallback", "full-scan"] },
+        "reverseIndexFresh": { "type": "boolean" }
+        ,"resourceObservations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["warningBytes", "knowledgeIndexBytes", "indexEntryCount"],
+          "properties": {
+            "warningBytes": { "type": "integer", "minimum": 0 },
+            "knowledgeIndexBytes": { "type": "integer", "minimum": 0 },
+            "indexEntryCount": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands", "inputHash", "candidateOnly", "applyRequired"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "inputHash": { "$ref": "#/$defs/hash" },
+        "candidateOnly": { "const": true },
+        "applyRequired": { "const": true }
+      }
+    },
+    "nonClaims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$" },
+    "projectPath": {
+      "type": "string",
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!\\\\)(?!.*(^|[/\\\\])\\.\\.([/\\\\]|$)).+$"
+    },
+    "routeKeys": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,80}$" }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "role"],
+      "properties": {
+        "path": { "$ref": "#/$defs/projectPath" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "role": { "enum": ["warning-authority", "required-read", "evidence-entry", "contract"] }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "field", "message"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z0-9._-]+$" },
+        "field": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "checkState": { "enum": ["pending", "passed", "failed", "not-applicable"] }
+  }
+}

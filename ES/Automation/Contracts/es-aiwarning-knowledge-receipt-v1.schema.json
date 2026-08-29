@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/aiwarning-knowledge-receipt/v1",
+  "title": "ES AIWarning Knowledge Orchestration Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "recordType",
+    "receiptId",
+    "candidateId",
+    "status",
+    "idempotencyKey",
+    "createdAtUtc",
+    "candidateHash",
+    "inputSnapshotHash",
+    "transactionExecuted",
+    "formalRegistration",
+    "nonClaims"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/aiwarning-knowledge-receipt/v1" },
+    "recordType": { "const": "AIWarningKnowledgeOrchestrationReceipt" },
+    "receiptId": { "$ref": "#/$defs/id" },
+    "candidateId": { "$ref": "#/$defs/id" },
+    "status": {
+      "enum": ["attached", "candidate-created", "review", "blocked", "stale/retry-required"]
+    },
+    "idempotencyKey": { "$ref": "#/$defs/hash" },
+    "createdAtUtc": { "type": "string", "format": "date-time" },
+    "candidateHash": { "$ref": "#/$defs/hash" },
+    "inputSnapshotHash": { "$ref": "#/$defs/hash" },
+    "transactionExecuted": { "const": false },
+    "formalRegistration": { "const": "not-run" },
+    "validationCommands": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nonClaims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$" }
+  }
+}

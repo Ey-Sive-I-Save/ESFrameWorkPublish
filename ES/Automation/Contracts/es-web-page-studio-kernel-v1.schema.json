@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://automation/contracts/web-page-studio-kernel/v1",
+  "title": "ES WebPageStudio Kernel Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recordType", "format", "renderMode", "page", "theme", "data", "routes", "components", "output"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "ESWebPageStudioKernelRequest"},
+    "format": {"const": "html-css-esm"},
+    "renderMode": {"enum": ["static", "dynamic"]},
+    "page": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "description", "pageKind", "primaryAction", "language"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 160},
+        "description": {"type": "string", "minLength": 1, "maxLength": 320},
+        "pageKind": {"enum": ["marketing", "dashboard"]},
+        "primaryAction": {"type": "string", "minLength": 1, "maxLength": 80},
+        "language": {"enum": ["en", "zh-CN", "ar"]}
+      }
+    },
+    "theme": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "dark", "light"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "dark": {"$ref": "#/$defs/tokens"},
+        "light": {"$ref": "#/$defs/tokens"}
+      }
+    },
+    "data": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "endpoint", "timeoutSeconds"],
+      "properties": {
+        "source": {"enum": ["inline", "same-origin-endpoint", "authorized-backend-contract"]},
+        "endpoint": {"type": "string", "pattern": "^(?:$|/[^/].*)"},
+        "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 300}
+      }
+    },
+    "routes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/route"}},
+    "components": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/component"}},
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["directory"],
+      "properties": {"directory": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}}
+    }
+  },
+  "$defs": {
+    "color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+    "tokens": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ink", "muted", "background", "panel", "line", "accent", "positive", "critical"],
+      "properties": {
+        "ink": {"$ref": "#/$defs/color"}, "muted": {"$ref": "#/$defs/color"}, "background": {"$ref": "#/$defs/color"}, "panel": {"$ref": "#/$defs/color"}, "line": {"$ref": "#/$defs/color"}, "accent": {"$ref": "#/$defs/color"}, "positive": {"$ref": "#/$defs/color"}, "critical": {"$ref": "#/$defs/color"}
+      }
+    },
+    "route": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "path", "entry", "renderMode"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "path": {"type": "string", "pattern": "^/[^?#]*$"},
+        "entry": {"type": "string", "minLength": 1},
+        "renderMode": {"enum": ["static", "dynamic"]}
+      }
+    },
+    "component": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "semanticRole", "children"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "kind": {"enum": ["layout", "navigation", "hero", "content", "form", "state", "footer"]},
+        "semanticRole": {"type": "string", "minLength": 1},
+        "children": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"}},
+        "dataBindings": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,63}$"}}
+      }
+    }
+  }
+}

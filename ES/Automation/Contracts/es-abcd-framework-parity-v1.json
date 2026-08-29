@@ -1,0 +1,15 @@
+{
+  "schemaVersion":1,
+  "matrixId":"es.abcd.framework-parity.v1",
+  "threshold":0.8,
+  "coverageDefinition":"adapted core capabilities / registered core capabilities",
+  "frameworks":[
+    {"frameworkId":"swe-agent-aci","coreCapabilities":["bounded-tool-surface","edit-lint-gate","bounded-file-view","search-surface","empty-output-feedback"]},
+    {"frameworkId":"reflexion","coreCapabilities":["feedback-capture","verbal-reflection","episodic-memory","next-attempt-injection","retry-budget"]},
+    {"frameworkId":"tree-of-thoughts","coreCapabilities":["branch-generation","state-evaluation","bfs-dfs-selection","prune-backtrack","search-budget"]},
+    {"frameworkId":"petri","coreCapabilities":["scenario-generation","auditor-target-judge-roles","multiturn-transcript","simulated-tools","judge-dimensions"]},
+    {"frameworkId":"envtrustbench","coreCapabilities":["environment-generation","stale-adversarial-surfaces","action-observation-trace","truth-oracle","final-state-verdict"]},
+    {"frameworkId":"auditbench","coreCapabilities":["blackbox-probing","diverse-prompt-scaffold","evidence-comparison","tool-agent-gap","quantitative-iteration"]}
+  ],
+  "policy":{"belowThreshold":"blocked","externalRuntimeClaims":"forbidden-without-runtime-evidence","sourceDrift":"invalidate-parity"}
+}

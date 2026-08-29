@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/interaction-binding-ref/v1",
+  "title": "ES Interaction Binding Reference v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bindingId", "bindingHash"],
+  "properties": {
+    "bindingId": { "type": "string", "pattern": "^isb-[a-f0-9]{32}$" },
+    "bindingHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es://automation/contracts/external-agent-feature-catalog/v1",
+  "schemaVersion":1,
+  "catalogId":"es.external-agent.features.v1",
+  "features":[
+    {"featureId":"langgraph.state-graph","frameworkId":"langgraph","sourceUrl":"https://github.com/langchain-ai/langgraph","observedScope":"StateGraph nodes, edges and state updates","esStatus":"reference-only","esMapping":"RoutePlan/RouteStage/TaskContext","exclusions":["No LangGraph runtime dependency"]},
+    {"featureId":"langgraph.interrupt-resume","frameworkId":"langgraph","sourceUrl":"https://github.com/langchain-ai/langgraph/blob/main/libs/langgraph/langgraph/types.py","observedScope":"interrupt and human confirmation resume","esStatus":"reference-only","esMapping":"pending-confirmation/confirmed plus checkpoint","exclusions":["No external checkpointer"]},
+    {"featureId":"langgraph.checkpoint","frameworkId":"langgraph","sourceUrl":"https://github.com/langchain-ai/langgraph","observedScope":"checkpoint persistence and replay","esStatus":"catalogued","esMapping":"TaskContext snapshot and immutable Receipt","exclusions":["Runtime persistence adapter not enabled"]},
+    {"featureId":"letta.memory-block","frameworkId":"letta","sourceUrl":"https://github.com/letta-ai/letta/blob/main/letta/schemas/memory.py","observedScope":"core memory blocks and bounded updates","esStatus":"reference-only","esMapping":"TaskFocusContext context block","exclusions":["No Letta database or agent service"]},
+    {"featureId":"letta.context-rebuild","frameworkId":"letta","sourceUrl":"https://github.com/letta-ai/letta","observedScope":"memory update projected into subsequent context","esStatus":"catalogued","esMapping":"ContextProjection Receipt","exclusions":["Projection effect requires ES adapter replay"]},
+    {"featureId":"letta.archival-memory","frameworkId":"letta","sourceUrl":"https://github.com/letta-ai/letta","observedScope":"recall and archival memory separation","esStatus":"reference-only","esMapping":"AIKnowledge versus TaskFocusContext separation","exclusions":["No automatic promotion to AIKnowledge"]},
+    {"featureId":"openhands.conversation-state","frameworkId":"openhands","sourceUrl":"https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/conversation/state.py","observedScope":"conversation lifecycle and persisted state","esStatus":"reference-only","esMapping":"Codex Session navigation plus TaskContext authority","exclusions":["Window presence is not task completion"]},
+    {"featureId":"openhands.agent-loop","frameworkId":"openhands","sourceUrl":"https://docs.openhands.dev/sdk/arch/agent","observedScope":"observe-decide-tool-result loop","esStatus":"catalogued","esMapping":"TaskContext events and verifier stages","exclusions":["No OpenHands execution service"]},
+    {"featureId":"openhands.tool-boundary","frameworkId":"openhands","sourceUrl":"https://docs.openhands.dev/sdk/arch/agent","observedScope":"sandbox and tool execution boundary","esStatus":"catalogued","esMapping":"allowedScope and user authorization","exclusions":["Focus cannot expand permissions"]},
+    {"featureId":"swe-agent.aci","frameworkId":"swe-agent","sourceUrl":"https://github.com/SWE-agent/SWE-agent","observedScope":"ACI restricted tools and command surface","esStatus":"reference-only","esMapping":"bounded tool contract","exclusions":["No SWE-agent runtime"]},
+    {"featureId":"swe-agent.patch-test-loop","frameworkId":"swe-agent","sourceUrl":"https://github.com/SWE-agent/SWE-agent","observedScope":"patch, test, diagnose and retry loop","esStatus":"catalogued","esMapping":"EvidenceSet and verifier replay","exclusions":["Unity runtime remains separate"]},
+    {"featureId":"swe-agent.environment-trust","frameworkId":"swe-agent","sourceUrl":"https://github.com/SWE-agent/SWE-agent","observedScope":"environment and sandbox assumptions","esStatus":"catalogued","esMapping":"Platform evidence and source snapshot","exclusions":["No implicit network or credential access"]}
+  ]
+}

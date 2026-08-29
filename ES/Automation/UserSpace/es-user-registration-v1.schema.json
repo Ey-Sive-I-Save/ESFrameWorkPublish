@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/user-registration/v1",
+  "title": "ES User Space Public Registration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "spaceId", "personId", "kind", "displayName", "ownerSubjectHash", "ownerId", "visibility", "membershipPolicy", "storageLocator", "responsibilities", "preferences", "public", "private", "status", "revision", "contentHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "spaceId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+    "personId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,47}$" },
+    "kind": { "enum": ["User", "Agent"] },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "ownerSubjectHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "ownerId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,47}$" },
+    "visibility": { "enum": ["PublicMetadata", "PublicContent", "Private", "Team"] },
+    "membershipPolicy": { "enum": ["OwnerOnly", "OpenReadOwnerWrite", "TeamMembers", "RoleBased"] },
+    "storageLocator": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "responsibilities": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 }, "maxItems": 32 },
+    "preferences": {
+      "type": "object", "additionalProperties": false,
+      "required": ["language", "branchStrategy", "mergePolicy"],
+      "properties": {
+        "language": { "type": "string", "minLength": 2, "maxLength": 16 },
+        "branchStrategy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "mergePolicy": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "workingHours": { "type": "string", "maxLength": 128 }
+      }
+    },
+    "public": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contact", "discoverableRoutes"],
+      "properties": {
+        "contact": { "type": "string", "maxLength": 256 },
+        "discoverableRoutes": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9._-]+$" }, "maxItems": 64 }
+      }
+    },
+    "private": {
+      "type": "object", "additionalProperties": false,
+      "required": ["storageClass", "locator"],
+      "properties": {
+        "storageClass": { "enum": ["ProjectIgnored", "External"] },
+        "locator": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    },
+    "status": { "enum": ["Active", "Suspended", "Revoked"] },
+    "revision": { "type": "integer", "minimum": 1 },
+    "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "updatedUtc": { "type": "string", "format": "date-time" }
+  }
+}

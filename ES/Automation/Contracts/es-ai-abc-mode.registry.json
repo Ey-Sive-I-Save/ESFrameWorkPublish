@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-ai-abc-mode-registry",
+  "namingAuthority": {
+    "authorityId": "es.ai-abc.naming.v1",
+    "version": "v1",
+    "base": {
+      "acronym": "ABC",
+      "english": "Agent–Behavior–Collaborator",
+      "chinese": "智能体—机制—协作者",
+      "roles": {
+        "A": { "english": "Agent", "chinese": "智能体/流程端", "meaning": "提出目标、生成意图并消费归一化结果" },
+        "B": { "english": "Behavior", "chinese": "机制/能力端", "meaning": "提供可协商、可验证能力的独立机制；不是 BehaviorTree 专属" },
+        "C": { "english": "Collaborator", "chinese": "协作者", "meaning": "用户、AI 或真人，提供目标、授权与最终接受" }
+      }
+    },
+    "modeNames": {
+      "ABCD.Dynamic": { "english": "Agent–Behavior–Collaborator Dynamics", "chinese": "ES 智能体—机制—协作者动态体系", "shortName": "ES 动态协作体", "suffix": "Dynamic" },
+      "ABCC.Core": { "english": "Agent–Behavior–Collaborator Core", "chinese": "ES 智能体—机制—协作者适配核心", "shortName": "ES ABC 核心", "suffix": "Core" },
+      "ABCP.Part": { "english": "Agent–Behavior–Collaborator Part", "chinese": "ES 智能体—机制—协作者领域部件", "shortName": "ES ABC 部件", "suffix": "Part" }
+    },
+    "rules": [
+      "ABC names the three semantic roles; D, Core and Part are mode suffixes, not additional roles.",
+      "modeId values remain stable compatibility identities; display names may be localized without renaming IDs.",
+      "ABCC and ABCP must reference this authority instead of copying or redefining the ABC vocabulary."
+    ]
+  },
+  "modes": [
+    { "modeId": "ABCD.Dynamic", "displayName": "ABCD (Dynamic)", "independent": true, "orchestration": "dynamic", "dependsOnCore": false, "capabilityCoverage": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "fallback": "none" },
+    { "modeId": "ABCC.Core", "displayName": "ABCC (Core)", "independent": true, "orchestration": "semantic-adapter", "dependsOnCore": false, "capabilityCoverage": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "fallback": "explicit-only", "contractRef": "ES/Automation/Contracts/es-ai-abc-core-v1.json" },
+    { "modeId": "ABCP.Part", "displayName": "ABCP (Part)", "independent": false, "orchestration": "bounded-domain", "dependsOnCore": true, "capabilityCoverage": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "fallback": "explicit-only", "contractRef": "ES/Automation/Contracts/es-ai-abc-part-v1.schema.json" }
+  ],
+  "parityRule": { "coreMustCoverDynamic": true, "missingCapabilityEffect": "blocked", "partMaySelectSubset": true, "silentFallback": false, "textCopying": false }
+}

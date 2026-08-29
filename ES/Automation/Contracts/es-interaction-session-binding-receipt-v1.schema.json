@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/interaction-session-binding-receipt/v1",
+  "title": "ES Interaction Session Binding Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractId",
+    "bindingId",
+    "scope",
+    "session",
+    "transcript",
+    "authorityProofHash",
+    "issuedUtc",
+    "bindingHash"
+  ],
+  "properties": {
+    "contractId": { "const": "es://automation/contracts/interaction-session-binding-receipt/v1" },
+    "bindingId": { "$ref": "#/$defs/bindingId" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "goalRevisionHash", "routePlanHash", "profile", "scope"],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "goalRevisionHash": { "$ref": "#/$defs/hash" },
+        "routePlanHash": { "$ref": "#/$defs/hash" },
+        "profile": { "const": "interaction-observation" },
+        "scope": { "const": "task-object" }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordId", "sessionId"],
+      "properties": {
+        "recordId": { "$ref": "#/$defs/id" },
+        "sessionId": { "$ref": "#/$defs/sessionId" }
+      }
+    },
+    "transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relativePath", "snapshotLength", "prefixHash", "taskStartByteOffset"],
+      "properties": {
+        "relativePath": { "$ref": "#/$defs/relativePath" },
+        "snapshotLength": { "type": "integer", "minimum": 1 },
+        "prefixHash": { "$ref": "#/$defs/hash" },
+        "taskStartByteOffset": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "authorityProofHash": { "$ref": "#/$defs/hash" },
+    "issuedUtc": { "type": "string", "format": "date-time" },
+    "bindingHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "bindingId": { "type": "string", "pattern": "^isb-[a-f0-9]{32}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "sessionId": { "type": "string", "pattern": "^[a-f0-9-]{16,64}$" },
+    "relativePath": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/() -]{0,1023}$" }
+  }
+}

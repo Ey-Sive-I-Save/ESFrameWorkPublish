@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "requestId": "aibrain_bootstrap_20260820",
+  "summary": "AIBrain 第一阶段的定向 Knowledge、Skill 质量闭环和 Feishu 受管适配候选包。",
+  "files": [
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-knowledge-maintenance/SKILL.md", "targetProjectPath": ".agents/skills/es-knowledge-maintenance/SKILL.md", "summary": "维护带来源、哈希和 stale 条件的定向 Knowledge 条目。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-knowledge-maintenance/agents/openai.yaml", "targetProjectPath": ".agents/skills/es-knowledge-maintenance/agents/openai.yaml", "summary": "Knowledge Skill 元数据。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-knowledge-maintenance/references/knowledge-entry-contract.md", "targetProjectPath": ".agents/skills/es-knowledge-maintenance/references/knowledge-entry-contract.md", "summary": "Knowledge 条目引用和失效合同。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-skill-quality-loop/SKILL.md", "targetProjectPath": ".agents/skills/es-skill-quality-loop/SKILL.md", "summary": "Skill 结构验证、代表任务前测和迭代闭环。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-skill-quality-loop/agents/openai.yaml", "targetProjectPath": ".agents/skills/es-skill-quality-loop/agents/openai.yaml", "summary": "Skill Quality 元数据。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-skill-quality-loop/references/quality-matrix.md", "targetProjectPath": ".agents/skills/es-skill-quality-loop/references/quality-matrix.md", "summary": "Skill 质量和迭代测试矩阵。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-feishu-cli/SKILL.md", "targetProjectPath": ".agents/skills/es-feishu-cli/SKILL.md", "summary": "经 ESAutomationCenter 管理的 Feishu 外部适配器工作流。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-feishu-cli/agents/openai.yaml", "targetProjectPath": ".agents/skills/es-feishu-cli/agents/openai.yaml", "summary": "Feishu Skill 元数据。" },
+    { "artifactKind": 1, "candidateRelativePath": "candidate/.agents/skills/es-feishu-cli/references/adapter-contract.md", "targetProjectPath": ".agents/skills/es-feishu-cli/references/adapter-contract.md", "summary": "Feishu 凭据、DryRun、RunRecord 和权限边界。" }
+  ]
+}

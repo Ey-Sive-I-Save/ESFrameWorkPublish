@@ -1,0 +1,6 @@
+{
+  "$schema":"http://json-schema.org/draft-07/schema#",
+  "$id":"esframework://automation/contracts/abcd/final-gate/v1",
+  "type":"object","required":["schemaVersion","contractId","gateId","status","decisionStatus","planId","planHash","authorityGraphHash","evidenceLevel","issues","claimsNotProven"],
+  "properties":{"schemaVersion":{"const":1},"contractId":{"const":"es://automation/contracts/abcd/final-gate/v1"},"gateId":{"type":"string","minLength":8},"status":{"enum":["accepted","blocked"]},"decisionStatus":{"enum":["Accepted","Blocked"]},"evidenceLevel":{"enum":["S1","S2","S3","S4","S5","S6"]},"issues":{"type":"array"},"claimsNotProven":{"type":"array"}}
+}

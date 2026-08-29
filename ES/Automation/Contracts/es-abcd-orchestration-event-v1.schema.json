@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/abcd/orchestration-event/v1",
+  "title": "ES ABCD Orchestration Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "eventId", "storeId", "taskId", "taskBindingRef", "routePlanHash", "sourceScopeHash", "eventType", "eventSequence", "previousEventHash", "expectedTaskRevision", "expectedContextVersion", "observedTaskRevision", "observedContextVersion", "idempotencyKey", "authorizationRef", "payloadHash", "payload", "eventHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/abcd/orchestration-event/v1" },
+    "recordType": { "const": "ABCDOrchestrationEvent" },
+    "eventId": { "type": "string", "pattern": "^abcdn-[a-f0-9]{32}$" },
+    "storeId": { "type": "string", "pattern": "^abcd-store-[a-f0-9]{32}$" },
+    "taskId": { "$ref": "#/$defs/id" },
+    "taskBindingRef": { "$ref": "#/$defs/bindingRef" },
+    "routePlanHash": { "$ref": "#/$defs/hash" },
+    "sourceScopeHash": { "$ref": "#/$defs/hash" },
+    "eventType": { "enum": ["iteration-round-started", "candidate-expanded", "candidate-pruned", "branch-backtracked", "audit-recorded", "branch-selected", "correction-cycle-started", "verification-recorded", "iteration-advanced", "iteration-stopped"] },
+    "eventSequence": { "type": "integer", "minimum": 1 },
+    "previousEventHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+    "expectedTaskRevision": { "type": "integer", "minimum": 1 },
+    "expectedContextVersion": { "type": "integer", "minimum": 1 },
+    "observedTaskRevision": { "type": "integer", "minimum": 1 },
+    "observedContextVersion": { "type": "integer", "minimum": 1 },
+    "idempotencyKey": { "type": "string", "pattern": "^abci-[a-f0-9]{64}$" },
+    "authorizationRef": { "type": "string", "minLength": 1 },
+    "payloadHash": { "$ref": "#/$defs/hash" },
+    "eventHash": { "$ref": "#/$defs/hash" },
+    "payload": { "type": "object", "minProperties": 1 }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bindingRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bindingId", "bindingHash"],
+      "properties": {
+        "bindingId": { "$ref": "#/$defs/id" },
+        "bindingHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

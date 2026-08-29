@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/team-registration/v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion","teamId","displayName","mission","members","collaboration","ownerSubjectHash","status","revision","contentHash"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "teamId": {"type":"string","pattern":"^[a-z][a-z0-9-]{1,47}$"},
+    "displayName": {"type":"string","minLength":1,"maxLength":128}, "mission": {"type":"string","maxLength":512},
+    "members": {"type":"array","minItems":1,"maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["personId","role"],"properties":{"personId":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,47}$"},"role":{"enum":["Owner","Maintainer","Contributor","Reader"]}}}},
+    "collaboration": {"type":"object","additionalProperties":false,"required":["branchStrategy","mergePolicy"],"properties":{"branchStrategy":{"type":"string","maxLength":256},"mergePolicy":{"type":"string","maxLength":256}}},
+    "ownerSubjectHash": {"type":"string","pattern":"^[a-f0-9]{64}$"}, "status":{"enum":["Active","Suspended","Revoked"]}, "revision":{"type":"integer","minimum":1}, "contentHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}, "updatedUtc":{"type":"string"}
+  }
+}

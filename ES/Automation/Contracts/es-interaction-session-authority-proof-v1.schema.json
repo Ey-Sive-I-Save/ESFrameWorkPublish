@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/interaction-session-authority-proof/v1",
+  "title": "ES Interaction Session Authority Proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractId",
+    "proofId",
+    "bindingId",
+    "authority",
+    "registry",
+    "acceptance",
+    "process",
+    "issuedUtc",
+    "proofHash"
+  ],
+  "properties": {
+    "contractId": { "const": "es://automation/contracts/interaction-session-authority-proof/v1" },
+    "proofId": { "type": "string", "pattern": "^iap-[a-f0-9]{32}$" },
+    "bindingId": { "type": "string", "pattern": "^isb-[a-f0-9]{32}$" },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionStateRootId", "transcriptRootId", "projectRootHash", "launchTokenHash", "resolutionMethod", "normalizationVersion"],
+      "properties": {
+        "sessionStateRootId": { "const": "es-codex-session-state-v2" },
+        "transcriptRootId": { "const": "codex-home-sessions-v1" },
+        "projectRootHash": { "$ref": "#/$defs/hash" },
+        "launchTokenHash": { "$ref": "#/$defs/hash" },
+        "resolutionMethod": { "const": "registry-acceptance-process-ancestry-v1" },
+        "normalizationVersion": { "const": "interaction-authority-canonical-v1" }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relativePath", "snapshotLength", "sha256", "syncState", "record"],
+      "properties": {
+        "relativePath": { "$ref": "#/$defs/relativePath" },
+        "snapshotLength": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "syncState": { "enum": ["aligned", "receipt-ahead-of-registry"] },
+        "record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["recordId", "sessionId", "transcriptRelativePath", "lifecycleStatus", "launchPhase", "registryContextAccepted", "recordHash"],
+          "properties": {
+            "recordId": { "$ref": "#/$defs/id" },
+            "sessionId": { "$ref": "#/$defs/sessionId" },
+            "transcriptRelativePath": { "$ref": "#/$defs/relativePath" },
+            "lifecycleStatus": { "enum": ["Registered", "PendingAcceptance", "PendingPrompt"] },
+            "launchPhase": { "enum": ["ContextAccepted", "PromptObserved", "TerminalStarted"] },
+            "registryContextAccepted": { "type": "boolean" },
+            "recordHash": { "$ref": "#/$defs/hash" }
+          }
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relativePath", "sha256", "acceptedUtc"],
+      "properties": {
+        "relativePath": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "acceptedUtc": { "type": "string", "format": "date-time" }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "processStartUtc", "ancestorChainHash"],
+      "properties": {
+        "pid": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "processStartUtc": { "type": "string", "format": "date-time" },
+        "ancestorChainHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "issuedUtc": { "type": "string", "format": "date-time" },
+    "proofHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "sessionId": { "type": "string", "pattern": "^[a-f0-9-]{16,64}$" },
+    "relativePath": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/() -]{0,1023}$" }
+  }
+}

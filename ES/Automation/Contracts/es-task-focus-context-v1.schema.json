@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-focus-context/v1",
+  "title": "ES TaskFocusContext v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "focusContextId", "focusRevision", "focusProposalHash", "focusReceiptHash", "focusScopeHash", "status", "proposalId", "proposalHash", "focus", "priority", "source", "allowedScope", "forbiddenExpansion", "requiredReads", "acceptanceSignals"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "focusContextId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "focusRevision": { "type": "integer", "minimum": 1 },
+    "focusProposalHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "focusReceiptHash": { "oneOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] },
+    "focusScopeHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "status": { "const": "confirmed" },
+    "proposalId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "proposalHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "focus": { "type": "string", "minLength": 1 },
+    "priority": { "enum": ["normal", "elevated", "critical"] },
+    "source": { "type": "string", "minLength": 1 },
+    "allowedScope": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "forbiddenExpansion": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "requiredReads": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "acceptanceSignals": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "supersedes": { "type": ["string", "null"] }
+  }
+}

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$ModulePath)
+param([string]$ModulePath,[string]$ProgressPath)
 $ErrorActionPreference='Stop'
 if([string]::IsNullOrWhiteSpace($ModulePath)){$ModulePath=Join-Path $PSScriptRoot 'ESTaskContextRuntime.psm1'}
 Import-Module $ModulePath -Force
@@ -11,12 +11,17 @@ $testRoot=Join-Path ([IO.Path]::GetTempPath()) ('es-task-context-runtime-' + [Gu
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 Initialize-ESTestRoutePlanRepository $testRoot
 $results=[System.Collections.Generic.List[object]]::new()
+$progressFull=$null
+if(-not [string]::IsNullOrWhiteSpace($ProgressPath)){$progressFull=[IO.Path]::GetFullPath($ProgressPath);$pp=Split-Path -Parent $progressFull;if(-not(Test-Path -LiteralPath $pp)){New-Item -ItemType Directory -Path $pp -Force|Out-Null}}
+function Save-TestProgress([string]$Case,[string]$Status){if($null -eq $progressFull){return};[IO.File]::WriteAllText($progressFull,([pscustomobject][ordered]@{schemaVersion=1;validator='Test-ESTaskContextRuntime';updatedUtc=[DateTime]::UtcNow.ToString('o');currentCase=$Case;currentStatus=$Status;completedCases=@($results)}|ConvertTo-Json -Depth 20),[Text.UTF8Encoding]::new($false))}
 
 function Assert-Equal($Actual,$Expected,[string]$Message){if([string]$Actual -cne [string]$Expected){throw "$Message Expected=$Expected Actual=$Actual"}}
 function Assert-True([bool]$Condition,[string]$Message){if(-not$Condition){throw $Message}}
 function Invoke-Case([string]$Name,[scriptblock]$Body){
+    Save-TestProgress $Name 'running'
     try{& $Body;[void]$results.Add([pscustomobject]@{case=$Name;status='passed';finding=$null})}
     catch{[void]$results.Add([pscustomobject]@{case=$Name;status='failed';finding=$_.Exception.Message})}
+    Save-TestProgress $Name $results[-1].status
 }
 function New-Fixture([string]$Name){
     $root=Join-Path $testRoot $Name;New-Item -ItemType Directory -Path $root|Out-Null
@@ -90,6 +95,11 @@ Invoke-Case 'transcript-observation-requires-frozen-session' {
     $root=New-Fixture 'optional-session-missing';$goal=New-ESGoalRevision -ProjectRoot $root -StoreRoot 'state' -GoalId 'goal-optional-session' -GoalRevision 'r1' -Scope @('source.txt') -AcceptanceIntent 'static' -Budget ([ordered]@{maxReads=8});$routePlan=New-ESTestRoutePlan -Root $root -Goal $goal;$threw=$false
     try{New-ESTaskContextTask -ProjectRoot $root -StoreRoot 'state' -TaskId 'task' -PlanHash $routePlan.routePlanHash -RoutePlanPath $routePlan.path -GoalRevisionPath $goal.path -AcceptanceProfileId 'static' -OutcomeEvaluatorId 'platform.task-context-outcome-v1' -OptionalClaim 'interaction-correction' -OptionalClaimVerifier ([ordered]@{'interaction-correction'='platform.codex-transcript-slice-v1'}) -RequestedSourceScope 'source.txt' -IdempotencyKey 'create'|Out-Null}catch{$threw=$_.Exception.Message-eq'Transcript observation claims require a frozen InteractionSessionId.'}
     Assert-True $threw 'A transcript observation claim without a frozen session was accepted.'
+}
+Invoke-Case 'transcript-observation-cannot-be-required' {
+    $root=New-Fixture 'required-session-missing';$goal=New-ESGoalRevision -ProjectRoot $root -StoreRoot 'state' -GoalId 'goal-required-session' -GoalRevision 'r1' -Scope @('source.txt') -AcceptanceIntent 'static' -Budget ([ordered]@{maxReads=8});$routePlan=New-ESTestRoutePlan -Root $root -Goal $goal;$threw=$false
+    try{New-ESTaskContextTask -ProjectRoot $root -StoreRoot 'state' -TaskId 'task' -PlanHash $routePlan.routePlanHash -RoutePlanPath $routePlan.path -GoalRevisionPath $goal.path -AcceptanceProfileId 'static' -OutcomeEvaluatorId 'platform.task-context-outcome-v1' -RequiredClaim 'interaction-correction' -RequiredClaimVerifier ([ordered]@{'interaction-correction'='platform.codex-transcript-slice-v1'}) -InteractionSessionId ('a'*32) -RequestedSourceScope 'source.txt' -IdempotencyKey 'create'|Out-Null}catch{$threw=$_.Exception.Message-eq'Transcript observation verifier cannot be bound to a required claim.'}
+    Assert-True $threw 'An observation-only transcript verifier was accepted as required completion evidence.'
 }
 Invoke-Case 'missing-route-plan-is-rejected' {
     $root=New-Fixture 'route-plan-missing';$goal=New-ESGoalRevision -ProjectRoot $root -StoreRoot 'state' -GoalId 'goal' -GoalRevision 'r1' -Scope @('source.txt') -AcceptanceIntent 'static' -Budget ([ordered]@{maxReads=8});$threw=$false

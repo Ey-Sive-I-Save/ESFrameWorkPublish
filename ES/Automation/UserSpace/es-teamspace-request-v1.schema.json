@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/teamspace/request/v1",
+  "title": "ES TeamSpace managed request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action"],
+  "properties": {
+    "action": { "type": "string", "enum": ["Initialize", "Update", "Discover", "Validate"] },
+    "TeamId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,47}$" },
+    "DisplayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "Mission": { "type": "string", "maxLength": 512 },
+    "MemberPersonIds": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,47}$" }, "maxItems": 64 },
+    "MemberRoles": { "type": "array", "items": { "enum": ["Owner", "Maintainer", "Contributor", "Reader"] }, "maxItems": 64 },
+    "BranchStrategy": { "type": "string", "maxLength": 256 },
+    "MergePolicy": { "type": "string", "maxLength": 256 },
+    "ExpectedRevision": { "type": "integer", "minimum": 1 },
+    "TransferOwnership": { "type": "boolean" }
+  }
+}

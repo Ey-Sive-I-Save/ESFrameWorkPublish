@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/ai-abc/exchange-receipt/v1",
+  "title": "ES AI ABC Exchange Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "exchangeId", "taskId", "routePlanHash", "sourceScopeHash", "coreRef", "partRefs", "status", "receiptHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/ai-abc/exchange-receipt/v1" },
+    "recordType": { "const": "ABCExchangeReceipt" },
+    "exchangeId": { "$ref": "#/$defs/id" },
+    "taskId": { "$ref": "#/$defs/id" },
+    "routePlanHash": { "$ref": "#/$defs/hash" },
+    "sourceScopeHash": { "$ref": "#/$defs/hash" },
+    "coreRef": { "const": "es.ai-abc.core.v1" },
+    "partRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "status": { "const": "accepted" },
+    "producerId": { "$ref": "#/$defs/id" },
+    "receiptHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

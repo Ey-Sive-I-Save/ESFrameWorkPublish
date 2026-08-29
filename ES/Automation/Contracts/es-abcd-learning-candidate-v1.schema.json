@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/abcd/learning-candidate/v1",
+  "title": "ES ABCD Learning Candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "candidateId", "status", "taskId", "cycleId", "attemptNo", "taskBindingRef", "routePlanHash", "sourceScopeHash", "findingReceiptRef", "verificationReceiptRef", "failureClass", "decision", "sourceRefs", "knowledgeTarget", "validation", "candidateHash", "nonClaims"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/abcd/learning-candidate/v1" },
+    "recordType": { "const": "ABCDLearningCandidate" },
+    "candidateId": { "type": "string", "pattern": "^abcd-lc-[a-f0-9]{32}$" },
+    "status": { "enum": ["candidate", "review", "validated", "stale", "rejected"] },
+    "taskId": { "$ref": "#/$defs/id" },
+    "cycleId": { "$ref": "#/$defs/id" },
+    "attemptNo": { "type": "integer", "minimum": 1 },
+    "taskBindingRef": { "$ref": "#/$defs/bindingRef" },
+    "routePlanHash": { "$ref": "#/$defs/hash" },
+    "sourceScopeHash": { "$ref": "#/$defs/hash" },
+    "findingReceiptRef": { "type": "string", "minLength": 1 },
+    "verificationReceiptRef": { "type": "string", "pattern": "^receipt-[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$" },
+    "failureClass": { "enum": ["input", "source", "route", "capability", "environment", "evidence"] },
+    "decision": { "enum": ["retry", "replan", "branch", "stop"] },
+    "sourceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sourceRef" } },
+    "knowledgeTarget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["knowledgeId", "targetPath", "routeKeys"],
+      "properties": {
+        "knowledgeId": { "$ref": "#/$defs/id" },
+        "targetPath": { "$ref": "#/$defs/projectPath" },
+        "routeKeys": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,80}$" } }
+      }
+    },
+    "validation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "verifierId", "verifierDefinitionHash", "sourceStableAtEnd", "promotionAllowed"],
+      "properties": {
+        "state": { "enum": ["pending", "passed", "review", "failed", "stale"] },
+        "verifierId": { "$ref": "#/$defs/id" },
+        "verifierDefinitionHash": { "$ref": "#/$defs/hash" },
+        "sourceStableAtEnd": { "type": "boolean" },
+        "promotionAllowed": { "const": false }
+      }
+    },
+    "candidateHash": { "$ref": "#/$defs/hash" },
+    "nonClaims": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "projectPath": { "type": "string", "pattern": "^(?![A-Za-z]:)(?!/)(?!\\\\)(?!.*(^|[/\\\\])\\.\\.([/\\\\]|$)).+$" },
+    "bindingRef": {
+      "type": "object", "additionalProperties": false, "required": ["bindingId", "bindingHash"],
+      "properties": { "bindingId": { "$ref": "#/$defs/id" }, "bindingHash": { "$ref": "#/$defs/hash" } }
+    },
+    "sourceRef": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256", "role"],
+      "properties": { "path": { "$ref": "#/$defs/projectPath" }, "sha256": { "$ref": "#/$defs/hash" }, "role": { "enum": ["finding", "verification", "contract", "required-read", "evidence"] } }
+    }
+  }
+}

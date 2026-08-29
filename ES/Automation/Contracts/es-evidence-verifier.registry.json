@@ -43,6 +43,15 @@
       "maxTranscriptBytes": 33554432,
       "maxSliceLines": 512,
       "maxSliceChars": 1048576
+    },
+    {
+      "verifierId": "es-adapter-observation-v1",
+      "authority": "TaskContextRuntime",
+      "artifactFormat": "json",
+      "claimIdPattern": "^adapter\\.[A-Za-z0-9][A-Za-z0-9._-]{0,72}$",
+      "requiredArtifactFields": ["schemaVersion", "claimId", "sourceScopeHash", "adapterId", "adapterVersion", "observationHash", "observation"],
+      "observationFields": ["adapterId", "adapterVersion", "observationHash"],
+      "outcomePolicy": "failed-if-observation-hash-mismatch;unverified-if-missing;passed-if-observation-hash-matches"
     }
   ]
 }

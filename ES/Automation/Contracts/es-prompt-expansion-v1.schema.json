@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://automation/contracts/prompt-expansion/v1",
+  "title": "ES Prompt Expansion Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recordType", "status", "idempotencyKey", "source", "expandedPrompt", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "PromptExpansionCandidate"},
+    "status": {"enum": ["expanded", "review", "blocked", "stale/retry-required"]},
+    "idempotencyKey": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source": {"type": "object", "required": ["promptHash", "capturedAtUtc"], "additionalProperties": false, "properties": {"promptHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "warningPath": {"type": "string"}, "warningHash": {"type": "string"}, "knowledgeIndexPath": {"type": "string"}, "knowledgeIndexHash": {"type": "string"}, "capturedAtUtc": {"type": "string"}}},
+    "expandedPrompt": {"type": "object", "required": ["objective", "scope", "mustPreserve", "acceptanceSignals", "requiredReads", "nonGoals", "evidencePlan"], "additionalProperties": false, "properties": {"objective": {"type": "string", "minLength": 1}, "scope": {"type": "array", "items": {"type": "string"}}, "mustPreserve": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "acceptanceSignals": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "requiredReads": {"type": "array", "items": {"type": "string"}}, "nonGoals": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "evidencePlan": {"type": "array", "minItems": 1, "items": {"type": "string"}}}},
+    "nonClaims": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

@@ -66,6 +66,15 @@
         "registryHash": { "$ref": "#/$defs/hash" }
       }
     },
+    "taskBindingRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bindingId", "bindingHash"],
+      "properties": {
+        "bindingId": { "type": "string", "pattern": "^atb-[a-f0-9]{32}$" },
+        "bindingHash": { "$ref": "#/$defs/hash" }
+      }
+    },
     "state": {
       "type": "object",
       "additionalProperties": false,
@@ -74,6 +83,12 @@
         "taskId": { "$ref": "#/$defs/id" },
         "planHash": { "$ref": "#/$defs/hash" },
         "routePlan": { "$ref": "#/$defs/routePlanBinding" },
+        "taskBindingRef": { "oneOf": [{ "$ref": "#/$defs/taskBindingRef" }, { "type": "null" }] },
+        "focusContextId": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "focusRevision": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "focusProposalHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "focusReceiptHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "focusScopeHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
         "goalId": { "$ref": "#/$defs/id" },
         "goalRevision": { "type": "string", "pattern": "^r[1-9][0-9]{0,8}$" },
         "goalRevisionHash": { "$ref": "#/$defs/hash" },
@@ -96,6 +111,10 @@
         "idempotencyKeys": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
       },
       "allOf": [
+        {
+          "if": { "properties": { "focusContextId": { "type": "string" } }, "required": ["focusContextId"] },
+          "then": { "required": ["focusRevision", "focusProposalHash", "focusReceiptHash", "focusScopeHash"] }
+        },
         {
           "if": { "properties": { "completionDecision": { "const": "accepted" } }, "required": ["completionDecision"] },
           "then": { "properties": { "taskStatus": { "const": "Completed" }, "contextStatus": { "const": "Frozen" }, "completionReceipt": { "type": "object" } } }
@@ -135,6 +154,11 @@
         "routePlanSnapshotHash": { "$ref": "#/$defs/hash" },
         "goalRevisionHash": { "$ref": "#/$defs/hash" },
         "acceptanceProfileHash": { "$ref": "#/$defs/hash" },
+        "focusContextId": { "$ref": "#/$defs/id" },
+        "focusRevision": { "type": "integer", "minimum": 1 },
+        "focusProposalHash": { "$ref": "#/$defs/hash" },
+        "focusReceiptHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "focusScopeHash": { "$ref": "#/$defs/hash" },
         "evidenceContractId": { "const": "es://automation/contracts/platform-evidence/v1" },
         "evidenceContractHash": { "$ref": "#/$defs/hash" },
         "evaluationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
@@ -145,7 +169,13 @@
         "completionDecision": { "const": "accepted" },
         "issuedUtc": { "type": "string", "format": "date-time" },
         "receiptHash": { "$ref": "#/$defs/hash" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "focusContextId": { "type": "string" } }, "required": ["focusContextId"] },
+          "then": { "required": ["focusRevision", "focusProposalHash", "focusReceiptHash", "focusScopeHash"] }
+        }
+      ]
     }
   }
 }

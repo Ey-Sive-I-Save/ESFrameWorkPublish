@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-collaboration/parent-aggregation/v1",
+  "title": "ES Parent Aggregation Observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "aggregationId", "parentTaskId", "collaborationPlanId", "collaborationPlanHash", "childRegistryHash", "aggregationStrategy", "status", "children", "conflictChildTaskIds", "completionDecisionRequired", "nonClaims", "aggregationHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-collaboration/parent-aggregation/v1" },
+    "recordType": { "const": "ParentAggregation" },
+    "aggregationId": { "type": "string", "pattern": "^agg-[a-f0-9]{32}$" },
+    "parentTaskId": { "$ref": "#/$defs/id" },
+    "collaborationPlanId": { "type": "string", "pattern": "^cplan-[a-f0-9]{32}$" },
+    "collaborationPlanHash": { "$ref": "#/$defs/hash" },
+    "childRegistryHash": { "$ref": "#/$defs/hash" },
+    "aggregationStrategy": { "enum": ["all-required", "quorum", "ordered"] },
+    "status": { "enum": ["candidate", "partial", "conflict", "replan"] },
+    "children": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/childObservation" } },
+    "conflictChildTaskIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "completionDecisionRequired": { "const": true },
+    "nonClaims": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "aggregationHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "childObservation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["childTaskId", "ordinal", "attempt", "disposition", "selectedResultHash", "evidenceRefs", "quarantinedResultHashes", "duplicateCount"],
+      "properties": {
+        "childTaskId": { "$ref": "#/$defs/id" },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "attempt": { "type": "integer", "minimum": 0 },
+        "disposition": { "enum": ["missing", "candidate", "failed", "cancelled", "conflict", "invalid"] },
+        "selectedResultHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "quarantinedResultHashes": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/hash" } },
+        "duplicateCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

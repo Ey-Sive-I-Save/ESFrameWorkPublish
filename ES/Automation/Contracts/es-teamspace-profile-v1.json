@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/teamspace-profile/v1",
+  "taskId": "es.teamspace.profile",
+  "taskVersion": 1,
+  "commandId": "teamspace.profile.manage",
+  "skillName": "es-ai-space-organization",
+  "operations": ["initialize", "update", "discover", "validate"],
+  "inputContract": {
+    "path": "ES/Automation/UserSpace/es-teamspace-request-v1.schema.json",
+    "sha256": "d3927c99243d30f63fcf788d26df8700edb43fd2aa5227e54f718cb722f739ac",
+    "concurrency": "ExpectedRevision CAS"
+  },
+  "worker": {
+    "type": "PowerShell",
+    "workerId": "es.teamspace.profile",
+    "version": "1.0.0",
+    "entrypoint": "ES/Automation/UserSpace/Invoke-ESTeamSpace.ps1",
+    "entrypointHash": "7e7e40b7f1834e4202cfc00c9c03aa03c9c0de245226a907642bf696e30ad4c2"
+  },
+  "readRoots": ["ES/AISpace/Public/Teams", "ES/AISpace/Public/People", "ES/Automation/UserSpace"],
+  "writeRoots": ["ES/AISpace/Public/Teams", "ES/Automation/Runs/TeamSpace"],
+  "capabilities": ["ReadArtifacts", "WriteReports"],
+  "security": {
+    "privateData": "gitignored-or-external",
+    "pathPolicy": "Team cards remain under ES/AISpace/Public/Teams/<team-id>",
+    "forbidden": ["Git history/index writes", "Unity Assets writes", "delete", "publish", "network"]
+  },
+  "verification": {
+    "staticScript": "ES/Automation/UserSpace/Test-ESUserSpaceAutomationContract.ps1",
+    "runtimeStatus": "runtime-not-run",
+    "sourceRegistrationIntegrated": true,
+    "productionExecutionObserved": false
+  },
+  "rollback": {
+    "registration": "Remove only the selected Automation registration; do not delete prior team cards.",
+    "data": "Keep immutable registration revisions; restore by ExpectedRevision update."
+  }
+}

@@ -1,0 +1,10 @@
+Set-StrictMode -Version Latest;$ErrorActionPreference='Stop'
+function Get-ESABCDDivergenceHash($v){$s=[Security.Cryptography.SHA256]::Create();try{([BitConverter]::ToString($s.ComputeHash([Text.Encoding]::UTF8.GetBytes(($v|ConvertTo-Json -Compress -Depth 20)))).Replace('-','').ToLowerInvariant())}finally{$s.Dispose()}}
+function Invoke-ESABCDFiveDirectionDivergence {
+ [CmdletBinding()]param([Parameter(Mandatory)][string]$Requirement,[Parameter(Mandatory)][string]$SourceHash,[ValidateRange(5,16)][int]$MinimumDirections=5)
+ if([string]::IsNullOrWhiteSpace($Requirement)){throw 'DIVERGENCE_REQUIREMENT_REQUIRED'};if($SourceHash -notmatch '^[a-f0-9]{64}$'){throw 'DIVERGENCE_SOURCE_HASH_INVALID'}
+ $kinds=@('minimal-change','alternative-architecture','failure-first','performance-first','compatibility-first','security-first','migration-first','observability-first');$dirs=@();foreach($k in $kinds|Select-Object -First $MinimumDirections){$seed=[ordered]@{requirement=$Requirement;sourceHash=$SourceHash;direction=$k};$dirs+=,[pscustomobject][ordered]@{directionId='dir-'+(Get-ESABCDDivergenceHash $seed).Substring(0,16);kind=$k;assumption="$k assumption for requirement";risk="risk:$k";verificationPredicate='source-hash-equals:'+ $SourceHash;identityHash=Get-ESABCDDivergenceHash $seed}}
+ $scored=@($dirs|ForEach-Object{[pscustomobject]@{direction=$_;score=[int](([convert]::ToInt32($_.identityHash.Substring(0,4),16))%100)}}|Sort-Object @{e={$_.score};Descending=$true},@{e={$_.direction.directionId}});$winner=$scored[0].direction
+ [pscustomobject][ordered]@{schemaVersion=1;requirement=$Requirement;sourceHash=$SourceHash;directionCount=$dirs.Count;directions=$dirs;selectedDirectionId=$winner.directionId;selection='deterministic-score-then-id';selectionScore=($scored|Where-Object {$_.direction.directionId -ceq $winner.directionId}).score;reusableCoreWrite=$false;persistedExperienceWrite=$false;status='accepted-for-current-task';hash=Get-ESABCDDivergenceHash ([ordered]@{directions=$dirs;winner=$winner.directionId})}
+}
+Export-ModuleMember -Function Invoke-ESABCDFiveDirectionDivergence,Get-ESABCDDivergenceHash

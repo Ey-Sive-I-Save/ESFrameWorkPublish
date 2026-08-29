@@ -12,6 +12,7 @@
 - `es-evidence-verifier-registry-v1.schema.json`：平台注册 verifier 的结构合同；语义验证额外检查唯一 ID、完整锚定 claim 范围、字段集合、策略和定义漂移。
 - `es-route-stage-registry-v1.schema.json` / `es-route-stage.registry.json`：RoutePlan 阶段输入、输出、失败条件与深度 2 授权的中央注册表；未注册阶段不能进入组合计划。
 - `es-route-plan-v1.schema.json`：只读组合路由计划合同，绑定 GoalRevision、Git HEAD、SourceRefs 与 Registry Hash；`executionEnabled=false`，不接管生产路由或全局 P0。
+- `es-interaction-binding-ref-v1.schema.json` / `es-interaction-session-binding-receipt-v1.schema.json` / `es-interaction-session-authority-proof-v1.schema.json`：生产会话身份绑定的三层静态合同。TaskContext 公共引用仅保留 `bindingId + bindingHash`；Receipt 绑定 Task/Goal/Route/Session/Transcript，AuthorityProof 独立保存注册表、接受回执、进程祖先与令牌哈希证据。当前未接生产路由或全局 P0。
 - `es-task-context-evaluation-adapter-v1.schema.json` / `es-task-context-evaluation-adapter-v1.json`：唯一 advisory `/eval` 的来源注册、Worker/hash、生命周期零变更、跨合同禁止投影、观测与回滚合同；`sourceRegistrationIntegrated` 不代表 Unity Runtime 已验证。
 - `es-commercial-evaluation-v1.schema.json` / `es-commercial-metric-registry-v1.schema.json` / `es-commercial-metric.registry.json`：平台只读商业指标控制面；已验证 TaskContext 记录可推导成功、稳定成功、任务级硬违规、延迟和恢复率，缺少权威来源的成本、人工纠正、声明夸大和回归指标保持 `evidence-pending/null`。
 - `ESJsonSchemaLite.psm1`：当前 Automation 合同使用的有界 Draft 2020-12 子集校验器，支持同目录外部 `$ref`；遇到未实现关键字时拒绝，不静默跳过。
@@ -21,6 +22,10 @@
 - `es-automation-ai-request.schema.json` / `es-automation-ai-response.schema.json`：本机受信 AI Bridge 的固定请求/响应信封；动作 payload 仍由 C# 按动作精确校验。
 - `es-automation-python-runtime.schema.json`：项目受管 Python 解释器及可选依赖锁文件的身份与 SHA-256 锁定协议。
 - `es-unity-build-identity-receipt-v1.schema.json`：Unity 构建意图、输入指纹、执行身份和逐项产物哈希的绑定协议；由 `es-unity-compile` 的 Capture/Finalize/Validate 脚本消费，不负责启动构建或证明 Runtime/发布通过。
+- `es-aiwarning-knowledge-candidate-v1.schema.json`：Warning 保存后的候选编排合同；绑定 Warning 快照、StableId+WarningHash 幂等键、匹配信号、冲突、预期 Knowledge 哈希和候选-only 回放命令。
+- `es-aiwarning-knowledge-receipt-v1.schema.json`：Warning→Knowledge 候选编排回执合同；明确 `transactionExecuted=false`、`formalRegistration=not-run`，禁止把候选回执冒充 Apply 或正式注册。
+- `Test-ESAIWarningKnowledgeApply.ps1`：显式 Apply 前置 CAS 门禁（只读）；重读 Warning 与目标 Knowledge，检测哈希漂移、缺失正文和越界路径，未提供正式 Apply 权限与内容补丁时不写入任何权威文件。
+- `es-aiwarning-save-observer-receipt-v1.schema.json` / `Invoke-ESAIWarningSaveObserver.ps1`：受限保存观察器回执与实现；去抖、稳定重读、进程锁、队列上限和 Warning 哈希 CAS 只触发 Candidate-only 编排，不执行正式 Apply。
 
 ## 规则
 

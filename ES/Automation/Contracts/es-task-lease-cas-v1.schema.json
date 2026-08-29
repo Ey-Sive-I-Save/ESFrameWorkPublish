@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-collaboration/lease-cas/v1",
+  "title": "ES Task Lease CAS v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-collaboration/lease-cas/v1" },
+    "recordType": { "enum": ["TaskLeaseClaim", "LeaseCasObservation"] },
+    "leaseId": { "type": "string", "pattern": "^lease-[a-f0-9]{32}$" },
+    "taskId": { "$ref": "#/$defs/id" },
+    "workerId": { "$ref": "#/$defs/id" },
+    "cas": { "$ref": "#/$defs/cas" },
+    "issuedUtc": { "type": "string", "format": "date-time" },
+    "expiresUtc": { "type": "string", "format": "date-time" },
+    "leaseTokenHash": { "$ref": "#/$defs/hash" },
+    "claimHash": { "$ref": "#/$defs/hash" },
+    "status": { "enum": ["claimed", "stale", "expired"] },
+    "reasonCode": { "enum": ["LEASE_ACTIVE", "CAS_STALE", "LEASE_EXPIRED"] },
+    "expectedTaskRevision": { "type": "integer", "minimum": 1 },
+    "expectedContextVersion": { "type": "integer", "minimum": 1 },
+    "observedTaskRevision": { "type": "integer", "minimum": 1 },
+    "observedContextVersion": { "type": "integer", "minimum": 1 },
+    "canSubmitResult": { "type": "boolean" }
+  },
+  "allOf": [
+    { "if": { "properties": { "recordType": { "const": "TaskLeaseClaim" } } }, "then": { "required": ["leaseId", "taskId", "workerId", "cas", "issuedUtc", "expiresUtc", "leaseTokenHash", "claimHash"] } },
+    { "if": { "properties": { "recordType": { "const": "LeaseCasObservation" } } }, "then": { "required": ["leaseId", "taskId", "status", "reasonCode", "expectedTaskRevision", "expectedContextVersion", "observedTaskRevision", "observedContextVersion", "canSubmitResult"] } }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "cas": {
+      "type": "object", "additionalProperties": false,
+      "required": ["expectedTaskRevision", "expectedContextVersion"],
+      "properties": {
+        "expectedTaskRevision": { "type": "integer", "minimum": 1 },
+        "expectedContextVersion": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

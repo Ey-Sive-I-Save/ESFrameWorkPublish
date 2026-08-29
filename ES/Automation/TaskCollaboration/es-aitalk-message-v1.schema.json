@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-collaboration/aitalk-message/v1",
+  "title": "ES AITalk Structured Message v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "conversationId", "messageId", "authorId", "createdUtc", "sequence", "messageKind", "taskBinding", "visibility", "payload", "payloadHash", "evidenceRefs", "idempotencyKey", "messageHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-collaboration/aitalk-message/v1" },
+    "conversationId": { "$ref": "#/$defs/id" },
+    "messageId": { "$ref": "#/$defs/id" },
+    "authorId": { "$ref": "#/$defs/id" },
+    "createdUtc": { "type": "string", "format": "date-time" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "messageKind": { "enum": ["proposal", "evidence", "question", "decision-request", "acknowledgement"] },
+    "taskBinding": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object", "additionalProperties": false, "required": ["taskId", "taskRevision", "contextVersion"], "properties": {
+          "taskId": { "$ref": "#/$defs/id" },
+          "taskRevision": { "type": "integer", "minimum": 1 },
+          "contextVersion": { "type": "integer", "minimum": 1 },
+          "goalRevisionHash": { "$ref": "#/$defs/hash" },
+          "routePlanHash": { "$ref": "#/$defs/hash" },
+          "sourceScopeHash": { "$ref": "#/$defs/hash" },
+          "parentTaskId": { "$ref": "#/$defs/id" },
+          "collaborationPlanHash": { "$ref": "#/$defs/hash" }
+        } }
+      ]
+    },
+    "visibility": { "enum": ["public", "private"] },
+    "payload": {},
+    "payloadHash": { "$ref": "#/$defs/hash" },
+    "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "idempotencyKey": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,160}$" },
+    "messageHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+  }
+}

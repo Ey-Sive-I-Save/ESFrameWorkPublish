@@ -1,0 +1,5 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"es://automation/userspace/ownership-transfer/v1","type":"object","additionalProperties":false,
+  "required":["schemaVersion","transferId","spaceId","fromOwnerId","toOwnerId","permissionScope","state","expectedRevision","effectiveAtUtc","expiresAtUtc","reason","previousReceiptHash","receiptHash"],
+  "properties":{"schemaVersion":{"const":1},"transferId":{"type":"string","pattern":"^[a-f0-9]{32}$"},"spaceId":{"type":"string","pattern":"^[a-f0-9]{32}$"},"fromOwnerId":{"type":"string","minLength":1},"toOwnerId":{"type":"string","minLength":1},"permissionScope":{"type":"array","minItems":1,"items":{"enum":["ReadMetadata","ReadPublicContent","WritePublicContent","ManageMembers","TransferOwnership"]}},"state":{"enum":["Unowned","Offered","Accepted","Active","Suspended","Revoked","Archived"]},"expectedRevision":{"type":"integer","minimum":1},"effectiveAtUtc":{"type":"string"},"expiresAtUtc":{"type":["string","null"]},"reason":{"type":"string","minLength":1,"maxLength":512},"previousReceiptHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"receiptHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}}
+}

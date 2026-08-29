@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/abcd/learning-review/v1",
+  "title": "ES ABCD Learning Review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "reviewId", "candidateRef", "sourceRefs", "validation", "reviewer", "promotion", "reviewHash", "nonClaims"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/abcd/learning-review/v1" },
+    "recordType": { "const": "ABCDLearningReview" },
+    "reviewId": { "type": "string", "pattern": "^abcd-lr-[a-f0-9]{32}$" },
+    "candidateRef": {
+      "type": "object", "additionalProperties": false, "required": ["candidateId", "candidateHash"],
+      "properties": { "candidateId": { "$ref": "#/$defs/id" }, "candidateHash": { "$ref": "#/$defs/hash" } }
+    },
+    "sourceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sourceRef" } },
+    "validation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "verifierId", "verifierDefinitionHash", "sourceStableAtEnd", "validationHash"],
+      "properties": {
+        "state": { "enum": ["validated", "stale", "rejected"] },
+        "verifierId": { "$ref": "#/$defs/id" },
+        "verifierDefinitionHash": { "$ref": "#/$defs/hash" },
+        "sourceStableAtEnd": { "type": "boolean" },
+        "validationHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "reviewer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reviewerId", "role", "authorizationProof"],
+      "properties": {
+        "reviewerId": { "$ref": "#/$defs/id" },
+        "role": { "enum": ["task-acceptance-owner", "knowledge-reviewer", "independent-auditor"] },
+        "authorizationProof": { "type": "string", "minLength": 1 }
+      }
+    },
+    "promotion": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "promotionAllowed", "requiresExplicitApply"],
+      "properties": {
+        "decision": { "enum": ["not-requested", "await-human-review", "approved-by-authority", "rejected"] },
+        "promotionAllowed": { "const": false },
+        "requiresExplicitApply": { "const": true }
+      }
+    },
+    "reviewHash": { "$ref": "#/$defs/hash" },
+    "nonClaims": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sourceRef": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256", "role"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "role": { "enum": ["finding", "verification", "contract", "evidence"] }
+      }
+    }
+  }
+}

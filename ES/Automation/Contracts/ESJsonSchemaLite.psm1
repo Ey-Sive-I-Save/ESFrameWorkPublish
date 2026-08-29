@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 
 $script:SupportedKeywords = @(
     '$schema','$id','$ref','$defs','title','oneOf','allOf','if','then','type','pattern','enum','const',
-    'required','properties','additionalProperties','items','uniqueItems','minLength','minimum','maximum','format'
+    'required','properties','additionalProperties','items','uniqueItems','minItems','minLength','minimum','maximum','format'
 )
 $script:SchemaCache = @{}
 
@@ -160,6 +160,8 @@ function Test-ESJsonSchemaNode {
         $maximum=Get-ESJsonObjectProperty $Schema 'maximum'; if ($maximum.Exists -and [decimal]$Value -gt [decimal]$maximum.Value) { Add-ESJsonSchemaError $Errors $Path 'value is above maximum' }
     }
     if ($Value -is [Array]) {
+        $minItems=Get-ESJsonObjectProperty $Schema 'minItems'
+        if ($minItems.Exists -and $Value.Count -lt [int]$minItems.Value) { Add-ESJsonSchemaError $Errors $Path 'array has fewer items than minItems' }
         $unique=Get-ESJsonObjectProperty $Schema 'uniqueItems'
         if ($unique.Exists -and [bool]$unique.Value) {
             $keys=@($Value | ForEach-Object { $_ | ConvertTo-Json -Depth 40 -Compress })

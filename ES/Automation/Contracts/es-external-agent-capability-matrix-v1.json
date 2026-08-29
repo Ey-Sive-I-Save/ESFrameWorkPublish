@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es://automation/contracts/external-agent-capability-matrix/v1",
+  "schemaVersion":1,
+  "matrixId":"es.external-agent.capabilities.v1",
+  "allowedStatuses":["catalogued","source-available","adapted","enabled","accepted","reference-only","not-adaptable","blocked-supply-chain"],
+  "records":[
+    {"featureId":"langgraph.state-graph","status":"adapted","adapterId":"es-adapter.langgraph.v1","evidenceRef":"Test-ESLangGraphAdapter"},
+    {"featureId":"langgraph.interrupt-resume","status":"adapted","adapterId":"es-adapter.langgraph.v1","evidenceRef":"Test-ESLangGraphAdapter"},
+    {"featureId":"langgraph.checkpoint","status":"adapted","adapterId":"es-adapter.langgraph.v1","evidenceRef":"Test-ESLangGraphAdapter"},
+    {"featureId":"letta.memory-block","status":"adapted","adapterId":"es-adapter.letta.v1","evidenceRef":"Test-ESLettaAdapter"},
+    {"featureId":"letta.context-rebuild","status":"adapted","adapterId":"es-adapter.letta.v1","evidenceRef":"Test-ESLettaAdapter"},
+    {"featureId":"letta.archival-memory","status":"reference-only","adapterId":null,"evidenceRef":null},
+    {"featureId":"openhands.conversation-state","status":"reference-only","adapterId":null,"evidenceRef":null},
+    {"featureId":"openhands.agent-loop","status":"adapted","adapterId":"es-adapter.openhands.v1","evidenceRef":"Test-ESAgentLoopAdapters"},
+    {"featureId":"openhands.tool-boundary","status":"adapted","adapterId":"es-adapter.openhands.v1","evidenceRef":"Test-ESAgentLoopAdapters"},
+    {"featureId":"swe-agent.aci","status":"reference-only","adapterId":null,"evidenceRef":null},
+    {"featureId":"swe-agent.patch-test-loop","status":"adapted","adapterId":"es-adapter.swe-agent.v1","evidenceRef":"Test-ESAgentLoopAdapters"},
+    {"featureId":"swe-agent.environment-trust","status":"adapted","adapterId":"es-adapter.swe-agent.v1","evidenceRef":"Test-ESAgentLoopAdapters"}
+  ]
+}

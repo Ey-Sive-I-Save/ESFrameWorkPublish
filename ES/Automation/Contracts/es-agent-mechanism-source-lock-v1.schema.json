@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/agent-mechanism/source-lock/v1",
+  "title": "ES Agent Mechanism External Source Lock v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "recordType",
+    "sourceLockId",
+    "authority",
+    "trustBoundary",
+    "captureStatus",
+    "retrievalAuthorized",
+    "capturedUtc",
+    "sources",
+    "adoptionRules",
+    "nonClaims",
+    "sourceSetHash"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/agent-mechanism/source-lock/v1" },
+    "recordType": { "const": "AgentMechanismExternalSourceLock" },
+    "sourceLockId": { "type": "string", "pattern": "^amsl-[a-f0-9]{32}$" },
+    "authority": { "const": "external-design-input" },
+    "trustBoundary": { "const": "untrusted-until-es-validated" },
+    "captureStatus": { "const": "commit-and-content-hash-bound" },
+    "retrievalAuthorized": { "const": true },
+    "capturedUtc": { "type": "string", "format": "date-time" },
+    "sources": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "adoptionRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["copyPolicy", "authorityPolicy", "verificationPolicy", "driftPolicy"],
+      "properties": {
+        "copyPolicy": { "const": "reference-design-mechanisms; do not copy implementation code" },
+        "authorityPolicy": { "const": "external sources never override ES source, P0 rules, user authority, or TaskContextRuntime" },
+        "verificationPolicy": { "const": "every adopted mechanism requires an ES contract, negative cases, and fresh receipts" },
+        "driftPolicy": { "const": "commit or content mismatch invalidates only the affected external design claim" }
+      }
+    },
+    "nonClaims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "sourceSetHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "sourceType",
+        "name",
+        "canonicalUrl",
+        "repository",
+        "commitSha",
+        "branchAtCapture",
+        "licenseSpdx",
+        "reusePolicy",
+        "verificationState",
+        "contentRefs",
+        "designMechanisms",
+        "esAdoptions"
+      ],
+      "properties": {
+        "sourceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{1,80}$" },
+        "sourceType": { "enum": ["repository", "paper", "article"] },
+        "name": { "type": "string", "minLength": 1 },
+        "canonicalUrl": { "type": "string", "pattern": "^https://" },
+        "repository": { "oneOf": [{ "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" }, { "type": "null" }] },
+        "commitSha": { "oneOf": [{ "type": "string", "pattern": "^[a-f0-9]{40}$" }, { "type": "null" }] },
+        "branchAtCapture": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "licenseSpdx": { "type": "string", "minLength": 1 },
+        "reusePolicy": { "enum": ["mechanism-reference-only", "reference-only-license-unverified"] },
+        "verificationState": { "const": "verified" },
+        "contentRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/contentRef" } },
+        "designMechanisms": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "esAdoptions": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "contentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "url", "sha256", "hashMode"],
+      "properties": {
+        "kind": { "enum": ["source-file", "documentation", "paper-metadata", "article"] },
+        "path": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "url": { "type": "string", "pattern": "^https://" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "hashMode": { "enum": ["raw-bytes", "utf8-decoded-body"] }
+      }
+    }
+  }
+}

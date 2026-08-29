@@ -1,0 +1,11 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es://automation/contracts/task-focus-evidence/v1",
+  "schemaVersion":1,
+  "definitions":{
+    "hash":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "confirmation":{"type":"object","required":["schemaVersion","receiptType","receiptId","proposalId","proposalHash","focusRevision","decision","userMessage","issuedUtc","receiptHash"],"additionalProperties":false},
+    "projection":{"type":"object","required":["schemaVersion","projectionType","projectionId","focusRevision","status","focus","allowedScope","forbiddenExpansion","requiredReads","includedBlocks","sourceProposalHash","projectedUtc","projectionHash"],"additionalProperties":false},
+    "checkpoint":{"type":"object","required":["schemaVersion","checkpointType","checkpointId","taskId","focusRevision","contextStatus","context","lastCompletedStage","createdUtc","checkpointHash"],"additionalProperties":false}
+  }
+}

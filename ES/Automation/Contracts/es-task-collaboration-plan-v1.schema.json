@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-collaboration/plan/v1",
+  "title": "ES Task Collaboration Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "collaborationPlanId", "parentTaskId", "goalRevisionHash", "routePlanHash", "childTaskIds", "dependencies", "concurrencyBudget", "aggregationStrategy", "planHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-collaboration/plan/v1" },
+    "collaborationPlanId": { "type": "string", "pattern": "^cplan-[a-f0-9]{32}$" },
+    "parentTaskId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "goalRevisionHash": { "$ref": "#/$defs/hash" },
+    "routePlanHash": { "$ref": "#/$defs/hash" },
+    "childTaskIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "dependencies": { "type": "array", "items": { "$ref": "#/$defs/dependency" } },
+    "concurrencyBudget": { "type": "integer", "minimum": 1, "maximum": 256 },
+    "aggregationStrategy": { "enum": ["all-required", "quorum", "ordered"] },
+    "planHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "dependency": {
+      "type": "object", "additionalProperties": false,
+      "required": ["childTaskId", "dependsOn"],
+      "properties": {
+        "childTaskId": { "$ref": "#/$defs/id" },
+        "dependsOn": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    }
+  }
+}

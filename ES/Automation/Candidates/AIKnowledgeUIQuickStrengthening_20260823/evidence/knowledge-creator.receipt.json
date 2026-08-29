@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-knowledge-creator",
+  "case": "ui-knowledge-candidate-source-ref-and-content-hash",
+  "status": "passed",
+  "evidenceLevel": "S0",
+  "receiptPath": "ES/Automation/Candidates/AIKnowledgeUIQuickStrengthening_20260823/evidence/knowledge-creator.receipt.json",
+  "sourceRefs": [
+    "ES/Automation/Candidates/AIKnowledgeUIQuickStrengthening_20260823/candidate/Documentation/AIKnowledge/entries/game-ui-screen-family-decisions.md",
+    "ES/Automation/Candidates/AIKnowledgeUIQuickStrengthening_20260823/candidate/Documentation/AIKnowledge/entries/game-ui-visual-design-system.md",
+    ".agents/skills/es-knowledge-creator/scripts/Test-ESKnowledgeEntry.ps1"
+  ],
+  "sourceRefHashes": {
+    "ES/Automation/Candidates/AIKnowledgeUIQuickStrengthening_20260823/candidate/Documentation/AIKnowledge/entries/game-ui-screen-family-decisions.md": "698a637bae1a78a013f6555d97a6e5b93e0d4fc015374b642134288bb6fed4d3",
+    "ES/Automation/Candidates/AIKnowledgeUIQuickStrengthening_20260823/candidate/Documentation/AIKnowledge/entries/game-ui-visual-design-system.md": "0b9e20665b221e264478343269794d781cdf1c795b1c69e645520829958cee7c",
+    ".agents/skills/es-knowledge-creator/scripts/Test-ESKnowledgeEntry.ps1": "cb7895d461b0139a6e195def43fe73f8a93e34eef7df3e32dad789010d09907a"
+  },
+  "toolId": "es-knowledge-creator/Test-ESKnowledgeEntry.ps1",
+  "unityVersion": "2022.3.45f1 (runtime-not-run)",
+  "capturedUtc": "2026-08-23T16:20:44.1989648Z",
+  "planHash": "a5cf567b7145f99c71f2ec6dc9cd24e4f2a6e192877b269e7028b922e665b1d2",
+  "planHashKind": "registration-candidate-document-sha256; not AIBrain authorization",
+  "timestampUtc": "2026-08-23T16:20:44.1989648Z",
+  "scope": "Candidate entries only; SourceRef existence, declared hashes and derived ContentHash.",
+  "formalRegistration": "not-run",
+  "runtimeStatus": "runtime-not-run",
+  "nonClaims": [
+    "KnowledgeIndex.yaml was not modified.",
+    "No AIBrain PlanHash or matching Knowledge update TaskContract was obtained.",
+    "Unity, visual, Profiler, Player, IL2CPP and release acceptance were not run."
+  ]
+}

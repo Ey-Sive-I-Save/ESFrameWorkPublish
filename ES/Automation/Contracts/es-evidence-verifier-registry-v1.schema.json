@@ -27,7 +27,8 @@
             "enum": [
               "failed-if-any-hash-mismatch;unverified-if-empty;passed-if-all-match",
               "failed-if-static-replay-blocked;unverified-if-runner-unavailable;passed-if-static-replay-passed",
-              "passed-if-task-slice-verified;unverified-if-followup-missing"
+              "passed-if-task-slice-verified;unverified-if-followup-missing",
+              "failed-if-observation-hash-mismatch;unverified-if-missing;passed-if-observation-hash-matches"
             ]
           },
           "implementationPath": { "type": "string", "minLength": 1 },

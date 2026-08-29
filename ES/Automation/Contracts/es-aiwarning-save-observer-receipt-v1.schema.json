@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/aiwarning-save-observer-receipt/v1",
+  "title": "ES AIWarning Save Observer Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recordType", "status", "transactionExecuted", "formalRegistration", "runtimeStatus"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "AIWarningSaveObserverReceipt"},
+    "status": {"enum": ["attached", "candidate-created", "review", "blocked", "stale/retry-required"]},
+    "reason": {"type": "string"},
+    "warningPath": {"type": "string", "pattern": "^(?![A-Za-z]:)(?!/)(?!\\\\)(?!.*(^|[/\\\\])\\.\\.([/\\\\]|$)).+"},
+    "warningHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "candidateId": {"type": "string"},
+    "queueLength": {"type": "integer", "minimum": 0},
+    "queueLimit": {"type": "integer", "minimum": 1},
+    "transactionExecuted": {"const": false},
+    "formalRegistration": {"const": "not-run"},
+    "runtimeStatus": {"const": "runtime-not-run"}
+  }
+}

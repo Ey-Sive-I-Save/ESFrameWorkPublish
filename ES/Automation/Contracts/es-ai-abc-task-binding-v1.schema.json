@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/ai-abc/task-binding/v1",
+  "title": "ES AI ABC Task Binding Sidecar v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "bindingId",
+    "task",
+    "route",
+    "abc",
+    "focus",
+    "sourceScopeHash",
+    "bindingHash"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "bindingId": { "type": "string", "pattern": "^atb-[a-f0-9]{32}$" },
+    "task": { "$ref": "#/$defs/task" },
+    "route": { "$ref": "#/$defs/route" },
+    "abc": { "$ref": "#/$defs/abc" },
+    "focus": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/focus" }
+      ]
+    },
+    "sourceScopeHash": { "$ref": "#/$defs/hash" },
+    "bindingHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "taskRevision", "contextVersion"],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "taskRevision": { "type": "integer", "minimum": 1 },
+        "contextVersion": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["routePlanId", "routePlanHash"],
+      "properties": {
+        "routePlanId": { "type": "string", "pattern": "^route-[a-f0-9]{32}$" },
+        "routePlanHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "abc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coreRef", "partRefs", "exchangeReceiptHash", "exchangeReceiptRef"],
+      "properties": {
+        "coreRef": { "type": "string", "const": "es.ai-abc.core.v1" },
+        "partRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "exchangeReceiptHash": { "$ref": "#/$defs/hash" },
+        "exchangeReceiptRef": { "$ref": "#/$defs/exchangeReceiptRef" }
+      }
+    },
+    "focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpointId", "revision", "proposalHash", "checkpointHash"],
+      "properties": {
+        "checkpointId": { "type": "string", "pattern": "^FCK-[A-Za-z0-9]{32}$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "proposalHash": { "$ref": "#/$defs/hash" },
+        "checkpointHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "exchangeReceiptRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "producerId"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "producerId": { "$ref": "#/$defs/id" }
+      }
+    }
+  }
+}

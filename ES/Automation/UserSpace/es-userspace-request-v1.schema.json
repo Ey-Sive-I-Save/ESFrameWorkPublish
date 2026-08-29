@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/userspace/request/v1",
+  "title": "ES UserSpace managed request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action"],
+  "properties": {
+    "action": { "type": "string", "enum": ["Initialize", "Update", "Discover", "Validate"] },
+    "PersonId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,47}$" },
+    "DisplayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "Kind": { "type": "string", "enum": ["User", "Agent"] },
+    "Responsibilities": { "type": "array", "items": { "type": "string", "maxLength": 256 }, "maxItems": 32 },
+    "BranchStrategy": { "type": "string", "maxLength": 256 },
+    "MergePolicy": { "type": "string", "maxLength": 256 },
+    "WorkingHours": { "type": "string", "maxLength": 128 },
+    "Language": { "type": "string", "maxLength": 32 },
+    "Contact": { "type": "string", "maxLength": 256 },
+    "DiscoverableRoutes": { "type": "array", "items": { "type": "string", "maxLength": 128 }, "maxItems": 32 },
+    "PrivateStorageClass": { "type": "string", "enum": ["ProjectIgnored", "External"] },
+    "PrivateLocator": { "type": "string", "maxLength": 512 },
+    "ExpectedRevision": { "type": "integer", "minimum": 1 }
+    ,"TransferOwnership": { "type": "boolean" }
+    ,"ConfirmTeamMember": { "type": "boolean" },
+    "ConfirmVisibility": { "type": "boolean" },
+    "ConfirmPreviousOwnerLockout": { "type": "boolean" },
+    "TakeoverReason": { "type": "string", "maxLength": 512 }
+  }
+}

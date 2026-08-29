@@ -1,0 +1,22 @@
+{
+    "schemaVersion":  1,
+    "contractId":  "es://automation/contracts/aiwarning-knowledge-receipt/v1",
+    "recordType":  "AIWarningKnowledgeOrchestrationReceipt",
+    "receiptId":  "es.aiwarning.receipt.b41bb2029d0d37de5b3cf9b8",
+    "candidateId":  "es.aiwarning.candidate.b5d5617f67d213a4ab456a71",
+    "status":  "attached",
+    "idempotencyKey":  "b5d5617f67d213a4ab456a713d46bec755c812e4e9bbb86f95ede37a3dceb3a1",
+    "createdAtUtc":  "2026-08-27T13:04:14.1352985Z",
+    "candidateHash":  "b41bb2029d0d37de5b3cf9b874a04c1366ac13ed0a52022b425ce3d358b7081c",
+    "inputSnapshotHash":  "d6379673020546951ed794cff2e409df82cc556926df1fd20a0a7d13a98cfdfb",
+    "transactionExecuted":  false,
+    "formalRegistration":  "not-run",
+    "validationCommands":  [
+                               "pwsh -NoProfile -File .agents/skills/es-ai-knowledge-curation/scripts/Test-ESAIWarningKnowledgeCandidate.ps1 -ProjectRoot . -CandidatePath \u0027\u003ccandidate\u003e\u0027"
+                           ],
+    "nonClaims":  [
+                      "The receipt records candidate orchestration only; it is not an Apply receipt.",
+                      "No formal KnowledgeIndex or AIBRAIN_ENTRY update was performed.",
+                      "Runtime and release behavior were not executed."
+                  ]
+}

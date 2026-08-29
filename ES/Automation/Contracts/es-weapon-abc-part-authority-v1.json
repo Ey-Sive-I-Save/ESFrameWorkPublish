@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es.weapon.abc.part.authority.v1",
+  "domain": "weapon",
+  "intents": [
+    { "intentId": "weapon.attack.lifecycle", "bCapability": "state-transition-guard" },
+    { "intentId": "weapon.damage.balance", "bCapability": "branch-evaluation" },
+    { "intentId": "weapon.prefab.binding", "bCapability": "bounded-tool-action" },
+    { "intentId": "weapon.resource.cooldown", "bCapability": "audit-evidence-chain" },
+    { "intentId": "weapon.failure.recovery", "bCapability": "failure-recovery" },
+    { "intentId": "weapon.environment.trust", "bCapability": "environment-trust-gate" }
+  ],
+  "providers": [
+    "es-entity-authoring",
+    "es-entity-prefab-validation",
+    "es-input-action",
+    "es-command-authoring",
+    "es-gamecore-integration",
+    "weapon-definition-provider"
+  ],
+  "sourceAuthority": "Canonical allowlist for Weapon ABCP intent and provider identities; a Part cannot extend it by self-declaration."
+}

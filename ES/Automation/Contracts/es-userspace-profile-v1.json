@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/userspace-profile/v1",
+  "taskId": "es.userspace.profile",
+  "taskVersion": 1,
+  "commandId": "userspace.profile.manage",
+  "skillName": "es-ai-space-organization",
+  "operations": ["initialize", "update", "discover", "validate"],
+  "inputContract": {
+    "path": "ES/Automation/UserSpace/es-userspace-request-v1.schema.json",
+    "sha256": "1e880caeade266dba0a0f6a00b1b0d4a9943ca55934915a3ec7760e0b2fcf333",
+    "concurrency": "ExpectedRevision CAS"
+  },
+  "worker": {
+    "type": "PowerShell",
+    "workerId": "es.userspace.profile",
+    "version": "1.0.0",
+    "entrypoint": "ES/Automation/UserSpace/Invoke-ESUserSpace.ps1",
+    "entrypointHash": "2bbba33e81f79b718fd28407a70b5fff204534ff96e3b516da7f5c57bfcd3a70"
+  },
+  "readRoots": ["ES/AISpace/Public/People", "ES/Automation/UserSpace"],
+  "writeRoots": ["ES/AISpace/Public/People", "ES/Automation/Runs/UserSpace"],
+  "capabilities": ["ReadArtifacts", "WriteReports"],
+  "security": {
+    "privateData": "gitignored-or-external",
+    "pathPolicy": "ProjectIgnored locator must remain ES/AISpace/Local/<person-id>",
+    "forbidden": ["Git history/index writes", "Unity Assets writes", "delete", "publish", "network"]
+  },
+  "verification": {
+    "staticScript": "ES/Automation/UserSpace/Test-ESUserSpace.ps1",
+    "runtimeStatus": "runtime-not-run",
+    "sourceRegistrationIntegrated": true,
+    "productionExecutionObserved": false
+  },
+  "runRecordSchema": "ES/Automation/UserSpace/es-userspace-run-record-v1.schema.json",
+  "rollback": {
+    "registration": "Remove only the selected Automation registration; do not delete prior registration cards.",
+    "data": "Keep immutable registration revisions; restore by ExpectedRevision update."
+  }
+}

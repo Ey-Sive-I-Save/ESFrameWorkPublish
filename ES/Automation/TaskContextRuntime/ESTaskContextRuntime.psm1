@@ -63,13 +63,17 @@ function Write-ESCreateOnlyJson {
     $parent = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $parent -PathType Container)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
     $json = $Value | ConvertTo-Json -Depth 40
+    $temporaryPath = Join-Path $parent ('.' + (Split-Path -Leaf $Path) + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
     $stream = $null
     $writer = $null
     try {
-        $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        $stream = [IO.File]::Open($temporaryPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
         $writer = [IO.StreamWriter]::new($stream, [Text.UTF8Encoding]::new($false))
         $writer.Write($json)
         $writer.Flush()
+        $stream.Flush($true)
+        $writer.Dispose(); $writer = $null; $stream = $null
+        [IO.File]::Move($temporaryPath, $Path)
     } finally {
         if ($null -ne $writer) { $writer.Dispose() } elseif ($null -ne $stream) { $stream.Dispose() }
     }
@@ -148,13 +152,15 @@ function Resolve-ESRuntimePaths {
     $eventsRoot = if ($taskRoot) { Join-Path $taskRoot 'events' } else { $null }
     $receiptsRoot = if ($taskRoot) { Join-Path $taskRoot 'receipts' } else { $null }
     $evaluationsRoot = if ($taskRoot) { Join-Path $taskRoot 'evaluations' } else { $null }
+    $bindingsRoot = if ($taskRoot) { Join-Path $taskRoot 'bindings' } else { $null }
     if ($taskRoot) {
         Assert-ESNoReparsePointBelowRoot $project $taskRoot 'TaskRoot'
         Assert-ESNoReparsePointBelowRoot $project $eventsRoot 'EventsRoot'
         Assert-ESNoReparsePointBelowRoot $project $receiptsRoot 'ReceiptsRoot'
         Assert-ESNoReparsePointBelowRoot $project $evaluationsRoot 'EvaluationsRoot'
+        Assert-ESNoReparsePointBelowRoot $project $bindingsRoot 'BindingsRoot'
     }
-    [pscustomobject]@{ ProjectRoot=$project; StoreRoot=$store; TaskRoot=$taskRoot; EventsRoot=$eventsRoot; ReceiptsRoot=$receiptsRoot; EvaluationsRoot=$evaluationsRoot }
+    [pscustomobject]@{ ProjectRoot=$project; StoreRoot=$store; TaskRoot=$taskRoot; EventsRoot=$eventsRoot; ReceiptsRoot=$receiptsRoot; EvaluationsRoot=$evaluationsRoot; BindingsRoot=$bindingsRoot }
 }
 
 function Resolve-ESProjectFile {
@@ -181,6 +187,101 @@ function Resolve-ESProjectItem {
     $item=Get-Item -LiteralPath $full -Force
     if($item.LinkType-or($item.Attributes-band[IO.FileAttributes]::ReparsePoint)-ne0){throw "Project item cannot be a reparse point: $Path"}
     [pscustomobject]@{Full=$full;Relative=$full.Substring($ProjectRoot.Length).TrimStart('\','/').Replace('\','/');IsFile=[bool](-not$item.PSIsContainer)}
+}
+
+function Get-ESABCTaskBindingHashInput {
+    param([Parameter(Mandatory=$true)]$Binding)
+    $core=[ordered]@{}
+    foreach($property in $Binding.PSObject.Properties){if([string]$property.Name -cne 'bindingHash'){$core[[string]$property.Name]=$property.Value}}
+    return $core
+}
+
+function Assert-ESABCExchangeReceipt {
+    param(
+        [Parameter(Mandatory=$true)][string]$ProjectRoot,
+        [Parameter(Mandatory=$true)]$Binding
+    )
+    if($null -eq $Binding.abc.PSObject.Properties['exchangeReceiptRef'] -or $null -eq $Binding.abc.exchangeReceiptRef){
+        throw 'ABC Task Binding exchangeReceiptRef is required for a producer-backed binding.'
+    }
+    $ref=$Binding.abc.exchangeReceiptRef
+    Assert-ESObjectShape $ref @('path','sha256','producerId') @('path','sha256','producerId') 'ABC exchangeReceiptRef'
+    $path=[string]$ref.path
+    $resolved=Resolve-ESProjectFile $ProjectRoot $path
+    Assert-ESHash ([string]$ref.sha256) 'BindingExchangeReceiptRefHash'
+    $actual=(Get-FileHash -LiteralPath $resolved.Full -Algorithm SHA256).Hash.ToLowerInvariant()
+    if($actual -cne [string]$ref.sha256){throw 'ABC exchange receipt artifact hash mismatch.'}
+    $receipt=Read-ESStrictJson $resolved.Full
+    Assert-ESObjectShape $receipt @('schemaVersion','contractId','recordType','exchangeId','taskId','routePlanHash','sourceScopeHash','coreRef','partRefs','status','receiptHash') @('schemaVersion','contractId','recordType','exchangeId','taskId','routePlanHash','sourceScopeHash','coreRef','partRefs','status','receiptHash','producerId') 'ABC exchange receipt'
+    if([int]$receipt.schemaVersion-ne1 -or [string]$receipt.contractId-cne'es://automation/contracts/ai-abc/exchange-receipt/v1' -or [string]$receipt.recordType-cne'ABCExchangeReceipt'){throw 'ABC exchange receipt identity is invalid.'}
+    Assert-ESSafeId ([string]$receipt.exchangeId) 'ExchangeId'; Assert-ESHash ([string]$receipt.routePlanHash) 'ExchangeRoutePlanHash'; Assert-ESHash ([string]$receipt.sourceScopeHash) 'ExchangeSourceScopeHash'; Assert-ESHash ([string]$receipt.receiptHash) 'ExchangeReceiptHash'
+    if([string]$receipt.taskId-cne[string]$Binding.task.taskId -or [string]$receipt.routePlanHash-cne[string]$Binding.route.routePlanHash -or [string]$receipt.sourceScopeHash-cne[string]$Binding.sourceScopeHash){throw 'ABC exchange receipt binding does not match Task/RoutePlan/sourceScope.'}
+    if([string]$receipt.coreRef-cne[string]$Binding.abc.coreRef -or [string]$receipt.status-cne'accepted'){throw 'ABC exchange receipt Core or status is invalid.'}
+    if($receipt.partRefs -isnot [Array]){throw 'ABC exchange receipt partRefs must be an array.'}
+    $bindingParts=@($Binding.abc.partRefs|ForEach-Object{[string]$_});$receiptParts=@($receipt.partRefs|ForEach-Object{[string]$_})
+    if(($bindingParts|ConvertTo-Json -Compress)-cne($receiptParts|ConvertTo-Json -Compress)){throw 'ABC exchange receipt partRefs do not match Binding.'}
+    $hashInput=[ordered]@{};foreach($p in $receipt.PSObject.Properties){if([string]$p.Name-cne'receiptHash'){$hashInput[[string]$p.Name]=$p.Value}}
+    if((Get-ESObjectHash $hashInput)-cne[string]$receipt.receiptHash){throw 'ABC exchange receipt hash mismatch.'}
+    if([string]$Binding.abc.exchangeReceiptHash-cne[string]$receipt.receiptHash){throw 'ABC exchangeReceiptHash does not match the producer receipt.'}
+    return $receipt
+}
+
+function Assert-ESABCTaskBinding {
+    param(
+        [Parameter(Mandatory=$true)]$Binding,
+        [Parameter(Mandatory=$true)][string]$TaskId,
+        [Parameter(Mandatory=$true)][int]$TaskRevision,
+        [Parameter(Mandatory=$true)][int]$ContextVersion,
+        [Parameter(Mandatory=$true)]$State,
+        [switch]$AllowAttachedRevision,
+        [string]$ProjectRoot
+    )
+    if($null -eq $Binding -or $Binding -isnot [pscustomobject]){throw 'ABC Task Binding must be a JSON object.'}
+    $required=@('schemaVersion','bindingId','task','route','abc','focus','sourceScopeHash','bindingHash')
+    foreach($name in $required){if($null -eq $Binding.PSObject.Properties[$name]){throw "ABC Task Binding is missing required property: $name"}}
+    if([int]$Binding.schemaVersion-ne1){throw 'ABC Task Binding schemaVersion must be 1.'}
+    if([string]$Binding.bindingId -notmatch '^atb-[a-f0-9]{32}$'){throw 'ABC Task Binding bindingId is invalid.'}
+    Assert-ESHash ([string]$Binding.bindingHash) 'BindingHash'; Assert-ESHash ([string]$Binding.sourceScopeHash) 'BindingSourceScopeHash'
+    if($null -eq $Binding.route -or [string]$Binding.route.routePlanId -notmatch '^route-[a-f0-9]{32}$'){throw 'ABC Task Binding routePlanId is invalid.'}
+    Assert-ESHash ([string]$Binding.route.routePlanHash) 'BindingRoutePlanHash'
+    if($null -eq $Binding.abc -or [string]$Binding.abc.coreRef -cne 'es.ai-abc.core.v1' -or $Binding.abc.partRefs -isnot [Array]){throw 'ABC Task Binding ABC payload is invalid.'}
+    Assert-ESHash ([string]$Binding.abc.exchangeReceiptHash) 'BindingExchangeReceiptHash'
+    if([string]::IsNullOrWhiteSpace($ProjectRoot)){throw 'ABC Task Binding ProjectRoot is required for exchange receipt verification.'}
+    Assert-ESABCExchangeReceipt $ProjectRoot $Binding | Out-Null
+    $computed=Get-ESObjectHash (Get-ESABCTaskBindingHashInput $Binding)
+    if([string]$Binding.bindingHash-cne$computed){throw 'ABC Task Binding hash mismatch.'}
+    if($null -eq $Binding.task -or [string]$Binding.task.taskId-cne$TaskId){throw 'ABC Task Binding taskId mismatch.'}
+    if([int]$Binding.task.taskRevision -lt 1 -or [int]$Binding.task.contextVersion -lt 1){throw 'ABC Task Binding task revision/context version is invalid.'}
+    if(-not $AllowAttachedRevision -and ([int]$Binding.task.taskRevision-ne$TaskRevision -or [int]$Binding.task.contextVersion-ne$ContextVersion)){throw 'ABC Task Binding CAS revision/context mismatch.'}
+    if($null -eq $State.routePlan -or [string]$Binding.route.routePlanId-cne[string]$State.routePlan.routePlanId -or [string]$Binding.route.routePlanHash-cne[string]$State.routePlan.routePlanHash){throw 'ABC Task Binding RoutePlan mismatch.'}
+    if($null -ne $Binding.focus){
+        foreach($name in @('checkpointId','revision','proposalHash','checkpointHash')){if($null -eq $Binding.focus.PSObject.Properties[$name]){throw "ABC Task Binding focus is missing: $name"}}
+        if([string]$Binding.focus.checkpointId -notmatch '^FCK-[A-Za-z0-9]{32}$' -or [int]$Binding.focus.revision -lt 1){throw 'ABC Task Binding focus identity is invalid.'}
+        Assert-ESHash ([string]$Binding.focus.proposalHash) 'BindingFocusProposalHash'; Assert-ESHash ([string]$Binding.focus.checkpointHash) 'BindingFocusCheckpointHash'
+        if([string]$State.focusContextId -and [string]$Binding.focus.checkpointId -ne [string]$State.focusContextId){throw 'ABC Task Binding focus checkpoint mismatch.'}
+        if($null -ne $State.PSObject.Properties['focusRevision'] -and $null -ne $State.focusRevision -and [int]$Binding.focus.revision-ne[int]$State.focusRevision){throw 'ABC Task Binding focus revision mismatch.'}
+        if($null -ne $State.PSObject.Properties['focusProposalHash'] -and [string]$State.focusProposalHash -and [string]$Binding.focus.proposalHash-ne[string]$State.focusProposalHash){throw 'ABC Task Binding focus proposal mismatch.'}
+        if($null -ne $State.PSObject.Properties['focusScopeHash'] -and [string]$State.focusScopeHash -and [string]$Binding.sourceScopeHash -ne[string]$State.focusScopeHash){throw 'ABC Task Binding focus scope mismatch.'}
+    } elseif($null -ne $State.PSObject.Properties['focusContextId'] -and [string]$State.focusContextId){throw 'ABC Task Binding focus is required for a focused Task.'}
+    return $Binding
+}
+
+function Read-ESABCTaskBinding {
+    param([Parameter(Mandatory=$true)]$Paths,[Parameter(Mandatory=$true)]$State,[int]$ExpectedTaskRevision,[int]$ExpectedContextVersion,[switch]$AllowAttachedRevision)
+    if($null -eq $State.PSObject.Properties['taskBindingRef'] -or $null -eq $State.taskBindingRef){return $null}
+    $ref=$State.taskBindingRef
+    if([string]$ref.bindingId -notmatch '^atb-[a-f0-9]{32}$'){throw 'Task binding reference identity is invalid.'}
+    Assert-ESHash ([string]$ref.bindingHash) 'TaskBindingRefHash'
+    $path=Join-Path $Paths.BindingsRoot ([string]$ref.bindingId+'.json')
+    if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw 'Task binding sidecar is missing.'}
+    $binding=Read-ESStrictJson $path
+    Assert-ESABCTaskBinding $binding ([string]$State.taskId) $ExpectedTaskRevision $ExpectedContextVersion $State -AllowAttachedRevision:$AllowAttachedRevision -ProjectRoot $Paths.ProjectRoot | Out-Null
+    if($AllowAttachedRevision){
+        $anchor=(Read-ESEventChain $Paths -VerifyReceipts)[0].state
+        if([int]$binding.task.taskRevision-ne[int]$anchor.taskRevision -or [int]$binding.task.contextVersion-ne[int]$anchor.contextVersion){throw 'ABC Task Binding attachment revision is not anchored to the Created event.'}
+    }
+    if([string]$binding.bindingHash-cne[string]$ref.bindingHash){throw 'Task binding reference hash mismatch.'}
+    return $binding
 }
 
 function Get-ESFileObservation {
@@ -210,7 +311,7 @@ function Get-ESEvidenceVerifierRegistrySnapshot {
         Assert-ESSafeId ([string]$_.verifierId) 'VerifierId';Assert-ESSafeId ([string]$_.authority) 'VerifierAuthority'
         if ([string]$_.artifactFormat -cne 'json') { throw "Evidence verifier contract is unsupported: $($_.verifierId)" }
         $policy=[string]$_.outcomePolicy
-        if($policy -notin @('failed-if-any-hash-mismatch;unverified-if-empty;passed-if-all-match','failed-if-static-replay-blocked;unverified-if-runner-unavailable;passed-if-static-replay-passed','passed-if-task-slice-verified;unverified-if-followup-missing')){throw "Evidence verifier outcome policy is unsupported: $($_.verifierId)"}
+        if($policy -notin @('failed-if-any-hash-mismatch;unverified-if-empty;passed-if-all-match','failed-if-static-replay-blocked;unverified-if-runner-unavailable;passed-if-static-replay-passed','passed-if-task-slice-verified;unverified-if-followup-missing','failed-if-observation-hash-mismatch;unverified-if-missing;passed-if-observation-hash-matches')){throw "Evidence verifier outcome policy is unsupported: $($_.verifierId)"}
         if ($_.requiredArtifactFields -isnot [Array] -or $_.observationFields -isnot [Array] -or @($_.requiredArtifactFields).Count -eq 0 -or @($_.observationFields).Count -eq 0) { throw "Evidence verifier field lists are invalid: $($_.verifierId)" }
         foreach($fieldList in @(@($_.requiredArtifactFields),@($_.observationFields))){
             foreach($field in $fieldList){if([string]$field -cnotmatch '^[A-Za-z][A-Za-z0-9]{0,63}$'){throw "Evidence verifier field name is invalid: $field"}}
@@ -384,7 +485,7 @@ function ConvertTo-ESVerifiedArtifact {
     $verifierSnapshot = Get-ESEvidenceVerifierDefinition $VerifierId
     if ([string]$verifierSnapshot.definitionHash -cne $ExpectedVerifierDefinitionHash) { throw "Evidence verifier definition drifted: $VerifierId" }
     $definition = $verifierSnapshot.definition
-    if([string]$definition.verifierId -notin @('platform.file-hash-manifest-v1','platform.static-replay-v1','platform.codex-transcript-slice-v1')){throw "Unsupported evidence verifier contract: $VerifierId"}
+    if([string]$definition.verifierId -notin @('platform.file-hash-manifest-v1','platform.static-replay-v1','platform.codex-transcript-slice-v1','es-adapter-observation-v1')){throw "Unsupported evidence verifier contract: $VerifierId"}
     if ([string]::IsNullOrWhiteSpace([string]$definition.claimIdPattern) -or $ClaimId -cnotmatch [string]$definition.claimIdPattern) { throw "Evidence verifier does not support claimId: $ClaimId" }
     $resolved = Resolve-ESProjectFile $ProjectRoot $ArtifactPath
     $artifactHash = (Get-FileHash -LiteralPath $resolved.Full -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -416,6 +517,18 @@ function ConvertTo-ESVerifiedArtifact {
         $derivedOutcome='passed'
         if($derivedOutcome-cne$CandidateOutcome){throw "Candidate outcome does not match platform-derived artifact outcome: $ArtifactPath"}
         return[pscustomobject][ordered]@{outcome=$derivedOutcome;evidenceHash=Get-ESObjectHash $observation;artifactHash=$artifactHash;verifierId=[string]$definition.verifierId;verifierDefinitionHash=[string]$verifierSnapshot.definitionHash;verificationStatus='verified';artifactPath=$resolved.Relative;observation=$observation}
+    }
+    if([string]$definition.verifierId-ceq'es-adapter-observation-v1'){
+        if([int]$artifact.schemaVersion -ne 1 -or [string]$artifact.claimId -notmatch '^adapter\.[A-Za-z0-9][A-Za-z0-9._-]{0,72}$'){throw 'Adapter observation artifact identity is invalid.'}
+        if([string]$artifact.sourceScopeHash -cne $ExpectedSourceScopeHash){throw 'Adapter observation source scope mismatch.'}
+        if([string]$artifact.adapterId -ne $ClaimId.Substring(8)){throw 'Adapter observation adapterId does not match claimId.'}
+        Assert-ESSafeId ([string]$artifact.adapterId) 'AdapterId'; Assert-ESSafeId ([string]$artifact.adapterVersion) 'AdapterVersion'; Assert-ESHash ([string]$artifact.observationHash) 'AdapterObservationHash'
+        $observationJson=$artifact.observation|ConvertTo-Json -Depth 40 -Compress
+        $observationHash=[Security.Cryptography.SHA256]::Create()
+        try{$computed=([BitConverter]::ToString($observationHash.ComputeHash([Text.Encoding]::UTF8.GetBytes($observationJson))).Replace('-','').ToLowerInvariant())}finally{$observationHash.Dispose()}
+        $derivedOutcome=if($null -eq $artifact.observation){'unverified'}elseif($computed -cne [string]$artifact.observationHash){'failed'}else{'passed'}
+        if($derivedOutcome-cne$CandidateOutcome){throw "Candidate outcome does not match adapter-derived artifact outcome: $ArtifactPath"}
+        return [pscustomobject][ordered]@{outcome=$derivedOutcome;evidenceHash=Get-ESObjectHash ([ordered]@{verifierDefinitionHash=$ExpectedVerifierDefinitionHash;adapterId=[string]$artifact.adapterId;adapterVersion=[string]$artifact.adapterVersion;observationHash=[string]$artifact.observationHash;observation=$artifact.observation});artifactHash=$artifactHash;verifierId=[string]$definition.verifierId;verifierDefinitionHash=$ExpectedVerifierDefinitionHash;verificationStatus='verified';artifactPath=$resolved.Relative}
     }
     if ($artifact.observations -isnot [Array]) { throw 'Evidence artifact observations must be an array.' }
     $failed = $false
@@ -504,6 +617,13 @@ function Get-ESReceiptHashInput {
         $input.evaluationId=[string]$Receipt.evaluationId
         $input.evaluationRecordPath=[string]$Receipt.evaluationRecordPath
         $input.evaluationRecordHash=[string]$Receipt.evaluationRecordHash
+    }
+    if($null-ne$Receipt.PSObject.Properties['focusContextId']-or$null-ne$Receipt.PSObject.Properties['focusRevision']-or$null-ne$Receipt.PSObject.Properties['focusProposalHash']-or$null-ne$Receipt.PSObject.Properties['focusReceiptHash']-or$null-ne$Receipt.PSObject.Properties['focusScopeHash']){
+        $input.focusContextId=[string]$Receipt.focusContextId
+        $input.focusRevision=if($null -eq $Receipt.focusRevision){$null}else{[int]$Receipt.focusRevision}
+        $input.focusProposalHash=if($null -eq $Receipt.focusProposalHash){$null}else{[string]$Receipt.focusProposalHash}
+        $input.focusReceiptHash=if($null -eq $Receipt.focusReceiptHash){$null}else{[string]$Receipt.focusReceiptHash}
+        $input.focusScopeHash=if($null -eq $Receipt.focusScopeHash){$null}else{[string]$Receipt.focusScopeHash}
     }
     $input.evidenceSetHash=[string]$Receipt.evidenceSetHash
     $input.verifiedSourceScopeHash=[string]$Receipt.verifiedSourceScopeHash
@@ -631,6 +751,7 @@ function Assert-ESEventTransition {
     switch ($EventType) {
         'SourceScopeVerified' { if ($Current.taskStatus -ne $Previous.taskStatus -or $Current.contextStatus -ne $Previous.contextStatus -or [int]$Current.contextVersion -ne [int]$Previous.contextVersion) { throw 'SourceScopeVerified changed lifecycle state.' } }
         'EvidenceSubmitted' { if ($Current.taskStatus -ne $Previous.taskStatus -or $Current.contextStatus -ne $Previous.contextStatus -or [int]$Current.contextVersion -ne [int]$Previous.contextVersion) { throw 'EvidenceSubmitted changed lifecycle state.' } }
+        'ABCDOrchestrationEvent' { if ($Previous.taskStatus -ne $Current.taskStatus -or $Previous.contextStatus -ne $Current.contextStatus -or [int]$Current.contextVersion -ne ([int]$Previous.contextVersion + 1) -or $null -eq $Current.PSObject.Properties['abcdOrchestration'] -or $null -eq $Current.abcdOrchestration) { throw 'ABCD orchestration transition is invalid.' } }
         'CompletionAccepted' { if ($Previous.taskStatus -ne 'Active' -or $Previous.contextStatus -ne 'Live' -or $Current.taskStatus -ne 'Completed' -or $Current.contextStatus -ne 'Frozen' -or $Current.completionDecision -ne 'accepted' -or $Current.deliveryAcceptance -ne 'pending' -or [int]$Current.contextVersion -ne ([int]$Previous.contextVersion + 1)) { throw 'Accepted completion transition is invalid.' } }
         'CompletionRejected' { if ($Previous.taskStatus -ne 'Active' -or $Current.taskStatus -ne 'Blocked' -or $Current.contextStatus -ne $Previous.contextStatus -or $Current.completionDecision -ne 'rejected') { throw 'Rejected completion transition is invalid.' } }
         'CompletionUndetermined' { if ($Previous.taskStatus -ne 'Active' -or $Current.taskStatus -ne 'Active' -or $Current.completionDecision -ne 'undetermined') { throw 'Undetermined completion transition is invalid.' } }
@@ -696,6 +817,7 @@ function Test-ESBoundReceipt {
     $actual = Get-ESObjectHash (Get-ESReceiptHashInput $receipt)
     if ([string]$receipt.receiptHash -cne $actual -or [string]$State.completionReceipt.receiptHash -cne $actual) { throw 'Completion receipt hash mismatch.' }
     $bindings=@(@('taskId',$State.taskId),@('taskRevision',$State.taskRevision),@('contextVersion',$State.contextVersion),@('planHash',$State.planHash),@('goalRevisionHash',$State.goalRevisionHash),@('acceptanceProfileHash',$State.acceptanceProfile.profileHash))
+    if($null-ne$State.PSObject.Properties['focusContextId']-and$null-ne$State.focusContextId){$bindings+=@(@('focusContextId',$State.focusContextId),@('focusRevision',$State.focusRevision),@('focusProposalHash',$State.focusProposalHash),@('focusReceiptHash',$State.focusReceiptHash),@('focusScopeHash',$State.focusScopeHash))}
     if($null-ne$State.PSObject.Properties['routePlan']-and$null-ne$State.routePlan){$bindings+=@(@('routePlanId',$State.routePlan.routePlanId),@('routePlanPath',$State.routePlan.routePlanPath),@('routePlanHash',$State.routePlan.routePlanHash),@('routePlanArtifactHash',$State.routePlan.artifactHash),@('routePlanSnapshotHash',$State.routePlan.snapshotHash))}
     if($null-ne$State.acceptanceProfile.PSObject.Properties['evidenceContractId']-or$null-ne$State.acceptanceProfile.PSObject.Properties['evidenceContractHash']){$bindings+=@(@('evidenceContractId',$State.acceptanceProfile.evidenceContractId),@('evidenceContractHash',$State.acceptanceProfile.evidenceContractHash))}
     $bindings+=@(@('evidenceSetHash',$State.evidenceSet.evidenceSetHash),@('verifiedSourceScopeHash',$State.verifiedSourceScopeHash),@('completionDecision','accepted'))
@@ -795,10 +917,20 @@ function New-ESTaskContextTask {
         [string[]]$RequiredClaim=@(), $RequiredClaimVerifier=$null,
         [string[]]$OptionalClaim=@(), $OptionalClaimVerifier=$null,
         [string]$InteractionSessionId,
+        [string]$FocusContextId, [int]$FocusRevision=0, [string]$FocusProposalHash, [string]$FocusReceiptHash, [string]$FocusScopeHash,
+        [string]$TaskBindingPath,
         [int]$MaxEvidenceAgeHours=24, [switch]$AllowUnverifiedClaims,
         [string[]]$RequestedSourceScope=@(), [Parameter(Mandatory=$true)][string]$IdempotencyKey
     )
     Assert-ESSafeId $TaskId 'TaskId'; Assert-ESSafeId $AcceptanceProfileId 'AcceptanceProfileId'; Assert-ESSafeId $OutcomeEvaluatorId 'OutcomeEvaluatorId'; Assert-ESSafeId $IdempotencyKey 'IdempotencyKey'
+    $hasFocus = -not [string]::IsNullOrWhiteSpace($FocusContextId)
+    if ($hasFocus) {
+        Assert-ESSafeId $FocusContextId 'FocusContextId'
+        if ($FocusRevision -lt 1 -or $FocusProposalHash -notmatch $script:Hex64Pattern -or $FocusScopeHash -notmatch $script:Hex64Pattern -or
+            ((-not [string]::IsNullOrWhiteSpace($FocusReceiptHash)) -and $FocusReceiptHash -notmatch $script:Hex64Pattern)) { throw 'Focus identity is invalid.' }
+    } elseif ($FocusRevision -ne 0 -or -not [string]::IsNullOrWhiteSpace($FocusProposalHash) -or -not [string]::IsNullOrWhiteSpace($FocusReceiptHash) -or -not [string]::IsNullOrWhiteSpace($FocusScopeHash)) {
+        throw 'Focus identity fields require FocusContextId.'
+    }
     if (-not [string]::IsNullOrWhiteSpace($PlanHash)) { Assert-ESHash $PlanHash 'PlanHash' }
     if ($MaxEvidenceAgeHours -lt 1 -or $MaxEvidenceAgeHours -gt 8760) { throw 'MaxEvidenceAgeHours is outside 1..8760.' }
     $claims = @($RequiredClaim | ForEach-Object { Assert-ESSafeId $_ 'RequiredClaim'; $_ } | Sort-Object -Unique)
@@ -817,6 +949,7 @@ function New-ESTaskContextTask {
         $verifierId = [string]$binding
         Assert-ESSafeId $verifierId 'RequiredClaimVerifierId'
         $verifierSnapshot = Get-ESEvidenceVerifierDefinition $verifierId
+        if($verifierId-ceq'platform.codex-transcript-slice-v1'){throw 'Transcript observation verifier cannot be bound to a required claim.'}
         if ([string]::IsNullOrWhiteSpace([string]$verifierSnapshot.definition.claimIdPattern) -or $claim -cnotmatch [string]$verifierSnapshot.definition.claimIdPattern) { throw "Evidence verifier does not support required claim: $claim" }
         $requiredVerifiers += [ordered]@{claimId=$claim;verifierId=$verifierId;verifierDefinitionHash=[string]$verifierSnapshot.definitionHash}
     }
@@ -837,7 +970,19 @@ function New-ESTaskContextTask {
     $goal = Resolve-ESGoalRevision $paths.ProjectRoot $GoalRevisionPath
     $routePlan = Resolve-ESRoutePlan $paths.ProjectRoot $RoutePlanPath $goal
     if (-not [string]::IsNullOrWhiteSpace($PlanHash) -and $PlanHash -cne [string]$routePlan.routePlanHash) { throw 'PlanHash must equal the platform-verified RoutePlan hash.' }
-    $operationHash = Get-ESObjectHash ([ordered]@{operation='Create';taskId=$TaskId;planHash=[string]$routePlan.routePlanHash;routePlanId=[string]$routePlan.routePlanId;routePlanPath=[string]$routePlan.routePlanPath;routePlanArtifactHash=[string]$routePlan.routePlanArtifactHash;routePlanSnapshotHash=[string]$routePlan.snapshotHash;goalRevisionHash=$goal.goalRevisionHash;acceptanceProfileId=$AcceptanceProfileId;outcomeEvaluatorId=$OutcomeEvaluatorId;outcomeEvaluatorDefinitionHash=[string]$outcomeEvaluatorSnapshot.definitionHash;outcomeEvaluatorRegistryHash=[string]$outcomeEvaluatorSnapshot.registryHash;evaluationContractId=[string]$evaluationContractSnapshot.contractId;evaluationContractHash=[string]$evaluationContractSnapshot.contractHash;requiredClaims=$claims;requiredVerifiers=$requiredVerifiers;optionalClaims=$optionalClaims;optionalVerifiers=$optionalVerifiers;interactionSessionId=$interactionSessionIdNormalized;verifierRegistryHash=[string]$registrySnapshot.registryHash;evidenceContractId=[string]$evidenceContractSnapshot.contractId;evidenceContractHash=[string]$evidenceContractSnapshot.contractHash;maxEvidenceAgeHours=$MaxEvidenceAgeHours;allowUnverifiedClaims=[bool]$AllowUnverifiedClaims;requestedSourceScope=@($RequestedSourceScope);idempotencyKey=$IdempotencyKey})
+    $resolved = @()
+    foreach ($sourcePath in @($RequestedSourceScope)) { $resolved += (Resolve-ESProjectFile $paths.ProjectRoot ([string]$sourcePath)).Relative }
+    if (@($resolved | Sort-Object -Unique).Count -ne @($resolved).Count) { throw 'RequestedSourceScope contains duplicate paths.' }
+    $binding=$null
+    $bindingRef=$null
+    if(-not [string]::IsNullOrWhiteSpace($TaskBindingPath)){
+        $bindingSource=Resolve-ESProjectFile $paths.ProjectRoot $TaskBindingPath
+        $binding=Read-ESStrictJson $bindingSource.Full
+        $bindingState=[pscustomobject][ordered]@{taskId=$TaskId;routePlan=[pscustomobject]@{routePlanId=[string]$routePlan.routePlanId;routePlanHash=[string]$routePlan.routePlanHash};focusContextId=if($hasFocus){$FocusContextId}else{$null};focusRevision=if($hasFocus){$FocusRevision}else{$null};focusProposalHash=if($hasFocus){$FocusProposalHash}else{$null};focusScopeHash=if($hasFocus){$FocusScopeHash}else{$null}}
+        Assert-ESABCTaskBinding $binding $TaskId 1 1 $bindingState -ProjectRoot $paths.ProjectRoot | Out-Null
+        $bindingRef=[ordered]@{bindingId=[string]$binding.bindingId;bindingHash=[string]$binding.bindingHash}
+    }
+    $operationHash = Get-ESObjectHash ([ordered]@{operation='Create';taskId=$TaskId;planHash=[string]$routePlan.routePlanHash;routePlanId=[string]$routePlan.routePlanId;routePlanPath=[string]$routePlan.routePlanPath;routePlanArtifactHash=[string]$routePlan.routePlanArtifactHash;routePlanSnapshotHash=[string]$routePlan.snapshotHash;goalRevisionHash=$goal.goalRevisionHash;acceptanceProfileId=$AcceptanceProfileId;outcomeEvaluatorId=$OutcomeEvaluatorId;outcomeEvaluatorDefinitionHash=[string]$outcomeEvaluatorSnapshot.definitionHash;outcomeEvaluatorRegistryHash=[string]$outcomeEvaluatorSnapshot.registryHash;evaluationContractId=[string]$evaluationContractSnapshot.contractId;evaluationContractHash=[string]$evaluationContractSnapshot.contractHash;requiredClaims=$claims;requiredVerifiers=$requiredVerifiers;optionalClaims=$optionalClaims;optionalVerifiers=$optionalVerifiers;interactionSessionId=$interactionSessionIdNormalized;focusContextId=$FocusContextId;focusRevision=$FocusRevision;focusProposalHash=$FocusProposalHash;focusReceiptHash=$FocusReceiptHash;focusScopeHash=$FocusScopeHash;taskBindingRef=$bindingRef;verifierRegistryHash=[string]$registrySnapshot.registryHash;evidenceContractId=[string]$evidenceContractSnapshot.contractId;evidenceContractHash=[string]$evidenceContractSnapshot.contractHash;maxEvidenceAgeHours=$MaxEvidenceAgeHours;allowUnverifiedClaims=[bool]$AllowUnverifiedClaims;requestedSourceScope=@($RequestedSourceScope);idempotencyKey=$IdempotencyKey})
     Invoke-ESTaskMutex $TaskId {
         if (Test-Path -LiteralPath $paths.TaskRoot) {
             $existing = Read-ESEventChain $paths -VerifyReceipts
@@ -845,9 +990,13 @@ function New-ESTaskContextTask {
             if ($null -ne $match -and $match.eventType -eq 'Created') { return $match.state }
             throw 'TaskId already exists.'
         }
-        $resolved = @()
-        foreach ($sourcePath in @($RequestedSourceScope)) { $resolved += (Resolve-ESProjectFile $paths.ProjectRoot ([string]$sourcePath)).Relative }
-        if (@($resolved | Sort-Object -Unique).Count -ne @($resolved).Count) { throw 'RequestedSourceScope contains duplicate paths.' }
+        if($null -ne $binding){
+            $bindingTarget=Join-Path $paths.BindingsRoot ([string]$binding.bindingId+'.json')
+            if(Test-Path -LiteralPath $bindingTarget -PathType Leaf){
+                $existingBinding=Read-ESStrictJson $bindingTarget
+                if([string]$existingBinding.bindingHash-cne[string]$binding.bindingHash){throw 'Task binding sidecar already exists with different content.'}
+            } else { Write-ESCreateOnlyJson $bindingTarget $binding }
+        }
         $profileCore = [ordered]@{ profileId=$AcceptanceProfileId; outcomeEvaluatorId=$OutcomeEvaluatorId; outcomeEvaluatorDefinitionHash=[string]$outcomeEvaluatorSnapshot.definitionHash; outcomeEvaluatorRegistryHash=[string]$outcomeEvaluatorSnapshot.registryHash; evaluationContractId=[string]$evaluationContractSnapshot.contractId; evaluationContractHash=[string]$evaluationContractSnapshot.contractHash; requiredClaims=$claims; requiredVerifiers=$requiredVerifiers; optionalClaims=$optionalClaims; optionalVerifiers=$optionalVerifiers; verifierRegistryHash=[string]$registrySnapshot.registryHash; evidenceContractId=[string]$evidenceContractSnapshot.contractId; evidenceContractHash=[string]$evidenceContractSnapshot.contractHash; maxEvidenceAgeHours=$MaxEvidenceAgeHours; allowUnverifiedClaims=[bool]$AllowUnverifiedClaims; frozen=$true }
         $profile = [ordered]@{}
         foreach ($key in $profileCore.Keys) { $profile[$key] = $profileCore[$key] }
@@ -856,9 +1005,9 @@ function New-ESTaskContextTask {
         $state = [pscustomobject][ordered]@{
             taskId=$TaskId; planHash=[string]$routePlan.routePlanHash
             routePlan=[pscustomobject][ordered]@{routePlanId=[string]$routePlan.routePlanId;routePlanPath=[string]$routePlan.routePlanPath;routePlanHash=[string]$routePlan.routePlanHash;artifactHash=[string]$routePlan.routePlanArtifactHash;snapshotHash=[string]$routePlan.snapshotHash;profile=[string]$routePlan.profile;routeState=[string]$routePlan.routeState;routeKeys=@($routePlan.routeKeys);head=[string]$routePlan.head;sourceRefsHash=[string]$routePlan.sourceRefsHash;registryHash=[string]$routePlan.registryHash}
-            goalId=$goal.goalId; goalRevision=$goal.goalRevision; goalRevisionHash=$goal.goalRevisionHash; goalRevisionPath=$goal.path; createdUtc=$createdUtc; interactionSessionId=$interactionSessionIdNormalized; taskRevision=1; contextVersion=1
+            goalId=$goal.goalId; goalRevision=$goal.goalRevision; goalRevisionHash=$goal.goalRevisionHash; goalRevisionPath=$goal.path; createdUtc=$createdUtc; interactionSessionId=$interactionSessionIdNormalized; focusContextId=if($hasFocus){$FocusContextId}else{$null}; focusRevision=if($hasFocus){$FocusRevision}else{$null}; focusProposalHash=if($hasFocus){$FocusProposalHash}else{$null}; focusReceiptHash=if($hasFocus -and -not [string]::IsNullOrWhiteSpace($FocusReceiptHash)){$FocusReceiptHash}else{$null}; focusScopeHash=if($hasFocus){$FocusScopeHash}else{$null}; taskRevision=1; contextVersion=1
             taskStatus='Active'; contextStatus='Live'; completionDecision='undetermined'; deliveryAcceptance='pending'
-            acceptanceProfile=$profile; requestedSourceScope=@($RequestedSourceScope); resolvedSourceScope=$resolved
+            acceptanceProfile=$profile; requestedSourceScope=@($RequestedSourceScope); resolvedSourceScope=$resolved; taskBindingRef=if($null -eq $bindingRef){$null}else{[pscustomobject]$bindingRef}
             verifiedSourceScope=@(); verifiedSourceScopeHash=$null; evidenceSet=$null; completionReceipt=$null; idempotencyKeys=@()
         }
         $event = Write-ESEvent $paths $null $state 'Created' $IdempotencyKey ([pscustomobject]@{ operationHash=$operationHash; sourceScopeCount=@($resolved).Count })
@@ -1314,6 +1463,9 @@ function Complete-ESTaskContextTask {
         if($null -ne $duplicate){return $duplicate.state}
         $previous=$events[-1];Assert-ESCas $previous.state $ExpectedTaskRevision $ExpectedContextVersion
         if($previous.state.taskStatus -ne 'Active' -or $previous.state.contextStatus -ne 'Live'){throw 'Completion evaluation requires Active+Live.'}
+        $binding=Read-ESABCTaskBinding $paths $previous.state $ExpectedTaskRevision $ExpectedContextVersion -AllowAttachedRevision
+        if($null -ne $binding -and [string]::IsNullOrWhiteSpace([string]$previous.state.verifiedSourceScopeHash)){throw 'ABC Task Binding requires a verified sourceScope before completion.'}
+        if($null -ne $binding -and [string]$binding.sourceScopeHash -cne [string]$previous.state.verifiedSourceScopeHash){throw 'ABC Task Binding sourceScopeHash does not match the verified source scope.'}
         $evaluationId=[Guid]::NewGuid().ToString('N')
         $evaluationResult=New-ESEvaluationRecordCore $paths $events $previous.state 'completion' $operationHash $evaluationId
         $evaluation=$evaluationResult.record
@@ -1323,6 +1475,7 @@ function Complete-ESTaskContextTask {
         if($evaluation.decision -eq 'accepted'){
             $state.taskStatus='Completed';$state.contextStatus='Frozen';$state.contextVersion=[int]$state.contextVersion+1;$state.deliveryAcceptance='pending'
             $receiptBase=[ordered]@{schemaVersion=1;receiptId=[Guid]::NewGuid().ToString('N');taskId=$TaskId;taskRevision=[int]$state.taskRevision;contextVersion=[int]$state.contextVersion;planHash=[string]$state.planHash;routePlanId=[string]$state.routePlan.routePlanId;routePlanPath=[string]$state.routePlan.routePlanPath;routePlanHash=[string]$state.routePlan.routePlanHash;routePlanArtifactHash=[string]$state.routePlan.artifactHash;routePlanSnapshotHash=[string]$state.routePlan.snapshotHash;goalRevisionHash=[string]$state.goalRevisionHash;acceptanceProfileHash=[string]$state.acceptanceProfile.profileHash;evidenceContractId=[string]$state.acceptanceProfile.evidenceContractId;evidenceContractHash=[string]$state.acceptanceProfile.evidenceContractHash;evaluationId=[string]$evaluation.evaluationId;evaluationRecordPath=[string]$evaluationResult.path;evaluationRecordHash=[string]$evaluation.recordHash;evidenceSetHash=[string]$state.evidenceSet.evidenceSetHash;verifiedSourceScopeHash=[string]$state.verifiedSourceScopeHash;completionDecision='accepted';issuedUtc=[DateTime]::UtcNow.ToString('o')}
+            if($null-ne$state.PSObject.Properties['focusContextId']-and$null-ne$state.focusContextId){$receiptBase.focusContextId=[string]$state.focusContextId;$receiptBase.focusRevision=[int]$state.focusRevision;$receiptBase.focusProposalHash=[string]$state.focusProposalHash;$receiptBase.focusReceiptHash=if($null -eq $state.focusReceiptHash){$null}else{[string]$state.focusReceiptHash};$receiptBase.focusScopeHash=[string]$state.focusScopeHash}
             $receipt=[ordered]@{};foreach($key in $receiptBase.Keys){$receipt[$key]=$receiptBase[$key]};$receipt['receiptHash']=Get-ESObjectHash $receiptBase
             $receiptRelative="$TaskId/receipts/$($receiptBase.receiptId).json";$receiptFull=Join-Path $paths.StoreRoot ($receiptRelative.Replace('/',[IO.Path]::DirectorySeparatorChar))
             Write-ESCreateOnlyJson $receiptFull $receipt
@@ -1386,6 +1539,36 @@ function Invoke-ESTaskContextTransition {
             'Reopen'{$state.taskStatus='Active';$state.contextStatus='Live';$state.contextVersion=[int]$state.contextVersion+1;$state.completionDecision='undetermined';$state.deliveryAcceptance='pending';$state.evidenceSet=$null;$state.completionReceipt=$null;$eventType='Reopened'}
         }
         $event=Write-ESEvent $paths $previous $state $eventType $IdempotencyKey ([pscustomobject]@{operationHash=$operationHash;transition=$Transition;recoveryContextStatus=if($Transition-in@('Quarantine','Recover')){$recoveryContext}else{$null}})
+        return $event.state
+    }
+}
+
+function Add-ESTaskABCDOrchestrationEvent {
+    [CmdletBinding()]
+    param(
+        [string]$ProjectRoot='.', [string]$StoreRoot='ES/Output/TaskContextRuntime', [Parameter(Mandatory=$true)][string]$TaskId,
+        [Parameter(Mandatory=$true)][string]$EventType, [Parameter(Mandatory=$true)]$Payload,
+        [Parameter(Mandatory=$true)][string]$TaskBindingId, [Parameter(Mandatory=$true)][string]$TaskBindingHash,
+        [Parameter(Mandatory=$true)][string]$RoutePlanHash, [Parameter(Mandatory=$true)][string]$SourceScopeHash,
+        [Parameter(Mandatory=$true)][int]$ExpectedTaskRevision, [Parameter(Mandatory=$true)][int]$ExpectedContextVersion,
+        [Parameter(Mandatory=$true)][string]$IdempotencyKey
+    )
+    Assert-ESSafeId $TaskId 'TaskId'; Assert-ESSafeId $IdempotencyKey 'IdempotencyKey'
+    if($EventType -notin @('iteration-round-started','candidate-expanded','candidate-pruned','branch-backtracked','audit-recorded','branch-selected','correction-cycle-started','verification-recorded','iteration-advanced','iteration-stopped')){throw 'Unknown ABCD event type.'}
+    if($null -eq $Payload -or $Payload -is [string]){throw 'ABCD payload must be a JSON object.'}
+    Assert-ESHash $TaskBindingHash 'TaskBindingHash'; Assert-ESHash $RoutePlanHash 'RoutePlanHash'; Assert-ESHash $SourceScopeHash 'SourceScopeHash'
+    $paths=Resolve-ESRuntimePaths $ProjectRoot $StoreRoot $TaskId
+    $operationHash=Get-ESObjectHash ([ordered]@{operation='ABCDOrchestrationEvent';taskId=$TaskId;eventType=$EventType;payloadHash=(Get-ESObjectHash $Payload);taskBindingId=$TaskBindingId;taskBindingHash=$TaskBindingHash;routePlanHash=$RoutePlanHash;sourceScopeHash=$SourceScopeHash})
+    Invoke-ESTaskMutex $TaskId {
+        $events=Read-ESEventChain $paths -VerifyReceipts;$duplicate=Find-ESIdempotentEvent $events $IdempotencyKey $operationHash;if($null-ne$duplicate){return $duplicate.state}
+        $previous=$events[-1];Assert-ESCas $previous.state $ExpectedTaskRevision $ExpectedContextVersion
+        $state=Copy-ESObject $previous.state
+        if($null -eq $state.taskBindingRef -or [string]$state.taskBindingRef.bindingId -cne $TaskBindingId -or [string]$state.taskBindingRef.bindingHash -cne $TaskBindingHash){throw 'ABCD Task Binding reference mismatch.'}
+        if([string]$state.routePlan.routePlanHash -cne $RoutePlanHash -or [string]$state.verifiedSourceScopeHash -and [string]$state.verifiedSourceScopeHash -cne $SourceScopeHash){throw 'ABCD RoutePlan or SourceScope mismatch.'}
+        $state.taskRevision=[int]$state.taskRevision+1;$state.contextVersion=[int]$state.contextVersion+1
+        $abcdMetadata=[pscustomobject][ordered]@{eventType=$EventType;payloadHash=Get-ESObjectHash $Payload;taskBindingRef=[pscustomobject][ordered]@{bindingId=$TaskBindingId;bindingHash=$TaskBindingHash};routePlanHash=$RoutePlanHash;sourceScopeHash=$SourceScopeHash}
+        if($null -eq $state.PSObject.Properties['abcdOrchestration']){$state|Add-Member -NotePropertyName abcdOrchestration -NotePropertyValue $abcdMetadata}else{$state.abcdOrchestration=$abcdMetadata}
+        $event=Write-ESEvent $paths $previous $state 'ABCDOrchestrationEvent' $IdempotencyKey ([pscustomobject]@{operationHash=$operationHash;abcdEventType=$EventType;abcdPayloadHash=[string]$state.abcdOrchestration.payloadHash;taskBindingId=$TaskBindingId})
         return $event.state
     }
 }
@@ -1516,4 +1699,4 @@ function Test-ESTaskContextIntegrity {
     }
 }
 
-Export-ModuleMember -Function New-ESGoalRevision,Resolve-ESGoalRevision,New-ESTaskContextTask,Get-ESTaskContextState,Confirm-ESTaskSourceScope,Submit-ESTaskEvidenceSet,New-ESTaskEvaluationRecord,Complete-ESTaskContextTask,Set-ESTaskDeliveryAcceptance,Invoke-ESTaskContextTransition,Get-ESTaskCommercialObservation,Test-ESTaskContextIntegrity
+Export-ModuleMember -Function New-ESGoalRevision,Resolve-ESGoalRevision,New-ESTaskContextTask,Get-ESTaskContextState,Confirm-ESTaskSourceScope,Submit-ESTaskEvidenceSet,New-ESTaskEvaluationRecord,Complete-ESTaskContextTask,Set-ESTaskDeliveryAcceptance,Invoke-ESTaskContextTransition,Add-ESTaskABCDOrchestrationEvent,Get-ESTaskCommercialObservation,Test-ESTaskContextIntegrity

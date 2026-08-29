@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es://automation/contracts/external-agent-supply-chain/v1",
+  "schemaVersion":1,
+  "receiptType":"ExternalAgentSupplyChainReceipt",
+  "policy":"reference-only-until-reviewed",
+  "frameworks":[
+    {"frameworkId":"langgraph","sourceUrl":"https://github.com/langchain-ai/langgraph","sourceRevision":null,"license":"未冻结","dependencies":[],"networkRequired":false,"credentialsRequired":false,"sourceHash":null,"status":"source-review-required","driftAction":"invalidate-adapter-and-replay"},
+    {"frameworkId":"letta","sourceUrl":"https://github.com/letta-ai/letta","sourceRevision":null,"license":"未冻结","dependencies":[],"networkRequired":false,"credentialsRequired":false,"sourceHash":null,"status":"source-review-required","driftAction":"invalidate-adapter-and-replay"},
+    {"frameworkId":"openhands","sourceUrl":"https://github.com/OpenHands/software-agent-sdk","sourceRevision":null,"license":"未冻结","dependencies":[],"networkRequired":false,"credentialsRequired":false,"sourceHash":null,"status":"source-review-required","driftAction":"invalidate-adapter-and-replay"},
+    {"frameworkId":"swe-agent","sourceUrl":"https://github.com/SWE-agent/SWE-agent","sourceRevision":null,"license":"未冻结","dependencies":[],"networkRequired":false,"credentialsRequired":false,"sourceHash":null,"status":"source-review-required","driftAction":"invalidate-adapter-and-replay"}
+  ]
+}

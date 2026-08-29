@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://automation/contracts/web-page-generation/v1",
+  "title": "ES Web Page Generation Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recordType", "status", "identity", "webPageIntent", "designSpec", "artifactPlan", "webArtifact", "previewRun", "previewSnapshot", "visualChecks", "evidence", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "WebPageGenerationContract"},
+    "status": {"enum": ["designed", "implemented-unverified", "review", "blocked", "stale"]},
+    "identity": {"$ref": "#/$defs/identity"},
+    "webPageIntent": {"$ref": "#/$defs/webPageIntent"},
+    "designSpec": {"$ref": "#/$defs/designSpec"},
+    "artifactPlan": {"$ref": "#/$defs/artifactPlan"},
+    "webArtifact": {"$ref": "#/$defs/webArtifact"},
+    "previewRun": {"$ref": "#/$defs/previewRun"},
+    "previewSnapshot": {"$ref": "#/$defs/previewSnapshot"},
+    "visualChecks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/visualCheck"}},
+    "revisionPatches": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/revisionPatch"}},
+    "evidence": {"$ref": "#/$defs/evidence"},
+    "nonClaims": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,127}$"},
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["projectKey", "pageId", "revisionId", "profileId", "stateId", "inputHash", "specHash"],
+      "properties": {
+        "projectKey": {"type": "string", "minLength": 1}, "pageId": {"$ref": "#/$defs/id"},
+        "revisionId": {"$ref": "#/$defs/id"}, "profileId": {"$ref": "#/$defs/id"}, "stateId": {"$ref": "#/$defs/id"},
+        "inputHash": {"$ref": "#/$defs/hash"}, "specHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "webPageIntent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pageKind", "objective", "primaryAction", "allowedOutput", "nonGoals"],
+      "properties": {
+        "pageKind": {"enum": ["marketing", "dashboard"]}, "objective": {"type": "string", "minLength": 1}, "language": {"enum": ["en", "zh-CN", "ar"]},
+        "primaryAction": {"type": "string", "minLength": 1},
+        "allowedOutput": {"const": "static-html-css"},
+        "nonGoals": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nodeId", "parentId", "kind", "semanticRole", "children", "sourceRefs", "tokenRefs"],
+      "properties": {
+        "nodeId": {"$ref": "#/$defs/id"}, "parentId": {"type": ["string", "null"]},
+        "kind": {"enum": ["document", "section", "container", "text", "image", "button", "input", "list", "data"]},
+        "semanticRole": {"type": "string", "minLength": 1},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "sourceRefs": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "tokenRefs": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "content": {"type": "string"}
+      }
+    },
+    "designToken": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tokenId", "role", "value", "valueType"],
+      "properties": {"tokenId": {"$ref": "#/$defs/id"}, "role": {"type": "string", "minLength": 1}, "value": {"type": ["string", "number"]}, "valueType": {"enum": ["color", "length", "font", "shadow", "string", "number"]}}
+    },
+    "component": {
+      "type": "object", "additionalProperties": false,
+      "required": ["componentId", "semanticRole", "allowedElements", "fallback"],
+      "properties": {"componentId": {"$ref": "#/$defs/id"}, "semanticRole": {"type": "string", "minLength": 1}, "allowedElements": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "fallback": {"type": "string", "minLength": 1}}
+    },
+    "designSpec": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "rootNodeId", "nodes", "sourceMap", "tokens", "components", "responsiveProfiles", "states", "assets", "measurementUncertainty", "knownLoss", "fallback"],
+      "properties": {
+        "version": {"type": "string", "pattern": "^1\\.[0-9]+$"}, "rootNodeId": {"$ref": "#/$defs/id"},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}},
+        "sourceMap": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["sourceId", "targetNodeId", "sourceHash"], "properties": {"sourceId": {"$ref": "#/$defs/id"}, "targetNodeId": {"$ref": "#/$defs/id"}, "sourceHash": {"$ref": "#/$defs/hash"}, "sourcePath": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}}}},
+        "tokens": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/designToken"}}, "components": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/component"}},
+        "responsiveProfiles": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["profileId", "viewport", "semanticEquivalence"], "properties": {"profileId": {"$ref": "#/$defs/id"}, "viewport": {"type": "object", "additionalProperties": false, "required": ["width", "height"], "properties": {"width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}}}, "semanticEquivalence": {"type": "string", "minLength": 1}}}},
+        "states": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["stateId", "effects"], "properties": {"stateId": {"$ref": "#/$defs/id"}, "effects": {"type": "array", "items": {"type": "string"}}}}},
+        "assets": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["assetId", "role", "source", "hash", "fallback"], "properties": {"assetId": {"$ref": "#/$defs/id"}, "role": {"type": "string", "minLength": 1}, "source": {"type": "string", "minLength": 1}, "hash": {"$ref": "#/$defs/hash"}, "license": {"type": "string"}, "fallback": {"type": "string", "minLength": 1}}}},
+        "measurementUncertainty": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["targetId", "reason", "confidence"], "properties": {"targetId": {"$ref": "#/$defs/id"}, "reason": {"type": "string", "minLength": 1}, "confidence": {"type": "number", "minimum": 0, "maximum": 1}}}},
+        "knownLoss": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["field", "reason", "handling"], "properties": {"field": {"type": "string", "minLength": 1}, "reason": {"type": "string", "minLength": 1}, "handling": {"enum": ["approx", "fallback", "blocked"]}}}},
+        "fallback": {"type": "object", "additionalProperties": false, "required": ["mode", "description"], "properties": {"mode": {"enum": ["explicit", "blocked"]}, "description": {"type": "string", "minLength": 1}}}
+      }
+    },
+    "artifactPlan": {
+      "type": "object", "additionalProperties": false, "required": ["entryFile", "outputFiles", "fileAllowlist", "dependencyPolicy"],
+      "properties": {"entryFile": {"type": "string", "pattern": "^[^/\\\\]+\\.html$"}, "outputFiles": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}}, "fileAllowlist": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}}, "dependencyPolicy": {"enum": ["no-dependencies", "allowlisted-local-only"]}}
+    },
+    "webArtifact": {
+      "type": "object", "additionalProperties": false, "required": ["rootDirectory", "files", "contentHashes", "externalLinks", "scripts"],
+      "properties": {"rootDirectory": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}, "files": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}}, "contentHashes": {"type": "object", "additionalProperties": {"$ref": "#/$defs/hash"}}, "externalLinks": {"type": "array", "items": {"type": "string"}}, "scripts": {"type": "array", "items": {"type": "string"}}}
+    },
+    "previewRun": {
+      "type": "object", "additionalProperties": false, "required": ["runId", "specHash", "profileId", "stateId", "nodeVersion", "browser", "network", "rootDirectory", "fileAllowlist", "budgets", "executionPolicy", "securityChecks"],
+      "properties": {
+        "runId": {"$ref": "#/$defs/id"}, "specHash": {"$ref": "#/$defs/hash"}, "profileId": {"$ref": "#/$defs/id"}, "stateId": {"$ref": "#/$defs/id"}, "nodeVersion": {"type": "string", "minLength": 1}, "browser": {"type": "string", "minLength": 1}, "network": {"const": "disabled"}, "rootDirectory": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}, "fileAllowlist": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}},
+        "budgets": {"type": "object", "additionalProperties": false, "required": ["processSeconds", "port", "memoryMb"], "properties": {"processSeconds": {"type": "integer", "minimum": 1}, "port": {"type": "integer", "minimum": 0, "maximum": 65535}, "memoryMb": {"type": "integer", "minimum": 1}}},
+        "executionPolicy": {"type": "object", "additionalProperties": false, "required": ["allowInstall", "allowGeneratedCode", "allowShell"], "properties": {"allowInstall": {"const": false}, "allowGeneratedCode": {"const": false}, "allowShell": {"const": false}}},
+        "securityChecks": {"type": "array", "minItems": 1, "items": {"enum": ["html-script-policy", "external-link-policy", "xss-sanitization", "asset-path-policy", "file-allowlist"]}}
+      }
+    },
+    "previewSnapshot": {
+      "type": "object", "additionalProperties": false, "required": ["snapshotId", "runId", "specHash", "profileId", "stateId", "htmlHash", "screenshotPath", "domSummary"],
+      "properties": {"snapshotId": {"$ref": "#/$defs/id"}, "runId": {"$ref": "#/$defs/id"}, "specHash": {"$ref": "#/$defs/hash"}, "profileId": {"$ref": "#/$defs/id"}, "stateId": {"$ref": "#/$defs/id"}, "htmlHash": {"$ref": "#/$defs/hash"}, "screenshotPath": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}, "domSummary": {"type": "object", "additionalProperties": false, "required": ["nodeCount", "interactiveCount"], "properties": {"nodeCount": {"type": "integer", "minimum": 0}, "interactiveCount": {"type": "integer", "minimum": 0}}}}
+    },
+    "visualCheck": {
+      "type": "object", "additionalProperties": false, "required": ["checkId", "category", "status", "targetId", "finding", "evidenceRefs"],
+      "properties": {"checkId": {"$ref": "#/$defs/id"}, "category": {"enum": ["dom-structure", "geometry", "token", "asset", "pixel", "human-review"]}, "status": {"enum": ["passed", "failed", "review", "not-run"]}, "targetId": {"$ref": "#/$defs/id"}, "finding": {"type": "string", "minLength": 1}, "evidenceRefs": {"type": "array", "items": {"type": "string"}}}
+    },
+    "revisionPatch": {
+      "type": "object", "additionalProperties": false, "required": ["patchId", "targetId", "beforeHash", "afterHash", "allowedFields", "findingSource", "idempotencyKey", "rollbackPoint", "impact", "expectedVisualEffect"],
+      "properties": {"patchId": {"$ref": "#/$defs/id"}, "targetId": {"$ref": "#/$defs/id"}, "beforeHash": {"$ref": "#/$defs/hash"}, "afterHash": {"$ref": "#/$defs/hash"}, "allowedFields": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "findingSource": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}}, "idempotencyKey": {"$ref": "#/$defs/hash"}, "rollbackPoint": {"type": "string", "minLength": 1}, "impact": {"enum": ["node", "file", "page"]}, "expectedVisualEffect": {"type": "string", "minLength": 1}}
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["inputHash", "outputHash", "receipts", "acceptanceStatus", "runtimeStatus"],
+      "properties": {"inputHash": {"$ref": "#/$defs/hash"}, "outputHash": {"$ref": "#/$defs/hash"}, "receipts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["stage", "receiptId", "receiptHash"], "properties": {"stage": {"type": "string", "minLength": 1}, "receiptId": {"$ref": "#/$defs/id"}, "receiptHash": {"$ref": "#/$defs/hash"}}}}, "acceptanceStatus": {"enum": ["designed", "static-verified", "review", "blocked"]}, "runtimeStatus": {"const": "runtime-not-run"}}
+    }
+  }
+}

@@ -1,0 +1,7 @@
+Set-StrictMode -Version Latest;$ErrorActionPreference='Stop'
+function Get-ESABCDAuditConsistencyHash($v){$s=[Security.Cryptography.SHA256]::Create();try{([BitConverter]::ToString($s.ComputeHash([Text.Encoding]::UTF8.GetBytes(($v|ConvertTo-Json -Compress -Depth 10)))).Replace('-','').ToLowerInvariant())}finally{$s.Dispose()}}
+function Invoke-ESABCDAuditConsistency {
+ [CmdletBinding()]param([Parameter(Mandatory)][string]$AuditPrompt,[Parameter(Mandatory)][string]$ArtifactHash,[Parameter(Mandatory)][bool]$EvidenceComplete)
+ if($ArtifactHash -notmatch '^[a-f0-9]{64}$'){throw 'AUDIT_ARTIFACT_HASH_INVALID'};$normalized=($AuditPrompt.ToLowerInvariant()-replace '\s+',' '-replace '(?i)please|kindly|strictly|audit|review|check','' -replace '[^\p{L}\p{N} ]','').Trim();$base=0.2;if($EvidenceComplete){$base=0.9};$scores=[ordered]@{correctness=$base;safety=$base;usability=$base};$status='review';if($EvidenceComplete){$status='passed'};[pscustomobject][ordered]@{schemaVersion=1;normalizedIntent=$normalized;rubricVersion='fixed-rubric-v1';scores=$scores;scoreSpread=0.0;artifactHash=$ArtifactHash;evidenceComplete=$EvidenceComplete;status=$status;promptInfluence='bounded-to-zero-for-rubric';receiptHash=Get-ESABCDAuditConsistencyHash ([ordered]@{normalized=$normalized;scores=$scores;artifactHash=$ArtifactHash})}
+}
+Export-ModuleMember -Function Invoke-ESABCDAuditConsistency,Get-ESABCDAuditConsistencyHash

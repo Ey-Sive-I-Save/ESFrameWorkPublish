@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "requestId": "artifact_20260810_130554_979_80097004",
+  "summary": "生成一条把中文需求转换为真实 ESFramework 实现链的 AICommand 候选；候选仅供 Unity Diff Review 与人工批准。",
+  "files": [
+    {
+      "artifactKind": 0,
+      "candidateRelativePath": "candidate/生成_新模块工作流_AI命令.md",
+      "targetProjectPath": "Assets/Plugins/ES/AICommands/生成_新模块工作流_AI命令.md",
+      "summary": "安全执行型 AICommand：读取权威规则、保护并行工作树、实施授权修改、分层验证并交付真实证据。"
+    }
+  ]
+}

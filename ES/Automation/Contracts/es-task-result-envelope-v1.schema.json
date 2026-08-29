@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-collaboration/result-envelope/v1",
+  "title": "ES Candidate Result Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "envelopeId", "parentTaskId", "childTaskId", "collaborationPlanHash", "taskRevision", "contextVersion", "attempt", "leaseId", "resultStatus", "outputHash", "evidenceRefs", "errorCode", "idempotencyKey", "capturedUtc", "resultHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-collaboration/result-envelope/v1" },
+    "recordType": { "const": "CandidateResultEnvelope" },
+    "envelopeId": { "type": "string", "pattern": "^result-[a-f0-9]{32}$" },
+    "parentTaskId": { "$ref": "#/$defs/id" },
+    "childTaskId": { "$ref": "#/$defs/id" },
+    "collaborationPlanHash": { "$ref": "#/$defs/hash" },
+    "taskRevision": { "type": "integer", "minimum": 1 },
+    "contextVersion": { "type": "integer", "minimum": 1 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "leaseId": { "type": "string", "pattern": "^lease-[a-f0-9]{32}$" },
+    "resultStatus": { "enum": ["candidate", "failed", "cancelled"] },
+    "outputHash": { "$ref": "#/$defs/hash" },
+    "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "errorCode": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+    "idempotencyKey": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,160}$" },
+    "capturedUtc": { "type": "string", "format": "date-time" },
+    "resultHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+  }
+}

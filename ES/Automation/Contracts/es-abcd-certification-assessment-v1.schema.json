@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/abcd/certification-assessment/v1",
+  "title": "ES ABCD Certification Assessment v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "recordType", "assessmentId", "subject", "profile", "status", "decisionStatus", "sourceSnapshot", "evidence", "verifier", "claims", "assessmentHash", "nonClaims"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/abcd/certification-assessment/v1" },
+    "recordType": { "const": "ABCDCertificationAssessment" },
+    "assessmentId": { "$ref": "#/$defs/assessmentId" },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["abcd-system", "task", "feature"] },
+        "id": { "$ref": "#/$defs/id" },
+        "taskBindingRef": { "$ref": "#/$defs/bindingRef" }
+      }
+    },
+    "profile": { "enum": ["DesignReview", "RuntimeAcceptance", "ReleaseAcceptance"] },
+    "status": { "enum": ["candidate", "eligible", "conditional", "rejected", "stale"] },
+    "decisionStatus": { "enum": ["accepted", "conditional", "rejected", "evidence-pending"] },
+    "sourceSnapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["branch", "head", "worktreeHash", "sourceRefs", "capturedUtc"],
+      "properties": {
+        "branch": { "type": "string", "minLength": 1 },
+        "head": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "worktreeHash": { "$ref": "#/$defs/hash" },
+        "sourceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sourceRef" } },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "snapshotArtifactPath": { "type": ["string", "null"], "minLength": 1 },
+        "snapshotArtifactHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] }
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["static", "runtime", "release", "requiredCaseIds", "completedCaseIds"],
+      "properties": {
+        "static": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } },
+        "runtime": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } },
+        "release": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } },
+        "requiredCaseIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "completedCaseIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "verifier": {
+      "type": "object", "additionalProperties": false,
+      "required": ["verifierId", "verifierDefinitionHash", "role", "independenceProof", "signatureStatus", "signatureVerificationMethod"],
+      "properties": {
+        "verifierId": { "$ref": "#/$defs/id" },
+        "verifierDefinitionHash": { "$ref": "#/$defs/hash" },
+        "role": { "enum": ["project-acceptance-owner", "independent-auditor", "external-certification-body"] },
+        "independenceProof": { "type": "string", "minLength": 1 },
+        "issuerRef": { "type": ["string", "null"], "minLength": 1 },
+        "signedPayloadHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "signatureStatus": { "enum": ["not-requested", "pending", "verified", "failed"] },
+        "signatureVerificationMethod": { "enum": ["none", "external-detached-signature"] },
+        "signatureRef": { "type": ["string", "null"], "minLength": 1 },
+        "signatureHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "signedAtUtc": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "claims": {
+      "type": "object", "additionalProperties": false,
+      "required": ["proven", "notProven", "scope"],
+      "properties": {
+        "proven": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "notProven": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "scope": { "type": "string", "minLength": 1 }
+      }
+    },
+    "assessmentHash": { "$ref": "#/$defs/hash" },
+    "nonClaims": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "assessmentId": { "type": "string", "pattern": "^abcd-ca-[a-f0-9]{32}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bindingRef": {
+      "type": "object", "additionalProperties": false, "required": ["bindingId", "bindingHash"],
+      "properties": { "bindingId": { "$ref": "#/$defs/id" }, "bindingHash": { "$ref": "#/$defs/hash" } }
+    },
+    "sourceRef": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256", "role"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "role": { "enum": ["implementation", "contract", "test", "policy", "evidence"] }
+      }
+    },
+    "evidenceRef": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256", "status", "capturedUtc", "receiptPath", "skillName", "case", "evidenceLevel", "evidenceContractId", "evidenceContractHash"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "status": { "enum": ["static-passed", "runtime-passed", "release-passed", "conditional", "failed", "runtime-not-run", "stale"] },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "receiptPath": { "type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" },
+        "skillName": { "type": "string", "pattern": "^es-[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "case": { "type": "string", "minLength": 1 },
+        "evidenceLevel": { "type": "string", "pattern": "^S[0-6]$" },
+        "evidenceContractId": { "const": "es.skill-evidence-receipt" },
+        "evidenceContractHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

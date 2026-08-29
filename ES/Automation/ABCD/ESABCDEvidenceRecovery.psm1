@@ -1,0 +1,12 @@
+﻿Set-StrictMode -Version Latest;$ErrorActionPreference='Stop'
+Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1') -Force
+function Invoke-ESABCDEvidenceRecovery {
+ [CmdletBinding()]param([Parameter(Mandatory)]$Store,[Parameter(Mandatory)][string]$EvidencePath,[Parameter(Mandatory)][string]$FindingDirectory)
+ $full=(Resolve-Path $EvidencePath).Path;$raw=Get-Content -Raw -Encoding UTF8 $full;$doc=$raw|ConvertFrom-Json;$missing=@();$cap=$doc.PSObject.Properties['capturedUtc'];if($null -eq $cap -or [string]::IsNullOrWhiteSpace([string]$cap.Value)){$missing+='capturedUtc'}
+ $findingId='finding-evidence-'+([guid]::NewGuid().ToString('N'));$findingPath=Join-Path $FindingDirectory ($findingId+'.json');New-Item -ItemType Directory -Force $FindingDirectory|Out-Null
+ $finding=[ordered]@{schemaVersion=1;findingId=$findingId;failureClass='evidence';severity='P0';evidencePath=$EvidencePath;missingFields=$missing;claimCap='claim-cap';createdUtc=[DateTime]::UtcNow.ToString('o')};[IO.File]::WriteAllText($findingPath,($finding|ConvertTo-Json -Depth 10),[Text.UTF8Encoding]::new($false))
+ if($missing.Count -eq 1 -and $missing[0] -eq 'capturedUtc'){$doc|Add-Member -NotePropertyName capturedUtc -NotePropertyValue ((Get-Item $full).LastWriteTimeUtc.ToString('o')) -Force;$tmp="$full.tmp-$([guid]::NewGuid().ToString('N'))";[IO.File]::WriteAllText($tmp,($doc|ConvertTo-Json -Depth 40),[Text.UTF8Encoding]::new($false));Move-Item -LiteralPath $tmp -Destination $full -Force;$cycle=Start-ESABCDCorrectionCycle -Store $Store -CycleId ('evidence-'+[guid]::NewGuid().ToString('N')) -FindingReceiptRef $findingPath -FailureClass evidence -Decision retry -ClaimLevel claim-cap -AttemptNo 1 -ExpectedTaskRevision $Store.taskRevision -ExpectedContextVersion $Store.contextVersion;return [pscustomobject]@{status='normalized-and-retry';findingPath=$findingPath;cycle=$cycle;claimLevel='claim-cap';nextAction='retry-after-normalization';blocked=$false}}
+ $cycle=Start-ESABCDCorrectionCycle -Store $Store -CycleId ('evidence-'+[guid]::NewGuid().ToString('N')) -FindingReceiptRef $findingPath -FailureClass evidence -Decision stop -ClaimLevel claim-cap -AttemptNo 1 -ExpectedTaskRevision $Store.taskRevision -ExpectedContextVersion $Store.contextVersion;[pscustomobject]@{status='blocked';findingPath=$findingPath;cycle=$cycle;claimLevel='claim-cap';nextAction='stop-and-report';blocked=$true}
+}
+Export-ModuleMember -Function Invoke-ESABCDEvidenceRecovery
+

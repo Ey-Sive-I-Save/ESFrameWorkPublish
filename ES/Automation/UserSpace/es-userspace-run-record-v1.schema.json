@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/userspace/run-record/v1",
+  "title": "ES UserSpace RunRecord v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["taskId", "taskVersion", "runId", "action", "status", "error", "updatedAtUtc"],
+  "properties": {
+    "taskId": { "const": "es.userspace.profile" },
+    "taskVersion": { "const": 1 },
+    "runId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+    "action": { "enum": ["Initialize", "Update", "Discover", "Validate"] },
+    "status": { "enum": ["Completed", "Failed"] },
+    "error": { "type": "string", "maxLength": 4096 },
+    "updatedAtUtc": { "type": "string", "format": "date-time" }
+  }
+}

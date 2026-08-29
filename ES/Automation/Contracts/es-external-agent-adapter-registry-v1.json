@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es://automation/contracts/external-agent-adapter-registry/v1",
+  "schemaVersion":1,
+  "registryId":"es.external-agent.adapters.v1",
+  "adapters":[
+    {"adapterId":"es-adapter.langgraph.v1","frameworkId":"langgraph","adapterVersion":"0.1.0","status":"reference-only","operations":["describe-state-graph","raise-interrupt","resume-checkpoint","replay-events"],"permissionBoundary":["no-external-runtime","user-confirmation-required","project-relative-sources-only"],"failureSemantics":["invalid-state","stale-checkpoint","confirmation-required","checkpoint-tampered","replay-divergence"],"evidenceOutputs":["state-hash","checkpoint-hash","event-chain-hash","resume-receipt"]},
+    {"adapterId":"es-adapter.letta.v1","frameworkId":"letta","adapterVersion":"0.1.0","status":"reference-only","operations":["read-memory-block","propose-memory-update","project-context","replay-projection"],"permissionBoundary":["no-auto-promotion-to-knowledge","user-confirmation-required-for-focus","bounded-block-size"],"failureSemantics":["block-overflow","conflicting-update","stale-block","projection-divergence"],"evidenceOutputs":["block-hash","projection-hash","update-receipt","source-snapshot-hash"]},
+    {"adapterId":"es-adapter.openhands.v1","frameworkId":"openhands","adapterVersion":"0.1.0","status":"reference-only","operations":["observe","decide","tool-call","verify","pause-resume"],"permissionBoundary":["allowlist-only-tools","bounded-timeout","no-network-by-default","project-root-only"],"failureSemantics":["tool-denied","tool-timeout","verifier-failed","context-compaction-loss","resume-mismatch"],"evidenceOutputs":["conversation-state-hash","tool-receipt","verifier-receipt","environment-snapshot"]},
+    {"adapterId":"es-adapter.swe-agent.v1","frameworkId":"swe-agent","adapterVersion":"0.1.0","status":"reference-only","operations":["inspect-issue","read-source","apply-patch","run-test","diagnose-retry"],"permissionBoundary":["bounded-repository-scope","patch-only-writes","no-implicit-network","no-implicit-git"],"failureSemantics":["invalid-patch","test-failed","environment-untrusted","scope-expansion-denied","retry-budget-exhausted"],"evidenceOutputs":["diff-hash","test-receipt","environment-receipt","retry-chain-hash"]}
+  ]
+}

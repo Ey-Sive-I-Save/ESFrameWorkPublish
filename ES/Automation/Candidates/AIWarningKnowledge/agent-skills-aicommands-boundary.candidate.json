@@ -1,0 +1,109 @@
+{
+    "schemaVersion":  1,
+    "contractId":  "es://automation/contracts/aiwarning-knowledge-candidate/v1",
+    "recordType":  "AIWarningKnowledgeCandidate",
+    "candidateId":  "es.aiwarning.candidate.b5d5617f67d213a4ab456a71",
+    "status":  "attached",
+    "idempotencyKey":  "b5d5617f67d213a4ab456a713d46bec755c812e4e9bbb86f95ede37a3dceb3a1",
+    "idempotencyKeyKind":  "stableId+warningHash-sha256",
+    "createdAtUtc":  "2026-08-28T14:43:30.1949951+00:00",
+    "sourceSnapshot":  {
+                           "warningPath":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                           "warningHash":  "842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166",
+                           "stableId":  "es.aiwarnings.agent-skills-aicommands-boundary",
+                           "status":  "current。",
+                           "authority":  "AIWarnings",
+                           "routeKeys":  [
+                                             "aiwarnings",
+                                             "architecture",
+                                             "skill",
+                                             "aicommand",
+                                             "knowledge",
+                                             "routing",
+                                             "evidence-boundary",
+                                             "permission-boundary"
+                                         ],
+                           "applicability":  "上述协作入口的发现、路由、受管执行、证据分层与权限边界。",
+                           "evidenceRef":  "Documentation/AIKnowledge/entries/agent-skills-aicommands-boundary.md`；`.agents/skills/es-aiwarning-authoring/scripts/Test-ESAIWarningRoute.ps1 -RouteId es.aiwarnings.agent-skills-aicommands-boundary",
+                           "staleWhen":  "AIWarnings Start 链、AICommand/Skill 合同、Registry/Catalog、AIBrain 路由、KnowledgeIndex 或任一来源哈希变化。",
+                           "capturedAtUtc":  "2026-08-28T14:43:30.2005410+00:00"
+                       },
+    "match":  {
+                  "decision":  "existing",
+                  "candidateKnowledgeIds":  [
+                                                "es.aiwarnings.agent-skills-aicommands-boundary.v1"
+                                            ],
+                  "signals":  {
+                                  "stableId":  true,
+                                  "knowledgePointer":  true,
+                                  "authority":  true,
+                                  "routeKeys":  true,
+                                  "applicability":  false,
+                                  "evidenceRef":  true
+                              },
+                  "conflicts":  [
+
+                                ],
+                  "rationale":  "The Warning Knowledge pointer resolves to one indexed entry with compatible identity, route and authority/source evidence."
+              },
+    "proposedEntry":  {
+                          "knowledgeId":  "es.aiwarnings.agent-skills-aicommands-boundary.v1",
+                          "targetPath":  "Documentation/AIKnowledge/entries/agent-skills-aicommands-boundary.md",
+                          "routeKeys":  [
+                                            "aiwarnings",
+                                            "architecture",
+                                            "skill",
+                                            "aicommand",
+                                            "knowledge",
+                                            "routing",
+                                            "evidence-boundary",
+                                            "permission-boundary"
+                                        ],
+                          "sourceRefs":  [
+                                             {
+                                                 "path":  "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                                 "sha256":  "842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166",
+                                                 "role":  "warning-authority"
+                                             }
+                                         ],
+                          "requiredReads":  [
+                                                "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                                "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                                "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+                                                "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md"
+                                            ],
+                          "expectedHashes":  {
+                                                 "contentHash":  "48f6346000c6b7e078497a776265ba75dbfcce6e34c9120cc35abd0c8ec0e966",
+                                                 "sourceSetHash":  "48f6346000c6b7e078497a776265ba75dbfcce6e34c9120cc35abd0c8ec0e966",
+                                                 "entryBodyHash":  "d878ab1c245529623e997108ac3342d079d3971f07681c7292bd94b43430b815"
+                                             }
+                      },
+    "validation":  {
+                       "state":  "passed",
+                       "checks":  {
+                                      "utf8":  "passed",
+                                      "sourceRefs":  "passed",
+                                      "contentHash":  "passed",
+                                      "indexBinding":  "passed",
+                                      "route":  "passed",
+                                      "evidenceRef":  "passed"
+                                  },
+                       "conflicts":  [
+
+                                     ],
+                       "sourceStableAtEnd":  true
+                   },
+    "replay":  {
+                   "commands":  [
+                                    "pwsh -NoProfile -File .agents/skills/es-ai-knowledge-curation/scripts/New-ESAIWarningKnowledgeCandidate.ps1 -ProjectRoot . -WarningPath \u0027Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md\u0027"
+                                ],
+                   "inputHash":  "842bc5d46a045f3e2f226426f005afb8f7114ba56646e623d245ea0f99a04166",
+                   "candidateOnly":  true,
+                   "applyRequired":  true
+               },
+    "nonClaims":  [
+                      "This candidate does not modify AIWarnings, KnowledgeIndex.yaml, formal Knowledge entries, migration ledgers, inventory or freshness projections.",
+                      "Candidate status is not formal Knowledge registration and does not grant write, Runtime, Git, release or external-service authority.",
+                      "Static path and hash checks do not prove Unity, PlayMode, Runtime, Profiler, Player, IL2CPP or release behavior."
+                  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "coreId": "es.ai-abc.core.v1",
+  "mode": "ABCC.Core",
+  "contractId": "es://automation/contracts/ai-abc/interface/v1",
+  "adapterVersion": "v1",
+  "executionEnabled": false,
+  "independence": { "ownsContract": true, "ownsCapabilityRegistry": true, "ownsAdapters": true, "researchProvenanceOnly": ["es-agent-mechanism-replication"], "runtimeDependencyOnResearchSkill": false },
+  "capabilities": [
+    { "capabilityId": "bounded-tool-action", "sourceMechanismId": "swe-agent-aci", "inputSemantics": "bounded action request with explicit scope", "outputSemantics": "action result plus changed-file evidence", "preconditions": ["scope declared", "authorization present"], "evidence": ["read/write receipt", "diff or no-change proof"], "failureCodes": ["scope-missing", "action-denied"], "selectionPredicate": "goal requires a bounded project action" },
+    { "capabilityId": "failure-recovery", "sourceMechanismId": "reflexion", "inputSemantics": "failed attempt and diagnosis", "outputSemantics": "revised attempt or bounded stop", "preconditions": ["failure is observable", "retry budget declared"], "evidence": ["failure record", "revision link"], "failureCodes": ["retry-budget-exhausted", "recovery-unsafe"], "selectionPredicate": "failure or contradiction is present" },
+    { "capabilityId": "branch-evaluation", "sourceMechanismId": "tree-of-thoughts", "inputSemantics": "finite candidate branches and criteria", "outputSemantics": "ranked branch decision with rationale", "preconditions": ["candidate set finite", "criteria explicit"], "evidence": ["branch scores", "selected branch"], "failureCodes": ["branch-set-empty", "criteria-missing"], "selectionPredicate": "more than one viable semantic route exists" },
+    { "capabilityId": "state-transition-guard", "sourceMechanismId": "petri", "inputSemantics": "state, transition and token guards", "outputSemantics": "legal transition or rejection", "preconditions": ["current state known", "transition contract known"], "evidence": ["before-after state", "transition receipt"], "failureCodes": ["illegal-transition", "token-conflict"], "selectionPredicate": "task crosses a lifecycle or ownership boundary" },
+    { "capabilityId": "environment-trust-gate", "sourceMechanismId": "envtrustbench", "inputSemantics": "environment identity and trust claims", "outputSemantics": "trusted, degraded or blocked environment", "preconditions": ["environment snapshot available"], "evidence": ["environment fingerprint", "trust decision"], "failureCodes": ["environment-mismatch", "trust-unproven"], "selectionPredicate": "external tool, runtime or source authority is required" },
+    { "capabilityId": "audit-evidence-chain", "sourceMechanismId": "auditbench", "inputSemantics": "claims, sources and verification results", "outputSemantics": "auditable completion decision", "preconditions": ["sources addressable", "non-claims declared"], "evidence": ["source hashes", "receipt", "completion decision"], "failureCodes": ["evidence-missing", "claim-overreach"], "selectionPredicate": "any completion or readiness claim is requested" }
+  ],
+  "interfacePairs": [
+    { "direction": "A-to-B", "fields": ["semanticGoal", "constraints", "requestedCapabilities", "evidenceExpectations"], "result": "capability offer or explicit mismatch" },
+    { "direction": "B-to-A", "fields": ["providerId", "inputSchemaRef", "outputSchemaRef", "preconditions", "effects", "evidenceProduced", "failureCodes"], "result": "normalized result with evidence" }
+  ],
+  "parityContract": { "requiredCapabilities": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "missingCapabilityEffect": "blocked", "semanticMismatchEffect": "replan", "evidenceMissingEffect": "claim-cap", "dynamicFallback": "explicit-only" },
+  "closedLoop": ["collaborator-goal", "a-intent", "adapter-negotiation", "b-capability", "evidence", "audit", "completion", "collaborator-acceptance"],
+  "failurePaths": { "mismatch": "replan", "missingCapability": "blocked", "missingEvidence": "claim-cap", "unauthorizedEffect": "blocked" },
+  "sourceRefs": [".agents/skills/es-agent-mechanism-replication/SKILL.md", "Documentation/AIKnowledge/entries/agent-mechanism-replication.md"],
+  "sourceAuthority": "This contract and interface schema own ABCC semantics; listed sources are provenance only."
+}

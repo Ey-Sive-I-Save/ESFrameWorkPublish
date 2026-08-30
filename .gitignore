@@ -94,6 +94,7 @@ crashlytics-build.properties
 # ES automation runtime state and generated evidence. Contracts, schemas and
 # deterministic worker source and explicit RunRecord audit entries remain tracked.
 /ES/Automation/Temp/
+/ES/Automation/Workers/Node/DeepSeekHarness/node_modules/
 /ES/Automation/Processing/
 /ES/Automation/Output/
 /ES/Automation/AI/Inbox/
@@ -136,3 +137,8 @@ crashlytics-build.properties
 # Existing tracked evidence remains tracked; new UIEvidence output requires an
 # explicit force-add decision if it is intentionally promoted to a baseline.
 /ES/UIEvidence/
+
+# Per-user AI Space is private by default. Keep only the directory marker;
+# public registration cards remain under ES/AISpace/Public.
+/ES/AISpace/Local/*
+!/ES/AISpace/Local/.gitkeep

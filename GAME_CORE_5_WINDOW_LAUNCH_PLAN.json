@@ -1,0 +1,43 @@
+{
+  "batchId": "game-core-five-window-readonly-20260830",
+  "projectIdentityFingerprint": "e8fbbfa3fd11646b67e28c44507005ec9299b52a997131ff4ab96ef6802b0160",
+  "maxParallel": 5,
+  "dryRun": false,
+  "launches": [
+    {
+      "taskKey": "gamecore-entry-readonly-20260830",
+      "responsibilityKey": "gamecore-entry",
+      "tabTitle": "W1-可玩入口盘点",
+      "mode": "New",
+      "taskPrompt": "只读盘点可玩入口。必须先完整读取项目AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings Start/CurrentStatus/RuleIndex及P0可玩闭环规则、AIBRAIN_ENTRY.md和匹配Knowledge requiredReads；再完整读取es-gamecore-integration与es-editor-tooling SKILL及其必要references。检查GameCore RuntimeData、ResourcePlan、唯一正式测试场景和Scene Builder。不得修改文件、不得重写已有系统。交付事实、权威入口、依赖、未知项和证据命令。"
+    },
+    {
+      "taskKey": "player-control-camera-readonly-20260830",
+      "responsibilityKey": "entity-control-camera",
+      "tabTitle": "W2-控制相机盘点",
+      "mode": "New",
+      "taskPrompt": "只读盘点玩家控制与相机接入。必须先完整读取项目AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings链和P0规则、AIBRAIN_ENTRY.md及匹配Knowledge requiredReads；再完整读取es-entity-authoring、es-entity-prefab-validation和相关references，并读取ES_CAMERA_RUNTIME_STANDARD.md、entity-input-command-runtime与control ownership权威文档。核对现有Input Writer、EntityAIDomain、控制权生命周期、Movement和Camera Director。不得修改位移/输入/相机核心或任何文件。交付调用链、所有权、风险和验证命令。"
+    },
+    {
+      "taskKey": "combat-integration-readonly-20260830",
+      "responsibilityKey": "combat-integration",
+      "tabTitle": "W3-战斗入口盘点",
+      "mode": "New",
+      "taskPrompt": "只读盘点攻击、武器、命中、伤害的现有权威入口。必须先完整读取项目AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings链和P0规则、AIBRAIN_ENTRY.md及匹配Knowledge requiredReads；再完整读取es-entity-authoring、es-api-contract-review及必要references，并读取aiwarning-p0-projectile-weapon-hotpath、Equipment/Combat相关权威文档。血量和属性视为现有状态量，只观察接口，不直接写入。禁止重写攻击、扣血、属性、位移或Combat。交付唯一调用链、配置接入点、失败路径和证据命令。"
+    },
+    {
+      "taskKey": "resource-content-readonly-20260830",
+      "responsibilityKey": "resource-pipeline",
+      "tabTitle": "W4-资源内容盘点",
+      "mode": "New",
+      "taskPrompt": "只读盘点纵切片所需资源和AISpace归属。必须先完整读取项目AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings链和P0规则、AIBRAIN_ENTRY.md及匹配Knowledge requiredReads；再完整读取es-resource-collection、es-resource-pipeline、es-resource-publish-audit SKILL及必要references，核对AssetPackage、ESAssetLibrary、Consumer、ResourcePlan、Catalog/Provider。禁止把自定义JSON当运行时权威，禁止改Provider核心，禁止迁移或删除文件。交付资源分组、依赖、归属和验证命令。"
+    },
+    {
+      "taskKey": "playable-evidence-readonly-20260830",
+      "responsibilityKey": "engineering-acceptance",
+      "tabTitle": "W5-验证证据盘点",
+      "mode": "New",
+      "taskPrompt": "只读盘点可玩纵切片的验证和证据矩阵。必须先完整读取项目AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings Start/CurrentStatus/RuleIndex及P0规则、AIBRAIN_ENTRY.md和匹配Knowledge requiredReads；再完整读取es-adversarial-review、es-release-acceptance、es-observability-evidence SKILL及必要references，并读取Scene validation guide。区分Static、Compile、PlayMode、Presentation、Profiler、Player证据；不得运行Unity、不得修改玩法源码。交付成功/失败/取消/打断/回池/重入观察点、未证实项和验证命令。"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "batchId": "rendering-five-window-engineering-abcd-20260830",
+  "projectIdentityFingerprint": "e8fbbfa3fd11646b67e28c44507005ec9299b52a997131ff4ab96ef6802b0160",
+  "maxParallel": 5,
+  "dryRun": false,
+  "launches": [
+    {
+      "taskKey": "render-architecture-quality-abcd-20260830",
+      "responsibilityKey": "render-architecture-quality",
+      "tabTitle": "R1-渲染架构质量档",
+      "mode": "New",
+      "taskPrompt": "接取 W1 渲染架构与质量档任务。先完整读取项目 AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings Start/CurrentStatus/RuleIndex 与命中 P0、AIBRAIN_ENTRY.md/KnowledgeIndex.yaml 及匹配 requiredReads；再完整读取 RENDERING_5_WINDOW_TASK_PACKET.md、es-performance-budgeting、es-resource-pipeline、es-unity-compile、es-adversarial-review SKILL 及必要 references。实际深读 GraphicsSettings/QualitySettings/URP 三档、RendererData、ESCompositeShaderParameters 和材质契约。独立运行工程 ABCD：A架构权威、B运行接入、C成本预算、D证据验收。只读分析，不改文件、不运行 Unity、不重写 Shader/质量系统。返回详细事实、路径、方案、冲突、未知和 runtime-not-run。"
+    },
+    {
+      "taskKey": "camera-character-presentation-abcd-20260830",
+      "responsibilityKey": "camera-character-presentation",
+      "tabTitle": "R2-相机角色表现",
+      "mode": "New",
+      "taskPrompt": "接取 W2 相机与角色表现接入任务。先完整读取项目 AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings 链、AIBRAIN_ENTRY.md/KnowledgeIndex.yaml 及匹配 requiredReads；再完整读取 RENDERING_5_WINDOW_TASK_PACKET.md、es-entity-authoring、es-entity-prefab-validation、es-editor-tooling、es-editor-availability-validator、es-adversarial-review SKILL 及必要 references，以及 ES_CAMERA_RUNTIME_STANDARD.md、CHARACTER_PREFAB_CONTRACT.md。实际深读 CameraModule/Director/CM2/SceneBinding、Animator/Playable/IK/Socket/Mapping。独立运行工程 ABCD：A架构、B行为接入、C生命周期/成本、D证据验收。只读分析，不改文件、不运行 Unity、不直写 VCam/Transform/KCC、不重写动画位移。返回详细方案与 runtime-not-run。"
+    },
+    {
+      "taskKey": "vfx-audio-animation-abcd-20260830",
+      "responsibilityKey": "vfx-audio-animation",
+      "tabTitle": "R3-VFX音频动画",
+      "mode": "New",
+      "taskPrompt": "接取 W3 VFX/Audio/Animation 运行表现任务。先完整读取项目 AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings 链及 P0 热路径规则、AIBRAIN_ENTRY.md/KnowledgeIndex.yaml 及匹配 requiredReads；再完整读取 RENDERING_5_WINDOW_TASK_PACKET.md、es-entity-authoring、es-resource-pipeline、es-observability-evidence、es-adversarial-review SKILL 及必要 references，Playable State Machine、VFX/Audio Runtime 和 Operation 08-11 权威文档。实际深读 ESVfxInfo/Group、ResourcePlan/Scope、ESVfxAudioEmitter、ESAudioModule、Playable Handle/回池。独立运行工程 ABCD：A权威架构、B状态到表现行为、C稳态/资源成本、D证据验收。只读分析，不改文件、不运行 Unity、不改 Combat/HP/Stats。返回状态映射、失败路径、方案和 runtime-not-run。"
+    },
+    {
+      "taskKey": "ui-hud-readability-abcd-20260830",
+      "responsibilityKey": "ui-hud-readability",
+      "tabTitle": "R4-UI可读性",
+      "mode": "New",
+      "taskPrompt": "接取 W4 UI/HUD 与画面可读性任务。先完整读取项目 AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings 链、AIBRAIN_ENTRY.md/KnowledgeIndex.yaml 及匹配 requiredReads；再完整读取 RENDERING_5_WINDOW_TASK_PACKET.md、es-ui-prefab-authoring、es-editor-tooling、es-adversarial-review SKILL 及必要 references、UI Visual Design System、ScreenSpec v3、UI Root/Window Knowledge。实际深读 ESUIRootCoordinator、Window Lease、六层 UI、Token、LayoutPlan、Materializer。独立运行工程 ABCD：A UI权威、B状态观察行为、C性能/遮挡预算、D证据验收。只读分析，不改文件、不运行 Unity、不另造 HUD/状态源、不直接读写 HP/Stats。返回详细方案、布局状态矩阵、未知和 runtime-not-run。"
+    },
+    {
+      "taskKey": "creative-resource-evidence-abcd-20260830",
+      "responsibilityKey": "creative-resource-evidence",
+      "tabTitle": "R5-创意资源证据",
+      "mode": "New",
+      "taskPrompt": "接取 W5 创意导演、资源投影与证据验收任务。先完整读取项目 AGENTS.md、ES/AISpace/README.md、AISPACE_AUTHORITY.json、AIWarnings 链、AIBRAIN_ENTRY.md/KnowledgeIndex.yaml 及匹配 requiredReads；再完整读取 RENDERING_5_WINDOW_TASK_PACKET.md、es-first-principles-analysis、es-adversarial-review、es-resource-collection、es-resource-publish-audit、es-observability-evidence SKILL 及必要 references、渲染证据契约。实际深读现有风格、相机、Composite Shader、VFX/Audio/UI 规范和候选资产来源。独立运行工程 ABCD：A创意与工程权威、B画面节奏/可读性、C构图与资源投影、D交付/证据。只读分析，不写 AISpace、不生成资产、不运行 Unity、不替换稳定系统。返回候选变量、provenance/license、单变量验证矩阵、反驳和 runtime-not-run。"
+    }
+  ]
+}

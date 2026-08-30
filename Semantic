@@ -1,0 +1,43 @@
+﻿{
+    "validator":  "es-skill-validator",
+    "timestampUtc":  "2026-08-29T09:02:49.2093457Z",
+    "authorizationLane":  "CurrentUserDirect",
+    "profiles":  [
+                     "VerificationSemantics"
+                 ],
+    "results":  [
+                    {
+                        "skill":  "es-prompt-engineering",
+                        "profile":  "VerificationSemantics",
+                        "status":  "blocked",
+                        "message":  "not-applicable Runtime profiles must remain Static-only for: StaticReview, EngineeringReadiness",
+                        "source":  "F:\\aaProject\\ESFrameWorkPublish\\.agents\\skills\\es-prompt-engineering\\governance.json",
+                        "legacyStatus":  "blocked",
+                        "claimStatus":  "StaticDefect",
+                        "authorizationLane":  "CurrentUserDirect"
+                    }
+                ],
+    "claimStatusCounts":  [
+                              {
+                                  "status":  "StaticDefect",
+                                  "count":  1
+                              }
+                          ],
+    "staticStatus":  "static-blocked",
+    "staticCodeStatus":  "passed",
+    "staticContractStatus":  "blocked",
+    "staticBoundaryStatus":  "passed",
+    "evidenceStatus":  "not-requested",
+    "staticReviewCount":  0,
+    "runtimeStatus":  "runtime-not-run",
+    "overallVerdict":  "StaticContractBlocked",
+    "claimsNotProven":  [
+                            "Unity/editor/process behavior",
+                            "display/layout/timing behavior",
+                            "Profiler/Player/IL2CPP/release behavior"
+                        ],
+    "nextAction":  "修复 Skill 合同、验证语义、回放或目录阻断；ES 业务代码不必因此重写。",
+    "decisionStatus":  "blocked",
+    "blockingLayer":  "static-contract",
+    "status":  "blocked"
+}

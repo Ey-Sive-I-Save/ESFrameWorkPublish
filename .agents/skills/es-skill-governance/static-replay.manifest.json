@@ -4,7 +4,8 @@
     "sourceRoots":  [
                         ".agents/skills/es-skill-governance",
                         "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json",
-                        "ES/Automation/Contracts/es-skill-evidence-binding-v1.schema.json"
+                        "ES/Automation/Contracts/es-skill-evidence-binding-v1.schema.json",
+                        ".agents/SKILL_AISPACE_BINDINGS.json"
                     ],
     "cases":  [
                   "normal-input",
@@ -75,7 +76,12 @@
                                                             "scripts/Test-ESStaticAcceptanceCoverage.ps1",
                                                             "scripts/Test-ESEvidenceContractBindings.ps1",
                                                             "scripts/Test-ESStrictEvidenceReceiptContract.ps1",
-                                                            "references/commercial-coherence-contract.md"
+                                                            "references/commercial-coherence-contract.md",
+                                                            "scripts/Build-ESSkillRelationRegistry.py",
+                                                            "scripts/Test-ESSkillRelationRegistry.py",
+                                                            "scripts/Test-ESSkillAISpaceBindings.py",
+                                                            "../../SKILL_AISPACE_BINDINGS.json",
+                                                            "../../../ES/AISpace/Public/Skills/registry.json"
                                                         ],
                                   "sourceAssertions":  [
                                                            "authority refs are closed",
@@ -85,7 +91,9 @@
                                                            "governance hash",
                                                            "ES entry compatibility",
                                                            "commercial coherence snapshot stability",
-                                                           "knowledge source freshness classification"
+                                                           "knowledge source freshness classification",
+                                                           "Skill relationship registry closure",
+                                                           "Skill↔AISpace binding closure"
                                                        ],
                                   "runtimeBoundary":  "Runtime cannot prove authority closure; only execution authorization receipts can prove actual enforcement."
                               },

@@ -5,20 +5,25 @@ Acceptance id: external-migration-static.
 
 Specialized static cases:
 
-- path-containment: isolated source paths cannot resolve inside the target project.
+- path-containment: external source paths cannot resolve inside the target project.
 - mapping-schema: the persistent migration map validates against its JSON schema.
-- permission-denial: network, Git write, delete, rename, and protected-target mutation remain denied.
+- permission-denial: network, Git-history write, and protected-target mutation remain denied; external checkout delete/rename is bounded to the explicit in-place replacement plan.
 - partition-determinism: mapping rows and Agent partitions use deterministic ordering.
 - recovery-state: interruption records recovery state while preserving the target.
+- recovery-phase-authority: the journal distinguishes a pre-commit missing staging tree (safe recovery)
+  from a commit-started missing staging tree (fail-closed), including legacy journals without `phase`.
+- identity-hardening: compound root fragments are remapped in text, paths and filenames without double-prefixing.
+- developer-branding: package developer metadata and legacy author seeds converge on the canonical ES studio identity.
+- evidence-separation: binary/licensed trees and Static versus Runtime claims remain separate evidence axes.
 
 Required cases:
 
-- normal-input: isolated source locator, protected target and map schema are declared.
+- normal-input: external source locator, protected target, in-place default and map schema are declared.
 - invalid-input: missing URL/revision/license or malformed map is rejected.
-- denied-expansion: target-root source path, network, Git write, delete and rename are denied.
+- denied-expansion: target-root source path, network, Git-history write, and unplanned path expansion are denied.
 - repeat-idempotency: the same map revision produces the same deterministic partition.
 - hash-change-cache-invalidation: source/target hash drift marks the map stale.
-- interruption-recovery: cancellation or partial batch preserves the target and quarantines the batch.
+- interruption-recovery: cancellation or partial in-place commit restores the external checkout from the transaction journal.
 - deterministic-output: mapping rows and agent partitions are stable-sorted.
 
 Responsibility profile: engineering

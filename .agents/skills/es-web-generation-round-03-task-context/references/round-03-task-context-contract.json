@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "roundId": "web-generation-round-03",
+  "stageId": "task-context-create",
+  "authority": "TaskContextRuntime platform API",
+  "requiredInput": {
+    "recordType": "FocusContextReceipt",
+    "status": "accepted",
+    "roundId": "web-generation-round-02"
+  },
+  "requiredBindings": [
+    "focusContextId",
+    "focusRevision",
+    "focusProposalHash",
+    "focusScopeHash",
+    "goalRevisionPath",
+    "routePlanPath",
+    "acceptanceProfileId",
+    "outcomeEvaluatorId",
+    "requestedSourceScope",
+    "idempotencyKey"
+  ],
+  "frozenInvariants": [
+    "taskId",
+    "goalRevisionHash",
+    "routePlanHash",
+    "requestedSourceScope",
+    "focusContextId",
+    "focusRevision",
+    "focusProposalHash",
+    "focusScopeHash",
+    "sourceScopeHash-after-VerifySources"
+  ],
+  "forbiddenTransitions": [
+    "focus.pending-to-task",
+    "focus.scope-expansion",
+    "route.synthetic-substitution",
+    "task.create-to-knowledge",
+    "task.create-to-generation"
+  ],
+  "acceptanceSignals": [
+    "platform TaskContextRuntime create returns Active+Live",
+    "taskRevision=1 and contextVersion=1",
+    "FocusContext hashes are bound",
+    "repeat idempotency returns same task state",
+    "receipt records runtime-not-run non-claims"
+  ],
+  "failureCodes": [
+    "blocked.round-03.missing-focus",
+    "blocked.round-03.invalid-focus-identity",
+    "blocked.round-03.route-or-goal-mismatch",
+    "blocked.round-03.scope-expansion",
+    "blocked.round-03.cas-conflict"
+  ],
+  "nextRound": "web-generation-round-04-knowledge-route"
+}

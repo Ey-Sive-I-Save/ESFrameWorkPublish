@@ -50,7 +50,7 @@ currentSkills:
   - {name: es-adversarial-review, family: governance, routeKeys: [review, risk, validation], mcp: [none-required]}
   - {name: es-agent-mechanism-replication, family: governance, routeKeys: [agent-mechanism-replication, research-to-contract, es-adaptation, route-plan, route-stage, evidence-set, closed-loop], mcp: [none-required]}
   - {name: es-ai-abc-core, family: governance, routeKeys: [ai-abc, abc-core, semantic-adapter, analysis, design, evidence, closed-loop, static-replay, route-stage, knowledge], mcp: [none-required]}
-  - {name: es-ai-space-organization, family: governance, routeKeys: [governance, ai-space, folder-organization, file-placement, local-public, generated-content, stale], mcp: [none-required]}
+  - {name: es-ai-space-organization, family: governance, routeKeys: [governance, ai-space, folder-organization, file-placement, local-public, generated-content, temporary-content, screenshot, stale, external-registration, userspace], mcp: [none-required]}
   - {name: es-weapon-abc-part, family: project-weapon, routeKeys: [ai-abc, abc-part, weapon, weapon-definition, prefab, input, evidence, static-replay, route-stage, knowledge], mcp: [none-required]}
   - {name: es-ai-collaboration-menu, family: governance, routeKeys: [menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination], mcp: [none-required]}
   - {name: es-ai-interaction-governance, family: governance, routeKeys: [interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, goal-drift, handover, closeout, evaluation, dialogue-quality], mcp: [none-required]}
@@ -61,6 +61,8 @@ currentSkills:
   - {name: es-entity-authoring, family: project-entity, routeKeys: [entity, prefab, runtime], mcp: [unity-editor]}
   - {name: es-feishu-cli, family: project, routeKeys: [feishu, lark, external-adapter, dry-run, task-monitor, task-dispatch, task-transition, virtual-team, identity-claim, bot-ownership, onboarding, message-send, notification], mcp: [none-required]}
   - {name: es-first-principles-analysis, family: governance, routeKeys: [analysis, design, architecture], mcp: [none-required]}
+  - {name: es-open-source-migration, family: engineering, routeKeys: [migration, open-source, compatibility, analysis, design], mcp: [none-required]}
+  - {name: es-prompt-engineering, family: governance, routeKeys: [prompt-engineering, prompt-expansion, prompt-template, prompt-wrapper, prompt-evaluation, prompt-regression, structured-output, guardrails], mcp: [none-required]}
   - {name: es-fix-compile-error, family: engineering, routeKeys: [compile, diagnosis, csharp], mcp: [unity-editor]}
   - {name: es-gamecore-integration, family: project-gamecore, routeKeys: [gamecore, config, identity], mcp: [unity-editor]}
   - {name: es-generate-agent-artifacts, family: project-agent-authoring, routeKeys: [agent-authoring, candidate, graph], mcp: [unity-editor]}
@@ -83,6 +85,7 @@ currentSkills:
   - {name: es-use-ai-command, family: governance, routeKeys: [command, authorization, routing], mcp: [none-required]}
   - {name: es-utf8-guard, family: engineering, routeKeys: [utf8, text, validation], mcp: [none-required]}
   - {name: es-worktree-audit, family: engineering, routeKeys: [worktree, git, change-boundary], mcp: [none-required]}
+  - {name: es-web-ui-generation-orchestration, family: project-web, routeKeys: [web-ui, web-page-generation, webpage-studio, scheduler, worker, knowledge], mcp: [none-required]}
 newSkills:
   engineering: [es-repository-discovery, es-change-risk-register, es-test-fixture-authoring, es-api-contract-review, es-dependency-boundary-audit, es-performance-budgeting, es-observability-evidence, es-migration-planning, es-security-input-audit, es-release-notes-evidence]
   project: [es-ai-knowledge-curation, es-knowledge-creator, es-knowledge-validator, es-skill-validator, es-aibrain-route-authoring, es-aiwarning-authoring, es-aicommand-contract-authoring, es-stable-graph-authoring, es-resource-publish-audit, es-gamecore-config-authoring, es-entity-prefab-validation, es-automation-worker-authoring]

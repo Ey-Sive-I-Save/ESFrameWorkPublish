@@ -9,9 +9,12 @@ $ErrorActionPreference='Stop'
 if($DurationSeconds -lt 1 -or $DurationSeconds -gt 3600){throw 'DURATION_OUT_OF_RANGE'}
 if($QueueLimit -lt 1 -or $QueueLimit -gt 1024){throw 'QUEUE_LIMIT_OUT_OF_RANGE'}
 $root=(Resolve-Path -LiteralPath $ProjectRoot).Path
-$warnings=Join-Path $root 'Assets/Plugins/ES/AIWarnings'
+$sharedPathBoundary=Join-Path $root '.agents/skills/es-skill-governance/scripts/ESPathBoundary.Common.ps1'
+if(-not (Test-Path -LiteralPath $sharedPathBoundary -PathType Leaf)){throw 'SHARED_PATH_BOUNDARY_MISSING'}
+. $sharedPathBoundary
+$warnings=(Resolve-ESContainedRelativePath -Candidate 'Assets/Plugins/ES/AIWarnings' -ContainerRoot $root -Label 'AIWarningsRoot').FullPath
 if(!(Test-Path -LiteralPath $warnings -PathType Container)){throw 'AIWARNINGS_ROOT_NOT_FOUND'}
-$observer=Join-Path $root '.agents/skills/es-ai-knowledge-curation/scripts/Invoke-ESAIWarningSaveObserver.ps1'
+$observer=(Resolve-ESContainedRelativePath -Candidate '.agents/skills/es-ai-knowledge-curation/scripts/Invoke-ESAIWarningSaveObserver.ps1' -ContainerRoot $root -Label 'ObserverScript').FullPath
 $watcher=[IO.FileSystemWatcher]::new($warnings,'*.md');$watcher.IncludeSubdirectories=$true;$watcher.NotifyFilter=[IO.NotifyFilters]::LastWrite
 $queue=[Collections.Concurrent.ConcurrentQueue[string]]::new();$queued=[Collections.Concurrent.ConcurrentDictionary[string,bool]]::new();$handler={param($s,$e);if($queued.Count -lt $QueueLimit -and $queued.TryAdd($e.FullPath,$true)){$queue.Enqueue($e.FullPath)}}
 $sub=Register-ObjectEvent -InputObject $watcher -EventName Changed -Action $handler

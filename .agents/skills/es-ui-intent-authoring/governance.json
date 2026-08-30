@@ -15,7 +15,7 @@
   "acceptanceOwner": "designated ESFramework maintainer",
   "requiredCases": ["positive", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery"],
   "routeKeys": ["skill", "ui-automation", "player-intent", "player-goal", "intent-spec", "screen-family", "layout", "responsive"],
-  "controlRefs": ["SKILL.md#contract", "SKILL.md#boundary-rules", "references/intent-spec.contract.md"],
+  "controlRefs": ["SKILL.md#contract", "SKILL.md#boundary-rules", "references/intent-spec.contract.md", "references/aispace-output-contract.md"],
   "requiredControls": ["identity", "authority", "risk", "observability", "recovery", "compatibility", "supply-chain"],
   "commandRequirement": "none",
   "requiredAuthorityRefs": [
@@ -24,7 +24,9 @@
     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
-    "Documentation/ES_UI_AUTHORING_WORKFLOW.md"
+    "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+    "ES/AISpace/README.md",
+    ".agents/skills/es-ui-intent-authoring/references/aispace-output-contract.md"
   ],
   "taskContractRequired": false,
   "knowledgePreflight": {

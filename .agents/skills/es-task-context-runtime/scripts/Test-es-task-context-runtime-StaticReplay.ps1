@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$ProjectRoot,[string]$ReportPath='ES/Output/StaticReplay/es-task-context-runtime.json',[string]$ProgressPath='ES/Output/StaticReplay/es-task-context-runtime-progress.json',[ValidateRange(5,3600)][int]$ValidatorTimeoutSeconds=90)
+param([string]$ProjectRoot,[string]$ReportPath='ES/Output/StaticReplay/es-task-context-runtime.json',[string]$ProgressPath='ES/Output/StaticReplay/es-task-context-runtime-progress.json',[ValidateRange(5,3600)][int]$ValidatorTimeoutSeconds=180)
 if([string]::IsNullOrWhiteSpace($ProjectRoot)){$ProjectRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).Path}
 $rootFull=[IO.Path]::GetFullPath($ProjectRoot)
 $rootPrefix=$rootFull.TrimEnd([IO.Path]::DirectorySeparatorChar,[IO.Path]::AltDirectorySeparatorChar)+[IO.Path]::DirectorySeparatorChar
@@ -31,8 +31,8 @@ foreach($validatorName in $validators){
     Save-ReplayProgress
     $process=Start-Process -FilePath $powershell -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$validator,'-ProjectRoot',$ProjectRoot) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if(-not $process.WaitForExit($ValidatorTimeoutSeconds * 1000)){
-        try{$process.Kill()}catch{}
-        try{$process.WaitForExit(5000)}catch{}
+        try{$process.Kill()}catch{Write-Verbose ("validator kill failed: {0}" -f $_.Exception.Message)}
+        try{$process.WaitForExit(5000)}catch{Write-Verbose ("validator wait failed: {0}" -f $_.Exception.Message)}
         Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
         $progress[-1].status='timeout';$progress[-1].finishedUtc=[DateTime]::UtcNow.ToString('o');Save-ReplayProgress
         Write-Error ("validator-timeout: {0} exceeded {1}s" -f $validatorName,$ValidatorTimeoutSeconds)

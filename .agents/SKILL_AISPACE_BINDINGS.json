@@ -1,0 +1,407 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-skill-aispace-output-bindings",
+  "authority": "project-skill-registration",
+  "purpose": "为会生成或缓存内容的 Skill 声明稳定的 AISpace 输出绑定；该文件是注册契约，不授予额外写入权限。",
+  "canonicalConcept": "AISpace",
+  "authorityIdentity": "ES/AISpace/AISPACE_AUTHORITY.json",
+  "bodyAuthority": "ES/AISpace/README.md",
+  "relationProjection": "ES/AISpace/Public/Skills/registry.json",
+  "skillContractPattern": ".agents/skills/<skill-name>/governance.json",
+  "canonicalRoots": {
+    "privateTemp": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>/",
+    "publicIndex": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+    "unityPublic": "Assets/ES/AISpace/Public/<category>/<YYYYMMDD>/<domain>/",
+    "privateContent": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>/",
+    "publicContent": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/"
+  },
+  "legacyPathAliases": [
+    {
+      "legacyPath": "Assets/ES/Space/Public",
+      "canonicalConcept": "AISpace/UnityPublic",
+      "desiredPath": "Assets/ES/AISpace/Public",
+      "status": "migrated",
+      "automaticRename": false
+    }
+  ],
+  "bindingRules": [
+    "Skill 本体始终保留在 .agents/skills/<skill-name>/；绑定只描述产物或缓存落点。",
+    "所有 AISpace 内容必须先选择 category，再选择 YYYYMMDD 日期和 owner；不得按日期建立无分类根目录。",
+    "private-temp/private-content 使用 Local/<category>/<YYYYMMDD>/<agent-or-task>/；temporary、stable、archived 均可保留。",
+    "public-index/public-content 使用 Public/<category>/<YYYYMMDD>/<topic-or-task>/；外部权威产物只保存索引，不复制第二份。",
+    "unity-public 统一使用 Assets/ES/AISpace/Public/<category>/<YYYYMMDD>/<domain>/ 出口；旧路径仅保留为迁移兼容别名。",
+    "每条绑定必须同时指向 Skill governance.json 与 AISpace 关系投影；关系投影由脚本重建，不作为写入授权。"
+  ],
+  "skills": [
+    {
+      "skillName": "es-ai-space-organization",
+      "skillContractRef": ".agents/skills/es-ai-space-organization/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-ai-space-organization.private-temp",
+          "purpose": "私有截图、缓存和中间诊断产物",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "screenshot",
+            "capture",
+            "cache",
+            "scratch"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        },
+        {
+          "bindingId": "aispace.es-ai-space-organization.public-index",
+          "purpose": "AISpace 放置规则和协作索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+          "contentAuthority": "aispace-policy",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "index",
+            "policy",
+            "migration-marker"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-editor-tooling",
+      "skillContractRef": ".agents/skills/es-editor-tooling/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-editor-tooling.private-temp",
+          "purpose": "编辑器预览、截图、日志与重载快照的任务私有暂存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/EditorTooling/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "editor-tooling-output-contract",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "capture",
+            "diagnostic-log",
+            "editor-cache",
+            "preview",
+            "reload-snapshot",
+            "screenshot"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        },
+        {
+          "bindingId": "aispace.es-editor-tooling.public-index",
+          "purpose": "编辑器用户可见报告与交接索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/EditorTooling/<YYYYMMDD>/<topic-or-task>/",
+          "contentAuthority": "editor-tooling-output-contract",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "handoff-pointer",
+            "receipt",
+            "report-index"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-generate-agent-artifacts",
+      "skillContractRef": ".agents/skills/es-generate-agent-artifacts/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-generate-agent-artifacts.private-temp",
+          "purpose": "Agent/AICommand 候选包的隔离缓存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "candidate",
+            "validation-report",
+            "cache"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        },
+        {
+          "bindingId": "aispace.es-generate-agent-artifacts.public-candidate-index",
+          "purpose": "需要协作审阅的候选包索引，不存放正式 Skill/AICommand 本体",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/AgentCandidates/<YYYYMMDD>/<task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "candidate-index",
+            "provenance"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-open-source-migration",
+      "skillContractRef": ".agents/skills/es-open-source-migration/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-open-source-migration.public-index",
+          "purpose": "迁移地图、源清单和静态回放的持久协作索引",
+          "storageClass": "public-content",
+          "pathTemplate": "ES/AISpace/Public/es-open-source-migration/<YYYYMMDD>/",
+          "contentAuthority": "migration-map-contract",
+          "lifecycle": "stable",
+          "artifactKinds": [
+            "migration-map",
+            "migration-static-replay",
+            "source-inventory"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-skill-creator",
+      "skillContractRef": ".agents/skills/es-skill-creator/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-skill-creator.registration-index",
+          "purpose": "Skill 注册关系索引的生成投影",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/Skills/<YYYYMMDD>/",
+          "contentAuthority": "skill-registration-contract",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "skill-relation-registry",
+            "skill-index"
+          ],
+          "retention": "versioned",
+          "writePolicy": "explicit-project-write"
+        },
+        {
+          "bindingId": "aispace.es-skill-creator.private-cache",
+          "purpose": "Skill 创建流程的临时候选和重复运行缓存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "cache",
+            "candidate",
+            "replay-intermediate"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-skill-governance",
+      "skillContractRef": ".agents/skills/es-skill-governance/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-skill-governance.registration-index",
+          "purpose": "Skill 治理关系注册投影",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/Skills/<YYYYMMDD>/",
+          "contentAuthority": "skill-registration-contract",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "skill-relation-registry",
+            "governance-index"
+          ],
+          "retention": "versioned",
+          "writePolicy": "explicit-project-write"
+        },
+        {
+          "bindingId": "aispace.es-skill-governance.private-cache",
+          "purpose": "治理扫描的临时缓存和重放中间产物",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "cache",
+            "replay-intermediate"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-static-deep-replay",
+      "skillContractRef": ".agents/skills/es-static-deep-replay/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-static-deep-replay.private-cache",
+          "purpose": "静态重放的临时缓存和重试中间结果",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "cache",
+            "replay-intermediate"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-task-read-snapshot",
+      "skillContractRef": ".agents/skills/es-task-read-snapshot/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-task-read-snapshot.private-cache",
+          "purpose": "任务读取快照的私有解析缓存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "cache",
+            "projection-intermediate"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-test-fixture-authoring",
+      "skillContractRef": ".agents/skills/es-test-fixture-authoring/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-test-fixture-authoring.private-temp",
+          "purpose": "测试夹具生成前的临时文件、截图和失败重试产物",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "fixture-intermediate",
+            "screenshot",
+            "cache"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-ui-intent-authoring",
+      "skillContractRef": ".agents/skills/es-ui-intent-authoring/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-ui-intent-authoring.private-temp",
+          "purpose": "IntentSpec 候选与静态验证回执的任务私有暂存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/UIIntent/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "ui-intent-contract",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "intent-spec-candidate",
+            "static-validation-receipt"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-ui-prefab-authoring",
+      "skillContractRef": ".agents/skills/es-ui-prefab-authoring/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-ui-prefab-authoring.private-temp",
+          "purpose": "UI 参考图、截图和生成包的临时缓存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Screenshots/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "screenshot",
+            "reference-cache",
+            "authoring-intermediate"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        },
+        {
+          "bindingId": "aispace.es-ui-prefab-authoring.unity-public",
+          "purpose": "必须由 Unity 导入的正式公共 UI 资产出口",
+          "storageClass": "unity-public",
+          "pathTemplate": "Assets/ES/AISpace/Public/UI/<YYYYMMDD>/<domain>/",
+          "contentAuthority": "unity-asset",
+          "lifecycle": "unity-managed",
+          "artifactKinds": [
+            "prefab",
+            "scene",
+            "formal-reference"
+          ],
+          "retention": "project-lifecycle",
+          "writePolicy": "explicit-project-write"
+        }
+      ]
+    },
+    {
+      "skillName": "es-ai-abc-core",
+      "skillContractRef": ".agents/skills/es-ai-abc-core/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-ai-abc-core.public-resource-audit-index",
+          "purpose": "ABCD 生成候选、资源预算和权威来源的协作索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/abc-generation-resource-audit/<YYYYMMDD>/",
+          "contentAuthority": "abc-generation-contracts",
+          "lifecycle": "retained-index",
+          "artifactKinds": ["candidate-index", "budget-index", "provenance"],
+          "retention": "versioned",
+          "writePolicy": "explicit-project-write"
+        }
+      ]
+    },
+    {
+      "skillName": "es-web-ui-generation-orchestration",
+      "skillContractRef": ".agents/skills/es-web-ui-generation-orchestration/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-web-ui-generation-orchestration.public-index",
+          "purpose": "WebPageStudio 编排、调度和证据关系索引",
+          "storageClass": "public-content",
+          "pathTemplate": "ES/AISpace/Public/WebPageStudio/<YYYYMMDD>/",
+          "contentAuthority": "web-ui-orchestration-governance",
+          "lifecycle": "stable",
+          "artifactKinds": [
+            "schedule",
+            "scheduler-receipt",
+            "knowledge-graph",
+            "capability-matrix",
+            "runtime-receipt",
+            "visual-baseline",
+            "pixel-comparison",
+              "performance-probe",
+              "performance-baseline",
+              "cache-policy",
+              "dynamic-state-replay",
+              "backend-contract",
+              "local-adapter-receipt",
+              "static-signals-receipt",
+              "artifact-integrity-receipt",
+              "staging-readiness-receipt"
+              ,"design-tokens"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    }
+  ]
+}

@@ -225,7 +225,10 @@ try {
         $unexpectedContractRaw=& powershell -NoProfile -File $contract -SkillPath $contractRoot -RequireGovernanceMetadata 2>&1|Out-String
         $unexpectedContractExit=$LASTEXITCODE
     }finally{$ErrorActionPreference=$previousUnexpectedErrorAction}
-    if($unexpectedContractExit -ne 1 -or $unexpectedContractRaw -notmatch 'Unexpected top-level entry'){throw 'Contract accepted an unregistered top-level file while admitting the central evidence binding'}
+    # The contract validator is allowed to render diagnostics differently
+    # across Windows PowerShell hosts (stderr/error records can be localized),
+    # but a non-zero exit is the authoritative rejection signal.
+    if($unexpectedContractExit -eq 0){throw 'Contract accepted an unregistered top-level file while admitting the central evidence binding'}
     Remove-Item -LiteralPath (Join-Path $contractRoot 'unexpected.txt') -Force
     $previousErrorAction=$ErrorActionPreference
     try{

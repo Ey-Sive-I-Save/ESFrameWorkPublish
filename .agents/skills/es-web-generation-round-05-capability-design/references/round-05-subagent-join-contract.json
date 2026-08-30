@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "planType": "ESCollaborationPlan",
+  "minChildren": 3,
+  "recommendedChildren": 4,
+  "roles": ["research", "information-architecture", "interaction-state", "visual-accessibility", "evidence-quality"],
+  "requiredChildFields": ["childTaskId", "parentTaskId", "scope", "budget", "acceptanceSignals", "resultHash", "evidenceRefs"],
+  "joinPolicy": "all-required",
+  "sharedMutablePageFiles": false,
+  "aggregationStates": ["candidate", "partial", "conflict"],
+  "forbidden": ["child-self-acceptance", "unbound-result", "silent-child-drop", "page-file-write"]
+}

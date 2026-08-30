@@ -18,8 +18,8 @@
 📊 证据评价状态：<aligned/partial/misaligned/unverifiable>
 🔎 观察证据：<用户消息/AI消息/工具/变更/验证/纠正计数>
 🚧 发现：<证据评估器 findings 或无>
-🎯 提示评分：<仅填 evidence evaluator 的真实结果；无则“不可用”>
-🔍 验证评分：<仅填 evidence evaluator 的真实结果；无则“不可用”>
+🐋 DeepSeek Harness：<本轮作用/状态；未实际调用时填“未调用”>
+🧰 Codex Harness：<本轮作用/状态；未实际调用时填“未调用”>
 🧭 目标清晰度：<清晰/部分清晰/不清晰>
 📌 下一步：
 1. <动作一>
@@ -29,7 +29,7 @@
 
 `📌 下一步` 必须是用户可直接回复序号的菜单。最多三项；不存在的项省略。即使只有一个动作，也必须写成 `1. <动作>`，不得使用未编号的自由文本。序号只绑定当前收尾菜单，不授予写入、Runtime、网络或外部执行权限。
 
-`📊`、`🔎`、`🚧` 是主结论；数字评分是可选投影，不得用手工估计替代 evidence-first 结果。最终收尾应由 `es-ai-interaction-governance/scripts/Invoke-ESInteractionCloseout.ps1` 提供状态、观察计数、发现和 non-claims。
+`📊`、`🔎`、`🚧` 是主结论；数字评分继续保留在 evidence evaluator 的机器结果中，但不再占用用户摘要字段，也不得用手工估计替代 evidence-first 结果。最终收尾应由 `es-ai-interaction-governance/scripts/Invoke-ESInteractionCloseout.ps1` 提供状态、观察计数、发现和 non-claims。
 
 `📌 下一步` 必须是最终用户可见摘要的最后一个字段。其后的任何文本都会使收尾合同失效；内部 JSON 的 `nextAction`/`nextSteps` 字段不改变这一呈现顺序要求。
 

@@ -3,7 +3,7 @@
   "skillName": "es-open-source-migration",
   "sourceRoots": [".agents/skills/es-open-source-migration", "ES/AISpace/Public/es-open-source-migration"],
   "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
-  "staticClaims": ["structure", "governance", "mapping-schema", "isolation-boundary", "deterministic-replay", "evidence-contract"],
+  "staticClaims": ["structure", "governance", "mapping-schema", "external-target-boundary", "in-place-default", "identity-hardening", "developer-branding", "recovery-phase-authority", "snapshot-locator-boundary", "binary-license-runtime-separation", "deterministic-replay", "evidence-contract"],
   "runtimeClaimsNotProven": ["network checkout", "Unity/editor behavior", "timing and process behavior", "Player/IL2CPP/release behavior"],
   "runtimeEscalation": {"required": false, "reason": "External checkout and Unity behavior require separate explicit authorization."},
   "caseAssertions": {
@@ -13,18 +13,23 @@
     "repeat-idempotency": "same map revision yields stable output",
     "hash-change-cache-invalidation": "source or target drift marks mapping stale",
     "interruption-recovery": "interrupted batch preserves target and recovery state",
-    "deterministic-output": "stable sorting and partitioning are declared"
+    "deterministic-output": "stable sorting and partitioning are declared",
+    "identity-hardening": "compound root fragments are remapped in text, paths and filenames without double-prefixing",
+    "developer-branding": "package developer metadata and legacy author seeds converge on the canonical ES studio identity",
+    "recovery-phase-authority": "journal phase determines whether missing staging is safely recoverable or fail-closed",
+    "snapshot-locator-boundary": "handoff consumes immutable private snapshot paths and receipts do not persist mutable absolute source paths",
+    "binary-license-runtime-separation": "binary preservation, license boundaries, and Static versus Runtime evidence remain separate"
   },
   "responsibilityProfile": "engineering",
   "responsibilityChecks": ["input-boundary", "recovery-cache", "deterministic-replay", "evidence-contract"],
-  "responsibilityScope": "Static acceptance for isolated external-source migration planning: input and permission boundaries, deterministic mapping replay, interruption recovery, and evidence receipts. It does not authorize checkout, target mutation, Unity execution, or release behavior.",
+  "responsibilityScope": "Static acceptance for direct external-checkout ES naming: input and permission boundaries, deterministic whole-repository replacement, interruption recovery, and evidence receipts. It does not authorize Git-history mutation, Unity execution, or release behavior.",
   "specializedAcceptance": {
     "id": "external-migration-static",
     "title": "isolated external migration static gate",
-    "requiredStaticCases": ["path-containment", "mapping-schema", "permission-denial", "partition-determinism", "recovery-state"],
+    "requiredStaticCases": ["path-containment", "mapping-schema", "permission-denial", "partition-determinism", "recovery-state", "identity-hardening", "developer-branding"],
     "evidenceArtifacts": ["SKILL.md", "governance.json", "references/migration-map.schema.json", "references/static-replay-adapter.md"],
-    "sourceAssertions": ["external-only", "protected-target", "mapping", "deterministic", "recovery"],
-    "runtimeBoundary": "Static acceptance proves contracts and deterministic checks only; checkout, Unity and release behavior remain unverified."
+    "sourceAssertions": ["external-target", "protected-target", "in-place-default", "mapping", "identity-hardening", "developer-branding", "recovery-phase-authority", "snapshot-locator-boundary", "binary-license-runtime-separation", "deterministic", "recovery"],
+    "runtimeBoundary": "Static acceptance proves contracts and deterministic checks only; external checkout execution, Unity and release behavior remain unverified."
   },
   "specializedGuidanceRef": "references/static-replay-adapter.md"
 }

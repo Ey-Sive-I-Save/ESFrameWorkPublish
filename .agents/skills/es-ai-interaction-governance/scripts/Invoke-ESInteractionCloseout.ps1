@@ -58,6 +58,22 @@ finally {
 }
 $risk=@($assessment.findings)
 $status=[string]$assessment.status
+$deepSeekHarness=[ordered]@{
+  frameworkId='deepseek-harness'
+  role='external-execution-plane'
+  status='not-called'
+  authority='es-governance'
+  evidenceRef=$null
+  nonClaims=@('No DeepSeek Harness invocation observed','No provider/runtime/network claim','No ES authorization or completion decision')
+}
+$codexHarness=[ordered]@{
+  frameworkId='codex-app-server'
+  role='external-execution-plane'
+  status='not-called'
+  authority='es-governance'
+  evidenceRef=$null
+  nonClaims=@('No Codex Harness invocation observed','No provider/runtime/network claim','No ES authorization or completion decision')
+}
 $closeout=[ordered]@{
   schemaVersion=1
   outputMode='evidence-first-closeout'
@@ -72,6 +88,9 @@ $closeout=[ordered]@{
   correctionState=[string]$assessment.correctionState
   feedbackLoop=$assessment.feedbackLoop
   diagnosticCodes=@($assessment.diagnosticCodes)
+  harnesses=[ordered]@{deepseek=$deepSeekHarness;codex=$codexHarness}
+  deepSeekHarness=$deepSeekHarness
+  codexHarness=$codexHarness
   source=if($PSCmdlet.ParameterSetName -eq 'SessionId'){'exact-session-id-latest-snapshot'}else{'explicit-input'}
   sessionPath=if($PSCmdlet.ParameterSetName -in @('Transcript','SessionId')){$resolvedSessionPath}else{$null}
   findings=$risk

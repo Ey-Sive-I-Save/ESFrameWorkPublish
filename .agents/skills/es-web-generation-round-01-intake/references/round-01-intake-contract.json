@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "roundId": "web-generation-round-01",
+  "stageId": "requirement-intake",
+  "authority": "current-user-direct",
+  "mustPreserve": ["raw prompt bytes", "input hash", "explicit authorization boundary", "unknowns", "non-claims"],
+  "forbiddenTransitions": ["intake -> focus without receipt", "intake -> knowledge", "intake -> generation", "synthetic acceptance"],
+  "acceptanceSignals": ["strict UTF-8 hash", "allowedScope and forbiddenScope present", "unknowns explicit", "returnReceipt persisted"],
+  "failureCodes": ["blocked.round-01.missing-input", "blocked.round-01.scope-ambiguous", "blocked.round-01.hash-missing"],
+  "nextRound": "web-generation-round-02-focus"
+}

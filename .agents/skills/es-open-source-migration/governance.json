@@ -15,7 +15,8 @@
   "acceptanceOwner": "migration owner",
   "requiredCases": ["positive", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery"],
   "controlRefs": ["SKILL.md#hard-boundaries", "SKILL.md#persistent-map", "references/migration-map.schema.json"],
-  "requiredControls": ["identity", "authority", "risk", "observability", "recovery", "performance", "compatibility", "supply-chain", "concurrency", "path-boundary"],
+  "requiredAuthorityRefs": ["AGENTS.md", ".agents/skills/es-open-source-migration/SKILL.md", ".agents/skills/es-open-source-migration/references/migration-map.schema.json", "ES/AISpace/Public/es-open-source-migration/migration-map.json", ".agents/skills/es-codex-session-bootstrap/SKILL.md"],
+  "requiredControls": ["identity", "authority", "risk", "observability", "recovery", "performance", "compatibility", "supply-chain", "concurrency", "path-boundary", "identity-hardening", "path-content-metadata-unification", "immutable-snapshot-locator", "journal-phase-recovery", "plan-hash-versioning", "binary-license-runtime-separation"],
   "routeKeys": ["migration", "compatibility", "rollback", "preservation", "external-source", "namespace", "assembly", "mapping", "parallelism"],
   "verificationProfiles": {
     "StaticReview": {"required": ["structural", "governance", "boundary", "contract", "evidence"], "runtimeRequired": false, "staticWeight": 0.7, "runtimeWeight": 0.3, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": true},

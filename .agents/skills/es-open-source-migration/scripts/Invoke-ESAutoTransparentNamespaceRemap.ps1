@@ -14,7 +14,10 @@ param(
     [ValidateRange(1, 2147483647)][long]$MaxBytes = 536870912,
     [switch]$DryRun,
     [switch]$RenamePathSegments,
-    [switch]$CopyToOutput
+    [switch]$CopyToOutput,
+
+    [string]$DeveloperName = '',
+    [string[]]$LegacyDeveloperTokens = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,6 +89,8 @@ $remapperParams = @{
     SourceRevision = $effectiveRevision
     MaxFiles = $MaxFiles
     MaxBytes = $MaxBytes
+    DeveloperName = $DeveloperName
+    LegacyDeveloperTokens = $LegacyDeveloperTokens
 }
 if ($RenamePathSegments) { $remapperParams.RenamePathSegments = $true }
 if ($inPlace) { $remapperParams.InPlace = $true; $remapperParams.WholeRepository = $true }
@@ -121,6 +126,8 @@ $summary = [ordered]@{
     sourceTreeSha256 = [string]$map.source.treeSha256
     mapPlanHash = [string]$mapReceipt.planHash
     remapPlanHash = [string]$remapReceipt.planHash
+    developerName = [string]$remapReceipt.developerName
+    identityHardeningApplied = [bool]$remapReceipt.identityHardeningApplied
     mapSymbolCount = @($map.symbols).Count
     mapReceipt = $mapReceipt
     remap = [ordered]@{

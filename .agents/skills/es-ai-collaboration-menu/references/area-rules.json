@@ -8,6 +8,7 @@
     {"area":"editor","terms":["编辑器","EditorWindow","Inspector","编辑器窗口"]},
     {"area":"gamecore","terms":["GameCore","配置","ConfigKey"]},
     {"area":"resource","terms":["资源","Asset","ResourcePlan","Manifest"]},
-    {"area":"entity","terms":["角色","Entity","Prefab","实体","敌人","玩家","NPC","怪物","Boss","战斗单位"]}
+    {"area":"entity","terms":["角色","Entity","Prefab","实体","敌人","玩家","NPC","怪物","Boss","战斗单位"]},
+    {"area":"aispace","terms":["AISpace","AI Space","AI空间","AI 空间","AI生成内容归档","内容归属","Public目录","Local目录"]}
   ]
 }

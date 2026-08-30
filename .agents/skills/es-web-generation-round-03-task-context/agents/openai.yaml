@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web Generation Round 03 TaskContext"
+  short_description: "Create a frozen platform task from FocusContext"
+  default_prompt: "Use $es-web-generation-round-03-task-context to create one TaskContextRuntime task from the confirmed Round 02 FocusContext, then stop before Knowledge or generation."

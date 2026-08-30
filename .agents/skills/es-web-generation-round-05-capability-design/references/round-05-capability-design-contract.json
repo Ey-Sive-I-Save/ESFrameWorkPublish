@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "roundId": "web-generation-round-05",
+  "stageId": "design-system-profile",
+  "authority": "ABCC/ABCD contracts + current TaskContext and KnowledgeRoute",
+  "requiredInput": {"recordType": "KnowledgeRouteReceipt", "status": "accepted", "roundId": "web-generation-round-04"},
+  "requiredBindings": ["taskId", "taskRevision", "knowledgeRouteHash", "selectedEntries"],
+  "requiredOutputs": ["resourceBudget", "resourceUsage", "subagentPlan", "subagentReceipts", "innovationRun", "abccNegotiation", "templateLibrary", "motionEffectLibrary", "effectUsagePolicy", "styleProfile", "innovationProfile", "acceptanceAssertions", "deepDesignPacketPath", "listSchemas", "dataContracts", "interactionContracts"],
+  "resourceBudget": {"maxRounds": 32, "maxBranches": 512, "maxModelCalls": 256, "maxEvaluations": 1024, "minBranchesPerRound": 3, "maxBranchesPerRound": 8, "requiredStageBudgets": ["tree-expansion", "global-convergence", "player-replay", "counterplay-audit", "candidate-tournament", "deep-design-expansion", "interaction-replay"]},
+  "subagentPlan": {"minRoles": 3, "requiredRoles": ["research", "interaction", "visual", "adversarial"], "sharedMutablePageFiles": false, "aggregation": "all-required"},
+  "minimumDivergence": {"independentCandidates": 3, "discardReasons": true, "selectionAuthority": "ABCD-or-user-recorded"},
+  "acceptanceSignals": ["reusable interaction/card/page templates", "three independent template axes", "motion/effect selections and density policy", "style tier and innovation limit", "InnovationRun evidence where used", "subagent receipts joined", "ABCC A-to-B negotiation and normalized evidence", "all budget stages recorded", "profile hash bound", "user decision explicit"],
+  "failureCodes": ["blocked.round-05.missing-route", "blocked.round-05.stale-knowledge", "blocked.round-05.template-contract-missing", "blocked.round-05.effect-policy-missing", "blocked.round-05.style-profile-missing", "blocked.round-05.innovation-limit-missing", "blocked.round-05.divergence-insufficient", "blocked.round-05.innovation-run-missing", "blocked.round-05.subagent-plan-missing", "blocked.round-05.child-join-incomplete", "blocked.round-05.abcc-negotiation-missing", "blocked.round-05.unauthorized-acceptance"],
+  "forbiddenTransitions": ["route-to-html", "candidate-to-accepted-without-user", "design-to-runtime", "design-to-network"],
+  "nextRound": "web-generation-round-06-deep-design-and-html"
+}

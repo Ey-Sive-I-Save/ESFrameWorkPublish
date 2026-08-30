@@ -53,8 +53,9 @@ Scores are 0-10 advisory measurements. `promptScore` measures request completene
 - A user correction or confirmed goal drift lowers alignment and calibration scores.
 - Historical misalignment must be reported separately from current intent alignment; a correction alone must not force the current alignment to zero.
 - Repeated high scores must be recalibrated using the prior score/streak; 9-10 requires strong intent and evidence support.
-- Closeout fields must use the assessment result's scores. Do not hand-write optimistic `提示评分` or `验证评分`; if no assessment was run, report the scores as unavailable or conservatively no higher than 5.
-- Chinese closeout must show the complete icon score line on one line: `📝提示完整度 / 🎯意图契合度 / 🔍验证充分度 / 📚证据质量 / ⚖️校准 / 🏁综合`.
+- Assessment scores remain machine-readable advisory evidence and must come from the deterministic result; do not hand-write or promote them into the user-summary headline.
+- Chinese closeout must show two independent observed Harness role/status lines: `🐋 DeepSeek Harness：<本轮作用/状态>` and `🧰 Codex Harness：<本轮作用/状态>`; absent invocation evidence (not-called) for either role is rendered as `未调用`, never as a claimed integration.
+- The normalized closeout JSON exposes `harnesses.deepseek` and `harnesses.codex` as separate aggregation objects. Both default to `status=not-called` conservatively; only a future verified invocation receipt may replace the corresponding role. Compatibility aliases `deepSeekHarness` and `codexHarness` may mirror these objects without merging their human-facing lines.
 - When `overallScore < 4`, emit a visible `🚨低评分风险` (`LOW_SCORE_RISK`) notice and do not claim the objective is complete or verified; when `overallScore` is 4-6, emit `⚠️证据/契合度有限` (`LIMITED_EVIDENCE`).
 
 ## Phase and root-cause priority

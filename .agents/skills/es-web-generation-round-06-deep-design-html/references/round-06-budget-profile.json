@@ -1,0 +1,18 @@
+{
+  "profileId": "web-deep-design-max-v1",
+  "maxRounds": 24,
+  "maxBranches": 256,
+  "maxModelCalls": 128,
+  "maxEvaluations": 512,
+  "stageBudgets": {
+    "objective-analysis": {"modelCalls": 16, "evaluations": 32},
+    "information-architecture": {"modelCalls": 16, "evaluations": 48},
+    "component-detailing": {"modelCalls": 24, "evaluations": 64},
+    "interaction-state": {"modelCalls": 24, "evaluations": 96},
+    "responsive-design": {"modelCalls": 12, "evaluations": 48},
+    "motion-choreography": {"modelCalls": 12, "evaluations": 64},
+    "html-materialization": {"modelCalls": 16, "evaluations": 64},
+    "static-verification": {"modelCalls": 8, "evaluations": 96}
+  },
+  "stopConditions": ["budget-exhausted", "design-rejected", "upstream-drift", "critical-integrity-failure", "user-stop"]
+}

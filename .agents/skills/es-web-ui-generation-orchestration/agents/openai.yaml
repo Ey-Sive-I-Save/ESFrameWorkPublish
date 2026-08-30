@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web UI Generation Orchestration"
+  short_description: "Bind six framework capabilities to ES web generation"
+  default_prompt: "Use $es-web-ui-generation-orchestration to bind render policy, component boundaries, route data contracts, interaction state machines, progressive enhancement and performance budgets to a WebPageStudio design and generated artifact."

@@ -9,7 +9,7 @@ This is a responsibility-specific static acceptance plan for **es-skill-governan
 - Profile: `governance`
 - Acceptance id: `governance-contract`
 - Runtime boundary: Runtime cannot prove authority closure; only execution authorization receipts can prove actual enforcement.
-- Static assertions: authority refs are closed; runtime hard gate; StaticDeepReplay-first; permission expansion denied; governance hash; ES entry compatibility; commercial coherence snapshot stability
+- Static assertions: authority refs are closed; runtime hard gate; StaticDeepReplay-first; permission expansion denied; governance hash; ES entry compatibility; commercial coherence snapshot stability; Skill↔AISpace binding closure
 
 ## Required specialized cases
 

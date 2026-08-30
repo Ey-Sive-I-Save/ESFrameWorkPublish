@@ -70,6 +70,12 @@
                        "responsibilityProfile":  "knowledge"
                    },
                    {
+                       "skillName":  "es-ai-space-organization",
+                       "acceptanceId":  "space-organization-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
                        "skillName":  "es-aibrain-route-authoring",
                        "acceptanceId":  "aibrain-route-contract",
                        "guidanceRef":  "references/static-specialized-acceptance.md",

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "roundId": "web-generation-round-06",
+  "stageId": "deep-design-and-html",
+  "authority": "accepted TaskContext + KnowledgeRoute + DesignSystemProfile + current user requirement",
+  "requiredInput": {"recordType": "DesignSystemProfileReceipt", "status": "accepted", "roundId": "web-generation-round-05"},
+  "requiredDesign": ["objectiveBrief", "informationArchitecture", "componentInventory", "contentModel", "interactionStateGraph", "responsiveMatrix", "motionTimeline", "a11yChecks", "traceability", "acceptanceAssertions", "resourceBudget", "resourceUsage", "listSchemas", "dataContracts", "interactionContracts", "dynamicDataModel", "apiAdapterConfig", "performanceBudget"],
+  "resourceBudget": {"profileId": "web-deep-design-ultra-v2", "maxRounds": 32, "maxBranches": 512, "maxModelCalls": 256, "maxEvaluations": 1024, "stageUsageRequired": true},
+  "requiredArtifact": ["semanticHtml", "styles", "interactionScript", "loadingState", "emptyState", "errorState", "successState", "reducedMotionFallback"],
+  "acceptanceSignals": ["design accepted before write", "real requirement-specific content", "no template-only output", "capability-to-DOM traceability", "max budget profile bound", "per-stage usage recorded", "static artifact hash", "UTF-8 valid", "static checks pass", "every round has artifact increment", "every round passes interaction gate", "every round passes layout gate"],
+  "failureCodes": ["blocked.round-06.missing-upstream", "blocked.round-06.design-not-accepted", "blocked.round-06.template-only", "blocked.round-06.state-coverage", "blocked.round-06.traceability-gap", "blocked.round-06.artifact-integrity"],
+  "forbiddenTransitions": ["upstream-stale-to-write", "design-unaccepted-to-html", "html-to-runtime-claim", "html-to-release"],
+  "nextRound": "web-generation-round-07-static-quality-closeout"
+}

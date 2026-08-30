@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "examplesId": "es-menu-examples.v1",
+  "examples": {
+    "create-content": ["给 ESGameCoreRuntimeData 新增 ConfigKey", "在 ESCommandPlayer 中注册一个 ESCommand"],
+    "iterate-feature": ["修复 ESInputActionId 输入绑定", "定位 ESResourcePlan 加载失败"],
+    "govern-framework": ["检查 Skill 权限边界", "审查 ESAIBrainCoordinator 依赖"],
+    "validate-evidence": ["运行 Test-ESAIWarnings.ps1", "跑 Skill StaticDeepReplay 并给证据"],
+    "discover-context": ["先读取 AIBRAIN_ENTRY 和 KnowledgeIndex", "帮我找当前任务必要的 AIWarning"],
+    "coordinate-session": ["用启动信封交给新 Codex 窗口", "恢复上次 Codex 会话"],
+    "ai-mechanism-atlas": ["查看超级语义注册表", "AG 分析 RoutePlan evidence gate"]
+  }
+}

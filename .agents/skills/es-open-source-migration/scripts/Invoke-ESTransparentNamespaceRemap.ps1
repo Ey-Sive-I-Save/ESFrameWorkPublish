@@ -14,7 +14,11 @@ param(
     [switch]$DryRun,
     [switch]$RenamePathSegments,
     [switch]$InPlace,
-    [switch]$WholeRepository
+    [switch]$WholeRepository,
+
+    # Whole-repository ES mode forces one canonical developer declaration.
+    [string]$DeveloperName = '',
+    [string[]]$LegacyDeveloperTokens = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,7 +47,10 @@ function Write-StrictUtf8Text([string]$Path, [string]$Text) {
 }
 
 function Get-FileSha256([string]$Path) {
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($Path)
+    try { return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+    finally { $stream.Dispose(); $sha.Dispose() }
 }
 
 function Get-TextSha256([string]$Text) {
@@ -72,13 +79,62 @@ function Get-RelativePath([string]$Root, [string]$Path) {
     return $Path.Substring($Root.Length).TrimStart('\').Replace('\', '/')
 }
 
+function Remove-EmptyRemapDirectories([string]$SourceRoot, [array]$Rows) {
+    # Moving a file leaves its old source directories behind. Git does not
+    # track empty directories, but an in-place whole-repository replacement
+    # must not leave visible legacy path shells. Only prune parents of rows
+    # whose path actually changed; protected trees and the checkout root are
+    # never candidates.
+    $candidates = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($row in $Rows) {
+        $sourceRel = [string]$row.sourceRelativePath
+        $outputRel = [string]$row.outputRelativePath
+        if ([string]::IsNullOrWhiteSpace($sourceRel) -or $sourceRel -ceq $outputRel) { continue }
+        $parent = Split-Path -Parent ($sourceRel.Replace('/', '\'))
+        while (-not [string]::IsNullOrWhiteSpace($parent)) {
+            $normalized = $parent.Replace('\', '/')
+            $lower = $normalized.ToLowerInvariant()
+            if ($lower -eq '.git' -or $lower.StartsWith('.git/') -or $lower -eq '.es-migration' -or $lower.StartsWith('.es-migration/') -or $lower -eq 'src/pro' -or $lower.StartsWith('src/pro/')) { break }
+            [void]$candidates.Add($normalized)
+            $parent = Split-Path -Parent $parent
+        }
+    }
+    foreach ($relative in @($candidates | Sort-Object { $_.Length } -Descending)) {
+        $directory = Join-Path $SourceRoot $relative.Replace('/', '\')
+        if (-not (Test-Path -LiteralPath $directory -PathType Container)) { continue }
+        if (@(Get-ChildItem -LiteralPath $directory -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+            Remove-Item -LiteralPath $directory -Force
+        }
+    }
+}
+
 function Recover-InPlaceJournal([string]$SourceRoot, [string]$ControlDirectory, [string]$JournalPath) {
     if (-not (Test-Path -LiteralPath $JournalPath -PathType Leaf)) { return }
     $journal = Get-Content -LiteralPath $JournalPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]$journal.status -eq 'passed') { return }
+    $journalStatus = [string]$journal.status
+    if ($journalStatus -eq 'passed') { return }
+    if ([string]::IsNullOrWhiteSpace($journalStatus)) {
+        throw "MIGRATION.RECOVERY.JOURNAL_STATUS_MISSING: $JournalPath"
+    }
     $staging = [string]$journal.stagingRoot
     if ([string]::IsNullOrWhiteSpace($staging) -or -not (Test-Path -LiteralPath $staging -PathType Container)) {
-        throw "In-place transaction is interrupted and has no recoverable staging tree: $JournalPath"
+        # The journal phase is authoritative.  A staging-phase interruption
+        # cannot have moved a source file yet, so a missing staging tree is a
+        # safely closable stale buffer even when a renamed destination already
+        # existed in the original checkout (for example A->B and B->A swaps).
+        # Once commit-started, the same missing tree may represent a partial
+        # swap and must remain fail-closed because the backup is gone.
+        $phase = [string]$journal.phase
+        if ([string]::IsNullOrWhiteSpace($phase) -and $journalStatus -eq 'staging') { $phase = 'staging' }
+        if ($phase -ne 'staging') {
+            throw "MIGRATION.RECOVERY.STAGING_MISSING_AFTER_COMMIT: $JournalPath (status=$journalStatus; phase=$phase)"
+        }
+        $journal.status = 'recovered'
+        $journal | Add-Member -NotePropertyName phase -NotePropertyValue 'recovered-before-commit' -Force
+        $journal | Add-Member -NotePropertyName recoveredUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+        $journal | Add-Member -NotePropertyName stagingRoot -NotePropertyValue $null -Force
+        Write-StrictUtf8Text $JournalPath ($journal | ConvertTo-Json -Depth 12)
+        return
     }
     $controlFull = ([IO.Path]::GetFullPath($ControlDirectory)).TrimEnd('\')
     $stagingFull = ([IO.Path]::GetFullPath($staging)).TrimEnd('\')
@@ -106,12 +162,16 @@ function Recover-InPlaceJournal([string]$SourceRoot, [string]$ControlDirectory, 
     }
     Remove-Item -LiteralPath $stagingFull -Recurse -Force
     $journal.status = 'recovered'
-    $journal.recoveredUtc = [DateTime]::UtcNow.ToString('o')
-    $journal.stagingRoot = $null
+    # ConvertFrom-Json returns a PSCustomObject whose properties are fixed to
+    # the original journal shape; add recovery metadata instead of assigning a
+    # missing property (which fails under ErrorActionPreference=Stop).
+    $journal | Add-Member -NotePropertyName recoveredUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    $journal | Add-Member -NotePropertyName phase -NotePropertyValue 'recovered-from-backup' -Force
+    $journal | Add-Member -NotePropertyName stagingRoot -NotePropertyValue $null -Force
     Write-StrictUtf8Text $JournalPath ($journal | ConvertTo-Json -Depth 12)
 }
 
-function Get-InPlaceAcceptedReplay([string]$SourceRoot, [string]$ControlDirectory) {
+function Get-InPlaceAcceptedReplay([string]$SourceRoot, [string]$ControlDirectory, [string]$CanonicalDeveloperName, [bool]$RequireIdentityHardening, [string]$RequiredHardeningVersion) {
     $manifestPath = Join-Path $ControlDirectory 'es-remap-manifest.json'
     $receiptPath = Join-Path $ControlDirectory 'es-remap-receipt.json'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -and -not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { return $null }
@@ -127,12 +187,13 @@ function Get-InPlaceAcceptedReplay([string]$SourceRoot, [string]$ControlDirector
         if (-not (Test-PathWithin $path $SourceRoot) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "In-place replay file is missing: $relative" }
         if ((Get-FileSha256 $path) -ne ([string]$row.outputSha256).ToLowerInvariant()) { throw "In-place replay file drift: $relative" }
     }
-    $current = @(Get-ChildItem -LiteralPath $SourceRoot -Recurse -File | ForEach-Object {
+    $current = @(Get-ChildItem -LiteralPath $SourceRoot -Recurse -Force -File | ForEach-Object {
             $relative = Get-RelativePath $SourceRoot $_.FullName
             if (-not (Test-ExcludedPath $relative)) { $relative }
         })
     if ($current.Count -ne $expected.Count) { throw "In-place replay file set drift: expected $($expected.Count), found $($current.Count)" }
     foreach ($relative in $current) { if (-not $expected.Contains([string]$relative)) { throw "In-place replay has unexpected file: $relative" } }
+    if ($RequireIdentityHardening -and (-not [bool]$receipt.identityHardeningApplied -or [string]$receipt.developerName -cne $CanonicalDeveloperName -or [string]$receipt.identityHardeningVersion -cne $RequiredHardeningVersion)) { return $null }
     $receipt | Add-Member -NotePropertyName idempotentReplay -NotePropertyValue $true -Force
     $receipt | Add-Member -NotePropertyName sourceTreeReplay -NotePropertyValue $true -Force
     $receipt | Add-Member -NotePropertyName replayManifestPath -NotePropertyValue $manifestPath -Force
@@ -168,7 +229,18 @@ function Test-TextExtension([string]$Path) {
         '.cc','.cpp','.cxx','.hpp','.py','.go','.rs','.java','.kt','.swift','.json','.yaml','.yml',
         '.md','.txt','.xml','.shader','.asmdef','.toml','.ini','.sql','.css','.scss','.html','.vue'
     )
-    return $textExtensions -contains ([IO.Path]::GetExtension($Path).ToLowerInvariant())
+    if ($textExtensions -contains ([IO.Path]::GetExtension($Path).ToLowerInvariant())) { return $true }
+    # Include extensionless/opaque-text repository files (`.gitignore`,
+    # `.env.example`, `.mdc`, `.snap`, shell helpers) while rejecting binary
+    # assets.  Strict UTF-8 + no NUL/control run is a bounded content probe;
+    # it avoids an ever-growing filename extension list.
+    try {
+        $bytes = [IO.File]::ReadAllBytes($Path)
+        if ([Array]::IndexOf($bytes, [byte]0) -ge 0) { return $false }
+        $decoded = ([Text.UTF8Encoding]::new($false, $true)).GetString($bytes)
+        $controls = [Regex]::Matches($decoded, '[\x00-\x08\x0B\x0C\x0E-\x1F]').Count
+        return ($controls -eq 0 -or $controls -lt [Math]::Max(1, [Math]::Floor($decoded.Length * 0.01)))
+    } catch { return $false }
 }
 
 function Test-CodeExtension([string]$Path) {
@@ -184,6 +256,12 @@ $script:ReplacementBySource = $null
 $script:ReplacementByTextIdentifier = $null
 $script:FreeTextRegex = $null
 $script:ReplacementByFreeText = $null
+$script:RootFragmentRegex = $null
+$script:DeveloperRegex = $null
+$script:CanonicalDeveloperName = ''
+$script:IdentityHardeningVersion = 'v8'
+$script:DeveloperPatternCount = 0
+$script:DeveloperPattern = ''
 
 function Initialize-TokenRemapper([array]$Rules, [array]$TextRules) {
     # Tokenize once per file instead of applying one regex per rule.  The old
@@ -212,6 +290,124 @@ function Initialize-TokenRemapper([array]$Rules, [array]$TextRules) {
     } else { $script:FreeTextRegex = $null }
 }
 
+function Initialize-IdentityHardening([object]$Mapping, [array]$Rules, [array]$TextRules, [string[]]$ExplicitDeveloperTokens) {
+    $rootRule = @($Rules | Where-Object { [string]$_.kind -eq 'repository-root' } | Select-Object -First 1)
+    $rootSource = if ($rootRule.Count -gt 0) { [string]$rootRule[0].source } else {
+        $fallbackRoot = @($Rules | Where-Object { [string]$_.source -match '^(?i:dyad)$' } | Select-Object -First 1)
+        if ($fallbackRoot.Count -gt 0) { [string]$fallbackRoot[0].source } else { [string]$Mapping.generation.rootToken }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($rootSource)) {
+        # Match the legacy project token inside compound identifiers, path
+        # segments, environment variables and URLs. The negative lookbehind
+        # keeps the operation idempotent: ESDyad is never prefixed again.
+        $script:RootFragmentRegex = [Regex]::new(
+            '(?i)(?<!ES)' + [Regex]::Escape($rootSource),
+            [Text.RegularExpressions.RegexOptions]::CultureInvariant -bor [Text.RegularExpressions.RegexOptions]::Compiled
+        )
+    }
+
+    $developerSources = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($legacy in @('wwwillchen', 'willchen90', 'Will Chen', 'WillChen', 'dyad-assistant', 'ESdyad-assistant', 'keppo-bot')) {
+        [void]$developerSources.Add($legacy)
+    }
+    foreach ($legacy in @($ExplicitDeveloperTokens)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$legacy)) { [void]$developerSources.Add([string]$legacy) }
+    }
+    if ($null -ne $Mapping.branding -and $null -ne $Mapping.branding.sourceTokens) {
+        foreach ($source in @($Mapping.branding.sourceTokens)) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$source)) { [void]$developerSources.Add([string]$source) }
+        }
+    }
+    # Backward-compatible inference for maps generated before branding was
+    # recorded explicitly. Author-like names and emails are the only legacy
+    # text seeds redirected to the canonical studio identity.
+    foreach ($rule in @($TextRules)) {
+        $source = [string]$rule.source
+        if ($source -match '(?i)@|willchen|will[ _-]?chen|legacy[ _-]?author') { [void]$developerSources.Add($source) }
+    }
+    $patterns = [Collections.Generic.List[string]]::new()
+    foreach ($source in @($developerSources)) {
+        [void]$patterns.Add([Regex]::Escape([string]$source))
+        foreach ($rule in @($TextRules | Where-Object { [string]$_.source -ieq $source })) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$rule.es)) { [void]$patterns.Add([Regex]::Escape([string]$rule.es)) }
+        }
+    }
+    if ($patterns.Count -gt 0) {
+        $ordered = @($patterns | Sort-Object Length -Descending -Unique)
+        # Keep the canonical web-handle seed explicit even when an older map
+        # has no branding section and PowerShell's case-insensitive set
+        # enumeration omits it while composing inferred text aliases.
+        $wwwillchenPattern = [Regex]::Escape('wwwillchen')
+        if (-not ($ordered -contains $wwwillchenPattern)) {
+            $ordered = @($wwwillchenPattern) + $ordered
+        }
+        $script:DeveloperPatternCount = $ordered.Count
+        $script:DeveloperPattern = ($ordered -join '|')
+        $script:DeveloperRegex = [Regex]::new(
+            '(?<![\p{L}\p{N}_])(?:' + ($ordered -join '|') + ')(?![\p{L}\p{N}_])',
+            [Text.RegularExpressions.RegexOptions]::CultureInvariant -bor [Text.RegularExpressions.RegexOptions]::Compiled -bor [Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+    }
+}
+
+function Get-RenamedIdentityFragments([string]$Value, [string]$CanonicalDeveloperName) {
+    $result = $Value
+    try {
+        if ($null -ne $script:RootFragmentRegex) {
+            $result = $script:RootFragmentRegex.Replace(
+                $result,
+                [Text.RegularExpressions.MatchEvaluator]{ param($match) return ('ES' + [string]$match.Value) }
+            )
+        }
+        if ($null -ne $script:DeveloperRegex) {
+            $result = $script:DeveloperRegex.Replace(
+                $result,
+                [Text.RegularExpressions.MatchEvaluator]{ param($match) return $CanonicalDeveloperName }
+            )
+        }
+    } catch {
+        throw ('identity hardening failed: ' + $_.Exception.Message)
+    }
+    return $result
+}
+
+function Set-EsDeveloperMetadata([string]$Path, [string]$Text, [string]$CanonicalDeveloperName) {
+    if ([IO.Path]::GetFileName($Path) -cne 'package.json') { return $Text }
+    try {
+        $package = $Text | ConvertFrom-Json
+        # Every package manifest must carry one canonical developer identity,
+        # including fixture/utility manifests that previously omitted author.
+        $author = $package.PSObject.Properties['author']
+        if ($null -eq $author) {
+            $package | Add-Member -NotePropertyName author -NotePropertyValue ([pscustomobject]@{ name = $CanonicalDeveloperName }) -Force
+        } elseif ($null -eq $author.Value) {
+            $author.Value = [pscustomobject]@{ name = $CanonicalDeveloperName }
+        }
+        foreach ($propertyName in @('author', 'publisher', 'maintainer')) {
+            $property = $package.PSObject.Properties[$propertyName]
+            if ($null -eq $property) { continue }
+            if ($property.Value -is [string]) {
+                $property.Value = $CanonicalDeveloperName
+            } elseif ($null -ne $property.Value) {
+                $nameProperty = $property.Value.PSObject.Properties['name']
+                if ($null -ne $nameProperty) { $nameProperty.Value = $CanonicalDeveloperName }
+                else { $property.Value | Add-Member -NotePropertyName name -NotePropertyValue $CanonicalDeveloperName -Force }
+                foreach ($remove in @('email', 'url', 'github', 'handle')) {
+                    $removeProperty = $property.Value.PSObject.Properties[$remove]
+                    if ($null -ne $removeProperty) { $property.Value.PSObject.Properties.Remove($remove) }
+                }
+            }
+        }
+        $contributors = $package.PSObject.Properties['contributors']
+        if ($null -ne $contributors) { $contributors.Value = @([pscustomobject]@{ name = $CanonicalDeveloperName }) }
+        return ($package | ConvertTo-Json -Depth 100)
+    } catch {
+        # Invalid JSON remains subject to lexical remapping and downstream
+        # syntax validation; do not destroy an opaque file.
+        return $Text
+    }
+}
+
 function Get-RenamedToken([string]$Value, [array]$Rules, [array]$TextRules) {
     if ($null -eq $script:TokenRegex) { Initialize-TokenRemapper $Rules $TextRules }
     return $script:TokenRegex.Replace(
@@ -225,7 +421,7 @@ function Get-RenamedToken([string]$Value, [array]$Rules, [array]$TextRules) {
     )
 }
 
-function Get-RenamedWholeText([string]$Value, [array]$Rules, [array]$TextRules) {
+function Get-RenamedWholeText([string]$Value, [array]$Rules, [array]$TextRules, [switch]$IncludeSymbolRules) {
     if ($null -eq $script:TokenRegex) { Initialize-TokenRemapper $Rules $TextRules }
     # A giant alternation over thousands of declarations makes a whole-tree
     # rewrite scale poorly.  Use one compiled token pattern and a MatchEvaluator
@@ -237,19 +433,22 @@ function Get-RenamedWholeText([string]$Value, [array]$Rules, [array]$TextRules) 
             param($match)
             $token = [string]$match.Value
             if ($script:ReplacementByTextIdentifier.ContainsKey($token)) { return $script:ReplacementByTextIdentifier[$token] }
+            if ($IncludeSymbolRules -and $script:ReplacementBySource.ContainsKey($token)) { return $script:ReplacementBySource[$token] }
             return $token
         }
     )
-    if ($null -eq $script:FreeTextRegex) { return $result }
-    return $script:FreeTextRegex.Replace(
-        $result,
-        [Text.RegularExpressions.MatchEvaluator]{
-            param($match)
-            $source = [string]$match.Value
-            if ($script:ReplacementByFreeText.ContainsKey($source)) { return $script:ReplacementByFreeText[$source] }
-            return $source
-        }
-    )
+    if ($null -ne $script:FreeTextRegex) {
+        $result = $script:FreeTextRegex.Replace(
+            $result,
+            [Text.RegularExpressions.MatchEvaluator]{
+                param($match)
+                $source = [string]$match.Value
+                if ($script:ReplacementByFreeText.ContainsKey($source)) { return $script:ReplacementByFreeText[$source] }
+                return $source
+            }
+        )
+    }
+    return Get-RenamedIdentityFragments $result $script:CanonicalDeveloperName
 }
 
 function Get-RenamedCode([string]$Value, [array]$Rules, [array]$TextRules) {
@@ -358,18 +557,21 @@ $textRules = @($mapping.textReplacements | Where-Object {
     })
 if ($textRules.Count -eq 0) { $textRules = @($rules) }
 Initialize-TokenRemapper $rules $textRules
+$script:CanonicalDeveloperName = if ([string]::IsNullOrWhiteSpace($DeveloperName)) { 'ES' + [char]0x5DE5 + [char]0x4F5C + [char]0x5BA4 } else { $DeveloperName.Trim() }
+try { Initialize-IdentityHardening $mapping $rules $textRules $LegacyDeveloperTokens }
+catch { throw ('identity hardening initialization failed: ' + $_.Exception.Message) }
 
 $wholeRepository = [bool]$WholeRepository -or $inPlace
 $renamePaths = [bool]$RenamePathSegments -or $inPlace
 if ($inPlace) {
-    $replayReceipt = Get-InPlaceAcceptedReplay $sourceFull $controlDirectory
+    $replayReceipt = Get-InPlaceAcceptedReplay $sourceFull $controlDirectory $script:CanonicalDeveloperName $true $script:IdentityHardeningVersion
     if ($null -ne $replayReceipt) {
         $replayReceipt | ConvertTo-Json -Depth 12
         exit 0
     }
 }
 
-$allFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object {
+$allFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -Force -File | ForEach-Object {
         $relative = Get-RelativePath $sourceFull $_.FullName
         if (-not (Test-HashExcludedPath $relative)) {
             [pscustomobject]@{ FullName = $_.FullName; RelativePath = $relative; Length = $_.Length; IsText = (Test-TextExtension $_.FullName) }
@@ -391,7 +593,7 @@ foreach ($sourceFile in $sourceFiles) { [void]$sourceRelSet.Add([string]$sourceF
 $changedFiles = 0
 foreach ($file in $sourceFiles) {
     $relative = $file.RelativePath
-    $outputRelative = if ($renamePaths) { Get-RenamedWholeText $relative $rules $textRules } else { $relative }
+    $outputRelative = if ($renamePaths) { Get-RenamedWholeText $relative $rules $textRules -IncludeSymbolRules } else { $relative }
     $candidateOutput = [IO.Path]::GetFullPath((Join-Path $outputFull ($outputRelative.Replace('/', '\')))).TrimEnd('\')
     if (-not (Test-PathWithin $candidateOutput $outputFull)) { throw "Output path escapes OutputRoot: $outputRelative" }
     if ($outputRelative.ToLowerInvariant().StartsWith('.git/') -or $outputRelative.ToLowerInvariant().StartsWith('.es-migration/') -or $outputRelative.ToLowerInvariant().StartsWith('src/pro/')) { throw "Output path enters a protected tree: $outputRelative" }
@@ -401,7 +603,8 @@ foreach ($file in $sourceFiles) {
     $outputText = if (-not $isText) { $null } elseif ([IO.Path]::GetFileName($relative) -match '^(LICENSE|NOTICE)(\.|$)') {
         $sourceText
     } elseif ($wholeRepository) {
-        Get-RenamedWholeText $sourceText $rules $textRules
+        $renamed = Get-RenamedWholeText $sourceText $rules $textRules -IncludeSymbolRules:(Test-CodeExtension $relative)
+        Set-EsDeveloperMetadata $relative $renamed $script:CanonicalDeveloperName
     } elseif (Test-CodeExtension $relative) {
         Get-RenamedCode $sourceText $rules $textRules
     } else {
@@ -448,6 +651,9 @@ $mappingFingerprintInput = @(
     "sourceTreeSha256=$sourceTreeHash",
     "renamePathSegments=$renamePaths",
     "wholeRepository=$wholeRepository",
+    "identityHardeningVersion=$(if ($wholeRepository) { $script:IdentityHardeningVersion } else { 'none' })",
+    "developerName=$(if ($wholeRepository) { $script:CanonicalDeveloperName } else { 'none' })",
+    "developerPattern=$(if ($wholeRepository) { $script:DeveloperPattern } else { 'none' })",
     (($rules | ForEach-Object { "$($_.source)=$($_.es)" }) -join "`n")
 ) -join "`n"
 $sha = [Security.Cryptography.SHA256]::Create()
@@ -482,6 +688,11 @@ $manifest = [ordered]@{
         planHash = $planHash
         provenancePreserved = $true
         textPolicy = if ($wholeRepository) { 'all-supported-text-including-metadata-docs-comments-ui; LICENSE/NOTICE preserved' } else { 'code-identifiers-and-path-segments-only; string/comment/structured-text contents preserved' }
+        identityHardening = if ($wholeRepository) { 'compound-root-fragments-and-canonical-developer-metadata' } else { 'explicit-symbols-only' }
+        identityHardeningVersion = if ($wholeRepository) { $script:IdentityHardeningVersion } else { $null }
+        developerName = if ($wholeRepository) { $script:CanonicalDeveloperName } else { $null }
+        developerPatternCount = if ($wholeRepository) { $script:DeveloperPatternCount } else { 0 }
+        developerPattern = if ($wholeRepository) { $script:DeveloperPattern } else { $null }
         licenseProtectedPatterns = @('src/pro/**', 'LICENSE*', 'NOTICE*')
     }
     boundaryFindings = [ordered]@{
@@ -507,6 +718,12 @@ $receipt = [ordered]@{
     timestampUtc = [DateTime]::UtcNow.ToString('o')
     planHash = $planHash
     outputRoot = $outputFull
+    identityHardeningApplied = [bool]$wholeRepository
+    identityHardeningVersion = if ($wholeRepository) { $script:IdentityHardeningVersion } else { $null }
+    rootFragmentRemap = [bool]($wholeRepository -and $null -ne $script:RootFragmentRegex)
+    developerName = if ($wholeRepository) { $script:CanonicalDeveloperName } else { $null }
+    developerPatternCount = if ($wholeRepository) { $script:DeveloperPatternCount } else { 0 }
+    developerPattern = if ($wholeRepository) { $script:DeveloperPattern } else { $null }
     nonClaims = $manifest.nonClaims
 }
 
@@ -526,6 +743,7 @@ if ($inPlace) {
     $journal = [ordered]@{
         schemaVersion = 1
         status = 'staging'
+        phase = 'staging'
         planHash = $planHash
         sourceTreeSha256 = $sourceTreeHash
         sourceRootName = [IO.Path]::GetFileName($sourceFull)
@@ -546,11 +764,11 @@ if ($inPlace) {
                 [IO.File]::Copy($sourcePath, $destination, $true)
             } else {
                 $sourceText = Get-StrictUtf8Text $sourcePath
-                $outputText = if ([IO.Path]::GetFileName($row.sourceRelativePath) -match '^(LICENSE|NOTICE)(\.|$)') { $sourceText } elseif ($wholeRepository) { Get-RenamedWholeText $sourceText $rules $textRules } elseif (Test-CodeExtension $row.sourceRelativePath) { Get-RenamedCode $sourceText $rules $textRules } else { $sourceText }
+                $outputText = if ([IO.Path]::GetFileName($row.sourceRelativePath) -match '^(LICENSE|NOTICE)(\.|$)') { $sourceText } elseif ($wholeRepository) { $renamed = Get-RenamedWholeText $sourceText $rules $textRules -IncludeSymbolRules:(Test-CodeExtension $row.sourceRelativePath); Set-EsDeveloperMetadata $row.sourceRelativePath $renamed $script:CanonicalDeveloperName } elseif (Test-CodeExtension $row.sourceRelativePath) { Get-RenamedCode $sourceText $rules $textRules } else { $sourceText }
                 Write-StrictUtf8Text $destination $outputText
             }
         }
-        $currentFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object {
+        $currentFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -Force -File | ForEach-Object {
                 $currentRelative = Get-RelativePath $sourceFull $_.FullName
                 if (-not (Test-HashExcludedPath $currentRelative)) {
                     [pscustomobject]@{ FullName = $_.FullName; RelativePath = $currentRelative; Length = $_.Length; IsText = (Test-TextExtension $_.FullName) }
@@ -559,6 +777,7 @@ if ($inPlace) {
         if ($currentFiles.Count -ne $allFiles.Count -or (Get-TreeSha256 $currentFiles $sourceFull) -ne $sourceTreeHash) { throw 'Source tree drifted during in-place staging; no source file was committed.' }
 
         $journal.status = 'commit-started'
+        $journal.phase = 'commit-started'
         Write-StrictUtf8Text $journalPath ($journal | ConvertTo-Json -Depth 12)
         foreach ($row in $planRows) {
             $sourcePath = Join-Path $sourceFull ([string]$row.sourceRelativePath).Replace('/', '\')
@@ -576,11 +795,13 @@ if ($inPlace) {
             if (-not (Test-Path -LiteralPath $destinationDirectory)) { New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null }
             Move-Item -LiteralPath $stagedPath -Destination $destinationPath -Force
         }
+        Remove-EmptyRemapDirectories $sourceFull $planRows
         $manifest.output.locatorPolicy = 'in-place source root; no final external copy'
         $manifest.output.locator = [IO.Path]::GetFileName($sourceFull)
         $manifest.output.insideProtectedProject = $false
         $manifest.status = 'written-in-place'
         $receipt.receiptPath = $receiptPath
+        $receipt.outputRoot = [IO.Path]::GetFileName($sourceFull)
         $receipt.status = 'passed'
         $receipt.inPlace = $true
         Write-StrictUtf8Text $manifestPath ($manifest | ConvertTo-Json -Depth 12)
@@ -591,15 +812,22 @@ if ($inPlace) {
         if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
         $journal.stagingRoot = $null
         $journal.status = 'passed'
+        $journal.phase = 'complete'
         $journal.completedUtc = [DateTime]::UtcNow.ToString('o')
         Write-StrictUtf8Text $journalPath ($journal | ConvertTo-Json -Depth 12)
         $receipt | ConvertTo-Json -Depth 12
         exit 0
     } catch {
+        $originalError = $_.Exception
         $journal.status = 'interrupted'
-        $journal.error = $_.Exception.Message
-        try { Write-StrictUtf8Text $journalPath ($journal | ConvertTo-Json -Depth 12) } catch { }
-        throw
+        $journal.error = $originalError.Message
+        try {
+            Write-StrictUtf8Text $journalPath ($journal | ConvertTo-Json -Depth 12)
+        } catch {
+            $journalWriteError = $_.Exception.Message
+            throw ('Migration failed and interrupted journal could not be persisted: ' + $journalWriteError + '; original error: ' + $originalError.Message)
+        }
+        throw $originalError
     }
 }
 
@@ -620,7 +848,7 @@ if (Test-Path -LiteralPath $outputFull) {
         if ((Get-FileSha256 $existingFile) -ne ([string]$row.outputSha256).ToLowerInvariant()) { throw "OutputRoot file hash drift: $($row.outputRelativePath)" }
     }
     $expectedOutputFiles = @($existingManifest.files | ForEach-Object { [string]$_.outputRelativePath })
-    $unexpected = @(Get-ChildItem -LiteralPath $outputFull -Recurse -File | ForEach-Object {
+    $unexpected = @(Get-ChildItem -LiteralPath $outputFull -Recurse -Force -File | ForEach-Object {
             $relative = Get-RelativePath $outputFull $_.FullName
             if ($relative -ne 'es-remap-manifest.json' -and $relative -ne 'es-remap-receipt.json' -and $expectedOutputFiles -notcontains $relative) { $relative }
         })
@@ -642,7 +870,7 @@ foreach ($row in $planRows) {
         [IO.File]::Copy($sourcePath, $destination, $false)
     } else {
         $sourceText = Get-StrictUtf8Text $sourcePath
-        $outputText = if ([IO.Path]::GetFileName($row.sourceRelativePath) -match '^(LICENSE|NOTICE)(\.|$)') { $sourceText } elseif ($wholeRepository) { Get-RenamedWholeText $sourceText $rules $textRules } elseif (Test-CodeExtension $row.sourceRelativePath) { Get-RenamedCode $sourceText $rules $textRules } else { $sourceText }
+        $outputText = if ([IO.Path]::GetFileName($row.sourceRelativePath) -match '^(LICENSE|NOTICE)(\.|$)') { $sourceText } elseif ($wholeRepository) { $renamed = Get-RenamedWholeText $sourceText $rules $textRules -IncludeSymbolRules:(Test-CodeExtension $row.sourceRelativePath); Set-EsDeveloperMetadata $row.sourceRelativePath $renamed $script:CanonicalDeveloperName } elseif (Test-CodeExtension $row.sourceRelativePath) { Get-RenamedCode $sourceText $rules $textRules } else { $sourceText }
         Write-StrictUtf8Text $destination $outputText
     }
 }
@@ -651,7 +879,7 @@ $receipt.receiptPath = Join-Path $outputFull 'es-remap-receipt.json'
 Write-StrictUtf8Text (Join-Path $staging 'es-remap-receipt.json') ($receipt | ConvertTo-Json -Depth 12)
 # Re-scan before publication so a source edit/addition/deletion during the
 # transform cannot be silently accepted under the initial source hash.
-$currentFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object {
+$currentFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -Force -File | ForEach-Object {
         $currentRelative = Get-RelativePath $sourceFull $_.FullName
         if (-not (Test-HashExcludedPath $currentRelative)) {
             [pscustomobject]@{ FullName = $_.FullName; RelativePath = $currentRelative; Length = $_.Length; IsText = (Test-TextExtension $_.FullName) }

@@ -10,7 +10,7 @@ registryManifest: .agents/SKILL_REGISTRY.manifest.json
 registrationRule: Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.
 hashRule: skillHash covers SKILL.md and governanceHash covers governance.json; lastModifiedUtc changes only when the generated
   catalog record projection changes. Other Skill resources are outside this hash projection.
-generatedAtUtc: '2026-08-29T05:59:58Z'
+generatedAtUtc: '2026-08-30T00:49:31Z'
 skills:
   es-adversarial-review:
     name: es-adversarial-review
@@ -115,10 +115,10 @@ skills:
     owner: ESFramework AI architecture maintainers
     acceptanceOwner: ESFramework governance owner
     firstRegisteredUtc: '2026-08-27T15:46:15Z'
-    lastModifiedUtc: '2026-08-28T01:00:15Z'
+    lastModifiedUtc: '2026-08-29T17:57:47Z'
     lastReviewedUtc: '2026-08-27T15:46:15Z'
-    skillHash: b2dcf4c76cfb8e5abaf1832b4d46cccb99a9d54e931224a09de3abad8e2a4e29
-    governanceHash: a9eae44527cfd418f812b354d4180fa2ec85c09075a4e279ad317da3a8b7ba92
+    skillHash: f423874bdc267eb787bda51055cfd0c0029a652ebc732408a9f475ed2fb7a239
+    governanceHash: 5ad446b5ed25914982649499657c7614d395b1a801078c3ab6bdc48875d400c3
     statusNote: Initial catalog registration
   es-ai-collaboration-menu:
     name: es-ai-collaboration-menu
@@ -150,9 +150,9 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T18:42:24Z'
-    lastModifiedUtc: '2026-08-27T15:46:15Z'
+    lastModifiedUtc: '2026-08-30T02:37:27Z'
     lastReviewedUtc: '2026-08-24T18:42:24Z'
-    skillHash: 63c986d43d7a4622657cc4428ca95a696775b55bd4d799c575f4304f2bb91a29
+    skillHash: acdd20bec8221f49f4e216eb02c6113a075edcf1f26b0dd9570815e78116677a
     governanceHash: f9001d6a521844c868c121e259cf0884f0892ae8d6d915a7969a1fc84b10f4b3
     statusNote: Initial catalog registration
   es-ai-interaction-governance:
@@ -195,11 +195,11 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T13:55:00Z'
-    lastModifiedUtc: '2026-08-29T05:07:22Z'
+    lastModifiedUtc: '2026-08-29T17:45:58Z'
     lastReviewedUtc: '2026-08-24T13:55:00Z'
-    skillHash: f638da6a676a0c2c9016d14096d8ded5b2553ba7f2e8cc7c431919913dfe0c9c
+    skillHash: 56846df7b30584630773cadb9201d6fdd1d25212885ff555d78f18d62eb6f785
     governanceHash: d59fb438cf1eb97b111c860e0dc0ff9447a35d60cde859bd53c28e6434462d21
-    statusNote: Initial catalog registration
+    statusNote: Harness dual-role closeout format synchronized
   es-ai-knowledge-curation:
     name: es-ai-knowledge-curation
     displayName: es-ai-knowledge-curation
@@ -243,6 +243,8 @@ skills:
     - file-placement
     - local-public
     - generated-content
+    - temporary-content
+    - screenshot
     - stale
     mcp:
     - none-required
@@ -259,10 +261,10 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-27T13:36:39Z'
-    lastModifiedUtc: '2026-08-28T18:23:03Z'
+    lastModifiedUtc: '2026-08-29T17:45:58Z'
     lastReviewedUtc: '2026-08-27T13:36:39Z'
-    skillHash: af53d93f3a6cc969e4d1bff7353bc331813db88416611fcdd47b4636012d7eae
-    governanceHash: 25e9c79bf39711c4c43847d3da81001c11b9031256b7b59f5adab4c686fe3341
+    skillHash: cc54d935acf4af513524460e690350ed3b0462e8f6c9f29ffce6264c2d776604
+    governanceHash: 394df7a24d4dcb5b1c8e54fde82289ee0cbbe11fdd9cb5b2a7186d0d5e9fad5d
     statusNote: Initial catalog registration
   es-aibrain-route-authoring:
     name: es-aibrain-route-authoring
@@ -475,7 +477,7 @@ skills:
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
     lastModifiedUtc: '2026-08-29T05:07:22Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: a318b1a9216c34fbe30484e497248e8d83e8a2273ff2faa567e38965cbf05f59
+    skillHash: 280a835617e8216f1a0192f3f46aeecb6c9426cf74dd62fafed62910704a189e
     governanceHash: dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd
     statusNote: Catalog hashes synchronized after session-bootstrap governance update
   es-command-authoring:
@@ -596,10 +598,10 @@ skills:
     owner: ESFramework es-editor-tooling maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-24T16:22:24Z'
+    lastModifiedUtc: '2026-08-29T12:00:15Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: e9aefdc7e931a14516f2807ecc588e0bb088d34677ed7800c3cd0ff758ad147e
-    governanceHash: a03f79bd3ee8ac895cc1d97fb336ee1f521a9b935c068d2ba1b0e01009519dd7
+    skillHash: 9e12ae58412f0c07cfb1239575baf1627e8bd5dffa69f3470aaee970d7d16877
+    governanceHash: fb6ff30a153068115de990aebc6501a33c5109af0d48af59a9c417fe0e8b20db
     statusNote: Initial catalog registration
   es-entity-authoring:
     name: es-entity-authoring
@@ -1042,7 +1044,7 @@ skills:
     name: es-open-source-migration
     displayName: es-open-source-migration
     skillPath: .agents/skills/es-open-source-migration
-    family: unclassified
+    family: engineering
     routeKeys:
     - migration
     - compatibility
@@ -1068,10 +1070,10 @@ skills:
     owner: ESFramework migration maintainers
     acceptanceOwner: migration owner
     firstRegisteredUtc: '2026-08-28T19:03:17Z'
-    lastModifiedUtc: '2026-08-29T05:59:58Z'
+    lastModifiedUtc: '2026-08-29T17:45:58Z'
     lastReviewedUtc: '2026-08-28T19:03:17Z'
-    skillHash: 306f99614fe2c4fa35ab6efa90c0179a061d514c007caa536743dffdd6134d36
-    governanceHash: 9eef14e1470af123596e1cd40037d22fea5d7947e762e213ec940241e905f7cd
+    skillHash: 521cf913f874be5935808496983c54e7a3016a017db2d6385ab75aef49e97207
+    governanceHash: e2721d9c7b94d0793159b74ed7fc84548dda82555422bb20af58c6a2cb3d9841
     statusNote: Initial catalog registration
   es-performance-budgeting:
     name: es-performance-budgeting
@@ -1108,7 +1110,7 @@ skills:
     name: es-prompt-engineering
     displayName: es-prompt-engineering
     skillPath: .agents/skills/es-prompt-engineering
-    family: unclassified
+    family: governance
     routeKeys:
     - prompt-engineering
     - prompt-expansion
@@ -1133,10 +1135,10 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-28T18:23:03Z'
-    lastModifiedUtc: '2026-08-28T19:38:08Z'
+    lastModifiedUtc: '2026-08-29T10:33:45Z'
     lastReviewedUtc: '2026-08-28T18:23:03Z'
     skillHash: b04e55acfb9375871d50818b005f350fd83115822e6e9e8be395118cbd361e7c
-    governanceHash: 7588aa1814b3a5a374d539ead1292aa604bec47268041d6f0e39f2ab898ccd3e
+    governanceHash: 7dd46de70b1ca5df15773b1dd6d692871311accf1607ad9fa8cc2b8cb8a90bc0
     statusNote: Initial catalog registration
   es-publish-aitest-prompt:
     name: es-publish-aitest-prompt
@@ -1377,9 +1379,9 @@ skills:
     owner: ESFramework Skill maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-25T14:00:38Z'
+    lastModifiedUtc: '2026-08-29T11:22:18Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: f8ba9bf418a855b37c8c4e89794ff05c7ce45643c876aa9e93357f86c6e12bff
+    skillHash: cdb87f354449b64c01da45ab77806431d94160e0323fc78b35a9ab635768a1b7
     governanceHash: c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1
     statusNote: Initial catalog registration
   es-skill-governance:
@@ -1417,9 +1419,9 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: task requester or designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-25T14:00:38Z'
+    lastModifiedUtc: '2026-08-29T17:45:58Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: b36a82da8dbfe955e6bcf5ad21595be218db0d4713cc3ff99f1a23c055777397
+    skillHash: bbecc4d595187553b720ad30acfbf71d7637706d5340f772d1f49eda7b11b619
     governanceHash: f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330
     statusNote: Initial catalog registration
   es-skill-session-refresh:
@@ -1751,10 +1753,10 @@ skills:
     owner: ESFramework Skill maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-23T12:49:11Z'
-    lastModifiedUtc: '2026-08-24T00:55:26Z'
+    lastModifiedUtc: '2026-08-29T12:00:15Z'
     lastReviewedUtc: '2026-08-23T12:49:11Z'
-    skillHash: d0532f5afb93df1b6371598819826b42d64063de1330501ac25633e776503cc3
-    governanceHash: 6b2b83e55d5063dc82ae9fcd5bf15e6b51e28f8d2b3bd889fc5ecabbf1f55bff
+    skillHash: 5d19a9c08315f11713d8b0bf8fb7454f6e73e68864d8fd7307400b9094593cf2
+    governanceHash: 6a4106d0a574b22a64f264886bb910905b09902bd96aa9c961894ea4af304161
     statusNote: Initial catalog registration
   es-ui-prefab-authoring:
     name: es-ui-prefab-authoring
@@ -1929,6 +1931,214 @@ skills:
     skillHash: 3b821c303da99f48cdf28061287e17be02f467cd7bd1deca01bff322d0077fb0
     governanceHash: 2fc2fd5ef1cef3fe4cf7074e3c7e49b0f07956001cb2d9a8cd103acf12d12cc6
     statusNote: Initial catalog registration
+  es-web-generation-round-01-intake:
+    name: es-web-generation-round-01-intake
+    displayName: es-web-generation-round-01-intake
+    skillPath: .agents/skills/es-web-generation-round-01-intake
+    family: unclassified
+    routeKeys:
+    - web-ui
+    - web-page-generation
+    mcp:
+    - none-required
+    tier: SmallTool
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: web-ui-intake
+    owner: ESFramework WebPageStudio maintainers
+    acceptanceOwner: WebPageStudio owner
+    firstRegisteredUtc: '2026-08-29T17:45:58Z'
+    lastModifiedUtc: '2026-08-29T17:45:58Z'
+    lastReviewedUtc: '2026-08-29T17:45:58Z'
+    skillHash: 25ce172a06f72768161b5f5ac31560c54d1f83d6de06e53ef7ed30e06cda2242
+    governanceHash: a53c46e73a12ceefa9d725f1329c66510438216c301535948e0a7f2a4d4d5c43
+    statusNote: Initial catalog registration
+  es-web-generation-round-02-focus:
+    name: es-web-generation-round-02-focus
+    displayName: es-web-generation-round-02-focus
+    skillPath: .agents/skills/es-web-generation-round-02-focus
+    family: unclassified
+    routeKeys:
+    - web-ui
+    - web-page-generation
+    - task-focus-context
+    mcp:
+    - none-required
+    tier: SmallTool
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: web-ui-focus
+    owner: ESFramework WebPageStudio maintainers
+    acceptanceOwner: WebPageStudio owner
+    firstRegisteredUtc: '2026-08-29T17:57:47Z'
+    lastModifiedUtc: '2026-08-29T17:57:47Z'
+    lastReviewedUtc: '2026-08-29T17:57:47Z'
+    skillHash: fa67282b0c3d89d576c96a22c0399124b0d7980bc211cb07ec83367a9bbdfa10
+    governanceHash: 866258f3c950b32a152570f5b73728e5a96affb5a2921031197ad1c5884c3480
+    statusNote: Initial catalog registration
+  es-web-generation-round-03-task-context:
+    name: es-web-generation-round-03-task-context
+    displayName: es-web-generation-round-03-task-context
+    skillPath: .agents/skills/es-web-generation-round-03-task-context
+    family: unclassified
+    routeKeys:
+    - web-page-generation
+    - task-context-runtime
+    - task-context-create
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: task-context-creation
+    owner: ESFramework Automation maintainers
+    acceptanceOwner: current task requester
+    firstRegisteredUtc: '2026-08-29T18:03:46Z'
+    lastModifiedUtc: '2026-08-29T18:03:46Z'
+    lastReviewedUtc: '2026-08-29T18:03:46Z'
+    skillHash: 4f0558e6552da55e6a44cdf3bd564dec2c3f3b6cba7e67cb92c2d56306651048
+    governanceHash: 12ae9ad7f98ff42262e34a48088b61694b043b1650a48a2f91be5038d5e00c6a
+    statusNote: Initial catalog registration
+  es-web-generation-round-04-knowledge-route:
+    name: es-web-generation-round-04-knowledge-route
+    displayName: es-web-generation-round-04-knowledge-route
+    skillPath: .agents/skills/es-web-generation-round-04-knowledge-route
+    family: unclassified
+    routeKeys:
+    - web-page-generation
+    - knowledge-route
+    - knowledge-validation
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: knowledge-routing
+    owner: ESFramework AIKnowledge maintainers
+    acceptanceOwner: current task requester
+    firstRegisteredUtc: '2026-08-29T18:10:48Z'
+    lastModifiedUtc: '2026-08-29T18:10:48Z'
+    lastReviewedUtc: '2026-08-29T18:10:48Z'
+    skillHash: 32f3867ead45d62da7ff8a9f8582332ccf4752b273fe87626e5d4b34d8675cfe
+    governanceHash: fd28896e15ee02380a0605eb97293277350f9f640b5fb474075f42286f57a7bc
+    statusNote: Initial catalog registration
+  es-web-generation-round-05-capability-design:
+    name: es-web-generation-round-05-capability-design
+    displayName: es-web-generation-round-05-capability-design
+    skillPath: .agents/skills/es-web-generation-round-05-capability-design
+    family: unclassified
+    routeKeys:
+    - web-page-generation
+    - capability-design
+    - abcc
+    - abcd-innovation
+    - subagent-orchestration
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: web-design-generation
+    owner: ESFramework WebPageStudio maintainers
+    acceptanceOwner: current task requester
+    firstRegisteredUtc: '2026-08-29T18:17:41Z'
+    lastModifiedUtc: '2026-08-29T18:34:37Z'
+    lastReviewedUtc: '2026-08-29T18:17:41Z'
+    skillHash: 0f47aefb9711bd32feb83c748a1292b93eeda0af0c3b9ffc8bc0b7da5dd43d0c
+    governanceHash: 6694f1aecdd1f8ad33d61f6b1b2ef0b4771e67a52b66f162876706c1248badcf
+    statusNote: Initial catalog registration
+  es-web-generation-round-06-deep-design-html:
+    name: es-web-generation-round-06-deep-design-html
+    displayName: es-web-generation-round-06-deep-design-html
+    skillPath: .agents/skills/es-web-generation-round-06-deep-design-html
+    family: unclassified
+    routeKeys:
+    - web-page-generation
+    - deep-design
+    - html-materialization
+    - static-web
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: web-html-materialization
+    owner: ESFramework WebPageStudio maintainers
+    acceptanceOwner: current task requester
+    firstRegisteredUtc: '2026-08-29T18:36:53Z'
+    lastModifiedUtc: '2026-08-30T00:49:31Z'
+    lastReviewedUtc: '2026-08-29T18:36:53Z'
+    skillHash: fb793e26ada65dd44f74157c666927374ecac5f92c8c4f65aca68df70dae4feb
+    governanceHash: dabb473c1db4a03c693da8b4719610556c404c59bbc13d48efb0ecc4250b2851
+    statusNote: Initial catalog registration
+  es-web-ui-generation-orchestration:
+    name: es-web-ui-generation-orchestration
+    displayName: es-web-ui-generation-orchestration
+    skillPath: .agents/skills/es-web-ui-generation-orchestration
+    family: project-web
+    routeKeys:
+    - web-ui
+    - web-page-generation
+    - webpagestudio
+    - scheduler
+    - worker
+    - knowledge
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: Draft
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: web-ui-orchestration
+    owner: ESFramework WebPageStudio maintainers
+    acceptanceOwner: WebPageStudio owner
+    firstRegisteredUtc: '2026-08-29T11:14:38Z'
+    lastModifiedUtc: '2026-08-29T17:45:58Z'
+    lastReviewedUtc: '2026-08-29T11:14:38Z'
+    skillHash: 9967add2dbd86181ea150b4f921367775e3b3c11a758b053753b4a8b11005cd9
+    governanceHash: 639197ee2ff2b88117b1f72a9f68a79ecb20eaed06fef16694ae16be06705611
+    statusNote: 'Draft registration: governance.json required before execution or acceptance'
   es-worktree-audit:
     name: es-worktree-audit
     displayName: es-worktree-audit

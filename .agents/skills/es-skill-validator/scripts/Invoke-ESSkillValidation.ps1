@@ -484,19 +484,17 @@ foreach($target in $targets){
         # explicit executable/argument boundary; it remains a review item.
         $hasApprovedExternalExecutionProfile=Test-Declaration $declaredText @('(?is)(external\s+process|process\s+boundary|外部进程|进程边界).{0,160}(exact\s+executable|allowlist|参数白名单|精确可执行文件|一次性)')
         $sharedPathBoundaryReady=$false
-        if($name -eq 'es-skill-governance'){
-            $sharedPathBoundaryPath=Join-Path $target 'scripts\ESPathBoundary.Common.ps1'
-            try{
-                $sharedPathBoundaryText=Read-StrictText $sharedPathBoundaryPath
-                $sharedPathBoundaryReady=(
-                    $sharedPathBoundaryText -match '(?i)function\s+Resolve-ESContainedRelativePath' -and
-                    $sharedPathBoundaryText -match '(?i)IsPathRooted' -and
-                    $sharedPathBoundaryText -match '(?i)GetFullPath' -and
-                    $sharedPathBoundaryText -match '(?i)StartsWith' -and
-                    $sharedPathBoundaryText -match '(?i)alternate\s+data\s+stream' -and
-                    $sharedPathBoundaryText -match '(?i)ReparsePoint')
-            }catch{}
-        }
+        $sharedPathBoundaryPath=Join-Path $root '.agents\skills\es-skill-governance\scripts\ESPathBoundary.Common.ps1'
+        try{
+            $sharedPathBoundaryText=Read-StrictText $sharedPathBoundaryPath
+            $sharedPathBoundaryReady=(
+                $sharedPathBoundaryText -match '(?i)function\s+Resolve-ESContainedRelativePath' -and
+                $sharedPathBoundaryText -match '(?i)IsPathRooted' -and
+                $sharedPathBoundaryText -match '(?i)GetFullPath' -and
+                $sharedPathBoundaryText -match '(?i)StartsWith' -and
+                $sharedPathBoundaryText -match '(?i)alternate\s+data\s+stream' -and
+                $sharedPathBoundaryText -match '(?i)ReparsePoint')
+        }catch{}
         foreach($file in $scriptFiles){
             $relative=Get-ProjectRelativePath $file.FullName; $n=0
             $fileText=''; try{$fileText=Read-StrictText $file.FullName}catch{}
@@ -510,15 +508,20 @@ foreach($target in $targets){
             # blanket security proof. Keep the finding visible as review instead of
             # misclassifying deterministic replay harnesses as source defects.
             $rootFromParameter=($fileText -match '(?is)(Resolve-Path(?:\s+-LiteralPath)?\s+\(?\s*\$ProjectRoot|GetFullPath\s*\(\s*\$(?:ProjectRoot|Candidate))')
-            $rootFromScriptDirectory=($fileText -match '(?is)Resolve-Path\s*\(\s*Join-Path\s+\$PSScriptRoot')
+            $rootFromScriptDirectory=($fileText -match '(?is)(?:Resolve-Path|GetFullPath)\s*\(\s*\(?\s*Join-Path\s+\$PSScriptRoot')
             $rootVariable=($fileText -match '(?im)\$(?:root|ProjectRoot|[A-Za-z_]*Root[A-Za-z0-9_]*)\s*=')
             $rootFromGit=($fileText -match '(?is)git\s+rev-parse\s+--show-toplevel')
             $rootDefault=($fileText -match '(?is)\$ProjectRoot\s*=\s*\(\s*Resolve-Path\s*\(\s*Join-Path\s+\$PSScriptRoot')
             $hasProjectRootBinding=((($rootFromParameter -or $rootFromScriptDirectory -or $rootFromGit) -and $rootVariable) -or $rootDefault)
+            # A deterministic script-root derivation is a bounded project path
+            # source when it is normalized and paired with containment evidence;
+            # it must not be treated like user-controlled dynamic input.
+            $hasScriptRootContainment=($rootFromScriptDirectory -and ($fileText -match '(?is)(Resolve-ESContainedRelativePath|StartsWith\s*\(|GetFullPath\s*\()'))
+            $hasLocalProjectRelativeResolver=($fileText -match '(?is)function\s+Resolve-ProjectRelative' -and $fileText -match '(?is)IsPathRooted' -and $fileText -match '(?is)GetFullPath' -and $fileText -match '(?is)StartsWith')
             $usesSharedPathBoundary=($sharedPathBoundaryReady -and
-                $fileText -match '(?is)\.\s*\(\s*Join-Path\s+\$PSScriptRoot\s+[\x27\x22]ESPathBoundary\.Common\.ps1[\x27\x22]\s*\)' -and
+                ($fileText -match '(?is)\.\s*\(\s*Join-Path\s+\$PSScriptRoot\s+[\x27\x22]ESPathBoundary\.Common\.ps1[\x27\x22]\s*\)' -or $fileText -match '(?is)\.\s*\$sharedPathBoundary\b') -and
                 $fileText -match '(?i)Resolve-ESContainedRelativePath')
-            $hasExplicitPathContainment=($usesSharedPathBoundary -or ((($fileText -match '(?is)IsPathRooted\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\)') -or $fileText -match '(?is)GetFullPath\s*\(\s*\$(?:ProjectRoot|Root|root)') -and ($fileText -match '(?is)(escapes?\s+ProjectRoot|StartsWith\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\+|cannot escape|\b越界\b)')))
+            $hasExplicitPathContainment=($hasScriptRootContainment -or $hasLocalProjectRelativeResolver -or $usesSharedPathBoundary -or ((($fileText -match '(?is)IsPathRooted\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\)') -or $fileText -match '(?is)GetFullPath\s*\(\s*\$(?:ProjectRoot|Root|root)') -and ($fileText -match '(?is)(escapes?\s+ProjectRoot|StartsWith\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\+|cannot escape|\b越界\b)')))
             $hasDeclaredPathContract=($null -ne $declaredPathContract -and $declaredPathContract -match '(?is)(project.?relative|approved.*state root|external.*state root)' -and $declaredPathContract -match '(?is)(reject|deny|cannot escape|越界|拒绝)')
             $hasApprovedExternalProfile=($hasDeclaredPathContract -and $declaredPathContract -match '(?is)approved.*(user.?profile|LOCALAPPDATA|\.codex)')
             $hasResolvedInputPath=($fileText -match '(?is)Resolve-Path(?:\s+-LiteralPath)?\s+\$[A-Za-z_][A-Za-z0-9_]*')
@@ -557,7 +560,7 @@ foreach($target in $targets){
                 $isInternalScriptPath=($line -match '(?is)Join-Path\s+\$PSScriptRoot')
                 if($line -match $pathEscapePattern -and $boundarySensitiveLine -and -not $isInternalRootDiscovery){$isBoundedFixtureEscape=($isReplayHarness -and $hasTemporaryFixtureBoundary -and $line -notmatch $explicitExternalPathPattern);$pathSeverity=if(($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or $isBoundedFixtureEscape){'review'}else{'blocked'};$pathDetail=if($isBoundedFixtureEscape){'路径穿越文本位于受控临时夹具内，用于拒绝/回滚负例；不得投影为生产路径授权。'}elseif($pathSeverity -eq 'review'){'路径指向已声明的受控外部用户状态根；仍需静态回放确认根目录固定且不可扩展。'}else{'脚本在写入/删除/外部执行或输出路径上出现项目根外路径、路径穿越或用户/系统目录；必须拒绝越界。'};Add-BoundaryFinding $findings 'path-boundary' $relative $n $pathDetail $pathSeverity}
                 if($line -match $dynamicPathPattern){
-                    $dynamicSeverity=if(($isReadOnlyPathContext -or $hasExplicitPathContainment -or ($hasDeclaredPathContract -and $contractBoundInput) -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and $isInternalScriptPath) -or $hasTemporaryFixtureBoundary -or $hasApprovedExternalStateGuard) -and (($line -notmatch $pathEscapePattern) -or $isInternalRootDiscovery -or $isInternalScriptPath -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and $hasTemporaryFixtureBoundary -and $line -notmatch $explicitExternalPathPattern))){'review'}else{'blocked'}
+                    $dynamicSeverity=if(($isReadOnlyPathContext -or $hasExplicitPathContainment -or ($hasDeclaredPathContract -and $contractBoundInput) -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and ($isInternalScriptPath -or $hasProjectRootBinding)) -or $hasTemporaryFixtureBoundary -or $hasApprovedExternalStateGuard) -and (($line -notmatch $pathEscapePattern) -or $isInternalRootDiscovery -or $isInternalScriptPath -or ($hasApprovedExternalProfile -and $line -match '(?i)\$env:(USERPROFILE|LOCALAPPDATA)') -or ($isReplayHarness -and $hasProjectRootBinding -and $line -notmatch $explicitExternalPathPattern) -or ($isReplayHarness -and $hasTemporaryFixtureBoundary -and $line -notmatch $explicitExternalPathPattern))){'review'}else{'blocked'}
                     $dynamicDetail=if($dynamicSeverity -eq 'review'){'脚本已绑定当前项目根且声明只读/报告范围；路径仍依赖变量，需在静态回放收据中确认相对路径拒绝与边界钳制。'}else{'脚本把未证明来源的变量拼入路径或路径操作；静态门禁无法证明项目根约束，必须显式收窄并人工复核。'}
                     Add-BoundaryFinding $findings 'dynamic-path' $relative $n $dynamicDetail $dynamicSeverity
                 }
@@ -574,7 +577,8 @@ foreach($target in $targets){
                     $isDeclaredScriptblock=($invokedVariable.Success -and $fileText -match ('(?is)\[scriptblock\]\$'+[regex]::Escape($invokedName)+'\b'))
                     $isReplayMemberCall=($isReplayHarness -and $line -match '(?i)&\s+\$[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*')
                     $isDirectInternalJoin=($line -match '(?i)&\s*\(\s*Join-Path\s+\$(?:(?:script:)?[A-Za-z_]*Root|PSScriptRoot|ProjectRoot)' -or ($isReplayHarness -and $line -match '(?i)&\s*\(\s*Join-Path\s+\$[A-Za-z_][A-Za-z0-9_]*'))
-                    $internalInvocation=($isBoundInternalCommand -or $isBoundInternalAlias -or $isReplayBoundCommand -or $isLocalScriptblock -or $isDeclaredScriptblock -or $isReplayMemberCall -or $isDirectInternalJoin -or $line -match '(?i)^\s*\.\s*\(Join-Path\s+\$PSScriptRoot')
+                    $isInternalModuleImport=($line -match '(?i)\bImport-Module\s+\(\s*Join-Path\s+\$(?:(?:script:)?[A-Za-z_]*Root|PSScriptRoot|ProjectRoot)')
+                    $internalInvocation=($isBoundInternalCommand -or $isBoundInternalAlias -or $isReplayBoundCommand -or $isLocalScriptblock -or $isDeclaredScriptblock -or $isReplayMemberCall -or $isDirectInternalJoin -or $isInternalModuleImport -or $line -match '(?i)^\s*\.\s*\(Join-Path\s+\$PSScriptRoot')
                     $executionSeverity=if($internalInvocation -or $hasApprovedExternalExecutionProfile){'review'}else{'blocked'}
                     $executionDetail=if($executionSeverity -eq 'review'){'间接调用目标由 PSScriptRoot 派生且处于只读/报告脚本；仍需收据确认目标脚本、参数和一次性边界。'}else{'脚本包含别名、变量或多语言间接执行路径；不能由逐行文本扫描证明安全，必须阻断并人工复核。'}
                     if($staticScannerContract){$executionSeverity='review';$executionDetail='脚本只把执行模式作为静态扫描数据，不执行匹配内容；仍需静态回放收据确认扫描范围。'}

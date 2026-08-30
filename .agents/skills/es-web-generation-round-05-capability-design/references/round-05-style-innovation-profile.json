@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "styleTiers": {
+    "quiet": {"density": "low", "contrast": "moderate", "motion": "subtle"},
+    "confident": {"density": "medium", "contrast": "high", "motion": "layered"},
+    "immersive": {"density": "high", "contrast": "high", "motion": "pervasive"},
+    "experimental": {"density": "very-high", "contrast": "variable", "motion": "speculative"}
+  },
+  "innovationLimits": {
+    "conservative": {"maxNovelMechanisms": 1, "layoutRisk": "low"},
+    "enhanced": {"maxNovelMechanisms": 3, "layoutRisk": "medium"},
+    "breakthrough": {"maxNovelMechanisms": 6, "layoutRisk": "high"},
+    "experimental": {"maxNovelMechanisms": 10, "layoutRisk": "bounded-experimental"}
+  },
+  "default": {"styleTier": "immersive", "innovationLimit": "enhanced", "effectDensity": "high"}
+}

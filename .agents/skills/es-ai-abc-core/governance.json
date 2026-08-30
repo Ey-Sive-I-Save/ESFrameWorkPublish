@@ -14,7 +14,7 @@
   "requiredAuthorityRefs": ["Documentation/AIKnowledge/AIBRAIN_ENTRY.md", "Documentation/AIKnowledge/KnowledgeIndex.yaml", "ES/Automation/Contracts/es-ai-abc-interface-v1.schema.json", "ES/Automation/Contracts/es-ai-abc-core-v1.json"],
   "owner": "ESFramework AI architecture maintainers",
   "acceptanceOwner": "ESFramework governance owner",
-  "requiredCases": ["positive", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery"],
+  "requiredCases": ["positive", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery", "innovation-run-stage-closure", "tree-branch-rejoin", "adaptive-branch-weighting", "player-first-use-gate"],
   "controlRefs": ["SKILL.md", "references/static-replay-adapter.md", "references/static-specialized-acceptance.md", "evidence-contract.binding.json"],
   "requiredControls": ["identity", "authority", "risk", "observability", "recovery", "performance", "compatibility", "supply-chain"],
   "routeKeys": ["ai-abc", "abc-core", "semantic-adapter", "analysis", "design", "evidence", "closed-loop", "static-replay", "route-stage", "knowledge"],
@@ -27,6 +27,6 @@
   "runtimeExecutionPolicy": "explicit-developer-authorization-only",
   "developerAuthorizationRequired": true,
   "staticDeepReplayRequired": true,
-  "staticDeepReplayCases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticDeepReplayCases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output", "innovation-run-stage-closure", "tree-branch-rejoin", "adaptive-branch-weighting", "player-first-use-gate"],
   "runtimeHardGate": "runtime-required && runtime-not-run => Blocked"
 }

@@ -45,6 +45,8 @@ For lifecycle, layout, sleep, restore, rebuild, default-state, or other user-vis
 ## Workflow
 
 1. Read the AIWarnings start files and `references/project-map.md`.
+   Also read `references/aispace-output-contract.md` before creating a preview, capture,
+   diagnostic artifact, report index, or handoff pointer.
 2. For any window, workbench, inspector, drawer, dialog, popup, layout, DPI, scroll, owner-lifecycle, or ReloadDomain work, read `Documentation/ES_EDITOR_WINDOW_PRODUCTION_STANDARD.md` and the availability matrix before implementation.
 2. For direct work, treat the current explicit user request as edit authority. Select the closest AICommand only when the execution path is `ManagedAIBrain/Worker`, where it is a protocol input rather than a second approval.
 3. Classify the tool as window, drawer, attribute processor, menu action, asset preview, SO table, or background service.
@@ -53,6 +55,16 @@ For lifecycle, layout, sleep, restore, rebuild, default-state, or other user-vis
 6. Keep scans behind explicit user action or a proven incremental invalidation path. Dispose callbacks, previews, PropertyTrees, and temporary resources.
 7. Use `$es-unity-compile` to import scripts, wait for ReloadDomain, read Console, reopen the tool, and exercise the changed interaction.
 8. Run `$es-utf8-guard` and report untested Unity-version, multi-object, prefab, or reload cases.
+
+## AISpace output boundary
+
+- Put transient previews, captures, screenshots, logs, and reload snapshots under
+  `ES/AISpace/Local/<agent-or-task>/Temp/EditorTooling/<category>/`.
+- Put only retained, project-relative report or handoff indexes under
+  `ES/AISpace/Public/EditorTooling/<topic-or-task>/`; raw evidence and existing
+  `ES/Output`/`ES/Automation`/Codex-history artifacts keep their current authority.
+- The binding is a discoverability contract. It does not grant Unity asset publishing,
+  scene saving, runtime execution, or Git permissions.
 
 ## Required boundaries
 

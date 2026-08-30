@@ -47,7 +47,7 @@ while ([DateTime]::UtcNow -lt $deadline) {
         try {
             $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
             if ([string]$receipt.launchToken -eq $newToken -and [string]$receipt.envelopePath -eq $newEnvelope) { $accepted = $true; break }
-        } catch { }
+        } catch { Write-Verbose ("acceptance receipt parse failed: {0}" -f $_.Exception.Message) }
     }
     Start-Sleep -Milliseconds 1000
 }

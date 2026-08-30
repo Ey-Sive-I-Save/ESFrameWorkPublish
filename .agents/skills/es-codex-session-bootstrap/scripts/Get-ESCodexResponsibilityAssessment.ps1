@@ -17,6 +17,10 @@ $text = [IO.File]::ReadAllText($archive, [Text.UTF8Encoding]::new($false))
 # assessment is deterministic and reads only the user-request field from each
 # formal T node when that field is available.
 $profiles = [ordered]@{
+    'es-aispace-organization' = @(
+        'AISpace|AIs*Space|aispace|LOCAL_TEMP_POLICY|SKILL_AISPACE_BINDINGS|Assets/ES/(?:AI)?Space|Local(?:/|\\).*Cache|Public(?:/|\\).*Skills',
+        '空间|临时|缓存|截图|归档|分类|日期|回流|杂乱|清理[AISpace空间]*'
+    )
     'es-editor-foundation-governance' = @(
         'editor(?:window)?|inspector|serializedproperty|\bundo\b|\bdirty\b|drawer|shadergui|compositeshader|workbench|reload|playmode|propertytree',
         '\u7f16\u8f91\u5668|\u68c0\u67e5\u5668|\u5e8f\u5217\u5316|\u64a4\u9500|\u91cd\u505a|\u5de5\u4f5c\u53f0|\u4f11\u7720|\u7ed8\u5236\u5668|\u5c5e\u6027\u6811|\u5f39\u7a97'
@@ -39,6 +43,7 @@ $profiles = [ordered]@{
 }
 
 $profilePriorities = @{
+    'es-aispace-organization' = 15
     'es-editor-foundation-governance' = 10
     'es-aibrain-architecture' = 10
     'es-session-bootstrap-maintenance' = 20

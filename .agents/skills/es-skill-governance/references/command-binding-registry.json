@@ -1,53 +1,534 @@
 {
-  "schemaVersion": 1,
-  "authority": "es-skill-governance",
-  "appliesTo": "managed-aibrain-execution",
-  "currentUserDirectPolicy": "Command bindings are not secondary approval and do not narrow a current explicit user request.",
-  "nonExecutionExemptions": [
-    {"skillName":"es-adversarial-review","reason":"只生成审查结论和证据建议，不直接修改项目或启动外部执行。","allowedOutputs":["review-report","evidence-plan"]},
-    {"skillName":"es-aibrain-route-authoring","reason":"自主/ManagedAIBrain 模式只生成候选路由与 Knowledge 变更；当前用户明确要求正式写入时可直接实施。","allowedOutputs":["route-candidate","knowledge-candidate"]},
-    {"skillName":"es-ai-collaboration-menu","reason":"只渲染确定性协作菜单和路由候选，不分派选项、不修改项目，也不启动会话或外部执行。","allowedOutputs":["collaboration-menu","route-candidate","non-persistent-decision-receipt"]},
-    {"skillName":"es-ai-interaction-governance","reason":"只评估可观察证据并生成收尾与下一步候选，不执行候选动作，也不修改业务或任务生命周期状态。","allowedOutputs":["evidence-assessment","interaction-closeout","next-step-candidate"]},
-    {"skillName":"es-first-principles-analysis","reason":"只做分析和方案分解，明确禁止更新项目状态。","allowedOutputs":["analysis","design-proposal"]},
-    {"skillName":"es-agent-mechanism-replication","reason":"只编排六类机制的静态合同、路由和证据闭环；不直接执行 Runtime 或外部副作用，用户明确授权时才生成项目内候选写入。","allowedOutputs":["mechanism-design","route-candidate","knowledge-candidate","static-evidence"]},
-    {"skillName":"es-migration-planning","reason":"只生成可回滚迁移计划和兼容性证据，不直接实施迁移。","allowedOutputs":["migration-plan","rollback-matrix"]},
-    {"skillName":"es-ui-intent-authoring","reason":"只生成 IntentSpec 候选与静态验证证据，不写入 Unity 资产或启动 Runtime。","allowedOutputs":["intent-spec-candidate","static-evidence"]},
-    {"skillName":"es-ui-prefab-authoring","reason":"静态验收只读取组件注册表并生成计划；Unity 资产物化属于独立受管阶段。","allowedOutputs":["ui-spec","static-evidence"]},
-    {"skillName":"es-use-ai-command","reason":"只选择和解释既有 AICommand，不直接执行命令或修改项目。","allowedOutputs":["command-selection","execution-plan"]}
-  ],
-  "entries": [
-    {"skillName":"es-fix-compile-error","commandId":"compile.error.fix","commandHash":"b4668f67f2e8cf323f47df502e4bc92d9b5d335ac778122f195d286930ff9e39","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-start-estest","commandId":"estest.start","commandHash":"733379e8f2879bcc16b683104f4ad4ce29f4d2a1f92bbf2936605d55086c765b","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-input-action","commandId":"input-action.add.strict","commandHash":"3df5cb949398029d29f34637a936edced41312b777ec16d272c0c35f6ebf05a9","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-gamecore-config-authoring","commandId":"gamecore.index.execute","commandHash":"98374391846e1c4ff1a7840484b4676176247f986057af4ebb4d2830baa2d050","role":"controlled-execution","riskLevel":"L3","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-gamecore-integration","commandId":"gamecore.index.execute","commandHash":"98374391846e1c4ff1a7840484b4676176247f986057af4ebb4d2830baa2d050","role":"controlled-execution","riskLevel":"L3","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-resource-pipeline","commandId":"asset-package.export.fix","commandHash":"a60f6318625ae4656b119be7aeedb7e6f411a216be8b44326d768c827099ae17","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-stable-graph-authoring","commandId":"graph.single-use.execute","commandHash":"0d10c4f34b22aa652d2825932b3cca480dea61283b6166dfc83b05d42724480d","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-tag-config","commandId":"tag.add","commandHash":"67b0e422da6dda6e59e57ce9cff0db1d666447b35d030e40a94367047a755ea8","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-command-authoring","commandId":"command.add-runtime.strict","commandHash":"01e54672cfb162fdf13215f0e94f6ceb5bc6bae9e98a820b5793515b2e30bd05","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-unity-compile","commandId":"compile.reload-memory.review","commandHash":"d69252726568fd002db596ae243a7708c1d00de2fec3a79003cfed306f9cdfda","role":"review","riskLevel":"L1","writeMode":"read-only","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-publish-aitest-prompt","commandId":"estest.start","commandHash":"733379e8f2879bcc16b683104f4ad4ce29f4d2a1f92bbf2936605d55086c765b","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-task-read-snapshot","commandId":"task.read-snapshot.write","commandHash":"7a2a960f90c6fc32e26a64806880de01fdfbb5ca31be0c85a2f3cb075a3aa5c0","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-task-context-runtime","commandId":"task.context-runtime.mutate","commandHash":"ac8e41b425e3ede7f8ae7748768b9620e4d357f6c92fae7403e2300968e65fab","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["commandId: task.context-runtime.mutate","TaskRevision","ContextVersion","runtime-not-run"],"taskContractRequired":true,"taskContractRef":"ES/Automation/Contracts/es-task-context-runtime-v1.schema.json"},
-    {"skillName":"es-codex-session-bootstrap","commandId":"session.handoff.execute","commandHash":"ade969450cf1d929020e2f94b20abaa9dc78712a42861c3c444565a33bf96e55","role":"controlled-execution","riskLevel":"L3","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
-    {"skillName":"es-skill-creator","commandId":"skill.create.candidate","commandHash":"4834cf042c0758c6e2fdbeff49c9ce58dbd8dee968ce4cea159a0af1f01c06f9","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","默认改文件","禁止事项"]},
-    {"skillName":"es-knowledge-creator","commandId":"knowledge.entry.update","commandHash":"9abb93f4bedd67ea1d2560655efddc4a2eb16ad6110398b24d98fe008320e1d7","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","SourceRef","ContentHash"]},
-    {"skillName":"es-editor-tooling","commandId":"editor.tooling.change.candidate","commandHash":"9f23d9f7b6526af51dd6d1a15252f08c3554f92770c1cbb2d302e5a0bf9b5046","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","StaticDeepReplay","禁止事项"]},
-    {"skillName":"es-feishu-cli","commandId":"feishu.read","commandHash":"da2bd989e00cdfca55e84f906ce2a69b10930e6e53dde2ef750d8f304c16b750","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","DryRun","交付格式"]},
-    {"skillName":"es-feishu-cli","commandId":"feishu.task.monitor","commandHash":"ada1a52a0f04c32c50600feee412ea25638cf081d2a7408097be7191678a3924","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","TaskContract","交付格式"]},
-    {"skillName":"es-feishu-cli","commandId":"feishu.task.mutate","commandHash":"b711aed9c7c5eaa884d6e406b6bb5f6ec7ab1ace65a92fb218c0a4475b9ce796","role":"controlled-execution","riskLevel":"L3","writeMode":"external-run","bodyContains":["命令类型","DryRun","交付格式"]},
-    {"skillName":"es-feishu-cli","commandId":"feishu.identity.manage","commandHash":"f3b85d270e46c2c2fd36afe32e37a260aa2e080a29061fad36855fd11f9ed54f","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","DryRun","交付格式"]},
-    {"skillName":"es-feishu-cli","commandId":"feishu.message.send","commandHash":"3d33177c2da8d2b04b32d098f91c58b8d5ea213c7addec65072aee1b9978cc40","role":"controlled-execution","riskLevel":"L3","writeMode":"external-run","bodyContains":["命令类型","DryRun","交付格式"]}
-    ,{"skillName":"es-aicommand-contract-authoring","commandId":"command.add-runtime.strict","commandHash":"01e54672cfb162fdf13215f0e94f6ceb5bc6bae9e98a820b5793515b2e30bd05","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]}
-    ,{"skillName":"es-ai-knowledge-curation","commandId":"knowledge.entry.update","commandHash":"9abb93f4bedd67ea1d2560655efddc4a2eb16ad6110398b24d98fe008320e1d7","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","SourceRef","ContentHash"]}
-    ,{"skillName":"es-aiwarning-authoring","commandId":"handover.add-aiwarning","commandHash":"52dbab1f4c6e9e79e5159f40d1d1c6620790a4cb9c8db5b0d315dc753e37f8cb","role":"handover","riskLevel":"L1","writeMode":"documentation-write","bodyContains":["命令类型","风险等级"]}
-    ,{"skillName":"es-generate-agent-artifacts","commandId":"agent-artifact.candidate","commandHash":"6f521b751d15e95c19e07d381afbc8db4ff33ba93acf206b5849f9e8e2f0d0b8","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","默认改文件"]}
-    ,{"skillName":"es-module-lifecycle","commandId":"module-maturity.review","commandHash":"2293889badef79194853ff5980a434ee07a7c81253db7fd3b6c3785df083dc2d","role":"review","riskLevel":"L1","writeMode":"read-only","bodyContains":["命令类型","风险等级"]}
-    ,{"skillName":"es-skill-governance","commandId":"skill.create.candidate","commandHash":"4834cf042c0758c6e2fdbeff49c9ce58dbd8dee968ce4cea159a0af1f01c06f9","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","默认改文件","禁止事项"]}
-    ,{"skillName":"es-automation-worker-authoring","commandId":"automation.worker.candidate","commandHash":"4da2ee090c189e090dd7feaceab8df6e4e6c2826c1251f4e73de37fc21c73ba5","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","必须先读","Prohibitions"]}
-    ,{"skillName":"es-change-risk-register","commandId":"change.risk-register.candidate","commandHash":"1f28d2df93bdc75c6e15c5ec2f8437f3abcee371e10e053e0cebbf94388b7093","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","必须先读","Prohibitions"]}
-    ,{"skillName":"es-entity-authoring","commandId":"entity.change.candidate","commandHash":"39e092ad4405b5db35ed43ff01e99487a2cc2f22216935edcaf8f47dc1047d4b","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","必须先读","Prohibitions"]}
-    ,{"skillName":"es-release-acceptance","commandId":"release.acceptance.evidence.candidate","commandHash":"c60803b809fa5c07dc2adc74342f8f277527ebb47f22f619e22b3eb17e3c459a","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","必须先读","Prohibitions"]}
-    ,{"skillName":"es-test-fixture-authoring","commandId":"test.fixture.candidate","commandHash":"428386b741f07c34031b95a526966af9c89dc1844f601820ce4a7dc758ca87fc","role":"candidate-generation","riskLevel":"L2","writeMode":"candidate-only","bodyContains":["命令类型","必须先读","Prohibitions"]}
-  ]
+    "schemaVersion":  1,
+    "authority":  "es-skill-governance",
+    "appliesTo":  "managed-aibrain-execution",
+    "currentUserDirectPolicy":  "Command bindings are not secondary approval and do not narrow a current explicit user request.",
+    "nonExecutionExemptions":  [
+                                   {
+                                       "skillName":  "es-adversarial-review",
+                                       "reason":  "只生成审查结论和证据建议，不直接修改项目或启动外部执行。",
+                                       "allowedOutputs":  [
+                                                              "review-report",
+                                                              "evidence-plan"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-aibrain-route-authoring",
+                                       "reason":  "自主/ManagedAIBrain 模式只生成候选路由与 Knowledge 变更；当前用户明确要求正式写入时可直接实施。",
+                                       "allowedOutputs":  [
+                                                              "route-candidate",
+                                                              "knowledge-candidate"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-ai-collaboration-menu",
+                                       "reason":  "只渲染确定性协作菜单和路由候选，不分派选项、不修改项目，也不启动会话或外部执行。",
+                                       "allowedOutputs":  [
+                                                              "collaboration-menu",
+                                                              "route-candidate",
+                                                              "non-persistent-decision-receipt"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-ai-interaction-governance",
+                                       "reason":  "只评估可观察证据并生成收尾与下一步候选，不执行候选动作，也不修改业务或任务生命周期状态。",
+                                       "allowedOutputs":  [
+                                                              "evidence-assessment",
+                                                              "interaction-closeout",
+                                                              "next-step-candidate"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-first-principles-analysis",
+                                       "reason":  "只做分析和方案分解，明确禁止更新项目状态。",
+                                       "allowedOutputs":  [
+                                                              "analysis",
+                                                              "design-proposal"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-agent-mechanism-replication",
+                                       "reason":  "只编排六类机制的静态合同、路由和证据闭环；不直接执行 Runtime 或外部副作用，用户明确授权时才生成项目内候选写入。",
+                                       "allowedOutputs":  [
+                                                              "mechanism-design",
+                                                              "route-candidate",
+                                                              "knowledge-candidate",
+                                                              "static-evidence"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-migration-planning",
+                                       "reason":  "只生成可回滚迁移计划和兼容性证据，不直接实施迁移。",
+                                       "allowedOutputs":  [
+                                                              "migration-plan",
+                                                              "rollback-matrix"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-ui-intent-authoring",
+                                       "reason":  "只生成 IntentSpec 候选与静态验证证据，不写入 Unity 资产或启动 Runtime。",
+                                       "allowedOutputs":  [
+                                                              "intent-spec-candidate",
+                                                              "static-evidence"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-ui-prefab-authoring",
+                                       "reason":  "静态验收只读取组件注册表并生成计划；Unity 资产物化属于独立受管阶段。",
+                                       "allowedOutputs":  [
+                                                              "ui-spec",
+                                                              "static-evidence"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-use-ai-command",
+                                       "reason":  "只选择和解释既有 AICommand，不直接执行命令或修改项目。",
+                                       "allowedOutputs":  [
+                                                              "command-selection",
+                                                              "execution-plan"
+                                                          ]
+                                   },
+                                   {
+                                       "skillName":  "es-ai-abc-core",
+                                       "reason":  "只生成 ABCC 能力协商、证据归一化与候选补丁计划；不在 ManagedAIBrain 通道直接写入。",
+                                       "allowedOutputs":  ["capability-plan", "normalized-evidence", "patch-candidate"]
+                                   },
+                                   {
+                                       "skillName":  "es-ai-space-organization",
+                                       "reason":  "只生成 AI 内容归属与路径候选，不直接物化文件或执行 Unity 导入。",
+                                       "allowedOutputs":  ["placement-candidate", "static-evidence"]
+                                   },
+                                   {
+                                       "skillName":  "es-open-source-migration",
+                                       "reason":  "只生成有界迁移计划与候选补丁，不在 ManagedAIBrain 通道直接执行迁移。",
+                                       "allowedOutputs":  ["migration-plan", "patch-candidate", "static-evidence"]
+                                   },
+                                   {
+                                       "skillName":  "es-prompt-engineering",
+                                       "reason":  "只生成哈希绑定提示词信封与验证结果，不直接执行信封中的动作。",
+                                       "allowedOutputs":  ["prompt-envelope", "verification-result"]
+                                   },
+                                   {
+                                       "skillName":  "es-weapon-abc-part",
+                                       "reason":  "只生成 Weapon ABCP 能力映射与候选变更，不在 ManagedAIBrain 通道直接写入。",
+                                       "allowedOutputs":  ["weapon-capability-plan", "patch-candidate", "static-evidence"]
+                                   }
+                               ],
+    "entries":  [
+                    {
+                        "skillName":  "es-fix-compile-error",
+                        "commandId":  "compile.error.fix",
+                        "commandHash":  "5cee61f3699159cebadc21bd12355921de70f20f30f0aacabcd97799ff8b739b",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-start-estest",
+                        "commandId":  "estest.start",
+                        "commandHash":  "44d6ef7d18293b1fb95beac3c8befbabb824e0b1d1aba69fbb253f6e2c11b8bf",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-input-action",
+                        "commandId":  "input-action.add.strict",
+                        "commandHash":  "f56ac1f045cdc1702b38ccf55cf27a24d09850233a90e108666fe91bc0ecf5e6",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-gamecore-config-authoring",
+                        "commandId":  "gamecore.index.execute",
+                        "commandHash":  "b80169760e5e509ae19c328908ea3b60c9fe1bd81c92ab40cb99d818ff9f591d",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L3",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-gamecore-integration",
+                        "commandId":  "gamecore.index.execute",
+                        "commandHash":  "b80169760e5e509ae19c328908ea3b60c9fe1bd81c92ab40cb99d818ff9f591d",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L3",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-resource-pipeline",
+                        "commandId":  "asset-package.export.fix",
+                        "commandHash":  "1aa72800b52d24bf1b3b6288224c4af01fee88c8da98862a5e52d9acb8318a25",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-stable-graph-authoring",
+                        "commandId":  "graph.single-use.execute",
+                        "commandHash":  "c84fa212c5010260cbd4b3899a5ff5446f1f3a1151017a3abe05b83b966ccf0f",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-tag-config",
+                        "commandId":  "tag.add",
+                        "commandHash":  "783f95c35db26236e5a612b370b53672d8252e51e538c646e10016295d0d074b",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-command-authoring",
+                        "commandId":  "command.add-runtime.strict",
+                        "commandHash":  "96fc22acc5f6ebe4c77245dff0a6d81ef90a9d0462ab9555fbaa340edea22c8c",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-unity-compile",
+                        "commandId":  "compile.reload-memory.review",
+                        "commandHash":  "c27a293d0c168c737749f03dd5e7179dc26925e2fbb01167211421a59218b7f6",
+                        "role":  "review",
+                        "riskLevel":  "L3",
+                        "writeMode":  "read-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-publish-aitest-prompt",
+                        "commandId":  "estest.start",
+                        "commandHash":  "44d6ef7d18293b1fb95beac3c8befbabb824e0b1d1aba69fbb253f6e2c11b8bf",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-task-read-snapshot",
+                        "commandId":  "task.read-snapshot.write",
+                        "commandHash":  "6e1b068ed4b0cf5ca78ebf654e17197035f16a5ba9d2e5f87332e08238f1e498",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-task-context-runtime",
+                        "commandId":  "task.context-runtime.mutate",
+                        "commandHash":  "e90c6020036f087ea15f8f69969cacbb3a6e24e68fb4b983acd8e0575f9faa65",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "commandId: task.context-runtime.mutate",
+                                             "TaskRevision",
+                                             "ContextVersion",
+                                             "runtime-not-run"
+                                         ],
+                        "taskContractRequired":  true,
+                        "taskContractRef":  "ES/Automation/Contracts/es-task-context-runtime-v1.schema.json"
+                    },
+                    {
+                        "skillName":  "es-codex-session-bootstrap",
+                        "commandId":  "session.handoff.execute",
+                        "commandHash":  "24667e20ea0be6b6b77fbffeb6aef530b7ddb20566d9689e456dea4309a6a7f0",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L3",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-skill-creator",
+                        "commandId":  "skill.create.candidate",
+                        "commandHash":  "a3def1fc21965dbb290cef8eae99a55f08ddde9101c87f658d82062dae9239e7",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "默认改文件",
+                                             "禁止事项"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-knowledge-creator",
+                        "commandId":  "knowledge.entry.update",
+                        "commandHash":  "88a8262f12c249a6a07117a886922cc7d706d3983213ac3dc3b2b06fc872590e",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "SourceRef",
+                                             "ContentHash"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-editor-tooling",
+                        "commandId":  "editor.tooling.change.candidate",
+                        "commandHash":  "91e685f4daa559748b6d72b427c76d72883b5b9a0bfe954c19f84e709434ce01",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "StaticDeepReplay",
+                                             "禁止事项"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-feishu-cli",
+                        "commandId":  "feishu.read",
+                        "commandHash":  "0dae251371caf0526a7541352ba76d79c017bc6db7afa654bcb34d93f3250484",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "DryRun",
+                                             "交付格式"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-feishu-cli",
+                        "commandId":  "feishu.task.monitor",
+                        "commandHash":  "756c663929abf66cd3c2d0e58b05d699648a4684a70e2e11ea3ac5deae18ef16",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "TaskContract",
+                                             "交付格式"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-feishu-cli",
+                        "commandId":  "feishu.task.mutate",
+                        "commandHash":  "1435ea790dd85b0cb0bfdc74cea992ee58d011bbb7c5deb561ca04ac91658864",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L3",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "DryRun",
+                                             "交付格式"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-feishu-cli",
+                        "commandId":  "feishu.identity.manage",
+                        "commandHash":  "9f8a0407a71025354a82c609f744066175ef8ab0ff98ab3e9edba60bc2bd6d90",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "DryRun",
+                                             "交付格式"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-feishu-cli",
+                        "commandId":  "feishu.message.send",
+                        "commandHash":  "3145232d6fad4b4b43e64a42e4888f8796bb89b140f47ff818b1174791512cbd",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L3",
+                        "writeMode":  "external-run",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "DryRun",
+                                             "交付格式"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-aicommand-contract-authoring",
+                        "commandId":  "command.add-runtime.strict",
+                        "commandHash":  "96fc22acc5f6ebe4c77245dff0a6d81ef90a9d0462ab9555fbaa340edea22c8c",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L3",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-ai-knowledge-curation",
+                        "commandId":  "knowledge.entry.update",
+                        "commandHash":  "88a8262f12c249a6a07117a886922cc7d706d3983213ac3dc3b2b06fc872590e",
+                        "role":  "controlled-execution",
+                        "riskLevel":  "L2",
+                        "writeMode":  "scoped-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "SourceRef",
+                                             "ContentHash"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-aiwarning-authoring",
+                        "commandId":  "handover.add-aiwarning",
+                        "commandHash":  "385e33042fbb313aa6c99a7059698558ab4d2ed0aa9f6799b8672fc6b0b8e874",
+                        "role":  "handover",
+                        "riskLevel":  "L1",
+                        "writeMode":  "documentation-write",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-generate-agent-artifacts",
+                        "commandId":  "agent-artifact.candidate",
+                        "commandHash":  "286c30d089ef899994db015cc5b1db5395ae68e728357dc0ab8724b528d9ffd8",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "默认改文件"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-module-lifecycle",
+                        "commandId":  "module-maturity.review",
+                        "commandHash":  "9376f79e6fe4e9ecc2efa99bb213d0b93738f748b5a45e10562ae8ecc7934153",
+                        "role":  "review",
+                        "riskLevel":  "L1",
+                        "writeMode":  "read-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "风险等级"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-skill-governance",
+                        "commandId":  "skill.create.candidate",
+                        "commandHash":  "a3def1fc21965dbb290cef8eae99a55f08ddde9101c87f658d82062dae9239e7",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "默认改文件",
+                                             "禁止事项"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-automation-worker-authoring",
+                        "commandId":  "automation.worker.candidate",
+                        "commandHash":  "d07652b47dab6f6ab8f248374caadf309caa93423fb6df2243c0749024f9abc3",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "必须先读",
+                                             "Prohibitions"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-change-risk-register",
+                        "commandId":  "change.risk-register.candidate",
+                        "commandHash":  "5f9341ab95913d331ebea2ebaa0a2ed2ab9bb497e9ddfb335dc8bfb4f7dd5f2d",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "必须先读",
+                                             "Prohibitions"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-entity-authoring",
+                        "commandId":  "entity.change.candidate",
+                        "commandHash":  "780886e1b1a4b674d55791c5a061c8d421032f35973517f5ad0e6315fbbc16ff",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "必须先读",
+                                             "Prohibitions"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-release-acceptance",
+                        "commandId":  "release.acceptance.evidence.candidate",
+                        "commandHash":  "2b6a00fd84b1b30fd3a2b75ade165bd741ec566099a3803ca6be97ef6ee6140c",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "必须先读",
+                                             "Prohibitions"
+                                         ]
+                    },
+                    {
+                        "skillName":  "es-test-fixture-authoring",
+                        "commandId":  "test.fixture.candidate",
+                        "commandHash":  "18231e4a10d2668c65d7715dc528a584c67b44803f6574e4cb8a766de3ddd55a",
+                        "role":  "candidate-generation",
+                        "riskLevel":  "L2",
+                        "writeMode":  "candidate-only",
+                        "bodyContains":  [
+                                             "命令类型",
+                                             "必须先读",
+                                             "Prohibitions"
+                                         ]
+                    }
+                ]
 }

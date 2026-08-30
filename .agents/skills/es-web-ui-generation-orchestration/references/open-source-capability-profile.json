@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "profileId": "es.web.open-source-capability-profile.v1",
+  "status": "calibrated-static",
+  "frameworks": ["nextjs", "astro", "nuxt", "sveltekit", "remix", "qwik"],
+  "capabilities": {
+    "renderPolicy": {"default": "prerender", "allowed": ["prerender", "cached", "dynamic", "client-only"], "source": ["nextjs", "nuxt", "sveltekit"]},
+    "componentBoundary": {"default": "static", "allowed": ["static", "island", "client-boundary", "resumable"], "source": ["nextjs", "astro", "qwik"]},
+    "routeDataContract": {"required": true, "fields": ["loader", "action", "cachePolicy", "errorPolicy"], "source": ["nuxt", "remix", "sveltekit"]},
+    "interactionStateMachine": {"required": true, "events": ["load", "submit", "retry", "cancel", "navigate", "filter"], "source": ["remix", "sveltekit", "astro"]},
+    "progressiveEnhancement": {"required": true, "staticFallback": "semantic-html", "source": ["astro", "sveltekit", "remix"]},
+    "resumabilityBudget": {"required": true, "maxHydratedRegions": 3, "source": ["qwik", "astro"]},
+    "performanceBudget": {"required": true, "lcpP75Ms": 2500, "inpP75Ms": 200, "clsP75": 0.1, "source": ["nextjs", "qwik", "nuxt"]}
+  },
+  "nonClaims": ["framework runtime is not vendored", "browser and production behavior require runtime evidence", "profile is a design and generation capability contract"]
+}

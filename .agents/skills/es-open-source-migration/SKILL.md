@@ -19,6 +19,8 @@ description: >-
 ## Hard boundaries
 
 The protected-target boundary and deterministic partitioning are explicit acceptance assertions.
+The identity-hardening assertion requires compound root fragments to be remapped in text, paths and filenames without double-prefixing.
+The developer-branding assertion requires package developer metadata and legacy author seeds to converge on the canonical ES studio identity.
 
 - **External target**：源树必须位于当前项目根之外；禁止使用当前项目根、`Assets/`、
   `Packages/`、`ProjectSettings/` 或 `.agents/` 作为源树目录。
@@ -29,10 +31,10 @@ The protected-target boundary and deterministic partitioning are explicit accept
 - **Manual substitution**：人工可替代下载、解压、许可证核对、文件搬运或某个验证步骤，但
   必须记录 `performedBy=human`、输入、输出和未证实项。
 - **Agent gate**：先完成方案、输入清单和持久映射表，并将 `status=mapping-approved` 后，
-  才能启动多 Agent。Agent 按不重叠的程序集/领域分区，只能写自己的隔离输出；合并由单一
-  owner 负责。
-- **Fail closed**：URL、固定版本、目标仓库、许可证或迁移范围缺失时返回 `NeedsInputs`，
-  不猜测源仓库、不自动联网、不扩大路径。
+  才能启动多 Agent。原地模式默认禁用并行写入；只有显式隔离输出模式才允许 Agent 写自己的
+  不重叠输出分区，合并由单一 owner 负责。
+- **Fail closed**：固定版本、目标仓库、许可证或迁移范围缺失时返回 `NeedsInputs`，不猜测
+  源仓库、不自动联网、不扩大路径；原地模式还会在目标文件集合、编码或事务状态异常时停止。
 
 ## Persistent map
 
@@ -42,7 +44,16 @@ The protected-target boundary and deterministic partitioning are explicit accept
 
 该文件是唯一共享协调面。每行映射记录源相对路径、目标相对路径（外部只读时为 `null`）、
 `adopt/adapt/rewrite/exclude/defer` 分类、owner、状态、源/目标哈希、兼容影响和回滚策略。
-不得写入凭据或可变的源绝对路径。
+顶层 `executionContract` 是原地整体替换的权威合同，必须同时声明全仓库/路径策略、开发者归一、
+身份硬化版本、私有快照与相对定位规则、journal 阶段恢复策略、二进制/许可证边界和
+Static/Runtime 证据分离。不得写入凭据或可变的源绝对路径。
+
+`snapshot-locator-boundary`：交接只消费每次启动创建的私有快照 `absolutePath`，回执不持久化可变
+`sourceAbsolutePath`；外部 checkout 仅以相对定位、固定 revision 和树哈希作为迁移证据。
+`recovery-phase-authority`：journal 的 `staging → commit-started → complete` 阶段决定恢复动作；
+缺少 staging 且仍处于 staging 阶段时安全收束，commit-started 阶段则 fail-closed。
+`binary-license-runtime-separation`：二进制按字节保留并单独计数，许可证/专业版树保持保护边界，
+Static 回执与 Unity/Runtime/Player/IL2CPP 证据分轴，`runtime-not-run` 不被压平成静态失败。
 
 ## Workflow
 
@@ -58,6 +69,8 @@ The protected-target boundary and deterministic partitioning are explicit accept
    禁止共享写目标，要求确定性结果包。
 7. **Dry-run batches**：先产出差异和回执，不改受保护目标。重复批次必须幂等，或因 map revision/hash
    冲突而明确拒绝。
+   大仓库先用 `scripts/New-ESMigrationBatchPlan.ps1` 只读生成计划；它按顶层/二级目录保持程序集、文档和模块边界，
+   每批最多 20 个文件，并输出可审计的显式 `relativePaths`。执行器不得自行扩大计划范围。
 8. **Acceptance**：执行 namespace/type 唯一性、asmdef 方向/循环、严格 UTF-8、身份/meta 保留、
    `git diff --check` 和迁移计划验证器。Unity、Runtime、Player、IL2CPP、发布证据另行授权。
 9. **Recovery**：取消、超时、哈希漂移或部分失败时隔离当前批次、保护目标、标记映射 stale，
@@ -122,15 +135,31 @@ The protected-target boundary and deterministic partitioning are explicit accept
 `scripts/Invoke-ESTransparentNamespaceRemap.ps1` 的原地模式。它只接受项目根之外的源树，
 按显式 `symbols[].source -> symbols[].es` 和 `textReplacements` 做严格 UTF-8 的整体替换，
 默认同时重命名路径段和文件名，并将控制回执放在源树的 `.es-migration` 目录；不会生成最终
-外部副本。原地提交采用临时事务树、源漂移复扫、逐文件哈希和中断恢复，成功后删除事务备份。
+外部副本。原地提交采用临时事务树、源漂移复扫、逐文件哈希和中断恢复，journal 明确记录
+`staging → commit-started → complete` 阶段；staging 阶段丢失可安全收束，commit-started
+阶段丢失必须 fail-closed，成功后删除事务备份。
 `src/pro/**`、`.git`、`LICENSE*`、`NOTICE*` 保持保护边界；已接受的原地结果只有在 manifest、
 receipt、逐文件哈希和文件集合全部一致时才允许幂等回放，否则 fail-closed。
+
+整体文本探测不依赖固定后缀：已知代码/配置/文档后缀直接进入，其他文件通过严格 UTF-8、NUL
+和控制字符探测纳入（无法证明为文本的二进制保持原样）。声明扫描仍是词法级；通用工具/协议
+标识（例如 `git`、`path`、`run`、`request`）不生成 ES 前缀，带旧项目根标识的复合符号仍会
+改名，防止把可执行命令或包协议改坏。全仓库模式还会把根标识嵌入的复合标识符、环境变量、
+URL、路径段和文件名统一补上 `ES` 前缀；该操作以负向前瞻保证幂等。所有 `package.json`
+（包括原本没有作者字段的 fixture/utility manifest）都会强制写入 `author.name=ES工作室`；已有
+`author`、`publisher`、`maintainer` 和 `contributors` 也会归一为 `ES工作室`，并移除旧作者
+联系方式。非 JSON 文本中的旧作者种子也归一为该开发者声明。原地提交后还会按变更行清理遗留
+的空旧目录。
+
+静态回放断言键：`external-target`、`protected-target`、`in-place-default`、`mapping`、
+`deterministic`、`recovery`。这些键只声明可重放的静态边界，不代表 Unity、Runtime 或发布验收。
 
 原地一键入口的默认调用：
 
 ```powershell
 & '.agents/skills/es-open-source-migration/scripts/Invoke-ESAutoTransparentNamespaceRemap.ps1' `
-  -SourceRoot 'F:\aaProject\Dyad.External' -SourceTextTokens @('Legacy Author')
+  -SourceRoot 'F:\aaProject\Dyad.External' -SourceTextTokens @('Legacy Author') `
+  -DeveloperName 'ES工作室'
 ```
 
 若必须保留旧的隔离输出行为，显式传入 `-CopyToOutput -OutputRoot <external-output>`；该兼容

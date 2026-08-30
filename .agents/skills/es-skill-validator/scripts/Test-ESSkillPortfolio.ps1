@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$ProjectRoot,
-    [string]$ReportPath = 'ES/Output/SkillPortfolioReceipt.json'
+    [string]$ReportPath = 'ES/Output/SkillPortfolioReceipt.json',
+    [ValidateRange(10,600)][int]$InnerValidationTimeoutSeconds = 180
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,16 +60,36 @@ $ErrorActionPreference=$previousErrorAction
 if($evidenceBindingsExit -ne 0){$contractFailures += 'central-evidence-bindings'}
 
 $innerRelative = Join-Path 'ES/Output' 'SkillPortfolioInnerValidation.json'
+$innerPath = Join-Path $root $innerRelative
+$innerBeforeHash = if (Test-Path -LiteralPath $innerPath -PathType Leaf) { (Get-FileHash -LiteralPath $innerPath -Algorithm SHA256).Hash } else { '' }
 $previousErrorAction=$ErrorActionPreference
 $ErrorActionPreference='Continue'
-& powershell -NoProfile -File $validator -ProjectRoot $root -Profile @('Full') -ReportPath $innerRelative *> $null
-$innerExit = $LASTEXITCODE
+$innerJob = Start-Job -ScriptBlock {
+    param($validatorPath,$projectRoot,$profile,$reportPath)
+    $output = (& powershell -NoProfile -File $validatorPath -ProjectRoot $projectRoot -Profile $profile -ReportPath $reportPath 2>&1 | Out-String).Trim()
+    [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = $output }
+} -ArgumentList $validator,$root,@('Full'),$innerRelative
+$innerError = ''
+$innerCompleted = Wait-Job -Job $innerJob -Timeout $InnerValidationTimeoutSeconds
+$innerTimedOut = ($null -eq $innerCompleted)
+if ($innerTimedOut) {
+    Stop-Job -Job $innerJob -ErrorAction SilentlyContinue
+    $innerExit = 124
+} else {
+    $innerResult = Receive-Job -Job $innerJob -ErrorAction SilentlyContinue | Select-Object -Last 1
+    $innerExit = if ($innerResult -and $innerResult.PSObject.Properties['ExitCode']) { [int]$innerResult.ExitCode } else { 1 }
+    $innerError = if ($innerResult -and $innerResult.PSObject.Properties['Output']) { [string]$innerResult.Output } else { '' }
+}
+if ($innerTimedOut) { $innerError = "Inner validation exceeded $InnerValidationTimeoutSeconds seconds." }
+Remove-Job -Job $innerJob -Force -ErrorAction SilentlyContinue
 $ErrorActionPreference=$previousErrorAction
-$innerPath = Join-Path $root $innerRelative
 $inner = $null
-if (Test-Path -LiteralPath $innerPath -PathType Leaf) {
+ $innerAfterHash = if (Test-Path -LiteralPath $innerPath -PathType Leaf) { (Get-FileHash -LiteralPath $innerPath -Algorithm SHA256).Hash } else { '' }
+if (-not $innerTimedOut -and (Test-Path -LiteralPath $innerPath -PathType Leaf) -and $innerAfterHash -ne $innerBeforeHash) {
     try { $inner = Get-Content -Raw -Encoding UTF8 $innerPath | ConvertFrom-Json } catch { $inner = $null }
 }
+$contractFailures = @($contractFailures)
+if ($innerTimedOut) { $contractFailures += 'inner-validator-timeout' }
 
 $innerResults = if ($inner) { @($inner.results) } else { @() }
 $blocked = @($innerResults | Where-Object { $_.status -eq 'blocked' })
@@ -106,7 +127,7 @@ $receipt = [pscustomobject][ordered]@{
                        '.agents/skills/es-skill-validator/scripts/Invoke-ESSkillValidation.ps1',
                        '.agents/skills/es-skill-validator/scripts/Test-ESSkillPortfolio.ps1',
                        '.agents/skills/es-skill-validator/scripts/ESPortfolioDecision.psm1',
-                       '.agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1'
+                       '.agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1',
                        '.agents/skills/es-skill-governance/scripts/Test-ESEvidenceContractBindings.ps1'
                    )
     timestampUtc = [DateTime]::UtcNow.ToString('o')
@@ -117,6 +138,8 @@ $receipt = [pscustomobject][ordered]@{
     innerReportHash = $innerReportHash
     innerResultAvailable = ($null -ne $inner)
     innerExitCode = $innerExit
+    innerTimedOut = $innerTimedOut
+    innerError = $innerError
     skillCount = $skillDirs.Count
     staticReadyCount = $staticReadyCount
     evidencePendingCount = $evidencePendingCount

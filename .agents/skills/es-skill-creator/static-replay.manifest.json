@@ -61,11 +61,13 @@
                                                             "scripts/init_skill.py",
                                                             "scripts/Build-ESSkillCatalog.py",
                                                             "scripts/quick_validate.py",
+                                                            "scripts/Test-ESSkillCreatorAISpaceRegistration.ps1",
                                                             "references/evidence-receipt-contract.md"
                                                         ],
                                   "sourceAssertions":  [
                                                            "explicit output path",
                                                            "registration is idempotent",
+                                                           "AISpace binding is mandatory",
                                                            "quick validation",
                                                            "catalog hash refresh",
                                                            "UTF-8"

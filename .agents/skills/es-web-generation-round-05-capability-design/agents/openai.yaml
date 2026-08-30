@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web Generation Round 05 Capability Design"
+  short_description: "Generate deep capability and interaction design before HTML"
+  default_prompt: "Use $es-web-generation-round-05-capability-design to analyze the accepted KnowledgeRoute, generate divergent mechanisms, and produce a user-reviewable design packet before HTML materialization."

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "web-motion-effect-catalog-v1",
+  "families": {
+    "entrance": ["stagger-fade", "clip-reveal", "spring-rise", "depth-parallax"],
+    "transition": ["shared-axis", "morph-layout", "crossfade-scale", "swipe-stack"],
+    "feedback": ["magnetic-hover", "press-ripple", "success-burst", "error-shake", "progress-sheen"],
+    "data": ["count-up", "sparkline-draw", "delta-pulse", "live-highlight"],
+    "ambient": ["grain-drift", "gradient-flow", "grid-breathe", "cursor-light"]
+  },
+  "globalEffects": ["pointer-field", "scroll-progress", "focus-ring-orbit", "theme-shift"],
+  "reducedMotionFallback": "opacity-and-color-only",
+  "selectionRule": "Default high density; reduce only for performance, prefers-reduced-motion, or explicit user constraint."
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web Generation Round 06 Deep Design & HTML"
+  short_description: "Design and materialize high-detail requirement-specific HTML"
+  default_prompt: "Use $es-web-generation-round-06-deep-design-html to consume the accepted Round 05 design-system profile, complete deep page design, and materialize static HTML only after design acceptance."

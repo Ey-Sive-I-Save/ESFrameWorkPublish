@@ -134,6 +134,37 @@ When the task is routed through AIBrain, use `planTask` before `runTask`. The pl
 - Run `scripts/Test-ESStaticAcceptanceCoverage.ps1` when changing the Skill portfolio; it verifies every Skill has a responsibility-specific static acceptance plan and discoverable evidence artifacts.
 - [references/user-directed-action-authority.md](references/user-directed-action-authority.md), `references/user-directed-low-risk-policy.json` and `scripts/Test-ESUserDirectedLowRiskPolicy.ps1`: current-user direct authority plus deterministic declared-scope checks; the old `UserDirectedLowRisk` name is compatibility-only and contains no path denylist.
 - `scripts/Build-ESSkillRegistryManifest.ps1`: deterministic, project-relative registry snapshot builder.
+- `scripts/Build-ESSkillRelationRegistry.py`: projects each direct Skill's relationships to the
+  Catalog, Resource Index, Registry Manifest, AIBrain, Knowledge, AICommand, evidence contracts,
+  authority references, Chinese aliases and AISpace output bindings
+  into `ES/AISpace/Public/Skills/registry.json`; use `--write` only for an explicitly requested
+  registration update and `--check` for read-only drift detection.
+- `scripts/Test-ESSkillRelationRegistry.py`: read-only closure, uniqueness, project-relative path
+  and freshness validator for the AISpace relationship projection.
+- `scripts/Test-ESSkillAISpaceBindings.py`: read-only validator for stable Skill output/cache
+  bindings and their reverse references in the AISpace projection.
+- `scripts/Register-ESSkillAISpaceBinding.py`: bounded explicit-write registration helper;
+  it enforces Skill existence, canonical roots, unique IDs and atomic update before projection.
+
+The governance acceptance also includes **Skill relationship registry closure**: every direct
+Skill must resolve exactly once across these navigation relations before the projection is
+treated as current.
+
+### AISpace output binding at registration
+
+Generation/cache-capable Skills must register stable output bindings in the project authority
+`.agents/SKILL_AISPACE_BINDINGS.json` before Catalog/Manifest/relationship rebuild. Each entry
+names the Skill, points to its `governance.json`, and declares a stable `bindingId`, purpose,
+storage class, project-relative path template, lifecycle, artifact kinds and write policy.
+`private-temp`/`private-content` uses `ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>/`;
+`public-index`/`public-content` uses `ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/`;
+Unity-facing formal assets use `Assets/ES/AISpace/Public/<category>/<YYYYMMDD>/<domain>/` after
+the authorized reference migration.
+
+`Build-ESSkillRelationRegistry.py` projects these declarations as the `aispace` relation with
+both `registryPath` and `skillContractPath`. `Test-ESSkillAISpaceBindings.py` proves the
+forward declaration and reverse projection agree. This is a discoverability and placement
+contract only; it does not redirect arbitrary writers or expand Skill permissions.
 - `.agents/SKILL_ROUTE_ALIASES.zh-CN.json` and `scripts/Test-ESChineseSkillRouteCoverage.ps1`: authoritative Chinese discovery aliases for every direct Skill; missing or ambiguous aliases block route coverage only, never grant permission.
 
 Run:
@@ -141,6 +172,12 @@ Run:
 ```powershell
 & .agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1 -SkillPath .agents/skills/es-skill-governance
 ```
+
+## Skill 使用披露
+
+使用本 Skill 时，按项目根 `AGENTS.md` 与 `.agents/README.md` 的 Skill 使用披露规范，
+在首次用户可见的进度更新中说明本 Skill 与当前任务的治理关系，并在最终答复列出本轮
+实际使用的 Skill。披露不等于授权、执行或验收证据。
 
 
 ## Specialized static acceptance

@@ -55,7 +55,11 @@ After any trigger, stop ordinary closeout behavior. Re-check intent alignment, o
 3. Assess whether the current assistant interpretation matches the user's intent, separately record prior misalignment, then assess claim-to-evidence correspondence. Return `intentAlignmentScore`, `verificationScore`, `evidenceQualityScore`, `calibrationScore`, `confidenceScore`, `overallScore`, `diagnosticReasons`, `runtimeStatus`, and `claimsNotProven`; never convert missing evidence into failure without a profile rule.
 4. Compare the current objective with the prior task snapshot when supplied. Mark `goalDrift` as `none`, `possible`, or `confirmed`.
 5. Load `references/next-step-behavior-tree.json` and select at most three highest-priority rules whose conditions are met. Preserve `requiresUserChoice` and `risk` on every suggestion.
-6. Emit the compact Chinese closeout fields required by `AGENTS.md`. Use the script for deterministic scoring and rule selection; closeout scores must come from that result, never from a manually optimistic estimate. Put the complete icon score set on one line (`📝 🎯 🔍 📚 ⚖️ 🏁`). If `overallScore < 4`, show the script's `🚨低评分风险` notice and do not claim completion or verification. If no assessment ran, mark scores unavailable or conservatively at most 5.
+6. Emit the compact Chinese closeout fields required by `AGENTS.md`. Use the script for deterministic scoring and rule selection; scores remain machine-readable evidence and are not rendered as the user-summary headline. Render two independent observed role/status lines: `🐋 DeepSeek Harness：...` and `🧰 Codex Harness：...`; each role without invocation evidence must be `未调用`, never implying integration or execution. If `overallScore < 4`, show the script's `🚨低评分风险` notice and do not claim completion or verification. If no assessment ran, keep scores unavailable in machine output.
+
+User-facing `使用Skill：` disclosure must contain stable Skill names only. Never
+render relative paths, `SKILL.md`, `references/`, or `scripts/` as a Skill name;
+those paths belong exclusively to internal evidence and read manifests.
 
 ## Workflow controls
 

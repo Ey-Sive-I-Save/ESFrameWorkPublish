@@ -8,8 +8,11 @@ not grant permission and do not replace the selected Skill's contract.
 
 ## Input contract
 
-`PromptText` is required. `ContextJson` is optional JSON and may contain only
-`taskKind`, `projectArea`, `routeStatus`, `contextFreshness`, and `riskLevel`.
+`PromptText` is required. `ContextJson` is optional JSON and may contain
+`taskKind`, `projectArea`, `routeStatus`, `contextFreshness`, `riskLevel`, and the
+navigation-only `navigationState` (or compatibility alias `menuState`). The state
+records the active main number so a following bare number is resolved within the
+same submenu instead of silently restarting at the root.
 Unknown enum values are rejected; missing fields normalize to `unknown`.
 The renderer also interprets natural-language PromptText. Structured signals are
 optional hints and do not need to be supplied by the user. High-confidence intent
@@ -51,6 +54,9 @@ Output also contains `routeDirectory.categories`. Each category and item has a
 stable number and route key. `-Selection Rcategory.item` resolves a directory item;
 `-Selection n` resolves a main option and `-Selection n.m` resolves its submenu.
 All three forms are route descriptors only and retain `requiresUserChoice=true`.
+The output `navigationState` must be passed back in the next `ContextJson` when a
+host collects a subsequent bare numeric reply; this preserves the visible menu
+path across turns and is not an execution permission.
 
 All main options expose bounded submenus. Intent output reports primary intent,
 confidence, candidates, negated intents, compound stages, inferred project area,

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web Generation Round 01 Intake"
+  short_description: "Freeze requirement intake and authority boundaries"
+  default_prompt: "Use $es-web-generation-round-01-intake to capture and freeze a WebPageStudio requirement before any focus, context, knowledge, design, or generation step."

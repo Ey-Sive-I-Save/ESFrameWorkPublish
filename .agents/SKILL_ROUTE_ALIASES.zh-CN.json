@@ -5,17 +5,17 @@
   "purpose": "Map natural Chinese task phrases to every direct project Skill; aliases discover capability only and never grant permission.",
   "locale": "zh-CN",
   "skills": {
-    "es-ai-space-organization": ["AI空间整理", "AI文件夹整理", "AI生成内容归档", "Local Public目录归属", "AISpace目录规范"],
+    "es-ai-space-organization": ["AI空间整理", "AI文件夹整理", "AI生成内容归档", "Local Public目录归属", "AISpace目录规范", "AISpace外部注册", "UserSpace注册", "个人协作区注册"],
     "es-adversarial-review": ["对抗审查", "风险漏洞审查", "安全反例复核", "Agent机制对抗审查"],
     "es-agent-mechanism-replication": ["帮我做机制复刻", "我想做机制复刻", "Agent机制复刻闭环", "机制复刻闭环验收", "六类Agent机制ES适配", "公开Agent机制复刻工作流", "机制研究闭环Skill", "把这个机制研究接到ES", "机制研究转ES合同", "六类机制ES设计", "看看机制流程怎么走", "机制路由探针同步", "机制RouteStage链审查", "检查机制证据够不够", "机制证据回执复核", "机制EvidenceSet验收", "源文件变了重查机制", "机制源漂移重放", "机制SourceRef漂移复核", "这套机制会不会越权", "机制权限扩展审查", "机制副作用边界复核", "验收这套机制闭环", "六类机制闭环静态验收", "机制研究闭环验收", "ABCD", "ABCD.Dynamic", "ABCD Dynamic", "ABCD动态", "ABCD动态体系", "ABCD动态协作", "ES动态协作体", "ES 动态协作体", "动态协作体", "动态协作接管", "ABCD接管"],
     "es-ai-abc-core": ["ES AI ABC核心", "ABC适配器核心", "ABCC核心", "A到B语义适配", "ABC核心能力对齐", "ABCC接口协商", "ABCC证据闭环"],
     "es-weapon-abc-part": ["武器ABC部件", "Weapon ABCP", "武器领域ABC", "武器ABC适配", "武器Part接入ABCC", "武器语义适配"],
-    "es-aibrain-route-authoring": ["AIBrain路由编写", "AI能力路由配置", "知识路由设计", "Agent机制ES路由", "机制复刻可发现接入"],
+    "es-aibrain-route-authoring": ["AIBrain路由编写", "AI能力路由配置", "知识路由设计", "Agent机制ES路由", "机制复刻可发现接入", "AG"],
     "es-aicommand-contract-authoring": ["AICommand合同编写", "AI命令契约设计", "任务合同绑定"],
     "es-ai-knowledge-curation": ["AI知识整理", "知识条目维护", "知识来源治理"],
     "es-ai-interaction-governance": ["AI交互治理", "对话质量评价", "任务收尾评价", "下一步建议治理", "下一步菜单", "回复序号", "回复数字", "选择下一步", "任务上下文收集", "Skill知识库警告收集", "0分反馈重对齐", "零分反馈重对齐", "迭代推进分叉", "兼容性推进分叉"],
     "es-prompt-engineering": ["包装", "提示词", "自动包装", "提示词包装", "先包装再读", "提示词扩写", "提示词模板", "提示词回归测试"],
-  "es-ai-collaboration-menu": ["菜单", "AI菜单", "AI 菜单", "协作菜单", "ES菜单", "给我菜单", "协作引导菜单", "超级语义", "超级语义触发器", "路由目录", "AI路由"],
+  "es-ai-collaboration-menu": ["菜单", "AI菜单", "AI 菜单", "协作菜单", "ES菜单", "给我菜单", "协作引导菜单", "打开菜单", "显示菜单", "我要菜单", "协作入口", "AI协作中心", "AI工作台", "导航菜单", "能力菜单", "路由菜单", "超级语义", "超级语义触发器", "路由目录", "AI路由"],
     "es-aiwarning-authoring": ["AIWarning编写", "AI警告规则编写", "P0规则治理"],
     "es-api-contract-review": ["API合同审查", "接口兼容性审查", "API契约复核"],
     "es-automation-worker-authoring": ["Automation Worker编写", "自动化工人编排", "任务Worker设计"],
@@ -37,7 +37,7 @@
     "es-knowledge-creator": ["知识库创建", "Knowledge条目编写", "知识输出限制", "机制研究Knowledge", "机制研究知识条目", "Agent机制知识库"],
     "es-knowledge-validator": ["知识库验证", "Knowledge索引校验", "知识来源Hash验证", "机制研究知识验证"],
     "es-migration-planning": ["迁移规划", "版本迁移设计", "重构迁移方案"],
-    "es-open-source-migration": ["ES化迁移", "ES 化迁移", "开源框架ES迁移", "开源框架到ES", "外部框架隔离迁移", "源框架映射表", "迁移映射表", "先建映射表再开Agent"],
+    "es-open-source-migration": ["ES化", "ES 化", "ES化迁移", "ES 化迁移", "开源框架ES迁移", "开源框架到ES", "外部框架隔离迁移", "源框架映射表", "迁移映射表", "先建映射表再开Agent"],
     "es-module-lifecycle": ["模块生命周期审计", "模块启停治理", "生命周期交接"],
     "es-observability-evidence": ["可观测性证据", "运行记录生成", "性能证据采集"],
     "es-performance-budgeting": ["性能预算", "热路径性能审查", "GC和内存预算"],
@@ -64,6 +64,7 @@
     "es-unity-compile": ["Unity编译", "Unity构建验证", "Unity编译证据"],
     "es-use-ai-command": ["使用AICommand", "调用AI命令", "受管命令执行"],
     "es-utf8-guard": ["UTF-8检查", "编码防乱码", "文本编码守卫"],
-    "es-worktree-audit": ["工作树审计", "Git工作区检查", "文件变更审查"]
+    "es-worktree-audit": ["工作树审计", "Git工作区检查", "文件变更审查"],
+    "es-web-ui-generation-orchestration": ["网页生成编排", "WebPageStudio编排", "网页生成调度", "网页生成闭环", "网页生成高级能力"]
   }
 }

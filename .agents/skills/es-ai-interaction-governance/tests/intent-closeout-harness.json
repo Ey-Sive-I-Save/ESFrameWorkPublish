@@ -1,0 +1,33 @@
+{
+  "contractVersion": "1",
+  "objective": "将用户可见收尾中的提示评分和验证评分替换为 DeepSeek 与 Codex Harness 的本轮作用/状态说明，同时保留机器可读评分作为证据投影。",
+  "scope": ["AGENTS.md 收尾字段", "task-closeout-contract", "交互治理 Skill 文档与静态验证"],
+  "mustPreserve": [
+    "evidence-first 状态、观察证据、发现和未证实项",
+    "deterministic evaluator 的机器可读评分与低评分风险规则",
+    "DeepSeek 或 Codex Harness 未调用时不得声称已接入或已执行",
+    "下一步菜单必须是收尾最后字段"
+  ],
+  "allowedTransitions": ["从用户摘要移除两个评分字段", "增加两行独立 Harness 作用/状态字段：🐋 DeepSeek 与 🧰 Codex", "更新对应 Skill 契约与静态断言"],
+  "forbiddenTransitions": [
+    "删除 evaluator 内部评分字段",
+    "将 Harness 字段作为 ES 授权、验收或运行时证明",
+    "无调用证据时输出 Harness 已执行",
+    "修改 Unity、Runtime、Git、发布或外部 Harness 安装状态"
+  ],
+  "acceptanceSignals": [
+    "静态治理验证通过",
+    "task-closeout-contract 包含 Harness 角色字段且明确未调用语义",
+    "evaluator 脚本仍输出 overallScore 等机器字段",
+    "git diff --check 通过（忽略既有无关差异）"
+  ],
+  "counterexamples": ["仅因出现 Harness 文本就写成已接入", "把不可用评分改写成主观分数", "删除低评分风险或证据状态字段"],
+  "nonGoals": ["安装或启动 DeepSeek Harness", "改变 ES 权威路由、权限和验收边界", "运行 Unity、Runtime 或发布流程"],
+  "assumptions": ["DeepSeek 与 Codex Harness 均作为可选外部执行层，而非 ES 治理层"],
+  "unresolvedQuestions": ["宿主未来是否提供可验证的 Harness invocation receipt"],
+  "intentAlignmentStatus": "aligned",
+  "executionDecision": "allow",
+  "priorContradictions": ["用户要求将单一 DeepSeek Harness 收尾字段改为同时展示 DeepSeek 与 Codex Harness 状态", "用户进一步要求 DeepSeek 与 Codex 使用两个独立图标和独立字段"],
+  "revision": 3,
+  "sourceRefs": ["AGENTS.md", ".agents/skills/es-ai-interaction-governance/SKILL.md", ".agents/skills/es-codex-session-bootstrap/references/task-closeout-contract.md"]
+}

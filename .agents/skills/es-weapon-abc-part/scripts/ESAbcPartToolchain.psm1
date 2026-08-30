@@ -280,6 +280,10 @@ function New-ESAbcInterfaceReplay {
     $sourceSeed = ($Core | ConvertTo-Json -Depth 20 -Compress) + '|' + ($Part | ConvertTo-Json -Depth 20 -Compress) + '|es-ai-abc-interface-v1'
     $sourceSetHash = Get-ESAbcSha256Text $sourceSeed
     $reportRef = $ReportPath.Replace('\', '/')
+    # Replay envelopes are candidate/static evidence only. Their `accepted`
+    # values describe adapter-shape closure; this toolchain never declares
+    # completion for the project or runtime. Final authority remains with
+    # ABCD/TaskContext.
     $replays = New-Object 'System.Collections.Generic.List[object]'
     foreach ($capabilityId in @($Part.capabilityRefs)) {
         $capability = $coreById[[string]$capabilityId]

@@ -81,6 +81,44 @@ The categorized route directory is always emitted, including when the user only
 says `菜单`; this makes the AI menu discoverable instead of requiring the user to
 know the hidden atlas submenu first.
 
+The menu also emits a bounded `contextSummary` and three `quickAccess` choices:
+`A` uses the case-insensitive `AG` child-agent shortcut, `B` continues with the
+current context, and `C` expands the complete menu. These are navigation choices;
+they never grant execution permission. At most one quick-access item is marked
+recommended.
+
+For host/UI presentation, the output also emits a stable `display` model
+(`es-menu-display.v1`). It supplies a compact-card layout, section labels, one
+icon per main option, Chinese subtitles, two bounded examples per main option, a
+single recommendation marker, and a short footer. Hosts should render this model
+instead of dumping the full JSON; the machine-readable `options` and
+`routeDirectory` remain unchanged and authoritative for selection. Menu aliases
+and examples are maintained in the route-alias registry and
+`references/menu-examples.json`; examples illustrate phrasing only and never
+execute or authorize an action.
+
+For a terminal-only view, use
+`scripts/Show-ESCollaborationMenu.ps1 -PromptText '菜单' -NoColor`; add
+`-Animate` for a short type-in animation. This is terminal text rendering, not a
+graphical window, and it has no project side effects.
+
+For a reusable rich-text block, use
+`scripts/Render-ESCollaborationMenuRichText.ps1 -PromptText '菜单'`. The fixed
+builder consumes `display` plus `references/menu-theme.json`, emits stable
+Markdown with a boxed header, sections, examples and semantic color tokens, and
+supports `-HtmlColor` for hosts that allow inline color spans. It does not invent
+menu entries or execute actions.
+
+The default framed output is intentionally compact: one responsibility line and
+one example per option. Pass `-AllExamples` only for a detailed reference view;
+the outer frame and section boundaries remain present in both modes.
+
+User-facing Skill disclosure must use stable names only (for example,
+`es-ai-collaboration-menu`). Relative paths, `SKILL.md`, `references/`, and
+`scripts/` are internal evidence and must not be rendered as responsibilities or
+menu labels. The `display.skillDisclosurePolicy` field makes this boundary
+machine-readable.
+
 The coordination submenu must keep these capabilities separate: `Fork` copies a
 confirmed session context; `Handoff` transfers a bounded task to a new window through
 `Complete-ESCodexHandoff.ps1`. Selecting either only routes to the session Skill; this

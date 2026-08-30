@@ -11,6 +11,8 @@ param(
 
     [string]$ProjectPath = '',
 
+    [string]$ProjectIdentityFingerprint = '',
+
     [string]$TaskPrompt = '',
 
     [string]$TaskKey = '',
@@ -535,6 +537,18 @@ function Resolve-HandoffFiles([string]$Root, [string[]]$Paths) {
     return $resolved
 }
 
+function Get-ProjectIdentityFingerprint([string]$Root) {
+    $parts = foreach ($relative in @('AGENTS.md','ProjectSettings/ProjectVersion.txt')) {
+        $full = [IO.Path]::GetFullPath((Join-Path $Root $relative))
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Project identity file is missing: $relative" }
+        $hash = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$relative|$hash"
+    }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes((($parts | Sort-Object) -join "`n")))).Replace('-','').ToLowerInvariant()) }
+    finally { $sha.Dispose() }
+}
+
 function New-HandoffSnapshots([object[]]$Sources, [string]$SnapshotDirectory) {
     if (Test-Path -LiteralPath $SnapshotDirectory) {
         throw "Handoff snapshot directory already exists: $SnapshotDirectory"
@@ -628,6 +642,14 @@ if ($Mode -eq 'New' -and $HandoffPath.Count -gt 0 -and -not $HandoffMode) {
     throw 'HandoffPath on a New session requires Complete-ESCodexHandoff.ps1; direct handoff delivery is prohibited.'
 }
 if ($HandoffMode) { Assert-HandoffAuthorization $HandoffAuthorization }
+
+$actualProjectIdentityFingerprint = Get-ProjectIdentityFingerprint $resolvedProjectRoot
+if (($HandoffMode -or $Mode -eq 'New') -and -not [string]::IsNullOrWhiteSpace($ProjectIdentityFingerprint) -and $ProjectIdentityFingerprint -cne $actualProjectIdentityFingerprint) {
+    throw 'Project identity fingerprint does not match the selected ProjectPath.'
+}
+if ($HandoffMode -and [string]::IsNullOrWhiteSpace($ProjectIdentityFingerprint)) {
+    throw 'Project identity fingerprint is required for handoff validation/launch.'
+}
 
 if ($Mode -eq 'Close') {
     $closeScriptPath = Join-Path $PSScriptRoot 'Close-ESCodexSession.ps1'
@@ -1102,6 +1124,7 @@ $hookConfigPresent = Test-Path -LiteralPath $hookConfigPath -PathType Leaf
 $result = [ordered]@{
     mode = $Mode
     projectRoot = $resolvedProjectRoot
+    projectIdentityFingerprint = $actualProjectIdentityFingerprint
     codexCli = $codexCmdPath
     windowsTerminal = if ($null -eq $wtCommand) { '' } else { $wtCommand.Source }
     terminalMode = $effectiveTerminalMode

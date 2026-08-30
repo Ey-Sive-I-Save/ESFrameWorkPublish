@@ -4,6 +4,10 @@ param(
   [string]$ReportPath='ES/Output/StaticReplay/es-ai-space-organization.json'
 )
 $shared=Join-Path $PSScriptRoot '..\..\es-static-deep-replay\scripts\Invoke-ESStaticDeepReplay.ps1'
+$authority=Join-Path $PSScriptRoot 'Test-ESAISpaceAuthority.ps1'
+& powershell -NoProfile -File $authority -ProjectRoot $ProjectRoot
+$authorityExitCode=$LASTEXITCODE
+if($authorityExitCode -ne 0){exit $authorityExitCode}
 & $shared -ProjectRoot $ProjectRoot -ManifestPath '.agents/skills/es-ai-space-organization/static-replay.manifest.json' -ReportPath $ReportPath
 $exitCode=$LASTEXITCODE
 if($exitCode -eq 0){

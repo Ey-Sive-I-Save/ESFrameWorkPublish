@@ -1,15 +1,15 @@
 {
     "schemaVersion":  1,
     "manifestId":  "esframework-skill-registry",
-    "registryHash":  "cc17f5839c1e802514282fc950d2a5eb990bb3dd33d52b7fcaa570245e0a8859",
-    "inputSnapshotHash":  "9b082c040d7bdac5d961aa8b0fbac78ca1b25f48716723ab57cbeb096236a2d4",
+    "registryHash":  "bcbbd388a893564d641673e1950484d968041af1295e889c9aa3908340e0a567",
+    "inputSnapshotHash":  "7b3439e4da8a8131af3c8f8ed0d943dd406a45fbaf96b8f4f5a5d6d765619b89",
     "policyHash":  "0399e899c6d890b94dfa06245f9a97445d45a0dfda7e550533b22d944385cba0",
     "metadata":  {
                      ".agents/SKILL_DISCOVERY_POLICY.json":  "0399e899c6d890b94dfa06245f9a97445d45a0dfda7e550533b22d944385cba0",
-                     ".agents/SKILL_RESOURCE_INDEX.yaml":  "2d0b6a7b53d02e7e8f0c102dcbb2ff4e3040045e25f5db5be7a31c9d9a43c62e",
-                     ".agents/SKILL_CATALOG.yaml":  "f54b3457873d1d1f987e02f936d28950b0230094a73a3306b1111197cd73da3f",
-                     "Documentation/AIKnowledge/AIBRAIN_ENTRY.md":  "8e3f621daa078c047311f28dede7e839aae4fd34d3062a259561604fdbd2f2f4",
-                     "Assets/Plugins/ES/AICommands/AICommandCatalog.json":  "3a701208cec3ffa8700a865c7397f3deab9b92e1a3649740b85f9adf46214633"
+                     ".agents/SKILL_RESOURCE_INDEX.yaml":  "764893b4b62319f89198cd3f42c26a6b82f632cbbe42ba21774f153001a57aac",
+                      ".agents/SKILL_CATALOG.yaml":  "f4102b2aac2382ef85862b74ec2af1ac4e694ffa56ed6c045c36009aae89dcea",
+                     "Documentation/AIKnowledge/AIBRAIN_ENTRY.md":  "597dd220dbaca6014e339f04432f881f32d64c34bdcd9cef46afb700d47a5eaa",
+                     "Assets/Plugins/ES/AICommands/AICommandCatalog.json":  "b21fe90d9333ea33e187400eb9e580be9678e06401cfd70facb4416bdc699208"
                  },
     "skills":  [
                    {
@@ -64,7 +64,7 @@
                        "family":  "governance",
                        "owner":  "ESFramework AI architecture maintainers",
                        "acceptanceOwner":  "ESFramework governance owner",
-                       "skillHash":  "46fd887ad8c6ef32037587ddf2d25da96f34308374dee759ae123a35edabe7a3",
+                       "skillHash":  "2bb473b0b92edd214da22a0d15a7abdfb21ad1c83dd02e200d1e63aed8a24f08",
                        "governanceHash":  "329dfae3d67974cdf4ef984027181231c85a1f3187deec003c9370ff40135a20",
                        "evidenceContractBindingHash":  "fdf70e3810d96e9bdd6af4a395262a813b0972612a05a54b6b5f022320300709"
                    },
@@ -92,7 +92,7 @@
                        "family":  "governance",
                        "owner":  "ESFramework AI architecture maintainers",
                        "acceptanceOwner":  "ESFramework governance owner",
-                       "skillHash":  "b2dcf4c76cfb8e5abaf1832b4d46cccb99a9d54e931224a09de3abad8e2a4e29",
+                       "skillHash":  "7b68033de8c5b20c92df2c92a9e7f04cf255a87644075b628a141891f7b758b8",
                        "governanceHash":  "a9eae44527cfd418f812b354d4180fa2ec85c09075a4e279ad317da3a8b7ba92",
                        "evidenceContractBindingHash":  "d3c5996a9d98a3849a4012c8aff31338ba8cf5c6f5dd71ac5a0a34600e519748"
                    },
@@ -144,7 +144,7 @@
                        "family":  "governance",
                        "owner":  "ESFramework AI governance maintainers",
                        "acceptanceOwner":  "ESFramework acceptance owner",
-                       "skillHash":  "63c986d43d7a4622657cc4428ca95a696775b55bd4d799c575f4304f2bb91a29",
+                       "skillHash":  "009e5ca1bd55d3fc639d860fbe3572958c79ca176f7314dd66b49ade92a3943f",
                        "governanceHash":  "f9001d6a521844c868c121e259cf0884f0892ae8d6d915a7969a1fc84b10f4b3",
                        "evidenceContractBindingHash":  "341512a1381f8bcdf2b05364a5052456ea39b957492ef9e126267f24216799bd"
                    },
@@ -203,7 +203,7 @@
                        "family":  "governance",
                        "owner":  "ESFramework AI governance maintainers",
                        "acceptanceOwner":  "ESFramework acceptance owner",
-                       "skillHash":  "38761eb965d757f5c351fd4fc26ea2f4bc60ded3a6a1bb3e2ef750a3ffeb9014",
+                        "skillHash":  "56846df7b30584630773cadb9201d6fdd1d25212885ff555d78f18d62eb6f785",
                        "governanceHash":  "d59fb438cf1eb97b111c860e0dc0ff9447a35d60cde859bd53c28e6434462d21",
                        "evidenceContractBindingHash":  "5ab7f480e1e6797385c5503b04d3405ed8151252f4dea2f5d1f65f5f5a9f49a0"
                    },
@@ -246,13 +246,15 @@
                                          "generated-content",
                                          "governance",
                                          "local-public",
-                                         "stale"
+                                         "screenshot",
+                                         "stale",
+                                         "temporary-content"
                                      ],
-                       "family":  "unclassified",
+                       "family":  "governance",
                        "owner":  "ESFramework AI governance maintainers",
                        "acceptanceOwner":  "designated ESFramework maintainer",
-                       "skillHash":  "af53d93f3a6cc969e4d1bff7353bc331813db88416611fcdd47b4636012d7eae",
-                       "governanceHash":  "25e9c79bf39711c4c43847d3da81001c11b9031256b7b59f5adab4c686fe3341",
+                       "skillHash":  "2f2d7d7273566d6c6445eff16600d63fedceed8adf770d6cd7ee14e3fd3566b7",
+                       "governanceHash":  "394df7a24d4dcb5b1c8e54fde82289ee0cbbe11fdd9cb5b2a7186d0d5e9fad5d",
                        "evidenceContractBindingHash":  "e2a23ed78c88abf9d97c4eb6afe336fa69aec7033a7be3dbde05011a04ce31eb"
                    },
                    {
@@ -362,7 +364,7 @@
                        "family":  "session",
                        "owner":  "ESFramework es-codex-session-bootstrap maintainers",
                        "acceptanceOwner":  "ESFramework acceptance owner",
-                       "skillHash":  "c8ee763c524b873651b1f45d2a083b312cdfa535844040e02ded1ef54f64a0fa",
+                       "skillHash":  "280a835617e8216f1a0192f3f46aeecb6c9426cf74dd62fafed62910704a189e",
                        "governanceHash":  "dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd",
                        "evidenceContractBindingHash":  "47ee09a005cf501bec1d8465c68d64f952254ea85cf67fef5bd79897b238986c"
                    },
@@ -453,8 +455,8 @@
                        "family":  "project-editor",
                        "owner":  "ESFramework es-editor-tooling maintainers",
                        "acceptanceOwner":  "ESFramework acceptance owner",
-                       "skillHash":  "e9aefdc7e931a14516f2807ecc588e0bb088d34677ed7800c3cd0ff758ad147e",
-                       "governanceHash":  "a03f79bd3ee8ac895cc1d97fb336ee1f521a9b935c068d2ba1b0e01009519dd7",
+                       "skillHash":  "9e12ae58412f0c07cfb1239575baf1627e8bd5dffa69f3470aaee970d7d16877",
+                       "governanceHash":  "fb6ff30a153068115de990aebc6501a33c5109af0d48af59a9c417fe0e8b20db",
                        "evidenceContractBindingHash":  "efa0d2d38fed1f0c7a2f7fad97fd51ecef248861b06dfda41574fc3c4fcce0a6"
                    },
                    {
@@ -783,6 +785,33 @@
                        "evidenceContractBindingHash":  "c5c2897b8f1d156ef5e9a4754e70bda979f9ebfda5ee8abbcf78c7ac3530655f"
                    },
                    {
+                       "skillName":  "es-open-source-migration",
+                       "maturity":  "Proposed",
+                       "delivery":  "Designed",
+                       "registrationState":  "NeedsReview",
+                       "discoveryState":  "candidate",
+                       "planEligibility":  "advisory-only",
+                       "runtimeEligibility":  "blocked",
+                       "reviewRequired":  true,
+                       "routeKeys":  [
+                                         "assembly",
+                                         "compatibility",
+                                         "external-source",
+                                         "mapping",
+                                         "migration",
+                                         "namespace",
+                                         "parallelism",
+                                         "preservation",
+                                         "rollback"
+                                     ],
+                       "family":  "engineering",
+                       "owner":  "ESFramework migration maintainers",
+                       "acceptanceOwner":  "migration owner",
+                       "skillHash":  "03716c5b5506d6e14eff3b950bccabde89524df60a46e666b240b92f124f699c",
+                       "governanceHash":  "e2721d9c7b94d0793159b74ed7fc84548dda82555422bb20af58c6a2cb3d9841",
+                       "evidenceContractBindingHash":  "e6c4b6279c2a7c23149c779309df15a38137dec7d2c82b8c8e552c67ca3e4e79"
+                   },
+                   {
                        "skillName":  "es-performance-budgeting",
                        "maturity":  "Proposed",
                        "delivery":  "Designed",
@@ -804,6 +833,32 @@
                        "skillHash":  "8324c45aed2fd40770e34ec8f21b01f10e2b18ce518013568ca96e97547e9e15",
                        "governanceHash":  "9fdf2cb2888babb8b5f8063e0dfbf68845e3bca0a34879204e6313d7a2bf19c3",
                        "evidenceContractBindingHash":  "b61e50f5f67ff53525e800522159c463e5933e3570174d4614ae313ab604ba10"
+                   },
+                   {
+                       "skillName":  "es-prompt-engineering",
+                       "maturity":  "Implementing",
+                       "delivery":  "Implemented-Unverified",
+                       "registrationState":  "NeedsReview",
+                       "discoveryState":  "operational-candidate",
+                       "planEligibility":  "plan-authorized",
+                       "runtimeEligibility":  "not-proven",
+                       "reviewRequired":  true,
+                       "routeKeys":  [
+                                         "guardrails",
+                                         "prompt-engineering",
+                                         "prompt-evaluation",
+                                         "prompt-expansion",
+                                         "prompt-regression",
+                                         "prompt-template",
+                                         "prompt-wrapper",
+                                         "structured-output"
+                                     ],
+                       "family":  "governance",
+                       "owner":  "ESFramework AI governance maintainers",
+                       "acceptanceOwner":  "ESFramework acceptance owner",
+                       "skillHash":  "b04e55acfb9375871d50818b005f350fd83115822e6e9e8be395118cbd361e7c",
+                       "governanceHash":  "7dd46de70b1ca5df15773b1dd6d692871311accf1607ad9fa8cc2b8cb8a90bc0",
+                       "evidenceContractBindingHash":  "90e4ba12c5cc8ac1a6d574792e9d336cbca148604aeb63910dc5dca50ec7fb83"
                    },
                    {
                        "skillName":  "es-publish-aitest-prompt",
@@ -981,7 +1036,7 @@
                        "family":  "governance",
                        "owner":  "ESFramework Skill maintainers",
                        "acceptanceOwner":  "designated ESFramework maintainer",
-                       "skillHash":  "f8ba9bf418a855b37c8c4e89794ff05c7ce45643c876aa9e93357f86c6e12bff",
+                       "skillHash":  "cdb87f354449b64c01da45ab77806431d94160e0323fc78b35a9ab635768a1b7",
                        "governanceHash":  "c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1",
                        "evidenceContractBindingHash":  "c66abd799bc12a74a38c8e90563ac210709b41eb418106f4ecf7371a7bd21b65"
                    },
@@ -1013,7 +1068,7 @@
                        "family":  "governance",
                        "owner":  "ESFramework AI governance maintainers",
                        "acceptanceOwner":  "task requester or designated ESFramework maintainer",
-                       "skillHash":  "b36a82da8dbfe955e6bcf5ad21595be218db0d4713cc3ff99f1a23c055777397",
+                       "skillHash":  "2654ed700a1f5e4d81e3803dc4086239eefcffe22d94c497961d92f67f76fb37",
                        "governanceHash":  "f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330",
                        "evidenceContractBindingHash":  "d1cf71aedec6fb4385096e954c7f9a4fb92ac87e91596009924082870ebecbb2"
                    },
@@ -1192,7 +1247,7 @@
                        "family":  "engineering",
                        "owner":  "ESFramework Automation maintainers",
                        "acceptanceOwner":  "task requester",
-                       "skillHash":  "d6a38462550755314177134b0b3475cb80910977cba2e7b2e3a9352848c21b4d",
+                       "skillHash":  "26df2239cf7b254b1f53c3805e669810300de7e00b1b7c9841585dcce592bb13",
                        "governanceHash":  "ba5ca259af3c4415d8ddbf26c6fddf2ec386f8a72f1f213985f74713634171af",
                        "evidenceContractBindingHash":  "c66bcc708e38fd46fa257274a90fb8632225c3521740bca330f4f89966021eda"
                    },
@@ -1266,8 +1321,8 @@
                        "family":  "project-ui",
                        "owner":  "ESFramework Skill maintainers",
                        "acceptanceOwner":  "designated ESFramework maintainer",
-                       "skillHash":  "d0532f5afb93df1b6371598819826b42d64063de1330501ac25633e776503cc3",
-                       "governanceHash":  "6b2b83e55d5063dc82ae9fcd5bf15e6b51e28f8d2b3bd889fc5ecabbf1f55bff",
+                       "skillHash":  "5d19a9c08315f11713d8b0bf8fb7454f6e73e68864d8fd7307400b9094593cf2",
+                       "governanceHash":  "6a4106d0a574b22a64f264886bb910905b09902bd96aa9c961894ea4af304161",
                        "evidenceContractBindingHash":  "2c92e19bb1ed654a3f10fe008ef98dfd9d0f0c733aecae6725b515a83c0bf6c2"
                    },
                    {
@@ -1402,6 +1457,30 @@
                        "skillHash":  "3b821c303da99f48cdf28061287e17be02f467cd7bd1deca01bff322d0077fb0",
                        "governanceHash":  "2fc2fd5ef1cef3fe4cf7074e3c7e49b0f07956001cb2d9a8cd103acf12d12cc6",
                        "evidenceContractBindingHash":  "3cf15bbb75da0b0218073d7f373107834535b6ee285d6b65aaa61f0a5aedda2b"
+                   },
+                   {
+                       "skillName":  "es-web-ui-generation-orchestration",
+                       "maturity":  "Proposed",
+                       "delivery":  "Designed",
+                       "registrationState":  "Draft",
+                       "discoveryState":  "candidate",
+                       "planEligibility":  "advisory-only",
+                       "runtimeEligibility":  "blocked",
+                       "reviewRequired":  true,
+                       "routeKeys":  [
+                                         "knowledge",
+                                         "scheduler",
+                                         "web-page-generation",
+                                         "webpagestudio",
+                                         "web-ui",
+                                         "worker"
+                                     ],
+                       "family":  "project-web",
+                       "owner":  "ESFramework WebPageStudio maintainers",
+                       "acceptanceOwner":  "WebPageStudio owner",
+                       "skillHash":  "35e0416b8c41ab30be9d8d23ecf772eded0b1dca4f8a8a7d7e3c679a48e63cb2",
+                       "governanceHash":  "d91a177623418ae74e61bd5de4284ac8dc4ae2d6683298b25b056d1d96a8d26b",
+                       "evidenceContractBindingHash":  "9957f607f0c315a9c07e535a47ef8d582007dac19047172afc14925fc68f97f8"
                    },
                    {
                        "skillName":  "es-worktree-audit",

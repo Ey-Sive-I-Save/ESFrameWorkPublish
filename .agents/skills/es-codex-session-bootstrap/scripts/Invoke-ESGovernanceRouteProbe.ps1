@@ -97,6 +97,8 @@ if ([string]$decisionInput.scopeKind -eq 'project-global' -and $reason.Count -eq
 if ([string]$decisionInput.routeState -eq 'blocked' -and [string]$decisionInput.effect -ne 'hard-block') { $errors.Add('blocked route requires hard-block effect') }
 if ([string]$decisionInput.effect -eq 'hard-block' -and [string]$decisionInput.routeState -ne 'blocked') { $errors.Add('hard-block effect requires blocked route') }
 $decisionStatus = if ($errors.Count -eq 0) { 'Accepted' } else { 'Rejected' }
+# ReadOnly probe result only: this Accepted value describes route-contract
+# consistency and never declares production completion or authorizes effects.
 [pscustomobject][ordered]@{
     probe = 'Invoke-ESGovernanceRouteProbe'
     probeStatus = 'ReadOnly'

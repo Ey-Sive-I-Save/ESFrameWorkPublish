@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "skillName": "es-ai-space-organization",
-  "sourceRoots": [".agents/skills/es-ai-space-organization", "ES/AISpace"],
+  "sourceRoots": [".agents/skills/es-ai-space-organization", "ES/AISpace", ".agents/SKILL_AISPACE_BINDINGS.json"],
   "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "interruption-recovery", "deterministic-output", "hash-change-cache-invalidation"],
-  "staticClaims": ["local-public-routing", "unity-boundary", "authority-preservation", "no-delete-by-default", "stale-marking", "deterministic-replay"],
+  "staticClaims": ["local-public-routing", "local-temp-routing", "unity-boundary", "authority-preservation", "no-delete-by-default", "stale-marking", "skill-aispace-binding", "deterministic-replay", "single-canonical-authority", "non-redundant-body", "no-competing-root", "no-runtime-competition", "discovery-closure"],
   "runtimeClaimsNotProven": ["Unity import behavior", "runtime asset loading", "multi-process coordination", "release behavior"],
   "runtimeEscalation": {"required": false, "reason": "Directory guidance is static-only."},
   "caseAssertions": {
@@ -13,16 +13,24 @@
     "repeat-idempotency": "re-reading the same path yields the same classification",
     "interruption-recovery": "classification can resume without destructive cleanup",
     "deterministic-output": "the same path and purpose produce the same root",
-    "hash-change-cache-invalidation": "changed authority guidance requires fresh classification"
+    "hash-change-cache-invalidation": "changed authority guidance requires fresh classification",
+    "local-temp-routing": "private temporary screenshots and caches route to Local Temp while Unity-owned captures remain in existing Assets roots",
+    "skill-aispace-binding": "generation/cache-capable Skills have stable binding IDs and a reverse AISpace relation",
+    "authority-identity": "the AISpace authority descriptor names one canonical body and one root identity",
+    "discovery-closure": "all required project discovery entrypoints point to the canonical AISpace body",
+    "non-redundant-body": "pointer/index and historical files do not copy the canonical AISpace body",
+    "no-competing-root": "Unity's AISpace path is an import exit and cannot declare a competing root",
+    "no-runtime-competition": "AISpace has no runtime lease or last-write-wins and stale writes require reread"
   },
   "responsibilityProfile": "governance",
   "responsibilityChecks": ["authority-routing", "permission-boundary", "deterministic-replay"],
   "responsibilityScope": "AI-generated content placement and Local/Public folder guidance only.",
   "specializedAcceptance": {
     "id": "space-organization-static",
-    "requiredStaticCases": ["route-minimality", "authority-preservation", "denied-expansion", "deterministic-routing", "stale-guidance"],
-    "evidenceArtifacts": ["SKILL.md", "references/evidence-receipt-contract.md", "references/static-specialized-acceptance.md", "scripts/Test-es-ai-space-organization-StaticReplay.ps1"],
-    "sourceAssertions": ["local-public-routing", "unity-boundary", "authority-preservation", "no-delete-by-default", "stale-marking"],
+    "title": "AISpace 唯一权威、发现闭包与非竞争静态验收",
+    "requiredStaticCases": ["route-minimality", "authority-preservation", "denied-expansion", "deterministic-routing", "local-temp-routing", "skill-aispace-binding", "asset-purpose-disambiguation", "stale-guidance", "authority-identity", "discovery-closure", "non-redundant-body", "no-competing-root", "no-runtime-competition"],
+    "evidenceArtifacts": ["SKILL.md", "references/evidence-receipt-contract.md", "references/static-specialized-acceptance.md", "scripts/Test-es-ai-space-organization-StaticReplay.ps1", "scripts/Test-ESAISpaceAuthority.ps1", "scripts/Test-ESLocalTempPolicy.ps1", "../../../ES/AISpace/AISPACE_AUTHORITY.json", "../../../ES/AISpace/README.md", "../../../ES/AISpace/Public/LOCAL_TEMP_POLICY.json", "../../../.agents/SKILL_AISPACE_BINDINGS.json", "../es-skill-governance/scripts/Test-ESSkillAISpaceBindings.py"],
+    "sourceAssertions": ["local-public-routing", "local-temp-routing", "unity-boundary", "authority-preservation", "no-delete-by-default", "skill-aispace-binding", "stale-marking", "single-canonical-authority", "non-redundant-body", "no-competing-root", "no-runtime-competition", "discovery-closure"],
     "runtimeBoundary": "Runtime is not required to prove folder ownership routing or path refusal."
   },
   "specializedGuidanceRef": "references/static-specialized-acceptance.md"

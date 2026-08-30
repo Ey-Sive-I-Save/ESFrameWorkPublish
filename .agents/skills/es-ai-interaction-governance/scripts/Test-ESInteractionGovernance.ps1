@@ -21,7 +21,8 @@ foreach($name in @('default','engineering','handover','release','minimal')){if($
 foreach($name in @('default','engineering','handover','release','minimal')){ $d=$p.profiles.$name.dimensionWeights; foreach($k in @('prompt','intent','evidence')){if($null -eq $d.$k){$fail+="missing-dimension-weight:$name.$k"}} }
 $contract=Get-Content (Join-Path $base 'references/interaction-governance-contract.md') -Raw -Encoding utf8
 foreach($k in @('intentAlignmentScore','evidenceQualityScore','calibrationScore','confidenceScore','overallScore','scoreSource')){if($contract -notmatch [regex]::Escape($k)){$fail+="contract-missing:$k"}}
-if($contract -notmatch 'complete icon score line'){$fail+='contract-missing:compact-score-line'}
+$whale=[char]::ConvertFromUtf32(0x1F40B); $toolbox=[char]::ConvertFromUtf32(0x1F9F0)
+if($contract -notmatch [regex]::Escape($whale+' DeepSeek Harness') -or $contract -notmatch [regex]::Escape($toolbox+' Codex Harness') -or $contract -notmatch 'invocation evidence' -or $contract -notmatch 'harnesses\.deepseek' -or $contract -notmatch 'harnesses\.codex'){$fail+='contract-missing:harness-role-line'}
 if($contract -notmatch 'LOW_SCORE_RISK'){$fail+='contract-missing:low-score-risk'}
 if($contract -notmatch 'observationMetrics' -or (Get-Content (Join-Path $base 'scripts/Convert-CodexTranscriptToEvidence.ps1') -Raw -Encoding utf8) -notmatch 'elapsedMs'){$fail+='contract-missing:observation-metrics'}
 $evidenceAssessment=Join-Path $base 'scripts/Invoke-ESInteractionEvidenceAssessment.ps1'
@@ -53,6 +54,7 @@ Assert-ContextCase 'not-started-ambiguous' @{Prompt='host has not started';Start
 Assert-ContextCase 'collected-stale-high-risk' @{Prompt='already collected high risk task';Started=$true;Kind='write';Route='resolved';Fresh='stale';Risk='high';Collected=$true;Recommended=$true;Override=$false;Suppressions=@('already-collected')} $false
 Assert-ContextCase 'explicit-test-override' @{Prompt='fixture override';Started=$true;Kind='read-only';Route='resolved';Fresh='fresh';Risk='low';Collected=$false;Recommended=$true;Override=$true;Suppressions=@()} $true 'test-override'
 $closeout=Get-Content (Join-Path $base 'scripts/Invoke-ESInteractionCloseout.ps1') -Raw -Encoding utf8
+if($closeout -notmatch 'harnesses' -or $closeout -notmatch 'deepSeekHarness' -or $closeout -notmatch 'codexHarness' -or $closeout -notmatch 'external-execution-plane' -or $closeout -notmatch "status='not-called'"){$fail+='closeout-missing:harness-aggregate'}
 if($closeout -notmatch '\$SessionPath' -or $closeout -notmatch '\$SessionId' -or $closeout -notmatch 'Convert-CodexTranscriptToEvidence'){$fail+='closeout-missing:fast-transcript-path'}
 if($contract -notmatch 'low-loss fast path' -or $contract -notmatch 'newest readable snapshot'){$fail+='contract-missing:fast-transcript-path'}
 foreach($k in @('mustPreserve','allowedTransitions','forbiddenTransitions','acceptanceSignals','counterexamples','intentAlignmentStatus','executionDecision','revision')){if($contract -notmatch [regex]::Escape($k)){$fail+="intent-contract-missing:$k"}}

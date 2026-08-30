@@ -1,0 +1,9 @@
+[CmdletBinding()]
+param([string]$ReceiptPath='ES/Output/WebPageStudio/bootstrap/round-07-static-artifact-closeout.json')
+$ErrorActionPreference='Stop';$root=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).Path;$r=Get-Content -Raw -Encoding UTF8 (Join-Path $root $ReceiptPath)|ConvertFrom-Json
+if([string]$r.recordType -cne 'StaticArtifactCloseoutReceipt' -or [string]$r.status -cne 'static-artifact-closed'){throw 'invalid-closeout-receipt'}
+$checks=@();foreach($f in @($r.files)){ $full=[IO.Path]::GetFullPath((Join-Path $root $f.path));if(-not $full.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'unsafe-artifact-path'};if(-not(Test-Path -LiteralPath $full -PathType Leaf)){throw 'artifact-missing'};$actual=(Get-FileHash $full -Algorithm SHA256).Hash.ToLowerInvariant();$checks+=[pscustomobject]@{path=$f.path;hashMatch=($actual -eq [string]$f.sha256);bytesMatch=((Get-Item $full).Length -eq [int64]$f.bytes)}}
+$dir=Join-Path $root $r.artifactRoot;$manifest=Get-Content -Raw -Encoding UTF8 (Join-Path $dir 'manifest.json')|ConvertFrom-Json;$robots=Get-Content -Raw -Encoding UTF8 (Join-Path $dir 'robots.txt');$sitemap=Get-Content -Raw -Encoding UTF8 (Join-Path $dir 'sitemap.xml')
+if([string]::IsNullOrWhiteSpace($manifest.name) -or $robots -notmatch 'User-agent:' -or $sitemap -notmatch '<urlset'){throw 'metadata-content-invalid'};if(@($checks|Where-Object{-not $_.hashMatch -or -not $_.bytesMatch}).Count -gt 0){throw 'artifact-integrity-mismatch'}
+[string]::IsNullOrWhiteSpace([string]$r.evidenceBindings.jsSyntax)|Out-Null;if($null -eq $r.PSObject.Properties['evidenceBindings'] -or @($r.evidenceBindings.PSObject.Properties).Count -lt 4){throw 'evidence-binding-missing'}
+[pscustomobject]@{status='passed';fileCount=$checks.Count;checks=$checks;metadata='passed';releaseStatus=$r.releaseStatus;runtimeStatus=$r.runtimeStatus}|ConvertTo-Json -Depth 20

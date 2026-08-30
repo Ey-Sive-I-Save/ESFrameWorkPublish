@@ -1,0 +1,86 @@
+schemaVersion: 1
+matrixId: es-web-ui-generation-orchestration-capability-coverage
+status: implemented-unverified
+authority:
+  workflow: .agents/skills/es-web-ui-generation-orchestration/SKILL.md
+  source:
+    - ES/Automation/WebPageStudio/Invoke-ESWebUiSubAgentProjection.ps1
+    - ES/Automation/WebPageStudio/Invoke-ESWebUiSubAgentSchedule.ps1
+    - ES/Automation/WebPageStudio/ESWebUiSubAgentScheduler.psm1
+  contracts:
+    - ES/Automation/Contracts/es-task-collaboration-plan-v1.schema.json
+    - ES/Automation/Contracts/es-task-lease-cas-v1.schema.json
+    - ES/Automation/Contracts/es-task-result-envelope-v1.schema.json
+    - ES/Automation/Contracts/es-task-parent-aggregation-v1.schema.json
+evidenceBoundary:
+  static: [contract, plan, admission, queue, lease-observation, retry-fixture, cancellation-fixture, utf8]
+  runtime: [external-worker, persistent-cas, process-timing, browser-dom, unity, deployment]
+  runtimeStatus: runtime-not-run
+capabilities:
+  - id: request-decomposition
+    current: passed-static
+    implementation: four-layer children network/preview/visual/release
+    gap: none-known-static
+  - id: dependency-planning
+    current: passed-static
+    implementation: serial-preparation->parallel-evidence->validation->aggregation
+    gap: persistent plan store
+  - id: ready-queue
+    current: replay-only
+    implementation: ESWebUiSubAgentScheduler.psm1 current-wave filtering and budget bound
+    gap: durable queue and cross-process fairness
+  - id: concurrency-control
+    current: replay-only
+    implementation: maxParallel admission and maxObservedConcurrency receipt
+    gap: host-level semaphore and throughput evidence
+  - id: lease-cas
+    current: observation-only
+    implementation: New-ESLeaseClaim/Test-ESLeaseCas with task/context revisions
+    gap: atomic persistent LeaseStore/CAS
+  - id: cancellation
+    current: bounded-replay
+    implementation: child/tree cancellation propagation and terminal cancelled state after valid lease observation
+    gap: cooperative worker acknowledgement and expired-lease recovery
+  - id: retry-recovery
+    current: bounded-replay
+    implementation: attempt counter, configurable backoff gate, retry re-entry and exhaustion guard
+    gap: retryable allowlist, jitter, idempotency and durable recovery
+  - id: evidence-aggregation
+    current: passed-static
+    implementation: verificationHash-bound envelopes and parent aggregation
+    gap: runtime evidence freshness and release sign-off
+  - id: observability
+    current: static-receipt
+    implementation: event chronology, counts, hashes and nonClaims
+    gap: durable RunRecord, metrics/traces and incident replay
+  - id: external-worker-execution
+    current: not-implemented
+    implementation: ESAutomationProcessRunner exists as a leaf executor only
+    gap: scheduler-owned worker handles, isolation, timeout and process-tree recovery
+openSourcePatternComparison:
+  - pattern: bounded-work-stealing-or-ready-queue
+    adopted: deterministic-wave ready queue
+    remaining: durable fairness and starvation metrics
+  - pattern: lease-based-distributed-claims
+    adopted: revision-bound lease observation
+    remaining: atomic persistent CAS and lease renewal
+  - pattern: structured-concurrency-cancellation
+    adopted: parent cancellation state and child terminal classification
+    remaining: cancellation propagation/acknowledgement across workers
+  - pattern: retry-with-idempotency
+    adopted: attempt and reason-code envelope
+    remaining: retry policy, backoff, deduplication and replay-safe side effects
+  - pattern: evidence-first-orchestration
+    adopted: verification wave and hash-bound aggregation
+    remaining: target-host runtime and release evidence
+acceptance:
+  staticChecks:
+    - Test-ESWebUiSubAgentAdmission.ps1
+    - Test-ESWebUiSubAgentSchedule.ps1
+    - Test-ESWebUiSubAgentScheduler.ps1
+    - Test-ESWebUiClosureStaticReplay.ps1
+  requiredNonClaims:
+    - no-runtime-worker-proof
+    - no-persistent-cas-proof
+    - no-browser-or-unity-proof
+    - no-release-proof

@@ -62,6 +62,20 @@ $wrap = & $resolver -ProjectRoot $ProjectRoot -PromptText $wrapText | ConvertFro
 if ($wrap.status -ne "triggered" -or $wrap.selected.operation -ne "PromptAutoWrapToggle") { throw "Prompt auto-wrap semantic is missing." }
 $prompt = & $resolver -ProjectRoot $ProjectRoot -PromptText $promptText | ConvertFrom-Json
 if ($prompt.status -ne "triggered" -or $prompt.selected.operation -ne "PromptAutoWrapToggle") { throw "Prompt semantic alias is missing." }
+# The collaboration-menu host must consume the canonical resolver rather than
+# reimplementing semantic matching or treating menu discovery as execution.
+$menuHost = Join-Path $ProjectRoot ".agents\skills\es-ai-collaboration-menu\scripts\Invoke-ESCollaborationMenu.ps1"
+$menuSource = Get-Content -LiteralPath $menuHost -Raw -Encoding UTF8
+if ($menuSource -notmatch "Resolve-ESSuperSemantics\.ps1" -or
+    $menuSource -notmatch '\$superSemanticResolution' -or
+    $menuSource -notmatch 'superSemanticResolution=\$superSemanticResolution') {
+    throw "Collaboration menu host does not consume or expose canonical super-semantics resolution."
+}
+$menu = & $menuHost -PromptText "menu" | ConvertFrom-Json
+if ($menu.superSemanticResolution.status -ne "not-triggered" -or
+    $menu.capabilityPolicy.canWrite -ne $false) {
+    throw "Collaboration menu host widened authority or failed to return semantic resolution."
+}
 Write-Output "passed"
 
 

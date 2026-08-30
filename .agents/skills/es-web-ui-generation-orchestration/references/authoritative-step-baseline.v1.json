@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "es.web.generation.authoritative-step-baseline.v1",
+  "authority": "current-user-direct + platform contracts",
+  "mode": "strict-sequential",
+  "skipPolicy": {"allowSkip": false, "allowReorder": false, "allowSyntheticReceipt": false, "upstreamBlockPropagation": true},
+  "invocationTiming": {
+    "taskFocus": {"phase":"before-intent-lock-and-before-knowledge-route","invoke":"once-per-user-goal-revision","input":"latest user message + explicit scope","freeze":"focusId, focusRevision, allowedScope, forbiddenScope","reinvoke":"only after explicit user goal revision or reopen","forbidden":"silent reset, scope expansion, post-generation focus rewrite"},
+    "taskContext": {"phase":"after-focus-accepted-and-intent-lock-passed; before-knowledge-route","invoke":"create-once-per-goal-revision","input":"IntentLockReceipt + FocusContextReceipt + immutable RoutePlan","freeze":"TaskId, GoalRevision, sourceScope, RoutePlan hash, AcceptanceProfile, ContextVersion","reinvoke":"only through explicit Reopen/new GoalRevision","forbidden":"late creation, replacement context, synthetic task, completion before evidence-closeout"},
+    "completion": {"phase":"after-evidence-closeout","invoke":"platform evaluator only","freeze":"CompletionReceipt and deliveryAcceptance independently","forbidden":"Skill/SubAgent/Worker self-acceptance"}
+  },
+  "requiredResources": {
+    "taskContext": {"contract":"ES/Automation/Contracts/es-task-context-runtime-intent-v1.json","role":"goal revision, source scope, CAS and completion evidence"},
+    "taskFocus": {"read":"ES/Automation/TaskFocusContext/README.md","role":"focus proposal and scope containment"},
+    "subAgent": {"read":"ES/Automation/TaskCollaboration/ESTaskCollaborationContracts.psm1","role":"bounded child identity, dependency and result envelope; no autonomous authority"},
+    "abcd": {"read":"ES/Automation/Contracts/es-ai-abc-core-v1.json","role":"bounded action, recovery, branch evaluation, transition guard, trust gate and evidence chain"},
+    "knowledge": {"read":"Documentation/AIKnowledge/AIBRAIN_ENTRY.md","index":"Documentation/AIKnowledge/KnowledgeIndex.yaml","role":"matched source-bound decisions only"},
+    "routePlan": {"read":"ES/Automation/Contracts/es-route-stage.registry.json","role":"immutable stage order and route membership"},
+    "resourceIndex": {"read":".agents/SKILL_RESOURCE_INDEX.yaml","role":"skill/reference/script discovery"}
+  },
+  "stages": [
+    {"ordinal":1,"id":"requirement-intake","requiredReads":["AGENTS.md","ES/AISpace/README.md"],"produces":"RequirementIntakeReceipt"},
+    {"ordinal":2,"id":"task-focus-lock","requiredReads":["taskFocus"],"produces":"FocusContextReceipt"},
+    {"ordinal":3,"id":"intent-lock","requiredReads":["RequirementIntakeReceipt"],"produces":"IntentLockReceipt"},
+    {"ordinal":4,"id":"task-context-create","requiredReads":["IntentLockReceipt","FocusContextReceipt","taskContext"],"produces":"TaskContextReceipt"},
+    {"ordinal":5,"id":"knowledge-route","requiredReads":["knowledge","resourceIndex","TaskContextReceipt"],"produces":"KnowledgeDecisionReceipt"},
+    {"ordinal":6,"id":"source-evidence","requiredReads":["open-source-source-manifest.json"],"produces":"SourceEvidenceReceipt"},
+    {"ordinal":7,"id":"abcd-capability-plan","requiredReads":["abcd","routePlan"],"produces":"CapabilityPlanReceipt"},
+    {"ordinal":8,"id":"subagent-plan","requiredReads":["subAgent","TaskContextReceipt"],"produces":"ChildTaskPlanReceipt"},
+    {"ordinal":9,"id":"design-synthesis","requiredReads":["IntentLockReceipt","FocusContextReceipt","KnowledgeDecisionReceipt","CapabilityPlanReceipt"],"produces":"DesignDecisionReceipt"},
+    {"ordinal":10,"id":"materialization","requiredReads":["DesignDecisionReceipt","ChildTaskPlanReceipt"],"produces":"ArtifactManifestReceipt"},
+    {"ordinal":11,"id":"evidence-closeout","requiredReads":["ArtifactManifestReceipt","TaskContextReceipt"],"produces":"CompletionEvidenceReceipt"}
+  ],
+  "stageReceiptContract": {"requiredFields":["baselineId","stageId","ordinal","inputHashes","requiredReads","aiAnalysis","execution","returnReceipt","decision","nonClaims"],"statusValues":["blocked","candidate","accepted","failed"]},
+  "hardBlocks":["missing-required-read","upstream-stage-not-accepted","receipt-missing","input-hash-drift","scope-expansion","synthetic-output"],
+  "nonClaims":["resource binding does not grant runtime/network/Unity/Git/release authority","static acceptance does not prove external AI invocation","subAgent plan does not prove worker execution"]
+}

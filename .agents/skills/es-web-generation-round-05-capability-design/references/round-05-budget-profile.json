@@ -1,0 +1,20 @@
+{
+  "profileId": "web-design-deep-v2",
+  "maxRounds": 24,
+  "maxBranches": 256,
+  "maxModelCalls": 128,
+  "maxEvaluations": 512,
+  "stageBudgets": {
+    "template-divergence": {"modelCalls": 24, "evaluations": 64},
+    "motion-selection": {"modelCalls": 16, "evaluations": 48},
+    "style-calibration": {"modelCalls": 12, "evaluations": 32},
+    "innovation-limit": {"modelCalls": 8, "evaluations": 24},
+    "tree-expansion": {"modelCalls": 24, "evaluations": 64},
+    "global-convergence": {"modelCalls": 8, "evaluations": 48},
+    "player-replay": {"modelCalls": 8, "evaluations": 48},
+    "counterplay-audit": {"modelCalls": 8, "evaluations": 48},
+    "candidate-tournament": {"modelCalls": 16, "evaluations": 32}
+  },
+  "fanOut": {"min": 2, "max": 4, "adaptive": true},
+  "stopConditions": ["budget-exhausted", "no-valid-seed", "critical-integrity-failure", "user-stop"]
+}

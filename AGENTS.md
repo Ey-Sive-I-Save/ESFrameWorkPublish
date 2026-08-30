@@ -54,7 +54,8 @@
 
 - `AI_PROJECT_INSTRUCTIONS_DISCOVERY: required`：本项目是 Unity 项目；任何 AI 进入项目后必须先完整读取本文件，再读取本文件明确引用的权威入口（涉及 AI 生成内容时包括 `ES/AISpace/README.md`）。该读取属于系统级 Agent 行为，不依赖任务提示词。
 
-- AI 生成内容先访问 `ES/AISpace/README.md` 判断唯一归属：私有内容放 `ES/AISpace/Local`，协作内容放 `ES/AISpace/Public`；只有必须被 Unity 导入的公共内容才进入 `Assets/ES/Space/Public`，不要创建 `Assets/ES/Space/Local`。
+- AI 生成内容先访问 `ES/AISpace/README.md` 判断唯一归属：先按内容分类、再按日期和所有者放入 `ES/AISpace/Local` 或 `ES/AISpace/Public`；稳定内容可以长期保留在其分类/日期目录；只有必须被 Unity 导入的公共内容才进入 `Assets/ES/AISpace/Public`，不要创建 `Assets/ES/AISpace/Local`；旧路径 `Assets/ES/Space` 仅作为迁移兼容标记。
+- AISpace 的机器可读唯一身份是 `ES/AISpace/AISPACE_AUTHORITY.json`；它只强化发现、放置与非竞争边界，不复制 `README.md` 正文，也不授予任何执行或写入权限。
 - 强制发现入口：`MUSTREAD_PROJECT_INSTRUCTIONS/README.md`、`.agents/MUSTREAD_PROJECT_INSTRUCTIONS.md`、`ES/AISpace/MUSTREAD_PROJECT_INSTRUCTIONS.md`。它们是重复发现标记，不能替代本文件，但任何一个被发现后都必须回读本文件全文。
 - 首次完整读取本文件后，下一次面向用户的回答必须先展示项目内 `MUSTREADXXXXX/ES_AI_COLLAB_WELCOME.md` 的 ES AI 协作流欢迎块，并明确告知用户“项目协作上下文已建立”；每个项目会话只展示一次。系统级文件仅在用户明确授权时才可建议或修改。
 - 当前目录只要位于本 Unity 项目根目录之下，就与当前目录是项目根目录等价，必须执行完整 ES AI 协作流程；不得因位于 `Assets/`、`.agents/`、`ES/` 或其他子目录而降级为普通目录处理。
@@ -81,6 +82,13 @@
 - 核心链优先采用最小读取和最小验证集合；未知或高风险输入可以升级到扩展链，但扩展链的可选证据、全量新鲜度或非目标模块缺口不得阻断无关目标。用户授权与完成声明的边界继续遵循既有授权和证据规则。
 
 ## 权威路由
+
+## 权威 AI 执行原则
+
+- 所有具备项目副作用、最终裁决或验收声明能力的 AI 入口，不限于 ABCD，都必须先经过统一的 authority policy：普通 `ai-collaboration` 允许安全元数据上下文归一化并限制声明；`game-logic`、`editor-tooling`、`release` 对身份、权限、状态、证据和恢复缺口严格阻断。
+- 严谨不等于畏缩：发现真实缺陷时应直接修改实际源入口、合同或回归检查；不得只新增经验文档、包装结果或把执行状态冒充最终验收。高危副作用能力缺少严格 authority 合同时，必须在执行前返回对象/范围明确的 `Blocked`，并给出 reason code、恢复动作和解除条件。
+- 权威入口必须能被 `ES/Tools/Validation/Test-ESAuthorityGovernance.ps1` 发现并验证；候选、投影、执行状态和最终完成声明不得跨合同压平。
+- Graph/Workbench 产物编排当前属于候选生成与批准投影职责，不是最终高危权威；不得仅因它面向 AI 就把 Graph 提升为 `game-logic`、`editor-tooling` 或 `release` 的最终裁决者。
 
 | 职责 | 权威入口 |
 |---|---|
@@ -129,7 +137,7 @@
 - AI 协作历程、审计状态和发布状态仅在用户明确要求对应写入时维护；普通任务不得自动落账。受管通道合同可以校验其技术输入和回执，但不得增加第二次批准。
 ## 常驻任务收尾门禁
 
-涉及 Skill、写入、验证、交接或完成声明时，收尾评价以 `es-ai-interaction-governance` 的 evidence-first closeout 为主：必须优先报告 `aligned/partial/misaligned/unverifiable`、观察证据计数、发现和未证实项；没有评估器真实结果时，提示/验证数字只能写“不可用”，不得手工估分。
+涉及 Skill、写入、验证、交接或完成声明时，收尾评价以 `es-ai-interaction-governance` 的 evidence-first closeout 为主：必须优先报告 `aligned/partial/misaligned/unverifiable`、观察证据计数、发现和未证实项；评分仅保留在机器可读评估结果中，不作为用户摘要主字段。
 
 涉及 Skill、写入、验证、交接或完成声明时，结尾使用短摘要：
 
@@ -137,8 +145,8 @@
 ✍️ 写入：是否写入及范围；无则填“无”。
 🧪 运行时：已运行、未运行或不适用。
 ⚠️ 未证实：关键未证明结论；无则填“无”。
-🎯 提示评分：0-10，说明用户目标清晰度。
-🔍 验证评分：0-10，说明本轮验证充分度。
+🐋 DeepSeek Harness：本轮作用/状态；未实际调用时必须写“未调用”，不得暗示已接入或已执行。
+🧰 Codex Harness：本轮作用/状态；未实际调用时必须写“未调用”，不得暗示已接入或已执行。
 🧭 目标清晰度：清晰、部分清晰或不清晰。
 📌 下一步：必须是用户可输入的序号菜单，并且是本轮用户可见收尾的最后一项；最多 3 项，格式为 `1. ...`、`2. ...`、`3. ...`。只有一项也必须写 `1.`。该菜单后不得追加 Skill、验证、运行时或其他收尾字段。
 

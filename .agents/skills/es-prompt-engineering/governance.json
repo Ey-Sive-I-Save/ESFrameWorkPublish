@@ -22,16 +22,18 @@
   "requiredAuthorityRefs": ["AGENTS.md", ".agents/README.md", "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md", "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md", "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md"],
   "taskContractRequired": false,
   "verificationProfiles": {
-    "StaticReview": {"required": ["schema", "deterministic-wrapper", "permission-boundary", "regression-cases"], "runtimeRequired": false, "staticWeight": 1.0, "runtimeWeight": 0.0, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": true},
-    "EngineeringReadiness": {"required": ["StaticReview"], "runtimeRequired": false, "runtimeOptional": true, "staticWeight": 1.0, "runtimeWeight": 0.0, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": true}
+    "StaticReview": {"required": ["schema", "deterministic-wrapper", "permission-boundary", "regression-cases"], "runtimeRequired": false, "staticWeight": 1.0, "runtimeWeight": 0.0, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": false},
+    "EngineeringReadiness": {"required": ["StaticReview"], "runtimeRequired": false, "runtimeOptional": true, "staticWeight": 1.0, "runtimeWeight": 0.0, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": false},
+    "RuntimeAcceptance": {"required": ["StaticReview"], "runtimeRequired": false, "runtimeOptional": true, "staticWeight": 1.0, "runtimeWeight": 0.0, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": false},
+    "ReleaseAcceptance": {"required": ["StaticReview"], "runtimeRequired": false, "runtimeOptional": true, "staticWeight": 1.0, "runtimeWeight": 0.0, "staticDeepReplayRequired": true, "runtimeAuthorizationRequired": false}
   },
   "runtimeNotRunPolicy": "runtime-not-run does not block StaticReview; this Skill makes no Runtime claim.",
   "defaultVerificationOrder": "StaticDeepReplay-first",
-  "runtimeExecutionPolicy": "explicit-user-authorization-only",
-  "developerAuthorizationRequired": true,
+  "runtimeExecutionPolicy": "not-applicable",
+  "developerAuthorizationRequired": false,
   "staticDeepReplayRequired": true,
   "staticDeepReplayCases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
   "runtimeAuthorizationContractRef": ".agents/skills/es-skill-governance/references/runtime-authorization-contract.md",
   "runtimeAuthorizationValidator": ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1",
-  "runtimeHardGate": "runtime-required && runtime-not-run => Blocked"
+  "runtimeHardGate": "not-applicable"
 }

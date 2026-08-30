@@ -10,8 +10,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = if ([string]::IsNullOrWhiteSpace($ProjectPath)) { (Resolve-Path (Join-Path $scriptRoot '..\..\..\..')).Path } else { (Resolve-Path $ProjectPath).Path }
-$planFull = (Resolve-Path $PlanPath).Path
+$projectRootCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) { [IO.Path]::GetFullPath((Join-Path $scriptRoot '..\..\..\..')) } else { [IO.Path]::GetFullPath($ProjectPath) }
+$projectRoot = (Resolve-Path -LiteralPath $projectRootCandidate).Path
+$sharedPathBoundary = Join-Path $projectRoot '.agents/skills/es-skill-governance/scripts/ESPathBoundary.Common.ps1'
+if (-not (Test-Path -LiteralPath $sharedPathBoundary -PathType Leaf)) { throw 'Shared path boundary contract is missing.' }
+. $sharedPathBoundary
+$planCandidate = [IO.Path]::GetFullPath($PlanPath)
+$projectPrefix = ([IO.Path]::GetFullPath($projectRoot)).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+$tempPrefix = ([IO.Path]::GetFullPath([IO.Path]::GetTempPath())).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+if (-not ($planCandidate.StartsWith($projectPrefix,[StringComparison]::OrdinalIgnoreCase) -or $planCandidate.StartsWith($tempPrefix,[StringComparison]::OrdinalIgnoreCase))) { throw 'PlanPath must remain within ProjectPath or the approved system Temp root.' }
+$planFull = (Resolve-Path -LiteralPath $planCandidate).Path
 $plan = Get-Content -LiteralPath $planFull -Raw -Encoding UTF8 | ConvertFrom-Json
 if (-not $plan) {
     [pscustomobject][ordered]@{
@@ -37,6 +45,20 @@ function Get-Sha256([string]$text) {
     try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text))).Replace('-', '').ToLowerInvariant()) }
     finally { $sha.Dispose() }
 }
+function Get-ProjectIdentityFingerprint([string]$Root) {
+    $identityFiles = @('AGENTS.md','ProjectSettings/ProjectVersion.txt')
+    $parts = foreach ($relative in $identityFiles) {
+        $full = (Resolve-ESContainedRelativePath -Candidate $relative -ContainerRoot $Root -Label 'ProjectIdentityFile').FullPath
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Project identity file is missing: $relative" }
+        $hash = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$relative|$hash"
+    }
+    return Get-Sha256 (($parts | Sort-Object) -join "`n")
+}
+$projectIdentityFingerprint = Get-ProjectIdentityFingerprint $projectRoot
+$declaredProjectIdentity = [string]$plan.projectIdentityFingerprint
+if (($Launch -or $Reissue) -and [string]::IsNullOrWhiteSpace($declaredProjectIdentity)) { throw 'Project identity fingerprint is required for Launch or Reissue.' }
+if (-not [string]::IsNullOrWhiteSpace($declaredProjectIdentity) -and $declaredProjectIdentity -cne $projectIdentityFingerprint) { throw 'Project identity fingerprint does not match the selected ProjectPath.' }
 
 $seenTask = @{}
 $seenResponsibility = @{}
@@ -101,7 +123,7 @@ foreach ($entry in $entries) {
     try {
         if ($mode -eq 'New') {
             $launcher = Join-Path $scriptRoot 'Start-ESCodexSession.ps1'
-            $args = @{ Mode='New'; ProjectPath=$projectRoot; TaskKey=$taskKey; ResponsibilityKey=$responsibility; TabTitle=$tabTitle; TaskPrompt=''; DeferTaskPrompt=$true }
+            $args = @{ Mode='New'; ProjectPath=$projectRoot; ProjectIdentityFingerprint=$projectIdentityFingerprint; TaskKey=$taskKey; ResponsibilityKey=$responsibility; TabTitle=$tabTitle; TaskPrompt=''; DeferTaskPrompt=$true }
             if ($DryRun) { $args.DryRun=$true }
             $out = & $launcher @args 2>&1
             $launchResult = @($out | Where-Object { $_.PSObject.Properties.Name -contains 'contextAccepted' } | Select-Object -Last 1)[0]
@@ -117,7 +139,7 @@ foreach ($entry in $entries) {
             }
         } else {
             $orchestrator = Join-Path $projectRoot 'ES\AI协作历程（Codex）\Tools\Complete-ESCodexHandoff.ps1'
-            $args = @{ SessionPath=$sessionPath; ArchivePath=$archivePath; ProjectPath=$projectRoot; TaskKey=$taskKey; ResponsibilityKey=$responsibility; TabTitle=$tabTitle; TaskPrompt=$prompt; OpenNew=$true; DryRun=$DryRun }
+            $args = @{ SessionPath=$sessionPath; ArchivePath=$archivePath; ProjectPath=$projectRoot; ProjectIdentityFingerprint=$projectIdentityFingerprint; TaskKey=$taskKey; ResponsibilityKey=$responsibility; TabTitle=$tabTitle; TaskPrompt=$prompt; OpenNew=$true; DryRun=$DryRun }
             if ($mode -eq 'Reissue' -and -not $Reissue) { $item.status='NeedsReissue'; $item.reasonCode='ExplicitReissueRequired'; $results += [pscustomobject]$item; continue }
             $out = & $orchestrator @args 2>&1
         }
@@ -142,7 +164,7 @@ foreach ($result in $results) {
 $failed = @($results | Where-Object { $_.status -in @('InvalidPlan','NeedsInputs','NeedsReissue','PreflightFailed','Failed') }).Count
 $operatorMessage = if ($failed -eq 0) { 'Plan accepted and preflighted; responsibility delivery is proven only by ContextAccepted.' } elseif ($failed -eq $entries.Count) { 'Request accepted, but no responsibility meets the start conditions. Follow each item userMessage and retry.' } else { 'Request accepted; some responsibilities are prepared while others remain paused for missing input or evidence.' }
 [pscustomobject][ordered]@{
-    operation='MultiLaunch'; status=if($failed -eq 0){'Prepared'}else{'NeedsInputs'}; userMessage=$operatorMessage; batchId=$batchId; batchFingerprint=(Get-Sha256 $canonical); projectRoot=$projectRoot
+    operation='MultiLaunch'; status=if($failed -eq 0){'Prepared'}else{'NeedsInputs'}; userMessage=$operatorMessage; batchId=$batchId; batchFingerprint=(Get-Sha256 $canonical); projectRoot=$projectRoot; projectIdentityFingerprint=$projectIdentityFingerprint
     requestedCount=$entries.Count; waveCount=[math]::Ceiling($entries.Count / [double]$MaxParallel); preparedCount=@($results | Where-Object status -in @('Prepared','DryRunPrepared')).Count
     launchedCount=@($results | Where-Object status -eq 'Launched').Count; failedCount=$failed
     partialFailure=($failed -gt 0 -and $failed -lt $entries.Count); maxParallel=$MaxParallel

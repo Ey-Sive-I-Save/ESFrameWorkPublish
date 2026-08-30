@@ -48,7 +48,20 @@ function Test-TextExtension([string]$Path) {
     $fileName = [IO.Path]::GetFileName($Path).ToUpperInvariant()
     if ($fileName -eq 'LICENSE' -or $fileName.StartsWith('LICENSE.') -or $fileName -eq 'NOTICE' -or $fileName.StartsWith('NOTICE.')) { return $true }
     $extensions = @('.cs','.csproj','.sln','.props','.targets','.ts','.tsx','.js','.jsx','.mjs','.c','.h','.cc','.cpp','.cxx','.hpp','.py','.go','.rs','.java','.kt','.swift','.json','.yaml','.yml','.md','.txt','.xml','.shader','.asmdef','.toml','.ini','.sql','.css','.scss','.html','.vue')
-    return $extensions -contains ([IO.Path]::GetExtension($Path).ToLowerInvariant())
+    if ($extensions -contains ([IO.Path]::GetExtension($Path).ToLowerInvariant())) { return $true }
+    # Whole-repository mode also covers extensionless/opaque-text project
+    # files such as `.gitignore`, `.env.example`, `.mdc`, `.snap`, and shell
+    # helpers.  Treat a file as text only when strict UTF-8 decoding succeeds,
+    # it has no NUL byte, and it contains no material control-character run;
+    # this keeps binary assets out of lexical replacement without maintaining
+    # an unbounded extension allow-list.
+    try {
+        $bytes = [IO.File]::ReadAllBytes($Path)
+        if ([Array]::IndexOf($bytes, [byte]0) -ge 0) { return $false }
+        $decoded = ([Text.UTF8Encoding]::new($false, $true)).GetString($bytes)
+        $controls = [Regex]::Matches($decoded, '[\x00-\x08\x0B\x0C\x0E-\x1F]').Count
+        return ($controls -eq 0 -or $controls -lt [Math]::Max(1, [Math]::Floor($decoded.Length * 0.01)))
+    } catch { return $false }
 }
 
 function Test-DeclarationExtension([string]$Path) {
@@ -113,7 +126,10 @@ function ConvertTo-DeclarationScanText([string]$Text) {
 }
 
 function Get-FileSha256([string]$Path) {
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($Path)
+    try { return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+    finally { $stream.Dispose(); $sha.Dispose() }
 }
 
 function Get-TreeSha256([array]$Files) {
@@ -158,18 +174,8 @@ if (($sourceItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { th
 $reparse = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -Force | Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
 if ($reparse.Count -gt 0) { throw "Source tree contains reparse points: $($reparse[0].FullName)" }
 $mapReceiptPath = [IO.Path]::ChangeExtension($mapFull, '.receipt.json')
-if ((Test-PathWithin $mapFull $controlDirectory) -and (Test-Path -LiteralPath $mapFull -PathType Leaf) -and (Test-Path -LiteralPath $mapReceiptPath -PathType Leaf)) {
-    $existingInPlaceMap = Get-Content -LiteralPath $mapFull -Raw -Encoding UTF8 | ConvertFrom-Json
-    $existingInPlaceReceipt = Get-Content -LiteralPath $mapReceiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([string]$existingInPlaceReceipt.status -eq 'passed' -and [string]$existingInPlaceReceipt.planHash -eq [string]$existingInPlaceMap.generation.planHash) {
-        $existingInPlaceReceipt | Add-Member -NotePropertyName idempotentReplay -NotePropertyValue $true -Force
-        $existingInPlaceReceipt | Add-Member -NotePropertyName sourceTreeReplay -NotePropertyValue $true -Force
-        $existingInPlaceReceipt | ConvertTo-Json -Depth 12
-        exit 0
-    }
-}
 
-$allFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object {
+$allFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -Force -File | ForEach-Object {
         $relative = Get-RelativePath $sourceFull $_.FullName
         if (-not (Test-HashExcludedPath $relative)) {
             [pscustomobject]@{ FullName = $_.FullName; RelativePath = $relative; IsText = (Test-TextExtension $_.FullName); Length = $_.Length }
@@ -182,6 +188,33 @@ if ($totalBytes -gt $MaxBytes) { throw "Source byte limit exceeded: $totalBytes 
 $eligibleFiles = @($allFiles | Where-Object { -not (Test-ExcludedPath $_.RelativePath) })
 $excludedProFiles = @($allFiles | Where-Object { $_.RelativePath.ToLowerInvariant().StartsWith('src/pro/') -or $_.RelativePath.ToLowerInvariant() -eq 'src/pro' }).Count
 $sourceTreeHash = Get-TreeSha256 $allFiles
+
+# An in-place map is reusable only when the accepted remap manifest still
+# accompanies the transformed checkout, or when the source tree itself is
+# unchanged.  The previous early replay check trusted the map alone, so a
+# restore/recovery followed by a fresh run could silently reuse a stale map.
+# Keep replay idempotent while forcing regeneration after recovery or drift.
+if ((Test-PathWithin $mapFull $controlDirectory) -and (Test-Path -LiteralPath $mapFull -PathType Leaf) -and (Test-Path -LiteralPath $mapReceiptPath -PathType Leaf)) {
+    $existingInPlaceMap = Get-Content -LiteralPath $mapFull -Raw -Encoding UTF8 | ConvertFrom-Json
+    $existingInPlaceReceipt = Get-Content -LiteralPath $mapReceiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $manifestPath = Join-Path $controlDirectory 'es-remap-manifest.json'
+    $remapReceiptPath = Join-Path $controlDirectory 'es-remap-receipt.json'
+    $manifestAccepted = $false
+    if ((Test-Path -LiteralPath $manifestPath -PathType Leaf) -and (Test-Path -LiteralPath $remapReceiptPath -PathType Leaf)) {
+        try {
+            $manifestState = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $remapState = Get-Content -LiteralPath $remapReceiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $manifestAccepted = ([string]$manifestState.status -eq 'written-in-place' -and [string]$remapState.status -eq 'passed')
+        } catch { $manifestAccepted = $false }
+    }
+    $sourceTreeUnchanged = ([string]$existingInPlaceMap.source.treeSha256 -eq $sourceTreeHash)
+    if ([string]$existingInPlaceReceipt.status -eq 'passed' -and [string]$existingInPlaceReceipt.planHash -eq [string]$existingInPlaceMap.generation.planHash -and ($manifestAccepted -or $sourceTreeUnchanged)) {
+        $existingInPlaceReceipt | Add-Member -NotePropertyName idempotentReplay -NotePropertyValue $true -Force
+        $existingInPlaceReceipt | Add-Member -NotePropertyName sourceTreeReplay -NotePropertyValue $sourceTreeUnchanged -Force
+        $existingInPlaceReceipt | ConvertTo-Json -Depth 12
+        exit 0
+    }
+}
 
 $resolvedToken = $SourceToken
 if ([string]::IsNullOrWhiteSpace($resolvedToken)) {
@@ -199,6 +232,7 @@ $rootIdentifier = ConvertTo-Identifier $resolvedToken
 if ([string]::IsNullOrWhiteSpace($rootIdentifier)) { throw 'Unable to derive a source identifier; pass -SourceToken.' }
 
 $textSeeds = [Collections.Generic.List[string]]::new()
+$packageBrandingWarnings = [Collections.Generic.List[string]]::new()
 function Add-TextSeed([string]$Value) {
     $normalized = if ($null -eq $Value) { '' } else { $Value.Trim() }
     if (-not [string]::IsNullOrWhiteSpace($normalized) -and -not ($textSeeds -ccontains $normalized)) {
@@ -216,13 +250,45 @@ if (Test-Path -LiteralPath $packagePath -PathType Leaf) {
             $property = $packageForBranding.PSObject.Properties[$propertyName]
             if ($null -eq $property) { continue }
             if ($property.Value -is [string]) { Add-TextSeed ([string]$property.Value) }
-            elseif ($property.Value -and $property.Value.name) { Add-TextSeed ([string]$property.Value.name) }
+            elseif ($property.Value) {
+                if ($property.Value.name) { Add-TextSeed ([string]$property.Value.name) }
+                if ($property.Value.email) { Add-TextSeed ([string]$property.Value.email) }
+            }
         }
         foreach ($contributor in @($packageForBranding.contributors)) {
             if ($contributor -is [string]) { Add-TextSeed ([string]$contributor) }
-            elseif ($contributor -and $contributor.name) { Add-TextSeed ([string]$contributor.name) }
+            elseif ($contributor) {
+                if ($contributor.name) { Add-TextSeed ([string]$contributor.name) }
+                if ($contributor.email) { Add-TextSeed ([string]$contributor.email) }
+            }
         }
-    } catch { }
+    } catch {
+        [void]$packageBrandingWarnings.Add('package.json branding seeds unavailable: ' + $_.Exception.Message)
+    }
+}
+
+# Declaration discovery is lexical rather than AST-backed. Preserve a small
+# high-confidence set of language/tooling identifiers so whole-text mode does
+# not turn executable protocol tokens (`git`, `path`, `run`, ... ) into
+# `ESgit`/`ESpath` and break scripts or package tooling. A name that carries
+# the repository identity (for example `getDyadAppPath`) is still remapped.
+$genericIdentifierPrefixes = @(
+    'git','path','node','run','request','response','entry','route','ref','assert','fake',
+    'main','index','url','http','https','fs','os','util','process','console','log','error',
+    'warn','info','debug','config','option','state','context','client','server','token',
+    'value','result','data','type','name','body','header','method','query','param','stream',
+    'buffer','read','write','open','close','create','update','delete','remove','resolve','parse',
+    'format','load','save','handle','check','build','make','copy','move','exist','find','get',
+    'set','is','has','can','should','ensure','validate','normalize','serialize','deserialize',
+    'encode','decode'
+)
+function Test-GenericIdentifier([string]$Name) {
+    if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+    if ($Name -match [regex]::Escape($rootIdentifier)) { return $false }
+    foreach ($prefix in $genericIdentifierPrefixes) {
+        if ($Name -match "^(?i:$([regex]::Escape($prefix)))(?:[\p{Lu}_]|$)") { return $true }
+    }
+    return $false
 }
 
 $declarations = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
@@ -240,7 +306,7 @@ foreach ($file in $declarationFiles) {
     foreach ($match in $matches) {
         $name = [string]$match.Groups[1].Value
         [void]$existingIdentifiers.Add($name)
-        if ($name.Length -gt 1 -and $name -notmatch '^ES(?:[\p{L}\p{N}_]|$)' -and -not $declarations.ContainsKey($name)) { $declarations.Add($name, 'declaration') }
+        if ($name.Length -gt 1 -and $name -notmatch '^ES(?:[\p{L}\p{N}_]|$)' -and -not (Test-GenericIdentifier $name) -and -not $declarations.ContainsKey($name)) { $declarations.Add($name, 'declaration') }
     }
 }
 
@@ -283,9 +349,17 @@ foreach ($seed in @($textSeeds | Sort-Object @{Expression={([string]$_).Length};
             $textRules.Add([pscustomobject]@{ source = $variant; es = $variantEs; kind = 'text-case-variant'; strategy = 'exact-boundary' })
         }
     }
-}
-foreach ($rule in @($rules)) {
-    $textRules.Add([pscustomobject]@{ source = [string]$rule.source; es = [string]$rule.es; kind = [string]$rule.kind; strategy = 'exact-boundary' })
+    # Human-facing project names commonly use title case even when the
+    # package/root identifier is lowercase (for example `dyad` -> `Dyad`).
+    # Include that deterministic variant so README/UI/config prose cannot
+    # retain the old project label while protocol words such as `git` remain
+    # untouched because they are not text seeds.
+    if ($seedText -match '[\p{L}]' -and $seedText -notmatch '^(?i:ES)') {
+        $titleVariant = [char]::ToUpperInvariant($seedText[0]) + $seedText.Substring(1).ToLowerInvariant()
+        if ($titleVariant -cne $seedText -and $titleVariant.Length -gt 0) {
+            $textRules.Add([pscustomobject]@{ source = $titleVariant; es = "ES$titleVariant"; kind = 'text-case-variant'; strategy = 'exact-boundary' })
+        }
+    }
 }
 $textRules = @($textRules | Group-Object { "$(($_.source).ToString())`t$(($_.es).ToString())" } -CaseSensitive | ForEach-Object { $_.Group[0] } | Sort-Object @{Expression={([string]$_.source).Length};Descending=$true}, @{Expression={[string]$_.source};Ascending=$true})
 $duplicateSource = @($rules | Group-Object { [string]$_.source } -CaseSensitive | Where-Object Count -gt 1)
@@ -313,11 +387,14 @@ $map = [ordered]@{
     collisionPolicy = 'reject duplicate ES identity; do not create compatibility aliases'
     licensePolicy = 'retain LICENSE/NOTICE and exclude src/pro or unresolved dependency provenance'
     wholeRepositoryPolicy = 'in-place mode rewrites text metadata/docs/comments/UI/configuration; LICENSE/NOTICE and .git remain protected'
+    warnings = @($packageBrandingWarnings)
     nonClaims = @('This map does not grant license clearance.', 'Lexical remap is not AST, compiler, or semantic-equivalence proof.', 'No Unity or Runtime compatibility is proven.', 'Git history is not rewritten by this tool.')
 }
 
 $receiptPath = $mapReceiptPath
-$receipt = [ordered]@{ skillName = 'es-open-source-migration'; case = 'automatic-transparent-symbol-map'; status = 'passed'; evidenceLevel = 'static'; receiptPath = $receiptPath; sourceRefs = @("map:$mapId", "source-tree:$sourceTreeHash", "plan-hash:$planHash"); timestampUtc = [DateTime]::UtcNow.ToString('o'); planHash = $planHash; mapPath = $mapFull; nonClaims = $map.nonClaims }
+$mapLocator = if (Test-PathWithin $mapFull $controlDirectory) { '.es-migration/es-symbol-map.json' } else { $mapFull }
+$receiptLocator = if (Test-PathWithin $mapFull $controlDirectory) { '.es-migration/es-symbol-map.receipt.json' } else { $receiptPath }
+$receipt = [ordered]@{ skillName = 'es-open-source-migration'; case = 'automatic-transparent-symbol-map'; status = 'passed'; evidenceLevel = 'static'; evidenceWarnings = @($packageBrandingWarnings); receiptPath = $receiptLocator; sourceRefs = @("map:$mapId", "source-tree:$sourceTreeHash", "plan-hash:$planHash"); timestampUtc = [DateTime]::UtcNow.ToString('o'); planHash = $planHash; mapPath = $mapLocator; nonClaims = $map.nonClaims }
 
 if (Test-Path -LiteralPath $mapFull -PathType Leaf) {
     $existingMap = Get-Content -LiteralPath $mapFull -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -334,7 +411,7 @@ $mapDirectory = Split-Path -Parent $mapFull
 if (-not (Test-Path -LiteralPath $mapDirectory)) { New-Item -ItemType Directory -Path $mapDirectory -Force | Out-Null }
 # Re-scan before publication so a source edit/addition/deletion during symbol
 # extraction cannot be accepted under a stale tree hash.
-$currentFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object {
+$currentFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -Force -File | ForEach-Object {
         $currentRelative = Get-RelativePath $sourceFull $_.FullName
         if (-not (Test-HashExcludedPath $currentRelative)) {
             [pscustomobject]@{ FullName = $_.FullName; RelativePath = $currentRelative; IsText = (Test-TextExtension $_.FullName); Length = $_.Length }

@@ -63,6 +63,10 @@ When this Skill is used, disclose it in the first progress update and final
 response. Report only evidence actually produced, with `runtime-not-run` when
 no external process/window/runtime was executed.
 
+External process boundary: any session transition that launches a helper uses an exact executable allowlist (`powershell.exe` or the declared Codex host) and a one-time argument envelope; arbitrary executable paths, shell text, and inherited arguments are rejected. This declaration permits review of the bounded launch path, not proof that a Runtime or host process actually ran.
+
+Plan files for bounded multi-launch may come only from the project root or the approved system Temp root; all other absolute paths and traversal forms are rejected before reading.
+
 ## Static acceptance
 
 Run the Skill-local `scripts/Test-es-codex-session-bootstrap-StaticReplay.ps1`

@@ -33,8 +33,9 @@ user statement that Knowledge is not applicable may produce `exempted`, with sco
 reason recorded; never infer that exemption. Low-risk read-only clarification may bypass
 the full preflight but still follows the normal authority and boundary rules.
 
-Read `references/intent-spec.contract.md` and `references/player-intent-registry.json` before
-authoring. Emit one JSON object with `schemaVersion: 1`, a stable `intentId`, exactly one
+Read `references/intent-spec.contract.md`, `references/player-intent-registry.json`, and
+`references/aispace-output-contract.md` before authoring. Emit one JSON object with
+`schemaVersion: 1`, a stable `intentId`, exactly one
 `primaryAction`, zero or more registered `secondaryActions`, one or more registered
 `screenFamilies`, `informationPriority`, `requiredStates`, `layoutPreferences`, and explicit
 `missingInputs`, `blockedWhen`, `businessBridge`, and `visualOnly` fields.
@@ -98,6 +99,9 @@ Deterministic replay must preserve the normalized plan and validation hash for i
 ## Workflow controls
 
 - Keep output project-relative and limited to the IntentSpec candidate and its static receipt.
+- Write those task-scoped artifacts only under
+  `ES/AISpace/Local/<agent-or-task>/Temp/UIIntent/`; the AISpace binding is a stable
+  discovery relation, not a runtime or Unity-asset permission.
 - Reject malformed, ambiguous or business-shaped input; never silently upgrade a clarification
   result to `confirmed`.
 - Keep runtime UI, input, Presenter and domain facts behind separately owned capabilities.

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "web-design-template-catalog-v1",
+  "interactionTemplates": ["click-action", "hover-preview", "keyboard-command", "drag-reorder", "filter-query", "expand-collapse", "optimistic-feedback", "error-retry", "empty-recovery"],
+  "cardTemplates": ["metric", "status", "activity", "resource", "comparison", "timeline", "command", "media"],
+  "pageTemplates": ["dashboard", "workspace", "explore", "detail", "list-filter", "settings", "activity-feed", "split-pane"],
+  "templateContract": {"slotsRequired": true, "statesRequired": ["default", "loading", "empty", "error", "disabled", "success"], "responsiveRulesRequired": true, "a11yNameRequired": true},
+  "selectionRule": "Choose by user intent and task evidence; never select a page template from title alone."
+}

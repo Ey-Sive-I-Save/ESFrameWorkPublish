@@ -5,6 +5,8 @@
 > 该文件是 `.agents` 内的治理导航，不替代 `Assets/Plugins/ES/AIWarnings`、`AICommands` 或源码验证。
 
 所有项目 AI 组件寻找 AIBrain 的统一入口：`Documentation/AIKnowledge/AIBRAIN_ENTRY.md`。
+AISpace 放置与唯一权威入口：`ES/AISpace/README.md`；机器可读身份：
+`ES/AISpace/AISPACE_AUTHORITY.json`。本目录只提供发现指针，不复制 AISpace 正文。
 
 验证结论必须分层显示：`static-blocked` 才表示源码/边界需要修改；`runtime-blocked` 或 `runtime-not-run` 表示外部证据阶段尚未授权、未运行或不可用，不得让 AI 重写已经静态通过的代码。
 
@@ -179,7 +181,11 @@ ESFrameWorkPublish/
 
 1. 先判断文件职责和唯一权威位置，再创建文件。
 2. 搜索是否已有同职责 Skill、AIWarning、AICommand 或文档，优先扩展而不是复制。
-3. 新增 Skill 时使用官方初始化器，保持直接子目录和标准内部结构；完成后必须注册到 `SKILL_CATALOG.yaml`。
+3. 新增 Skill 时使用官方初始化器，保持直接子目录和标准内部结构；完成后必须依次更新
+   `SKILL_CATALOG.yaml`、`.agents/SKILL_REGISTRY.manifest.json` 与
+   `ES/AISpace/Public/Skills/registry.json`，再运行对应的只读关系验证。若 Skill 会生成或
+   缓存内容，先在 `.agents/SKILL_AISPACE_BINDINGS.json` 注册稳定绑定，并运行
+   `Test-ESSkillAISpaceBindings.py` 验证 Skill 合同与 AISpace 反向投影一致。
    新 Skill 的 `SKILL.md` 必须包含并遵循“Skill 使用披露”段，初始化器会生成该段；不得在定稿时删除。
 4. 更新 AIWarnings/AICommands 的映射，但不复制 Skill 全文。
 5. 运行官方 Skill 验证器、严格 UTF-8、项目路径检查和 AICommands 全库校验。

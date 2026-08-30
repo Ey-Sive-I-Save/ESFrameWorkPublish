@@ -36,7 +36,24 @@ This project copy is the authority for Skills under `<current-project-root>/.age
 - New project Skills must be direct children of `.agents/skills`, use lowercase `es-` names, and contain only the official Skill structure plus necessary resources.
 - Before creating or changing a Skill, read `.agents/README.md`, the relevant AIWarnings routes, and the current target Skill; do not copy AIWarnings, AICommands, session history, Unity assemblies, or generated output into a Skill.
 - Use the bundled `scripts/init_skill.py`, `scripts/generate_openai_yaml.py`, and `scripts/quick_validate.py` from this project copy. Pass an explicit project output path; do not silently write to global Skill directories.
-- After creating or changing a Skill, run `python .agents/skills/es-skill-creator/scripts/Build-ESSkillCatalog.py --project-root . --catalog .agents/SKILL_CATALOG.yaml --write` from the current project root, then run `.agents/skills/es-skill-creator/scripts/Test-ESSkillCatalog.ps1`. Registration is an explicit project write and must be included in the change budget.
+- After creating or changing a Skill, run `python .agents/skills/es-skill-creator/scripts/Build-ESSkillCatalog.py --project-root . --catalog .agents/SKILL_CATALOG.yaml --write` from the current project root, rebuild `.agents/SKILL_REGISTRY.manifest.json`, then run `python .agents/skills/es-skill-governance/scripts/Build-ESSkillRelationRegistry.py --project-root . --write`. Finish with the Catalog and relation validators. Registration is an explicit project write and must be included in the change budget.
+
+If the Skill generates candidates, screenshots, caches, replay intermediates or collaboration
+indexes, register its stable AISpace binding first in `.agents/SKILL_AISPACE_BINDINGS.json`.
+Use `Register-ESSkillAISpaceBinding.py` for a bounded explicit registration write, then use
+`Test-ESSkillAISpaceBindings.py` after rebuilding the relation registry. The binding is a
+bidirectional discoverability edge to `governance.json`; it does not move the Skill body or
+authorize writes beyond the current user instruction.
+
+AISpace registration is a mandatory creation/upgrade gate, not optional documentation guidance.
+For every new or changed Skill, before Catalog/Manifest rebuild run:
+
+```powershell
+& .agents/skills/es-skill-creator/scripts/Test-ESSkillCreatorAISpaceRegistration.ps1 -ProjectRoot . -SkillName <skill-name>
+```
+
+The gate fails closed when the Skill has no exactly-one AISpace binding, points at another
+governance file, or uses a non-canonical path template.
 - Before acceptance, invoke `$es-skill-validator` (read-only) for Structural, Governance, Catalog and Security profiles; behavioral cases require authoritative receipts and cannot be inferred from a green frontmatter check.
 - Before acceptance, invoke `$es-skill-validator -Profile StaticDeepReplay` and run the Skill-local `*-StaticReplay.ps1`; this is the default static fast path and must pass before any Runtime request is considered.
 - All bundled Python tools must read and write UTF-8 explicitly. Run the project UTF-8 guard and the Skill's own tests after changes.
@@ -80,7 +97,7 @@ Tier never grants AI permission to expand scope. AIWarnings remain the long-live
 - Guidance: `references/static-specialized-acceptance.md`
 - Acceptance ID: `creator-pipeline`
 - Required cases: `scaffold-contract, invalid-name-rejection, resource-composition, registration-idempotency, catalog-refresh`
-- Static assertions: explicit output path; registration is idempotent; quick validation; catalog hash refresh; UTF-8
+- Static assertions: explicit output path; AISpace binding is mandatory; registration is idempotent; quick validation; catalog hash refresh; UTF-8
 - This contract is responsibility-specific and remains distinct from Runtime proof.
 
 ## Responsibility-specific static acceptance
@@ -318,7 +335,7 @@ Skill creation involves these steps:
 3. Initialize the skill (run init_skill.py)
 4. Edit the skill (implement resources and write SKILL.md)
 5. Validate the skill with `quick_validate.py --require-skill-disclosure`
-6. Register or refresh the Skill Catalog record and validate its hashes.
+6. Run `Test-ESSkillCreatorAISpaceRegistration.ps1` for the target Skill; only then register or refresh the Skill Catalog record, rebuild the Registry Manifest and AISpace Skill relationship projection, and validate all three hashes.
 7. Iterate based on real usage and forward-test complex skills.
 
 During step 4, retain the initializer's `## Skill 使用披露` section and make any task-specific reporting language consistent with the project-wide contract.
@@ -519,6 +536,7 @@ Acceptance ID: `creator-pipeline`
 
 Responsibility-specific static assertions (these are source-level requirements, not Runtime claims):
 - explicit output path
+- AISpace binding is mandatory
 - registration is idempotent
 - quick validation
 - catalog hash refresh

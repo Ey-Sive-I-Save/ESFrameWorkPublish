@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web Generation Round 04 Knowledge Route"
+  short_description: "Bind minimal Knowledge evidence to TaskContext"
+  default_prompt: "Use $es-web-generation-round-04-knowledge-route to validate and hash-bind the minimum Knowledge entries for the accepted TaskContext, then stop before design."

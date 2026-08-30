@@ -1,0 +1,7 @@
+{
+  "schemaVersion":1,
+  "contractId":"es://web-generation/abcd-hard-gate/v1",
+  "requiredEvidence":["recordType","taskId","routePlanHash","sourceScopeHash","invocationId","eventSequence","candidateCount","candidateHashes","selectedCandidateId","decision","existingArtifactBindings"],
+  "minimumCandidateCount":3,
+  "nonClaims":["plan fields are not execution evidence","subagentReceipts embedded in DesignPacket are not process receipts","selectionAuthority=ABCD alone is insufficient"]
+}

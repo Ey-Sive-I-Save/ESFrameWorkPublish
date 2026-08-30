@@ -19,6 +19,6 @@ Run-Case 'artifact-outside-root-denied' { $x=Copy-Packet $packet;$x.Artifacts='D
 Run-Case 'plan-hash-tamper-denied' { $x=Copy-Packet $packet;$x.Plan=[ordered]@{taskContract='catalog-audit-contract';steps=@('read','delete')};$path=Write-Packet 'plan-tamper.json' $x;$denied=$false;try{& $validator -ProjectRoot $root -PacketPath $path|Out-Null}catch{$denied=$true};if(-not$denied){throw 'plan hash tamper accepted'} }
 Run-Case 'duplicate-root-denied' { $x=Copy-Packet $packet;$x.AllowedRoots=@('ES/Output','ES/Output');$path=Write-Packet 'duplicate-root.json' $x;$denied=$false;try{& $validator -ProjectRoot $root -PacketPath $path|Out-Null}catch{$denied=$true};if(-not$denied){throw 'duplicate roots accepted'} }
 $failed=@($cases|Where-Object status -eq 'failed')
-try { Remove-Item -LiteralPath $fixtureRoot -Recurse -Force -ErrorAction Stop } catch {}
+try { Remove-Item -LiteralPath $fixtureRoot -Recurse -Force -ErrorAction Stop } catch { Write-Verbose ("fixture cleanup failed: {0}" -f $_.Exception.Message) }
 [pscustomobject][ordered]@{schemaVersion=1;validator='Test-ESWorkerContractStrictness';status=if($failed.Count){'failed'}else{'passed'};caseCount=$cases.Count;passedCount=($cases.Count-$failed.Count);failedCount=$failed.Count;cases=@($cases);staticStatus=if($failed.Count){'static-failed'}else{'static-passed'};runtimeStatus='runtime-not-run';evidenceLevel='S1';capturedUtc=[DateTime]::UtcNow.ToString('o');claimsNotProven=@('Worker process runtime','external service behavior','release acceptance')}|ConvertTo-Json -Depth 20
 if($failed.Count){exit 1}

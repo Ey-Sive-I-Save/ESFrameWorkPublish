@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "themeId": "es-menu-theme-ocean.v1",
+  "palette": {
+    "accent": "#38BDF8",
+    "accentStrong": "#0EA5E9",
+    "recommendation": "#F59E0B",
+    "success": "#22C55E",
+    "muted": "#94A3B8",
+    "surface": "#0F172A",
+    "surfaceRaised": "#1E293B",
+    "text": "#E2E8F0"
+  },
+  "semanticColors": {
+    "quickAccess": "accent",
+    "main": "text",
+    "recommended": "recommendation",
+    "secondary": "muted",
+    "footer": "muted"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Web Generation Round 02 Focus"
+  short_description: "Freeze focus scope before task context"
+  default_prompt: "Use $es-web-generation-round-02-focus to convert an accepted Round 01 intake into a confirmed FocusContext with frozen scope and acceptance signals."

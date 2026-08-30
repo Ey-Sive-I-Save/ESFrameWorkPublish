@@ -12,7 +12,12 @@ $matches=@()
 foreach($entry in @($registry.skills.PSObject.Properties)){
     $skillName=$entry.Name;$skillPath=[IO.Path]::Combine($root,'.agents','skills',$skillName)
     $aliases=@($entry.Value|ForEach-Object {[string]$_}|Where-Object {$_})
-    $hits=@($aliases|Where-Object {$normalizedObjective.IndexOf($_,[StringComparison]::OrdinalIgnoreCase) -ge 0})
+    $hits=@($aliases|ForEach-Object {
+        $aliasText=[string]$_
+        if($aliasText -eq 'AG') {
+            if([System.Text.RegularExpressions.Regex]::IsMatch($normalizedObjective,'(?i)(?<![A-Za-z0-9_])AG(?![A-Za-z0-9_])')) { $aliasText }
+        } elseif($normalizedObjective.IndexOf($aliasText,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $aliasText }
+    })
     if($hits.Count -gt 0){
         $govPath=Join-Path $skillPath 'governance.json';$gov=$null
         if(Test-Path -LiteralPath $govPath -PathType Leaf){

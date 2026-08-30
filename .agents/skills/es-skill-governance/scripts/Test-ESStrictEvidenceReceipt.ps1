@@ -108,6 +108,23 @@ try {
     throw 'Evidence receipt is not strict UTF-8 JSON'
 }
 
+# Safe observation metadata is not a semantic acceptance signal.  For direct
+# collaboration/read-only receipts, recover only the bounded fields whose
+# value can be derived from the receipt file itself.  Managed/high-risk
+# receipts remain strict: a producer must persist these fields explicitly.
+$normalizations = [Collections.Generic.List[string]]::new()
+$authorizationKindHint = if ($null -ne $r.PSObject.Properties['authorizationKind']) { [string]$r.authorizationKind } else { 'managed-aibrain' }
+if ($authorizationKindHint -in @('current-user-direct', 'read-only')) {
+    if ($null -eq $r.PSObject.Properties['capturedUtc'] -or [string]::IsNullOrWhiteSpace([string]$r.capturedUtc)) {
+        $r | Add-Member -NotePropertyName capturedUtc -NotePropertyValue ((Get-Item -LiteralPath $receipt).LastWriteTimeUtc.ToString('o')) -Force
+        [void]$normalizations.Add('capturedUtc=file.LastWriteTimeUtc')
+    }
+    if ($null -eq $r.PSObject.Properties['receiptPath'] -or [string]::IsNullOrWhiteSpace([string]$r.receiptPath)) {
+        $r | Add-Member -NotePropertyName receiptPath -NotePropertyValue (Relative $receipt) -Force
+        [void]$normalizations.Add('receiptPath=receipt.absolutePath')
+    }
+}
+
 $contractIdProperty = Get-ReceiptProperty $r 'evidenceContractId'
 $contractHashProperty = Get-ReceiptProperty $r 'evidenceContractHash'
 if (($null -eq $contractIdProperty) -xor ($null -eq $contractHashProperty)) {
@@ -214,4 +231,5 @@ foreach ($ref in @($r.sourceRefs)) {
         throw "Receipt sourceRef hash is stale: $refText"
     }
 }
-Write-Output "PASS: strict evidence receipt contract: $name/$($r.case)"
+$normalizationText = if ($normalizations.Count -gt 0) { "; normalized=$($normalizations -join ',')" } else { '' }
+Write-Output "PASS: strict evidence receipt contract: $name/$($r.case)$normalizationText"

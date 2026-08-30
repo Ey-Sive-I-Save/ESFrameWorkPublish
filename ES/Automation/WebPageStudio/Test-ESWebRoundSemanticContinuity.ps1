@@ -11,7 +11,7 @@ if($items.Count -eq 4){
   if([string]$b.intakeHash -cne [string]$a.inputHash){$findings.Add('blocked.round-continuity.round02-intake-hash')}
   if([string]$c.focusProposalHash -cne [string]$b.proposalHash -or [string]$c.focusScopeHash -cne [string]$b.focusScopeHash){$findings.Add('blocked.round-continuity.round03-focus-binding')}
   if([string]$d.taskContextHash -cne [string]$c.taskContextHash -or [string]$d.sourceScopeHash -cne [string]$c.sourceScopeHash){$findings.Add('blocked.round-continuity.round04-task-binding')}
-  $ia=$a.aiInterpretation;if($null -eq $ia -or ([string]$ia.objectiveBrief).Trim().Length -lt 40 -or ([string]$ia.analysis).Trim().Length -lt 80){$findings.Add('blocked.round-continuity.round01-ai-meaning-missing')}
+  $ia=$a.aiInterpretation;if($null -eq $ia -or ([string]$ia.objectiveBrief).Trim().Length -lt 40 -or ([string]$a.objectiveBrief).Trim().Length -lt 40 -or ([string]$ia.analysis).Trim().Length -lt 80){$findings.Add('blocked.round-continuity.round01-ai-meaning-missing')}
   foreach($x in @(@($b,'round02',80,60),@($c,'round03',80,80),@($d,'round04',80,80))){if(([string]$x[0].aiAnalysis).Trim().Length -lt [int]$x[2] -or ([string]$x[0].execution).Trim().Length -lt 40 -or $null -eq $x[0].PSObject.Properties['returnReceipt']){$findings.Add("blocked.round-continuity.$($x[1])-ai-evidence-shallow")}}
   if([string]$b.focus.Trim().Length -lt 40){$findings.Add('blocked.round-continuity.focus-too-short')};if(@($d.selectedEntries).Count -lt 1){$findings.Add('blocked.round-continuity.knowledge-selection-empty')}
 }

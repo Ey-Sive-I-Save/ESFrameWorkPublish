@@ -198,7 +198,8 @@ function Convert-ESABCEngineeringResultToCandidatePatchPlan {
  [CmdletBinding()]param([Parameter(Mandatory)]$EngineeringResult,[Parameter(Mandatory)]$CandidateEnvelope,[Parameter(Mandatory)][ValidateSet('DesignChange','RuntimeChange','DataMigration','ExternalSourceAdoption','PerformanceCritical','ReleaseCandidate')][string]$Scenario,[Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{40}$')][string]$CurrentHead,[Parameter(Mandatory)][string]$AuthorizationRef,[Parameter(Mandatory)][string[]]$AllowedWriteScopes)
  if([string]$EngineeringResult.status -ne 'completed' -or $EngineeringResult.completionEligible -ne $true){throw 'ENGINEERING_RESULT_NOT_ELIGIBLE_FOR_PATCH_PLAN'}
  $e=$EngineeringResult.evidenceSummary
- if($null -eq $e -or -not $e.PSObject.Properties['eligibleCount'] -or -not $e.PSObject.Properties['implementationEvidenceVerifiedCount'] -or -not $e.PSObject.Properties['independentReplayVerifiedCount'] -or -not $e.PSObject.Properties['providerScoreComparisonStatus']){throw 'ENGINEERING_COMPLETION_EVIDENCE_REQUIRED'}
+ $eNames=if($null -eq $e){@()}{@($e.PSObject.Properties.Name)}
+ if($null -eq $e -or @('eligibleCount','implementationEvidenceVerifiedCount','independentReplayVerifiedCount','providerScoreComparisonStatus'|Where-Object{$_ -notin $eNames}).Count -gt 0){throw 'ENGINEERING_COMPLETION_EVIDENCE_REQUIRED'}
  if([int]$e.eligibleCount -lt 2 -or [int]$e.implementationEvidenceVerifiedCount -ne [int]$e.eligibleCount -or [int]$e.independentReplayVerifiedCount -ne [int]$e.eligibleCount -or [string]$e.providerScoreComparisonStatus -cne 'stable'){throw 'ENGINEERING_COMPLETION_EVIDENCE_NOT_VERIFIED'}
  if([string]$CandidateEnvelope.status -ne 'candidate'){throw 'ENGINEERING_CANDIDATE_ENVELOPE_REQUIRED'}
  $candidate=@($CandidateEnvelope.candidates|Where-Object{[string]$_.candidateId -eq [string]$EngineeringResult.winnerId}|Select-Object -First 1);if($candidate.Count -ne 1){throw 'ENGINEERING_WINNER_NOT_IN_CANDIDATE_ENVELOPE'}

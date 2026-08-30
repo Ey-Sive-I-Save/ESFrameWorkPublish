@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$RequestPath,
-    [string]$OutputPath = ''
+    [string]$OutputPath = '',
+    [Parameter(Mandatory = $true)][string]$DesignSpecPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +12,10 @@ $requestFull = (Resolve-Path -LiteralPath $RequestPath -ErrorAction Stop).Path
 if (-not $requestFull.StartsWith($projectRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'RequestPath must remain under the project root.' }
 & (Join-Path (Get-Location) 'ES/Automation/WebPageStudio/Test-ESWebPageStudioRequest.ps1') -RequestPath $requestFull | Out-Null
 $request = Get-Content -Raw -Encoding UTF8 -LiteralPath $requestFull | ConvertFrom-Json
+$designFull = (Resolve-Path -LiteralPath $DesignSpecPath -ErrorAction Stop).Path
+if (-not $designFull.StartsWith($projectRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'DesignSpecPath must remain under the project root.' }
+$designInput = Get-Content -Raw -Encoding UTF8 -LiteralPath $designFull | ConvertFrom-Json
+if ([string]$designInput.designStatus -ne 'accepted' -or [string]$designInput.decisionStatus -ne 'accepted') { throw 'BLOCKED_WEB_CONTRACT_DESIGN_REQUIRED' }
 if ([bool]$request.network.enabled -or [string]$request.backend.mode -ne 'mock-contract-only') {
     throw 'WebPageStudio static contract conversion currently supports mock-contract-only with network disabled. Use a dedicated authorized backend adapter before requesting network execution.'
 }
@@ -40,31 +45,34 @@ $sourceId = 'request-source'
 $tokenId = 'token-accent'
 $componentId = if ([string]$request.pageKind -eq 'dashboard') { 'dashboard-shell' } else { 'marketing-shell' }
 $nodes = [System.Collections.Generic.List[object]]::new()
-$nodes.Add([ordered]@{ nodeId = $rootId; parentId = $null; kind = 'document'; semanticRole = [string]$request.pageKind; children = @($componentId); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-if ([string]$request.pageKind -eq 'dashboard') {
-    $nodes.Add([ordered]@{ nodeId = $componentId; parentId = $rootId; kind = 'section'; semanticRole = 'primary-content'; children = @('dashboard-intro','dashboard-metrics','dashboard-panel'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'dashboard-intro'; parentId = $componentId; kind = 'section'; semanticRole = 'intro'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'dashboard-metrics'; parentId = $componentId; kind = 'data'; semanticRole = 'metrics-grid'; children = @('metric-signal-health','metric-active-flows','metric-response-time','metric-coverage'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    foreach ($metric in @('signal-health','active-flows','response-time','coverage')) {
-        $nodes.Add([ordered]@{ nodeId = "metric-$metric"; parentId = 'dashboard-metrics'; kind = 'data'; semanticRole = "metric-$metric"; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
+$tokens = @($designInput.designTokens)
+$components = @()
+$responsive = @()
+$states = @()
+$aiRegions = @($designInput.informationArchitecture)
+if ($aiRegions.Count -eq 0) { throw 'BLOCKED_WEB_CONTRACT_AI_INFORMATION_ARCHITECTURE_REQUIRED' }
+if ($aiRegions.Count -gt 0) {
+    $nodes = [System.Collections.Generic.List[object]]::new()
+    $nodes.Add([ordered]@{ nodeId = $rootId; parentId = $null; kind = 'document'; semanticRole = 'document'; children = @($aiRegions | ForEach-Object { New-Id ([string]$_.id) }); sourceRefs = @($sourceId); tokenRefs = @() })
+    foreach ($region in $aiRegions) {
+        $rid = New-Id ([string]$region.id); if ($rid -eq 'id-generated') { $rid = 'region-' + $nodes.Count }
+        $nodes.Add([ordered]@{ nodeId = $rid; parentId = $rootId; kind = 'region'; semanticRole = [string]$region.role; children = @(); sourceRefs = @($sourceId); tokenRefs = @() })
     }
-    $nodes.Add([ordered]@{ nodeId = 'dashboard-panel'; parentId = $componentId; kind = 'section'; semanticRole = 'trend-panel'; children = @('dashboard-primary-action'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'dashboard-primary-action'; parentId = 'dashboard-panel'; kind = 'button'; semanticRole = 'primary-action'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-} else {
-    $nodes.Add([ordered]@{ nodeId = $componentId; parentId = $rootId; kind = 'section'; semanticRole = 'primary-content'; children = @('marketing-hero','marketing-signal','marketing-proof','marketing-closing'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-hero'; parentId = $componentId; kind = 'section'; semanticRole = 'hero'; children = @('marketing-hero-copy','marketing-hero-art'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-hero-copy'; parentId = 'marketing-hero'; kind = 'container'; semanticRole = 'hero-copy'; children = @('marketing-primary-action'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-hero-art'; parentId = 'marketing-hero'; kind = 'container'; semanticRole = 'hero-art'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-primary-action'; parentId = 'marketing-hero-copy'; kind = 'button'; semanticRole = 'primary-action'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-signal'; parentId = $componentId; kind = 'section'; semanticRole = 'signal'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-proof'; parentId = $componentId; kind = 'section'; semanticRole = 'proof'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-closing'; parentId = $componentId; kind = 'section'; semanticRole = 'closing'; children = @('marketing-closing-action'); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
-    $nodes.Add([ordered]@{ nodeId = 'marketing-closing-action'; parentId = 'marketing-closing'; kind = 'button'; semanticRole = 'secondary-action'; children = @(); sourceRefs = @($sourceId); tokenRefs = @($tokenId) })
 }
-$tokens = @([ordered]@{ tokenId = $tokenId; role = 'accent'; value = '#75e1d1'; valueType = 'color' })
-$components = @([ordered]@{ componentId = $componentId; semanticRole = 'primary-content'; allowedElements = @('section', 'article', 'button', 'h1', 'p'); fallback = 'plain-content' })
-$responsive = @($request.responsiveProfiles | ForEach-Object { [ordered]@{ profileId = New-Id ([string]$_.id); viewport = [ordered]@{ width = [int]$_.width; height = [int]$_.height }; semanticEquivalence = 'preserve-primary-content-and-action' } })
-$states = @($request.states | ForEach-Object { [ordered]@{ stateId = New-Id ([string]$_); effects = @() } })
+$aiComponents = @($designInput.componentInventory)
+if ($aiComponents.Count -eq 0) { throw 'BLOCKED_WEB_CONTRACT_AI_COMPONENT_INVENTORY_REQUIRED' }
+if ($aiComponents.Count -gt 0) {
+    $components = @($aiComponents | ForEach-Object { [ordered]@{ componentId = New-Id ([string]$_.id); semanticRole = [string]$_.role; allowedElements = @('section','article','button','input','label','p','h1','h2'); fallback = 'plain-content' } })
+}
+$aiResponsive = @($designInput.responsiveMatrix)
+if ($aiResponsive.Count -eq 0) { throw 'BLOCKED_WEB_CONTRACT_AI_RESPONSIVE_MATRIX_REQUIRED' }
+if ($aiResponsive.Count -gt 0) {
+    $responsive = @($aiResponsive | ForEach-Object { [ordered]@{ profileId = New-Id ([string]$_.id); viewport = [ordered]@{ width = [int]$_.width; height = [int]$_.height }; semanticEquivalence = [string]$_.semanticEquivalence } })
+}
+$aiStates = @($designInput.interactionStateGraph)
+if ($aiStates.Count -eq 0) { throw 'BLOCKED_WEB_CONTRACT_AI_STATE_GRAPH_REQUIRED' }
+if ($aiStates.Count -gt 0) { $states = @($aiStates | ForEach-Object { [ordered]@{ stateId = New-Id ([string]$_.id); effects = @($_.effects) } }) }
+$designSourceHash = (Get-FileHash -LiteralPath $designFull -Algorithm SHA256).Hash.ToLowerInvariant()
 $sourcePath = ([Uri]::new($projectRoot)).MakeRelativeUri([Uri]::new($requestFull)).ToString().Replace('\', '/')
 $artifactDirectory = [string]$request.output.outputDirectory
 $entryFile = [string]$request.output.entryFile
@@ -116,7 +124,7 @@ $contractStatus = if ($artifactExists) { 'implemented-unverified' } else { 'desi
 $acceptanceStatus = if ($artifactExists) { 'static-verified' } else { 'designed' }
 $design = [ordered]@{
     version = '1.0'; rootNodeId = $rootId; nodes = $nodes
-    sourceMap = @([ordered]@{ sourceId = $sourceId; targetNodeId = $rootId; sourceHash = $inputHash; sourcePath = $sourcePath })
+    sourceMap = @([ordered]@{ sourceId = $sourceId; targetNodeId = $rootId; sourceHash = $inputHash; sourcePath = $sourcePath },[ordered]@{ sourceId = 'ai-design'; targetNodeId = $rootId; sourceHash = $designSourceHash; sourcePath = $DesignSpecPath.Replace('\','/') })
     tokens = $tokens; components = $components; responsiveProfiles = $responsive; states = $states; assets = @()
     measurementUncertainty = @(); knownLoss = @(); fallback = [ordered]@{ mode = 'explicit'; description = 'Unsupported visual effects remain reviewable and never silently execute.' }
 }
@@ -138,7 +146,7 @@ $contract = [ordered]@{
     visualChecks = @('dom-structure', 'geometry', 'token', 'asset', 'pixel', 'human-review' | ForEach-Object { [ordered]@{ checkId = "pending-$($_)"; category = $_; status = 'not-run'; targetId = $rootId; finding = 'No preview run has been authorized.'; evidenceRefs = @() } })
     revisionPatches = @()
     evidence = [ordered]@{ inputHash = $inputHash; outputHash = $outputHash; receipts = @($evidenceReceipts); acceptanceStatus = $acceptanceStatus; runtimeStatus = 'runtime-not-run' }
-    nonClaims = @('No browser, backend, network, Unity or release process was run by this converter.')
+    nonClaims = @('No browser, backend, network, Unity or release process was run by this converter.','Contract structure is derived from the accepted AI design; it does not prove the AI artifact was rendered.')
 }
 $json = $contract | ConvertTo-Json -Depth 30
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path (Split-Path -Parent $requestFull) 'web-page-contract.json' }

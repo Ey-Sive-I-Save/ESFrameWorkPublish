@@ -21,6 +21,10 @@ param(
     [switch]$RunPreview,
     [switch]$RunValidationBundle,
     [switch]$ApplyRevision,
+    [string]$ModelResponsePath = '',
+    [string]$AiSolutionPath = '',
+    [string[]]$RoundPaths = @(),
+    [string]$RevisionReceiptPath = '',
     [bool]$AutoOpen = $true
 )
 
@@ -42,23 +46,29 @@ if ($EnableNetwork) { $newArgs.EnableNetwork = $true; $newArgs.ApiBase = $ApiBas
 $request = Get-Content -Raw -Encoding UTF8 -LiteralPath $requestPath | ConvertFrom-Json
 
 $preflightPath = Join-Path $root "ES/Output/WebPageStudio/requests/preflight-$($request.requestId).json"
-$preflight = & (Join-Path $root 'ES/Automation/WebPageStudio/Invoke-ESWebPageStudioPreflight.ps1') -RequestPath $requestPath -OutputPath $preflightPath | ConvertFrom-Json
+$preflightArgs = @{ RequestPath = $requestPath; OutputPath = $preflightPath }
+if (-not [string]::IsNullOrWhiteSpace($AiSolutionPath)) { $preflightArgs.AiSolutionPath = $AiSolutionPath }
+if (@($RoundPaths).Count -eq 5) { $preflightArgs.RoundPaths = $RoundPaths }
+$preflight = & (Join-Path $root 'ES/Automation/WebPageStudio/Invoke-ESWebPageStudioPreflight.ps1') @preflightArgs | ConvertFrom-Json
 if ([string]$preflight.status -ne 'accepted') { throw 'P0_PREFLIGHT_BLOCKED: intent/prompt/layout/knowledge preflight did not pass.' }
 $artifactRoot = [IO.Path]::GetFullPath((Join-Path $root ([string]$request.output.outputDirectory)))
 $designPath = Join-Path $root "ES/Output/WebPageStudio/requests/deep-design-$($request.requestId).json"
-$design = & $deepDesignScript -PreflightPath $preflightPath -OutputPath $designPath | ConvertFrom-Json
+$deepArgs = @{ PreflightPath = $preflightPath; OutputPath = $designPath }
+if (-not [string]::IsNullOrWhiteSpace($ModelResponsePath)) { $deepArgs.ModelResponsePath = $ModelResponsePath }
+$design = & $deepDesignScript @deepArgs | ConvertFrom-Json
 if ([string]$design.designStatus -ne 'accepted' -or [string]$design.decisionStatus -ne 'accepted') { throw 'P0_DESIGN_NOT_ACCEPTED: deep design was not accepted.' }
 
 if ($EnableNetwork) {
     throw 'This one-command entry currently stops at an explicit network boundary. Use an authorized backend adapter before enabling network execution.'
 }
-& $staticScript -RequestPath $requestPath -DesignSpecPath $designPath | Out-Null
+if ([string]::IsNullOrWhiteSpace($RevisionReceiptPath)) { throw 'BLOCKED_WEB_MATERIALIZATION_AI_REVISION_REQUIRED' }
+& $staticScript -RequestPath $requestPath -DesignSpecPath $designPath -RevisionReceiptPath $RevisionReceiptPath | Out-Null
 Copy-Item -LiteralPath $designPath -Destination (Join-Path $artifactRoot 'deep-design.json') -Force
 $artifactPreflightPath = Join-Path $artifactRoot 'preflight.json'
 Copy-Item -LiteralPath $preflightPath -Destination $artifactPreflightPath -Force
 $contractPath = Join-Path $artifactRoot 'web-page-contract.json'
 $validationPath = Join-Path $artifactRoot 'contract-validation.json'
-& $convertScript -RequestPath $requestPath -OutputPath $contractPath | Out-Null
+& $convertScript -RequestPath $requestPath -DesignSpecPath $designPath -OutputPath $contractPath | Out-Null
 $contractReport = & $testContract -ContractPath $contractPath -ReportPath $validationPath | ConvertFrom-Json
 $staticSignalsPath = Join-Path $artifactRoot 'static-signals.json'
 $staticSignalsScript = Join-Path $root 'ES/Automation/WebPageStudio/Test-ESWebPageStudioStaticSignals.ps1'

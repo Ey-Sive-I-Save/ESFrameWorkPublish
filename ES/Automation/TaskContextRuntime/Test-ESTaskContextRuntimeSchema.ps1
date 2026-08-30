@@ -163,8 +163,8 @@ $receipt=$strictUtf8.GetString([IO.File]::ReadAllBytes($receiptPath))|ConvertFro
 $cases=[Collections.Generic.List[object]]::new()
 function Add-Case([string]$Name,[bool]$Passed,[string[]]$Findings){[void]$cases.Add([pscustomobject]@{case=$Name;status=if($Passed){'passed'}else{'failed'};findings=@($Findings)})}
 $supportErrors=@(Test-ESJsonSchemaSupported -SchemaPath $SchemaPath);Add-Case 'supported-keyword-closure' ($supportErrors.Count-eq0) $supportErrors
-$eventErrors=@(Test-ESJsonSchemaValue -SchemaPath $SchemaPath -Value $event);Add-Case 'representative-event' ($eventErrors.Count-eq0) $eventErrors
-$receiptErrors=@(Test-ESJsonSchemaValue -SchemaPath $SchemaPath -Value $receipt);Add-Case 'representative-receipt' ($receiptErrors.Count-eq0) $receiptErrors
+$eventErrors=@(Test-ESJsonSchemaValue -SchemaPath $SchemaPath -DefinitionName 'event' -Value $event);Add-Case 'representative-event' ($eventErrors.Count-eq0) $eventErrors
+$receiptErrors=@(Test-ESJsonSchemaValue -SchemaPath $SchemaPath -DefinitionName 'completionReceipt' -Value $receipt);Add-Case 'representative-receipt' ($receiptErrors.Count-eq0) $receiptErrors
 $evidenceErrors=@(Test-ESJsonSchemaValue -SchemaPath $EvidenceSchemaPath -DefinitionName 'normalizedEvidenceSet' -Value $event.state.evidenceSet);Add-Case 'representative-evidence-set' ($evidenceErrors.Count-eq0) $evidenceErrors
 $badState=$event|ConvertTo-Json -Depth 40|ConvertFrom-Json;$badState.state.taskStatus='Active';$badStateErrors=@(Test-ESJsonSchemaValue -SchemaPath $SchemaPath -Value $badState);Add-Case 'accepted-state-invariant-negative' ($badStateErrors.Count-gt0) $(if($badStateErrors.Count){@()}else{@('invalid accepted state was not rejected')})
 $badReceipt=$receipt|ConvertTo-Json -Depth 40|ConvertFrom-Json;$badReceipt.planHash='invalid';$badReceiptErrors=@(Test-ESJsonSchemaValue -SchemaPath $SchemaPath -Value $badReceipt);Add-Case 'invalid-hash-negative' ($badReceiptErrors.Count-gt0) $(if($badReceiptErrors.Count){@()}else{@('invalid receipt hash field was not rejected')})

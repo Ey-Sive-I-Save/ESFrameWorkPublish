@@ -41,19 +41,25 @@ function Copy-PlatformFixture([string]$Name) {
     $runtime = Join-Path $root 'ES/Automation/TaskContextRuntime'
     $contracts = Join-Path $root 'ES/Automation/Contracts'
     $routePlan = Join-Path $root 'ES/Automation/RoutePlan'
+    $abcd = Join-Path $root 'ES/Automation/ABCD'
+    $ai = Join-Path $root 'ES/Automation/AI'
+    $evaluation = Join-Path $root 'ES/Automation/Evaluation'
     $staticReplayRunner = Join-Path $root '.agents/skills/es-static-deep-replay/scripts'
     $run = Join-Path $root 'ES/Automation/Runs/TaskContextEvaluation/11111111111111111111111111111111'
-    New-Item -ItemType Directory -Path $runtime, $contracts, $routePlan, $staticReplayRunner, $run -Force | Out-Null
+    New-Item -ItemType Directory -Path $runtime, $contracts, $routePlan, $abcd, $ai, $evaluation, $staticReplayRunner, $run -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1') -Destination $runtime
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ES/Automation/TaskContextRuntime/Invoke-ESTaskContextRuntime.ps1') -Destination $runtime
     Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ES/Automation/RoutePlan/ESRoutePlanContract.psm1') -Destination $routePlan
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ES/Automation/ABCD/ESABCDAuthorityKernel.psm1') -Destination $abcd
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ES/Automation/AI/ESAuthorityDecisionPolicy.psm1') -Destination $ai
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ES/Automation/Evaluation/ESTranscriptCorrectionObservation.psm1') -Destination $evaluation
     Copy-Item -LiteralPath (Join-Path $ProjectRoot '.agents/skills/es-static-deep-replay/scripts/Invoke-ESStaticDeepReplay.ps1') -Destination $staticReplayRunner
     foreach ($name in @(
         'es-task-context-runtime-v1.schema.json', 'es-platform-evidence-v1.schema.json',
-        'es-goal-v1.schema.json', 'es-evidence-verifier.registry.json',
+        'es-goal-v1.schema.json', 'es-evidence-verifier.registry.json', 'es-task-transcript-slice-v1.schema.json',
         'es-outcome-evaluator.registry.json', 'es-evaluation-record-v1.schema.json',
         'es-route-plan-v1.schema.json', 'es-route-stage.registry.json',
-        'es-route-stage-registry-v1.schema.json', 'ESJsonSchemaLite.psm1'
+        'es-route-stage-registry-v1.schema.json', 'es-authority-ai-decision-policy-v1.json', 'ESJsonSchemaLite.psm1'
     )) {
         Copy-Item -LiteralPath (Join-Path $ProjectRoot "ES/Automation/Contracts/$name") -Destination $contracts
     }

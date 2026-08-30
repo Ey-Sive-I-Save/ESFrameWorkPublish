@@ -1,58 +1,43 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$PreflightPath,[Parameter(Mandatory=$true)][string]$OutputPath)
+param(
+  [Parameter(Mandatory=$true)][string]$PreflightPath,
+  [Parameter(Mandatory=$true)][string]$OutputPath,
+  [string]$ModelResponsePath=''
+)
 $ErrorActionPreference='Stop';$OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
+# AI-owned page instance: this adapter may validate/map a real response, but never invents layout, content or interaction.
 $root=[IO.Path]::GetFullPath((Get-Location).Path).TrimEnd('\')+'\'
 function Resolve-RootPath([string]$p){$f=if([IO.Path]::IsPathRooted($p)){[IO.Path]::GetFullPath($p)}else{[IO.Path]::GetFullPath((Join-Path (Get-Location) $p))};if(-not $f.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)){throw 'Path outside project root.'};$f}
-$preflightFull=Resolve-RootPath $PreflightPath;$pf=Get-Content -LiteralPath $preflightFull -Raw -Encoding UTF8|ConvertFrom-Json
-if([string]$pf.status -ne 'accepted'){throw 'P0_DESIGN_NOT_ACCEPTED: preflight is not accepted.'}
-if(-not $pf.promptPlan){throw 'P0_DESIGN_NOT_ACCEPTED: promptPlan is missing.'}
-if(-not $pf.capabilityProfile -or [string]$pf.capabilityProfile.status -ne 'accepted'){throw 'P0_DESIGN_NOT_ACCEPTED: open-source capability profile is missing or not accepted.'}
-$stageNames=@($pf.stages|ForEach-Object {[string]$_.stage});foreach($required in @('intent-review','prompt-generation','layout-thinking')){if($stageNames -notcontains $required){throw "P0_DESIGN_NOT_ACCEPTED: missing stage $required."}}
-$objective=[string]$pf.intent.objective;$isGithub=$objective -match '(?i)github|repository|仓库'
-if($isGithub){
-  $capabilities=@(
-    [ordered]@{id='repository-overview';title='Repository overview';purpose='Understand identity, visibility, health and activity';priority='primary';region='repo-header'},
-    [ordered]@{id='code-browser';title='Code browser';purpose='Browse branch, file tree and README';priority='primary';region='code-panel'},
-    [ordered]@{id='issue-triage';title='Issue triage';purpose='Search, filter and prioritize work items';priority='primary';region='issues-panel'},
-    [ordered]@{id='pull-request-review';title='Pull request review';purpose='Track review, CI and merge risk';priority='primary';region='pulls-panel'},
-    [ordered]@{id='commit-activity';title='Commit activity';purpose='Scan recent changes and contributors';priority='secondary';region='activity-panel'},
-    [ordered]@{id='repository-insights';title='Repository insights';purpose='Summarize languages, releases and maintenance risk';priority='secondary';region='insights-panel'}
-  )
-  $regions=@(
-    [ordered]@{id='global-nav';label='Global navigation';role='navigation';order=1},
-    [ordered]@{id='repo-header';label='Repository identity and primary actions';role='banner';order=2},
-    [ordered]@{id='repo-tabs';label='Repository routes';role='navigation';order=3},
-    [ordered]@{id='overview-grid';label='Repository overview';role='main';order=4},
-    [ordered]@{id='code-panel';label='Code and README';role='region';order=5},
-    [ordered]@{id='issues-panel';label='Issues';role='region';order=6},
-    [ordered]@{id='pulls-panel';label='Pull requests';role='region';order=7},
-    [ordered]@{id='activity-panel';label='Commits and activity';role='region';order=8},
-    [ordered]@{id='insights-panel';label='Insights';role='region';order=9}
-  )
-} else {
-  $capabilities=@(
-    [ordered]@{id='core-task';title='Core task';purpose='Complete the primary user outcome';priority='primary';region='primary-content'},
-    [ordered]@{id='supporting-tools';title='Supporting tools';purpose='Reduce friction around the core task';priority='secondary';region='supporting-content'},
-    [ordered]@{id='feedback-and-recovery';title='Feedback and recovery';purpose='Explain progress, errors and recovery';priority='primary';region='state-panel'},
-    [ordered]@{id='insights';title='Insights';purpose='Help users decide what to do next';priority='secondary';region='insights-panel'}
-  )
-  $regions=@(
-    [ordered]@{id='global-nav';label='Global navigation';role='navigation';order=1},
-    [ordered]@{id='primary-content';label='Primary content and action';role='main';order=2},
-    [ordered]@{id='supporting-content';label='Supporting capabilities';role='region';order=3},
-    [ordered]@{id='state-panel';label='Feedback and recovery';role='region';order=4},
-    [ordered]@{id='insights-panel';label='Insights';role='region';order=5}
-  )
+function Write-Receipt($value,[string]$path){$out=Resolve-RootPath $path;New-Item -ItemType Directory -Path (Split-Path $out) -Force|Out-Null;$json=$value|ConvertTo-Json -Depth 40;[IO.File]::WriteAllText($out,$json,[Text.UTF8Encoding]::new($false));$json}
+$preflightFull=Resolve-RootPath $PreflightPath
+$pf=Get-Content -LiteralPath $preflightFull -Raw -Encoding UTF8|ConvertFrom-Json
+$common=[ordered]@{schemaVersion=2;recordType='WebPageStudioDeepDesignSpec';designEngine='ESWebPageStudioDeepDesign.AIAdapter';sourcePreflightPath=$preflightFull.Substring($root.Length).Replace('\','/');sourcePromptHash=(Get-FileHash -LiteralPath $preflightFull -Algorithm SHA256).Hash.ToLowerInvariant();runtimeStatus='runtime-not-run';nonClaims=@('no browser, network or release proof','adapter does not author design decisions','review is not acceptance')}
+if([string]$pf.status -ne 'accepted'){ $r=[ordered]@{}+$common;$r.status='blocked';$r.designStatus='review';$r.decisionStatus='review';$r.blockedReason='P0_DESIGN_NOT_ACCEPTED: preflight is not accepted.';Write-Receipt $r $OutputPath|Out-Null;throw $r.blockedReason }
+if([string]::IsNullOrWhiteSpace($ModelResponsePath)){
+  $r=[ordered]@{}+$common;$r.status='review';$r.designStatus='review';$r.decisionStatus='review';$r.objective=[string]$pf.intent.objective;$r.blockedReason='BLOCKED_WEB_DEEP_DESIGN_MODEL_RESPONSE_REQUIRED';$r.requiredResponse=@('objectiveBrief','securityContract','semanticHtml','informationArchitecture','visualDirection','interactionModel','implementationPlan','filesToCreate','filesToModify','riskAssessment','rejectedAlternatives','componentInventory','interactionStateGraph','responsiveMatrix','motionTimeline','a11yChecks','interactionContracts','viewContracts','detailContract');Write-Receipt $r $OutputPath|Out-Null;throw $r.blockedReason
 }
-$design=[ordered]@{
-  schemaVersion=1;recordType='WebPageStudioDeepDesignSpec';designStatus='accepted';decisionStatus='accepted';designEngine='ESWebPageStudioDeepDesign';sourcePreflightPath=$preflightFull.Substring($root.Length).Replace('\','/');sourcePromptHash=(Get-FileHash -LiteralPath $preflightFull -Algorithm SHA256).Hash.ToLowerInvariant();objective=$objective;pageKind=[string]$pf.intent.pageKind;audience=[string]$pf.intent.audience;primaryAction=[string]$pf.intent.primaryAction;
-  generationInput=[ordered]@{prompt=[string]$pf.generatedPrompt;plan=$pf.promptPlan;capabilityProfileId=[string]$pf.capabilityProfile.profileId};frameworkCapabilities=$pf.capabilityProfile;capabilities=$capabilities;regions=$regions;
-  interactions=@([ordered]@{id='primary-action';trigger='primary action';result='visible action feedback';recovery='retry or return'},[ordered]@{id='route-navigation';trigger='route/tab selection';result='active region and URL fragment';recovery='fallback to overview'},[ordered]@{id='filter-and-search';trigger='filter/search input';result='filtered result count';recovery='clear filters'},[ordered]@{id='error-recovery';trigger='error state';result='explanation and retry';recovery='offline snapshot or empty state'});
-  visualSystem=[ordered]@{style='premium-tech';focus='repository identity plus next action';semanticColors=@('canvas','surface','text','muted','brand','accent','danger','success','warning');typeScale=@('display','title','body','meta');spacing='4pt/8pt rhythm';motionLayers=@('hero-intro','section-reveal','micro-interaction');reducedMotion='required';forcedColors='required'};
-  responsiveProfiles=@([ordered]@{id='desktop';width=1440;layout='two-column overview with persistent navigation'},[ordered]@{id='mobile';width=390;layout='single-column linear reading with horizontal route tabs'});
-  states=@('default','loading','empty','error','success','offline','permission-denied','not-found');
-  dataContract=[ordered]@{repository=@('owner','name','visibility','description','defaultBranch','stars','forks','watchers');commit=@('id','message','author','timestamp','changedFiles');issue=@('id','title','status','labels','author','updatedAt');pullRequest=@('id','title','status','reviewStatus','ciStatus','author','updatedAt')};
-  htmlDirectives=[ordered]@{rootClass='designed-workbench';requiredDataAttributes=@('data-design-status=accepted','data-capability-id');capabilityElement='section';capabilityClass='design-capability';interactiveControls=@('primary-action','route-navigation','filter-and-search','error-recovery');visualClasses=@('design-grid','repo-meta','capability-priority');};acceptanceCriteria=@('every capability maps to a region id','every route target resolves to a region id','primary and recovery interactions are represented','desktop and mobile profiles are represented','loading/empty/error/success/offline states are represented','visual tokens and reduced-motion are represented','static output remains offline and deterministic');
-  knowledgeRefs=@($pf.promptPlan.knowledgeRefs);runtimeStatus='runtime-not-run';nonClaims=@('deep design spec is a static design decision, not browser or production proof','no network or backend was invoked')
+$responseFull=Resolve-RootPath $ModelResponsePath
+if(-not(Test-Path -LiteralPath $responseFull -PathType Leaf)){throw "BLOCKED_WEB_DEEP_DESIGN_MODEL_RESPONSE_MISSING:$ModelResponsePath"}
+$doc=Get-Content -LiteralPath $responseFull -Raw -Encoding UTF8|ConvertFrom-Json
+$entry=@($doc.responses|Where-Object {[string]$_.phase -eq 'page-design-instantiation'}|Select-Object -First 1)
+if(-not $entry){throw 'BLOCKED_WEB_DEEP_DESIGN_PAGE_RESPONSE_NOT_FOUND'}
+$o=$entry[0].outputs|Select-Object -First 1
+$providerRunId=[string]$doc.providerRunId
+if([string]::IsNullOrWhiteSpace($providerRunId) -or $providerRunId.ToLowerInvariant().StartsWith('normalized-') -or $providerRunId.ToLowerInvariant().Contains('synthetic') -or $providerRunId.ToLowerInvariant().Contains('fixture')){throw 'BLOCKED_WEB_DEEP_DESIGN_PROVIDER_ID_INVALID'}
+if($null -eq $o.provenance -or [string]$o.provenance.actor -notin @('current-ai-session','provider')){throw 'BLOCKED_WEB_DEEP_DESIGN_AI_PROVENANCE_REQUIRED'}
+$required=@('objectiveBrief','securityContract','semanticHtml','informationArchitecture','visualDirection','interactionModel','implementationPlan','filesToCreate','filesToModify','riskAssessment','rejectedAlternatives','componentInventory','interactionStateGraph','responsiveMatrix','motionTimeline','a11yChecks','interactionContracts','viewContracts','detailContract')
+$missing=@();foreach($name in $required){$p=$o.PSObject.Properties[$name];if($null -eq $p -or $null -eq $p.Value -or ([string]$p.Value -is [string] -and [string]::IsNullOrWhiteSpace([string]$p.Value)) -or ($p.Value -is [System.Array] -and @($p.Value).Count -eq 0)){$missing+=$name}}
+if($missing.Count -gt 0 -or [string]$o.aiAnalysis -notmatch '.{40}' -or [string]$o.execution -notmatch '.{20}' -or $null -eq $o.returnReceipt -or $null -eq $o.evidence){throw ('BLOCKED_WEB_DEEP_DESIGN_MODEL_RESPONSE_INCOMPLETE:' + ($missing -join ','))}
+$qualityRules = @(
+  @{ name='objectiveBrief'; min=80 }, @{ name='informationArchitecture'; min=120 },
+  @{ name='visualDirection'; min=120 }, @{ name='interactionModel'; min=160 },
+  @{ name='implementationPlan'; min=160 }, @{ name='securityContract'; min=80 }
+)
+foreach($rule in $qualityRules){
+  $fieldName=[string]$rule.name; $v=[string]$o.$fieldName
+  if($v.Trim().Length -lt [int]$rule.min){throw "BLOCKED_WEB_DEEP_DESIGN_MODEL_RESPONSE_SHALLOW:$fieldName"}
+  if($v -like '*placeholder*' -or $v -like '*todo*' -or $v -like '*lorem ipsum*' -or $v -like '*待补充*'){throw ('BLOCKED_WEB_DEEP_DESIGN_MODEL_RESPONSE_PLACEHOLDER:' + $fieldName)}
 }
-$out=Resolve-RootPath $OutputPath;New-Item -ItemType Directory -Path (Split-Path $out) -Force|Out-Null;$json=$design|ConvertTo-Json -Depth 20;[IO.File]::WriteAllText($out,$json,[Text.UTF8Encoding]::new($false));$json
+$design=[ordered]@{}+$common;$design.status='accepted';$design.designStatus='accepted';$design.decisionStatus='accepted';$design.modelResponsePath=$ModelResponsePath.Replace('\','/');$design.modelResponseHash=(Get-FileHash -LiteralPath $responseFull -Algorithm SHA256).Hash.ToLowerInvariant();$design.providerRunId=$providerRunId;$design.phase=[string]$entry[0].phase;$design.generationMode=[string]$entry[0].generationMode;$design.round=[int]$entry[0].round
+foreach($name in $required){$design[$name]=$o.$name};$design.aiAnalysis=[string]$o.aiAnalysis;$design.execution=[string]$o.execution;$design.returnReceipt=$o.returnReceipt;$design.evidence=$o.evidence;$design.sourceResponseHash=$design.modelResponseHash
+Write-Receipt $design $OutputPath

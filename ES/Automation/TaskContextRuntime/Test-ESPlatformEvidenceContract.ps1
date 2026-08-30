@@ -64,8 +64,11 @@ Invoke-Case 'legacy-accepted-receipt-remains-verifiable' {
     $paths=[pscustomobject]@{ProjectRoot=$root;StoreRoot=$store};$verified=&$runtimeModule{param($runtimePaths,$runtimeState)Test-ESBoundReceipt $runtimePaths $runtimeState}$paths $state;Assert-Equal $verified.receiptHash $receipt.receiptHash 'legacy receipt hash'
 }
 Invoke-Case 'frozen-contract-drift-limits-completion' {
-    $isolated=Join-Path $testRoot 'isolated';$automationDir=Join-Path $isolated 'ES\Automation';$runtimeDir=Join-Path $automationDir 'TaskContextRuntime';$contractsDir=Join-Path $automationDir 'Contracts';$routePlanDir=Join-Path $automationDir 'RoutePlan';$evaluationDir=Join-Path $automationDir 'Evaluation';$runnerDir=Join-Path $isolated '.agents\skills\es-static-deep-replay\scripts';New-Item -ItemType Directory -Path $runtimeDir,$contractsDir,$routePlanDir,$evaluationDir,$runnerDir|Out-Null
+    $isolated=Join-Path $testRoot 'isolated';$automationDir=Join-Path $isolated 'ES\Automation';$runtimeDir=Join-Path $automationDir 'TaskContextRuntime';$contractsDir=Join-Path $automationDir 'Contracts';$routePlanDir=Join-Path $automationDir 'RoutePlan';$evaluationDir=Join-Path $automationDir 'Evaluation';$abcdDir=Join-Path $automationDir 'ABCD';$aiDir=Join-Path $automationDir 'AI';$runnerDir=Join-Path $isolated '.agents\skills\es-static-deep-replay\scripts';New-Item -ItemType Directory -Path $runtimeDir,$contractsDir,$routePlanDir,$evaluationDir,$abcdDir,$aiDir,$runnerDir|Out-Null
     Copy-Item -LiteralPath $RuntimeModulePath -Destination (Join-Path $runtimeDir 'ESTaskContextRuntime.psm1')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\ABCD\ESABCDAuthorityKernel.psm1') -Destination (Join-Path $abcdDir 'ESABCDAuthorityKernel.psm1')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\AI\ESAuthorityDecisionPolicy.psm1') -Destination (Join-Path $aiDir 'ESAuthorityDecisionPolicy.psm1')
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $SchemaPath) 'es-authority-ai-decision-policy-v1.json') -Destination (Join-Path $contractsDir 'es-authority-ai-decision-policy-v1.json')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\RoutePlan\ESRoutePlanContract.psm1') -Destination (Join-Path $routePlanDir 'ESRoutePlanContract.psm1')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\..\..\.agents\skills\es-static-deep-replay\scripts\Invoke-ESStaticDeepReplay.ps1') -Destination (Join-Path $runnerDir 'Invoke-ESStaticDeepReplay.ps1')
     Copy-Item -LiteralPath $SchemaPath -Destination (Join-Path $contractsDir 'es-platform-evidence-v1.schema.json')

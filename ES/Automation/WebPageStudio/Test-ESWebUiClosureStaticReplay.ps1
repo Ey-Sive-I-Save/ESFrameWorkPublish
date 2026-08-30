@@ -16,8 +16,9 @@ foreach($name in $tests){
             $raw=& $path -ArtifactDirectory $artifact 2>$null
         } else { $raw=& $path 2>$null }
         $json=($raw -join "`n")|ConvertFrom-Json
-        $results += [pscustomobject]@{test=$name;status=[string]$json.status;runtimeStatus=[string]$json.runtimeStatus}
-    } catch { $results += [pscustomobject]@{test=$name;status='failed';runtimeStatus='runtime-not-run';error=$_.Exception.Message} }
+        $findings=@(); if($json.PSObject.Properties['checks']){$findings=@($json.checks|Where-Object {[string]$_.status -ne 'passed'}|ForEach-Object {[ordered]@{check=[string]$_.check;status=[string]$_.status;detail=[string]$_.detail}})}
+        $results += [pscustomobject]@{test=$name;status=[string]$json.status;runtimeStatus=[string]$json.runtimeStatus;findings=$findings}
+    } catch { $results += [pscustomobject]@{test=$name;status='failed';runtimeStatus='runtime-not-run';findings=@([ordered]@{check='validator-exception';status='failed';detail=$_.Exception.Message})} }
 }
 $failed=@($results|Where-Object status -ne 'passed')
 $schemaResult=$results|Where-Object test -eq 'Test-ESWebUiReceiptSchemas.ps1'|Select-Object -First 1

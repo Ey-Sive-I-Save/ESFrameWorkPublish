@@ -1,0 +1,31 @@
+{
+    "schemaVersion":  1,
+    "indexId":  "es-resource-reader.resource-index.v1",
+    "projectRoot":  "F:\\aaProject\\ESFrameWorkPublish\\Assets",
+    "capturedUtc":  "2026-08-30T10:14:53.8456249Z",
+    "fileCount":  1,
+    "maxFiles":  1,
+    "maxParallel":  1,
+    "items":  [
+                  {
+                      "sourcePath":  "CLazyRunnerActionAnimPack.meta",
+                      "sourceSha256":  "ea816c3bb5e73f82af892f8ae9fe95a991c936f077f8592c73b062621da84db8",
+                      "detectedFormat":  "unityyaml",
+                      "parserId":  "unityyaml.v1",
+                      "parserVersion":  "1",
+                      "byteCount":  172,
+                      "entryCount":  0,
+                      "objectCount":  0,
+                      "dependencyCount":  0,
+                      "warningCount":  0,
+                      "errorCount":  0,
+                      "status":  "ready"
+                  }
+              ],
+    "nonClaims":  [
+                      "Unity import",
+                      "runtime loading",
+                      "network retrieval",
+                      "release readiness"
+                  ]
+}

@@ -20,6 +20,8 @@ MonoBehaviour:
   povLookSensitivity: {x: 220, y: 90}
   freeLookSensitivity: {x: 220, y: 0.5}
   pointerLookScale: 0.001
+  maxPovLookRate: {x: 720, y: 180}
+  maxFreeLookRate: {x: 720, y: 1}
   invertVerticalLook: 0
   baseFieldOfView: 60
   baseDistanceScale: 1

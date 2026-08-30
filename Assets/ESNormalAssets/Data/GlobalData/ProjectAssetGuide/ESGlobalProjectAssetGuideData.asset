@@ -134,7 +134,7 @@ MonoBehaviour:
     expandedTransformPaths: []
   - sceneGuid: 56b71f36d8040a44ebdacf759edc04ca
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/02_CompositeShader_UI_Cases.unity
-    savedUtcTicks: 639236659263711600
+    savedUtcTicks: 639236709185648574
     expandedTransformPaths: []
   - sceneGuid: 6b375c60c399eee48bcc8c14f94b7d14
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/03_CompositeShader_3D_Lit_Cases.unity

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/deepseek-harness/v1",
+  "schemaVersion": 1,
+  "title": "ES DeepSeek Harness受管请求",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["projectRoot", "providerDeclaration", "workerId", "workerVersion", "taskId", "runId", "dryRun", "operation", "prompt"],
+  "properties": {
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "providerDeclaration": { "const": "es-deepseek" },
+    "workerId": { "const": "es.deepseek-harness" },
+    "workerVersion": { "const": "0.2.0" },
+    "taskId": { "const": "es.deepseek.harness" },
+    "runId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "dryRun": { "type": "boolean" },
+    "operation": { "enum": ["dry-run", "check-local", "headless-prompt"] },
+    "prompt": { "type": "string", "minLength": 0, "maxLength": 12000 },
+    "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 7200000 },
+    "requireProvider": { "type": "boolean" }
+  }
+}

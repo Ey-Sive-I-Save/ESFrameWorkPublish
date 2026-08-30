@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/web-ui/sub-agent-schedule/v1",
+  "title": "Web UI Sub-Agent Schedule v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["projectionRecordType", "parentTaskId", "planHash", "verificationHash", "maxParallel", "waves", "dispatch", "cancellation", "admissionGate", "workerContractIds", "leafExecutor", "nonClaims", "scheduleHash"],
+  "properties": {
+    "projectionRecordType": { "const": "WebPageStudioSubAgentProjection" },
+    "parentTaskId": { "$ref": "#/$defs/id" },
+    "planHash": { "$ref": "#/$defs/hash" },
+    "verificationHash": { "$ref": "#/$defs/hash" },
+    "maxParallel": { "type": "integer", "minimum": 1, "maximum": 256 },
+    "waves": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/wave" } },
+    "dispatch": { "const": "external-managed-worker-required" },
+    "cancellation": { "const": "lease-cas" },
+    "admissionGate": { "const": "web-ui-sub-agent-admission" },
+    "workerContractIds": { "type": "array", "minItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "leafExecutor": { "const": "ESAutomationProcessRunner" },
+    "nonClaims": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "scheduleHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "wave": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wave", "stage", "dependsOnWaves", "maxParallel", "taskIds"],
+      "properties": {
+        "wave": { "type": "integer", "minimum": 0 },
+        "stage": { "enum": ["layer-evidence", "layer-validation", "evidence-aggregation"] },
+        "dependsOnWaves": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "maxParallel": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "taskIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    }
+  }
+}

@@ -15,6 +15,8 @@ $script:JsonSchemaLitePath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..
 $script:RoutePlanModulePath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\RoutePlan\ESRoutePlanContract.psm1'))
 Import-Module $script:JsonSchemaLitePath -ErrorAction Stop
 Import-Module $script:RoutePlanModulePath -ErrorAction Stop
+Import-Module ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\ABCD\ESABCDAuthorityKernel.psm1'))) -ErrorAction Stop
+Import-Module ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\AI\ESAuthorityDecisionPolicy.psm1'))) -ErrorAction Stop
 
 function ConvertTo-ESCanonicalJson {
     param([AllowNull()]$Value)
@@ -919,6 +921,8 @@ function New-ESTaskContextTask {
         [string]$InteractionSessionId,
         [string]$FocusContextId, [int]$FocusRevision=0, [string]$FocusProposalHash, [string]$FocusReceiptHash, [string]$FocusScopeHash,
         [string]$TaskBindingPath,
+        [ValidateSet('ai-collaboration','game-logic','editor-tooling','release')][string]$AuthorityDomain='ai-collaboration',
+        [ValidateSet('standard','high','critical')][string]$AuthorityRiskClass='standard',
         [int]$MaxEvidenceAgeHours=24, [switch]$AllowUnverifiedClaims,
         [string[]]$RequestedSourceScope=@(), [Parameter(Mandatory=$true)][string]$IdempotencyKey
     )
@@ -982,7 +986,12 @@ function New-ESTaskContextTask {
         Assert-ESABCTaskBinding $binding $TaskId 1 1 $bindingState -ProjectRoot $paths.ProjectRoot | Out-Null
         $bindingRef=[ordered]@{bindingId=[string]$binding.bindingId;bindingHash=[string]$binding.bindingHash}
     }
-    $operationHash = Get-ESObjectHash ([ordered]@{operation='Create';taskId=$TaskId;planHash=[string]$routePlan.routePlanHash;routePlanId=[string]$routePlan.routePlanId;routePlanPath=[string]$routePlan.routePlanPath;routePlanArtifactHash=[string]$routePlan.routePlanArtifactHash;routePlanSnapshotHash=[string]$routePlan.snapshotHash;goalRevisionHash=$goal.goalRevisionHash;acceptanceProfileId=$AcceptanceProfileId;outcomeEvaluatorId=$OutcomeEvaluatorId;outcomeEvaluatorDefinitionHash=[string]$outcomeEvaluatorSnapshot.definitionHash;outcomeEvaluatorRegistryHash=[string]$outcomeEvaluatorSnapshot.registryHash;evaluationContractId=[string]$evaluationContractSnapshot.contractId;evaluationContractHash=[string]$evaluationContractSnapshot.contractHash;requiredClaims=$claims;requiredVerifiers=$requiredVerifiers;optionalClaims=$optionalClaims;optionalVerifiers=$optionalVerifiers;interactionSessionId=$interactionSessionIdNormalized;focusContextId=$FocusContextId;focusRevision=$FocusRevision;focusProposalHash=$FocusProposalHash;focusReceiptHash=$FocusReceiptHash;focusScopeHash=$FocusScopeHash;taskBindingRef=$bindingRef;verifierRegistryHash=[string]$registrySnapshot.registryHash;evidenceContractId=[string]$evidenceContractSnapshot.contractId;evidenceContractHash=[string]$evidenceContractSnapshot.contractHash;maxEvidenceAgeHours=$MaxEvidenceAgeHours;allowUnverifiedClaims=[bool]$AllowUnverifiedClaims;requestedSourceScope=@($RequestedSourceScope);idempotencyKey=$IdempotencyKey})
+    # Test fixtures may use an isolated ProjectRoot; authority policy remains
+    # owned by the installed ES project, never by a mutable task output root.
+    $authorityPolicyRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
+    $authorityPolicy = Get-ESAuthorityDecisionPolicy -ProjectRoot $authorityPolicyRoot -Domain $AuthorityDomain
+    if ($AuthorityRiskClass -in @('high','critical') -and $AuthorityDomain -eq 'ai-collaboration') { throw 'High-risk tasks must declare a strict authority domain.' }
+    $operationHash = Get-ESObjectHash ([ordered]@{operation='Create';taskId=$TaskId;authorityDomain=$AuthorityDomain;authorityRiskClass=$AuthorityRiskClass;planHash=[string]$routePlan.routePlanHash;routePlanId=[string]$routePlan.routePlanId;routePlanPath=[string]$routePlan.routePlanPath;routePlanArtifactHash=[string]$routePlan.routePlanArtifactHash;routePlanSnapshotHash=[string]$routePlan.snapshotHash;goalRevisionHash=$goal.goalRevisionHash;acceptanceProfileId=$AcceptanceProfileId;outcomeEvaluatorId=$OutcomeEvaluatorId;outcomeEvaluatorDefinitionHash=[string]$outcomeEvaluatorSnapshot.definitionHash;outcomeEvaluatorRegistryHash=[string]$outcomeEvaluatorSnapshot.registryHash;evaluationContractId=[string]$evaluationContractSnapshot.contractId;evaluationContractHash=[string]$evaluationContractSnapshot.contractHash;requiredClaims=$claims;requiredVerifiers=$requiredVerifiers;optionalClaims=$optionalClaims;optionalVerifiers=$optionalVerifiers;interactionSessionId=$interactionSessionIdNormalized;focusContextId=$FocusContextId;focusRevision=$FocusRevision;focusProposalHash=$FocusProposalHash;focusReceiptHash=$FocusReceiptHash;focusScopeHash=$FocusScopeHash;taskBindingRef=$bindingRef;verifierRegistryHash=[string]$registrySnapshot.registryHash;evidenceContractId=[string]$evidenceContractSnapshot.contractId;evidenceContractHash=[string]$evidenceContractSnapshot.contractHash;maxEvidenceAgeHours=$MaxEvidenceAgeHours;allowUnverifiedClaims=[bool]$AllowUnverifiedClaims;requestedSourceScope=@($RequestedSourceScope);idempotencyKey=$IdempotencyKey})
     Invoke-ESTaskMutex $TaskId {
         if (Test-Path -LiteralPath $paths.TaskRoot) {
             $existing = Read-ESEventChain $paths -VerifyReceipts
@@ -1003,7 +1012,7 @@ function New-ESTaskContextTask {
         $profile['profileHash'] = Get-ESObjectHash $profileCore
         $createdUtc=[DateTime]::UtcNow.ToString('o')
         $state = [pscustomobject][ordered]@{
-            taskId=$TaskId; planHash=[string]$routePlan.routePlanHash
+            taskId=$TaskId; authorityDomain=$AuthorityDomain; authorityRiskClass=$AuthorityRiskClass; authorityPolicyHash=[string]$authorityPolicy.contractHash; planHash=[string]$routePlan.routePlanHash
             routePlan=[pscustomobject][ordered]@{routePlanId=[string]$routePlan.routePlanId;routePlanPath=[string]$routePlan.routePlanPath;routePlanHash=[string]$routePlan.routePlanHash;artifactHash=[string]$routePlan.routePlanArtifactHash;snapshotHash=[string]$routePlan.snapshotHash;profile=[string]$routePlan.profile;routeState=[string]$routePlan.routeState;routeKeys=@($routePlan.routeKeys);head=[string]$routePlan.head;sourceRefsHash=[string]$routePlan.sourceRefsHash;registryHash=[string]$routePlan.registryHash}
             goalId=$goal.goalId; goalRevision=$goal.goalRevision; goalRevisionHash=$goal.goalRevisionHash; goalRevisionPath=$goal.path; createdUtc=$createdUtc; interactionSessionId=$interactionSessionIdNormalized; focusContextId=if($hasFocus){$FocusContextId}else{$null}; focusRevision=if($hasFocus){$FocusRevision}else{$null}; focusProposalHash=if($hasFocus){$FocusProposalHash}else{$null}; focusReceiptHash=if($hasFocus -and -not [string]::IsNullOrWhiteSpace($FocusReceiptHash)){$FocusReceiptHash}else{$null}; focusScopeHash=if($hasFocus){$FocusScopeHash}else{$null}; taskRevision=1; contextVersion=1
             taskStatus='Active'; contextStatus='Live'; completionDecision='undetermined'; deliveryAcceptance='pending'
@@ -1466,6 +1475,33 @@ function Complete-ESTaskContextTask {
         $binding=Read-ESABCTaskBinding $paths $previous.state $ExpectedTaskRevision $ExpectedContextVersion -AllowAttachedRevision
         if($null -ne $binding -and [string]::IsNullOrWhiteSpace([string]$previous.state.verifiedSourceScopeHash)){throw 'ABC Task Binding requires a verified sourceScope before completion.'}
         if($null -ne $binding -and [string]$binding.sourceScopeHash -cne [string]$previous.state.verifiedSourceScopeHash){throw 'ABC Task Binding sourceScopeHash does not match the verified source scope.'}
+        $authorityKernel = $null
+        if($null -ne $binding){
+            $hasAbcdAuthorityEvent = $null -ne $previous.state.PSObject.Properties['abcdOrchestration'] -and $null -ne $previous.state.abcdOrchestration
+            $authorityEvidence = [pscustomobject][ordered]@{
+                taskId = $TaskId
+                taskBindingId = [string]$binding.bindingId
+                requiredCapabilities = @(Get-ESABCDCoreCapabilities)
+                selectedCapabilities = @(Get-ESABCDCoreCapabilities)
+                orchestrationEventPresent = [bool]$hasAbcdAuthorityEvent
+            }
+            $authorityMissing = if($hasAbcdAuthorityEvent){@()}else{@('abcdAuthorityDecision')}
+            $authorityKernel = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Evidence $authorityEvidence -MissingFields $authorityMissing
+            if($authorityKernel.status -ne 'accepted'){
+                $state=Copy-ESObject $previous.state
+                $state.taskRevision=[int]$state.taskRevision+1
+                $state.completionDecision='undetermined'
+                $blockedEvent=Write-ESEvent $paths $previous $state 'CompletionUndetermined' $IdempotencyKey ([pscustomobject]@{operationHash=$operationHash;decision='undetermined';authorityKernel=$authorityKernel;reasonCode='AUTHORITY_KERNEL_BLOCKED'})
+                return $blockedEvent.state
+            }
+        }
+        if($null -eq $binding -and [string]$previous.state.authorityDomain -in @('game-logic','editor-tooling','release')) {
+            $strictEvidence = [pscustomobject][ordered]@{ requiredCapabilities=@(Get-ESABCDCoreCapabilities); selectedCapabilities=@(Get-ESABCDCoreCapabilities) }
+            $authorityKernel = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Domain ([string]$previous.state.authorityDomain) -Evidence $strictEvidence -MissingFields @('abcdAuthorityDecision')
+            $state=Copy-ESObject $previous.state; $state.taskRevision=[int]$state.taskRevision+1; $state.completionDecision='undetermined'
+            $blockedEvent=Write-ESEvent $paths $previous $state 'CompletionUndetermined' $IdempotencyKey ([pscustomobject]@{operationHash=$operationHash;decision='undetermined';authorityKernel=$authorityKernel;reasonCode='STRICT_AUTHORITY_REQUIRES_ABCD'})
+            return $blockedEvent.state
+        }
         $evaluationId=[Guid]::NewGuid().ToString('N')
         $evaluationResult=New-ESEvaluationRecordCore $paths $events $previous.state 'completion' $operationHash $evaluationId
         $evaluation=$evaluationResult.record
@@ -1475,6 +1511,7 @@ function Complete-ESTaskContextTask {
         if($evaluation.decision -eq 'accepted'){
             $state.taskStatus='Completed';$state.contextStatus='Frozen';$state.contextVersion=[int]$state.contextVersion+1;$state.deliveryAcceptance='pending'
             $receiptBase=[ordered]@{schemaVersion=1;receiptId=[Guid]::NewGuid().ToString('N');taskId=$TaskId;taskRevision=[int]$state.taskRevision;contextVersion=[int]$state.contextVersion;planHash=[string]$state.planHash;routePlanId=[string]$state.routePlan.routePlanId;routePlanPath=[string]$state.routePlan.routePlanPath;routePlanHash=[string]$state.routePlan.routePlanHash;routePlanArtifactHash=[string]$state.routePlan.artifactHash;routePlanSnapshotHash=[string]$state.routePlan.snapshotHash;goalRevisionHash=[string]$state.goalRevisionHash;acceptanceProfileHash=[string]$state.acceptanceProfile.profileHash;evidenceContractId=[string]$state.acceptanceProfile.evidenceContractId;evidenceContractHash=[string]$state.acceptanceProfile.evidenceContractHash;evaluationId=[string]$evaluation.evaluationId;evaluationRecordPath=[string]$evaluationResult.path;evaluationRecordHash=[string]$evaluation.recordHash;evidenceSetHash=[string]$state.evidenceSet.evidenceSetHash;verifiedSourceScopeHash=[string]$state.verifiedSourceScopeHash;completionDecision='accepted';issuedUtc=[DateTime]::UtcNow.ToString('o')}
+            if($null -ne $authorityKernel){$receiptBase.authorityKernel=$authorityKernel}
             if($null-ne$state.PSObject.Properties['focusContextId']-and$null-ne$state.focusContextId){$receiptBase.focusContextId=[string]$state.focusContextId;$receiptBase.focusRevision=[int]$state.focusRevision;$receiptBase.focusProposalHash=[string]$state.focusProposalHash;$receiptBase.focusReceiptHash=if($null -eq $state.focusReceiptHash){$null}else{[string]$state.focusReceiptHash};$receiptBase.focusScopeHash=[string]$state.focusScopeHash}
             $receipt=[ordered]@{};foreach($key in $receiptBase.Keys){$receipt[$key]=$receiptBase[$key]};$receipt['receiptHash']=Get-ESObjectHash $receiptBase
             $receiptRelative="$TaskId/receipts/$($receiptBase.receiptId).json";$receiptFull=Join-Path $paths.StoreRoot ($receiptRelative.Replace('/',[IO.Path]::DirectorySeparatorChar))

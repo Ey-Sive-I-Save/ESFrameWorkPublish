@@ -52,6 +52,8 @@
       "required": ["schemaVersion", "criteria"],
       "properties": {
         "schemaVersion": { "type": "integer", "const": 1 },
+        "authorityDomain": { "type": "string", "enum": ["", "ai-collaboration", "game-logic", "editor-tooling", "release"] },
+        "authorityRiskClass": { "type": "string", "enum": ["", "standard", "high", "critical"] },
         "freshnessPolicy": {
           "anyOf": [ { "type": "null" }, {
           "type": "object",

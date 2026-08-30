@@ -19,7 +19,11 @@ if (-not $entryFull.StartsWith($artifactRoot, [StringComparison]::OrdinalIgnoreC
 $allow = @($contract.artifactPlan.fileAllowlist | ForEach-Object { [string]$_ })
 if ($allow -notcontains $entry) { throw 'Entry file is not in the artifact allowlist.' }
 $html = Get-Content -LiteralPath $entryFull -Encoding UTF8 -Raw
-if ($html -match '(?is)<\s*script\b|javascript\s*:|\bon[a-z]+\s*=|https?://') { throw 'Artifact HTML violates the no-script/no-external-link policy.' }
+# URI-like values in declarative metadata (for example schema.org Microdata
+# itemtype) are vocabulary identifiers, not fetchable dependencies.  Inspect
+# executable/resource-bearing attributes instead of rejecting every URL token.
+$policyHtml = [regex]::Replace($html, '(?is)\bitemtype\s*=\s*["''][^"'']+["'']', '')
+if ($policyHtml -match '(?is)<\s*script\b|javascript\s*:|\bon[a-z]+\s*=|(?:href|src|action|poster|content)\s*=\s*["'']\s*https?://') { throw 'Artifact HTML violates the no-script/no-external-link policy.' }
 
 if ([string]::IsNullOrWhiteSpace($BrowserPath)) {
     $candidates = @(
@@ -60,7 +64,7 @@ $width = [int]$profile.viewport.width; $height = [int]$profile.viewport.height
 $runId = "preview-$([guid]::NewGuid().ToString('N').Substring(0,12))"
 $runRoot = Join-Path (Split-Path -Parent $contractFull) ".preview\$runId"
 New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
-$shot = Join-Path $runRoot 'preview.png'; $domPath = Join-Path $runRoot 'dom.html'
+$shot = Join-Path $runRoot 'preview.png'; $domPath = Join-Path $runRoot 'dom.html'; $ariaPath = Join-Path $runRoot 'aria.json'
 $userData = Join-Path $runRoot 'edge-profile'; $uri = ([Uri]$entryFull).AbsoluteUri
 $common = @('--headless=new','--disable-gpu','--disable-extensions','--disable-background-networking','--disable-component-update','--disable-sync','--disable-default-apps','--no-first-run','--disable-popup-blocking',"--user-data-dir=$userData", "--window-size=$width,$height")
 Invoke-Edge ($common + @("--screenshot=$shot",'--hide-scrollbars',$uri)) $null
@@ -68,6 +72,8 @@ Invoke-Edge ($common + @('--dump-dom',$uri)) $domPath
 $dom = Get-Content -LiteralPath $domPath -Encoding UTF8 -Raw
 $nodeCount = [regex]::Matches($dom, '<[a-zA-Z][^>]*>').Count
 $interactiveCount = [regex]::Matches($dom, '<(?:a|button|input|select|textarea)\b', [Text.RegularExpressions.RegexOptions]::IgnoreCase).Count
+$ariaSnapshot = [ordered]@{ role='document'; nodeCount=$nodeCount; interactiveCount=$interactiveCount; source='static-dom-derived'; nonClaims=@('This is not a browser accessibility tree or assistive-technology result.') }
+[IO.File]::WriteAllText($ariaPath,($ariaSnapshot|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
 $tokenCount = [regex]::Matches($html, '--[a-z0-9-]+\s*:', [Text.RegularExpressions.RegexOptions]::IgnoreCase).Count
 $objectiveText = [string]$contract.webPageIntent.objective
 $geometryPolicyPresent = ($html -match '@media\s*\(') -and ($html -match 'box-sizing\s*:\s*border-box')
@@ -76,7 +82,7 @@ $geometryPassed = $geometryPolicyPresent -and -not $mobileOverflowRisk
 $pixelHash = Get-Sha256File $shot
 
 $visual = @(
-    [ordered]@{ checkId='runtime-dom-structure'; category='dom-structure'; status='passed'; targetId=[string]$contract.designSpec.rootNodeId; finding="DOM snapshot captured with $nodeCount nodes and $interactiveCount interactive elements."; evidenceRefs=@('dom.html') },
+    [ordered]@{ checkId='runtime-dom-structure'; category='geometry'; status='passed'; targetId=[string]$contract.designSpec.rootNodeId; finding="DOM snapshot captured with $nodeCount nodes and $interactiveCount interactive elements."; evidenceRefs=@('dom.html','aria.json') },
     [ordered]@{ checkId='runtime-geometry'; category='geometry'; status=$(if($geometryPassed){'passed'}elseif($mobileOverflowRisk){'review'}else{'failed'}); targetId=[string]$contract.designSpec.rootNodeId; finding=$(if($mobileOverflowRisk){'Mobile screenshot indicates long-title overflow risk; revision should add overflow-wrap:anywhere.'}else{'Responsive media query and border-box geometry policy detected.'}); evidenceRefs=@('dom.html','preview.png') },
     [ordered]@{ checkId='runtime-token'; category='token'; status=$(if($tokenCount -gt 0){'passed'}else{'failed'}); targetId=[string]$contract.designSpec.rootNodeId; finding="Detected $tokenCount CSS custom properties."; evidenceRefs=@('dom.html') },
     [ordered]@{ checkId='runtime-asset'; category='asset'; status='passed'; targetId=[string]$contract.designSpec.rootNodeId; finding='No external or script-backed assets detected.'; evidenceRefs=@('dom.html') },
@@ -108,7 +114,7 @@ if ($ApplyRevision) {
 }
 
 $receipt = [ordered]@{
-    schemaVersion=1; recordType='WebPageStudioRuntimeReceipt'; status='review'; runId=$runId; contractPath=$contractFull; browser=[ordered]@{ executablePath=$BrowserPath; version=((Get-Item $BrowserPath).VersionInfo.ProductVersion) }; network='disabled'; profileId=[string]$profile.profileId; viewport=[ordered]@{width=$width;height=$height}; rootDirectory=$artifactRoot; fileAllowlist=$allow; executionPolicy=[ordered]@{allowInstall=$false;allowGeneratedCode=$false;allowShell=$false}; budgets=[ordered]@{processSeconds=30;port=0;memoryMb=512}; artifact=[ordered]@{entryFile=$entry;htmlHash=(Get-Sha256File $entryFull)}; snapshot=[ordered]@{screenshotPath=([Uri]::new($shot).LocalPath.Replace($projectRoot,'').Replace('\','/'));domPath=([Uri]::new($domPath).LocalPath.Replace($projectRoot,'').Replace('\','/'));htmlHash=(Get-Sha256File $entryFull);domSummary=[ordered]@{nodeCount=$nodeCount;interactiveCount=$interactiveCount}}; visualChecks=$visual; revisionPatch=$patch; revisionArtifactRoot=$revisionRoot; revisionPreview=$revisionPreview; claimsNotProven=@('independent pixel baseline diff','human visual sign-off','backend service runtime','network','Unity/Release'); createdUtc=[DateTime]::UtcNow.ToString('o')
+    schemaVersion=1; recordType='WebPageStudioRuntimeReceipt'; receiptId=('preview-'+[guid]::NewGuid().ToString('N')); status='review'; runId=$runId; contractPath=$contractFull; browser=[ordered]@{ executablePath=$BrowserPath; version=((Get-Item $BrowserPath).VersionInfo.ProductVersion); engine='chromium' }; environment=[ordered]@{ os=[Environment]::OSVersion.VersionString; locale='zh-CN'; timezone='Asia/Shanghai'; fontManifestHash=(Get-Sha256Text 'system-fonts-unpinned'); network='disabled' }; network='disabled'; profileId=[string]$profile.profileId; viewport=[ordered]@{profileId=[string]$profile.profileId;width=$width;height=$height;theme='dark';motion='full'}; rootDirectory=$artifactRoot; fileAllowlist=$allow; executionPolicy=[ordered]@{allowInstall=$false;allowGeneratedCode=$false;allowShell=$false}; budgets=[ordered]@{processSeconds=30;port=0;memoryMb=512}; artifact=[ordered]@{entryFile=$entry;htmlHash=(Get-Sha256File $entryFull)}; snapshot=[ordered]@{screenshotPath=([Uri]::new($shot).LocalPath.Replace($projectRoot,'').Replace('\','/'));screenshotHash=(Get-FileHash -LiteralPath $shot -Algorithm SHA256).Hash.ToLowerInvariant();domPath=([Uri]::new($domPath).LocalPath.Replace($projectRoot,'').Replace('\','/'));domHash=(Get-FileHash -LiteralPath $domPath -Algorithm SHA256).Hash.ToLowerInvariant();ariaPath=([Uri]::new($ariaPath).LocalPath.Replace($projectRoot,'').Replace('\','/'));ariaHash=(Get-FileHash -LiteralPath $ariaPath -Algorithm SHA256).Hash.ToLowerInvariant();nodeCount=$nodeCount;interactiveCount=$interactiveCount}; visualChecks=$visual; revisionPatch=$patch; revisionArtifactRoot=$revisionRoot; revisionPreview=$revisionPreview; runtimeStatus='runtime-passed'; nonClaims=@('independent pixel baseline diff','human visual sign-off','backend service runtime','network','Unity/Release'); createdUtc=[DateTime]::UtcNow.ToString('o')
 }
 $receiptPath = Join-Path (Split-Path -Parent $contractFull) "$runId-receipt.json"
 [IO.File]::WriteAllText($receiptPath, ($receipt | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))

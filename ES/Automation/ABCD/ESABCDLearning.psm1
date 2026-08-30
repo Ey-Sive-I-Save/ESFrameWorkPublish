@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $moduleRoot = Split-Path -Parent $PSScriptRoot
-Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1')
 
 function Assert-Hash([string]$Value,[string]$Name){if([string]::IsNullOrWhiteSpace($Value)-or$Value-notmatch'^[a-f0-9]{64}$'){throw "$Name must be a lowercase SHA-256 hash."}}
 function Assert-Id([string]$Value,[string]$Name){if([string]::IsNullOrWhiteSpace($Value)-or$Value-notmatch'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'){throw "$Name is invalid."}}

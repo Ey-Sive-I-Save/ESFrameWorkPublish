@@ -1,4 +1,65 @@
-﻿[CmdletBinding()]param([string]$ProjectRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path,[string]$ReportPath='ES/Output/StaticReplay/es-abcd-authority-kernel.json')
-$ErrorActionPreference='Stop';$root=(Resolve-Path $ProjectRoot).Path;Import-Module (Join-Path $root 'ES/Automation/ABCD/ESABCDAuthorityKernel.psm1') -Force;$e=[pscustomobject]@{status='passed'};$a=Resolve-ESABCDAuthorityDecision -Mode shallow-fast -Evidence $e -MissingFields @('capturedUtc');$b=Resolve-ESABCDAuthorityDecision -Mode full-depth -Evidence $e -MissingFields @('artifactHash');$c=Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Evidence $e -MissingFields @('artifactHash');$cases=@([pscustomobject]@{case='three-modes';status=if($a.mode-eq'shallow-fast' -and $b.mode-eq'full-depth' -and $c.mode-eq'core-high-risk'){'passed'}else{'failed'}},[pscustomobject]@{case='safe-field-default-does-not-break';status=if($a.status-eq'accepted' -and $a.mechanismsContinue -and $a.normalizedFields.capturedUtc){'passed'}else{'failed'}},[pscustomobject]@{case='unsafe-field-claim-cap';status=if($b.status-eq'claim-cap' -and $b.claimLevel-eq'claim-cap'){'passed'}else{'failed'}},[pscustomobject]@{case='core-high-risk-early-stop';status=if($c.status-eq'blocked' -and -not$c.mechanismsContinue -and $c.nextAction-eq'stop-and-report'){'passed'}else{'failed'}});$failed=@($cases|Where-Object {$_.status -eq 'failed'});$overall='passed';if($failed.Count){$overall='failed'};$refs=@('ES/Automation/ABCD/ESABCDAuthorityKernel.psm1','ES/Automation/ABCD/Test-ESABCDAuthorityKernel.ps1');$hashes=[ordered]@{};foreach($ref in $refs){$hashes[$ref]=(Get-FileHash (Join-Path $root $ref) -Algorithm SHA256).Hash.ToLowerInvariant()};$report=[ordered]@{schemaVersion=1;validator='Test-ESABCDAuthorityKernel';status=$overall;staticStatus=if($failed.Count){'static-failed'}else{'static-passed'};runtimeStatus='runtime-not-run';evidenceLevel='S1';capturedUtc=[DateTime]::UtcNow.ToString('o');caseCount=$cases.Count;passedCount=($cases.Count-$failed.Count);failedCount=$failed.Count;cases=$cases;authorizationKind='read-only';sourceRefs=$refs;sourceRefHashes=$hashes;evidenceContractId='es.skill-evidence-receipt';evidenceContractHash=(Get-FileHash (Join-Path $root 'ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json') -Algorithm SHA256).Hash.ToLowerInvariant();skillName='es-agent-mechanism-replication';case='abcd-authority-kernel';toolId='es-abcd-authority-kernel-validator';receiptPath=$ReportPath.Replace('\','/');unityVersion='not-run';claimsNotProven=@('full project integration')};$out=Join-Path $root $ReportPath;New-Item -ItemType Directory -Force (Split-Path $out)|Out-Null;[IO.File]::WriteAllText($out,($report|ConvertTo-Json -Depth 20),[Text.UTF8Encoding]::new($false));$report|ConvertTo-Json -Depth 20;if($failed.Count){exit 1}
+[CmdletBinding()]
+param(
+    [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path,
+    [string]$ReportPath = 'ES/Output/StaticReplay/es-abcd-authority-kernel.json'
+)
+$ErrorActionPreference = 'Stop'
+$root = (Resolve-Path -LiteralPath $ProjectRoot).Path
+Import-Module (Join-Path $root 'ES/Automation/ABCD/ESABCDAuthorityKernel.psm1') -Force
 
+$e = [pscustomobject]@{ status = 'passed' }
+$core = @(Get-ESABCDCoreCapabilities)
+$a = Resolve-ESABCDAuthorityDecision -Mode shallow-fast -Evidence $e -MissingFields @('capturedUtc')
+$b = Resolve-ESABCDAuthorityDecision -Mode full-depth -Evidence $e -MissingFields @('artifactHash')
+$c = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Domain game-logic -Evidence $e -MissingFields @('artifactHash')
+$closedEvidence = [pscustomobject][ordered]@{ requiredCapabilities = @($core); selectedCapabilities = @($core) }
+$d = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Evidence $closedEvidence
+$partialEvidence = [pscustomobject][ordered]@{ requiredCapabilities = @($core); selectedCapabilities = @($core | Where-Object { $_ -ne 'branch-evaluation' }) }
+$f = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Evidence $partialEvidence
+$g = Resolve-ESABCDAuthorityDecision -Mode shallow-fast -Evidence $e -MissingFields @('artifactHash')
+$h = Resolve-ESABCDAuthorityDecision -Mode full-depth -Evidence $e -MissingFields @('semanticGoal')
 
+$cases = @(
+    [pscustomobject]@{ case = 'three-modes'; status = if ($a.mode -eq 'shallow-fast' -and $b.mode -eq 'full-depth' -and $c.mode -eq 'core-high-risk') { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'safe-field-default-does-not-break'; status = if ($a.status -eq 'accepted' -and $a.mechanismsContinue -and $a.normalizedFields.capturedUtc) { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'unsafe-field-claim-cap'; status = if ($b.status -eq 'claim-cap' -and $b.claimLevel -eq 'claim-cap') { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'core-high-risk-early-stop'; status = if ($c.status -eq 'blocked' -and -not $c.mechanismsContinue -and $c.nextAction -eq 'stop-and-report') { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'core-six-capability-closure'; status = if ($d.status -eq 'accepted' -and $d.capabilityClosure.status -eq 'closed' -and @($d.selectedCapabilities).Count -eq 6 -and @($d.selectedCapabilities) -contains 'branch-evaluation') { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'missing-capability-blocks'; status = if ($f.status -eq 'blocked' -and $f.reasonCode -eq 'CAPABILITY_CLOSURE_MISSING' -and @($f.capabilityClosure.missing) -contains 'branch-evaluation') { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'evidence-missing-claim-cap'; status = if ($g.status -eq 'claim-cap' -and $g.claimLevel -eq 'claim-cap' -and $g.nextAction -eq 'replan') { 'passed' } else { 'failed' } }
+    [pscustomobject]@{ case = 'semantic-mismatch-replans'; status = if ($h.status -eq 'replan' -and $h.nextAction -eq 'replan' -and $h.reasonCode -eq 'SEMANTIC_MISMATCH_REPLAN') { 'passed' } else { 'failed' } }
+)
+$failed = @($cases | Where-Object { $_.status -eq 'failed' })
+$overall = if ($failed.Count) { 'failed' } else { 'passed' }
+$refs = @('ES/Automation/ABCD/ESABCDAuthorityKernel.psm1', 'ES/Automation/ABCD/Test-ESABCDAuthorityKernel.ps1')
+$hashes = [ordered]@{}
+foreach ($ref in $refs) { $hashes[$ref] = (Get-FileHash (Join-Path $root $ref) -Algorithm SHA256).Hash.ToLowerInvariant() }
+$report = [ordered]@{
+    schemaVersion = 1
+    validator = 'Test-ESABCDAuthorityKernel'
+    status = $overall
+    staticStatus = if ($failed.Count) { 'static-failed' } else { 'static-passed' }
+    runtimeStatus = 'runtime-not-run'
+    evidenceLevel = 'S1'
+    capturedUtc = [DateTime]::UtcNow.ToString('o')
+    caseCount = $cases.Count
+    passedCount = $cases.Count - $failed.Count
+    failedCount = $failed.Count
+    cases = $cases
+    authorizationKind = 'read-only'
+    sourceRefs = $refs
+    sourceRefHashes = $hashes
+    evidenceContractId = 'es.skill-evidence-receipt'
+    evidenceContractHash = (Get-FileHash (Join-Path $root 'ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+    skillName = 'es-agent-mechanism-replication'
+    case = 'abcd-authority-kernel'
+    toolId = 'es-abcd-authority-kernel-validator'
+    receiptPath = $ReportPath.Replace('\', '/')
+    unityVersion = 'not-run'
+    claimsNotProven = @('full project integration')
+}
+$out = if ([IO.Path]::IsPathRooted($ReportPath)) { $ReportPath } else { Join-Path $root $ReportPath }
+New-Item -ItemType Directory -Force (Split-Path -Parent $out) | Out-Null
+[IO.File]::WriteAllText($out, ($report | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
+$report | ConvertTo-Json -Depth 20
+if ($failed.Count) { exit 1 }

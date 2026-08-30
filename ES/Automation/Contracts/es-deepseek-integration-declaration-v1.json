@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/deepseek-integration-declaration/v1",
+  "schemaVersion": 1,
+  "declarationId": "es-deepseek",
+  "providerDeclaration": "es-deepseek",
+  "provider": "deepseek",
+  "frameworkId": "deepseek-harness",
+  "taskId": "es.deepseek.harness",
+  "taskVersion": 1,
+  "role": "external-execution-plane",
+  "authority": "ESFramework/ESAI",
+  "authorityLevel": "high-contributor-not-final-acceptance",
+  "boundSkills": ["es-aicommand-contract-authoring", "es-automation-worker-authoring", "es-aibrain-route-authoring", "es-editor-tooling", "es-use-ai-command"],
+  "boundKnowledge": ["es.deepseek.harness.integration.v1"],
+  "status": "implemented-unverified",
+  "runtimeStatus": "runtime-not-run",
+  "policy": {
+    "esOwns": ["task-authorization", "allowed-roots", "evidence", "completion-decision", "recovery"],
+    "dshOwns": ["model-provider", "agent-loop", "candidate-answer"],
+    "forbidden": ["direct-assets-write", "implicit-path-expansion", "credential-output", "automatic-es-acceptance", "unbounded-process"]
+  },
+  "nonClaims": ["does-not-prove-Unity", "does-not-prove-PlayMode", "does-not-prove-provider-availability", "does-not-promote-DSH-output-to-ES-acceptance"]
+}

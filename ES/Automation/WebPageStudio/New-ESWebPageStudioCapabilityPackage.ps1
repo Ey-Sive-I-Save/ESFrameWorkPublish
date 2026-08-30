@@ -32,9 +32,9 @@ $paths = @(
     'ES/Automation/Contracts/es-web-page-generation-v1.schema.json',
     'ES/Automation/Contracts/es-web-page-studio-request-v1.schema.json',
     'ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json',
-    'ES/AISpace/Public/WebPageStudio/README.md',
+    'ES/AISpace/Public/WebPageStudio/20260829/README.md',
     'ES/AISpace/Public/WebPageStudio/INDEX.yaml',
-    'ES/AISpace/Public/WebPageStudio/ACCEPTANCE_MATRIX.md',
+    'ES/AISpace/Public/WebPageStudio/20260829/ACCEPTANCE_MATRIX.md',
     'Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md',
     'Documentation/AIKnowledge/KnowledgeIndex.yaml'
 )
@@ -63,7 +63,7 @@ $package = [ordered]@{
         contract = 'ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1'
         accessibility = 'ES/Automation/WebPageStudio/Test-ESWebPageStudioAccessibility.ps1'
         freshness = 'ES/Automation/WebPageStudio/Test-ESWebPageStudioFreshness.ps1'
-        acceptanceMatrix = 'ES/AISpace/Public/WebPageStudio/ACCEPTANCE_MATRIX.md'
+        acceptanceMatrix = 'ES/AISpace/Public/WebPageStudio/20260829/ACCEPTANCE_MATRIX.md'
     }
     sourceFiles = @($files)
     claimsNotProven = @('browser visual regression','axe or Lighthouse runtime','Service Worker installation and offline lifecycle','Unity/PlayMode/Worker runtime','production release acceptance')

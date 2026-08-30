@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/authority-consumer-registry/v1",
+  "description": "项目内 AI 权威消费者的显式覆盖清单；观察器和候选生成器不得冒充最终裁决者。",
+  "consumers": [
+    {
+      "id": "esautomation-center",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+      "kind": "final-decision",
+      "requiredMarkers": ["authorityDomain", "authorityRiskClass", "IsStrictAuthorityDomain", "domain-required-for-high-risk"]
+    },
+    {
+      "id": "aibrain-coordinator",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs",
+      "kind": "final-decision",
+      "requiredMarkers": ["authorityDomain", "authorityRiskClass", "MapAuthorityDomain", "MapAuthorityRiskClass"]
+    },
+    {
+      "id": "abcd-authority-kernel",
+      "path": "ES/Automation/ABCD/ESABCDAuthorityKernel.psm1",
+      "kind": "final-decision",
+      "requiredMarkers": ["Get-ESAuthorityDecisionPolicy", "strictOnUnresolved", "claim-cap", "stop-and-report"]
+    },
+    {
+      "id": "task-context-runtime",
+      "path": "ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1",
+      "kind": "final-decision",
+      "requiredMarkers": ["AuthorityDomain", "AuthorityRiskClass", "STRICT_AUTHORITY_REQUIRES_ABCD", "Get-ESAuthorityDecisionPolicy"]
+    },
+    {
+      "id": "scene-scan-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+      "kind": "final-decision",
+      "requiredMarkers": ["completionDecision", "CanAccept", "authorityDomain", "editor-tooling"]
+    },
+    {
+      "id": "feishu-read-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs",
+      "kind": "final-decision",
+      "requiredMarkers": ["completionDecision", "CanAccept", "authorityDomain", "ai-collaboration"]
+    },
+    {
+      "id": "feishu-task-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuTaskAutomation.cs",
+      "kind": "final-decision",
+      "requiredMarkers": ["completionDecision", "CanAccept", "authorityDomain", "editor-tooling"]
+    },
+    {
+      "id": "abcd-audit-gate",
+      "path": "ES/Automation/ABCD/ESABCDAuditGate.psm1",
+      "kind": "final-decision",
+      "requiredMarkers": ["decisionStatus", "AUTHORITY_KERNEL_BLOCKED", "final-gate"]
+    },
+    {
+      "id": "abcd-certification",
+      "path": "ES/Automation/ABCD/ESABCDCertification.psm1",
+      "kind": "final-decision",
+      "requiredMarkers": ["decisionStatus", "eligibleForCertification", "evidence-pending"]
+    },
+    {
+      "id": "evaluation-worker",
+      "path": "ES/Automation/Workers/PowerShell/Invoke-ESTaskContextEvaluationWorker.ps1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["completionDecision = $null"]
+    },
+    {
+      "id": "weapon-abc-part-toolchain",
+      "path": ".agents/skills/es-weapon-abc-part/scripts/ESAbcPartToolchain.psm1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["candidate/static evidence only", "ABCD/TaskContext", "execution-disabled"]
+    },
+    {
+      "id": "aitalk-aggregation",
+      "path": "ES/Automation/TaskCollaboration/ESAITalkAggregation.psm1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["completionDecisionRequired=$true", "never declares Accepted or Completed", "TaskContextRuntime"]
+    },
+    {
+      "id": "web-ui-abcd-projection",
+      "path": "ES/Automation/WebPageStudio/Convert-ESWebUiAggregateToABCD.ps1",
+      "kind": "projection-only",
+      "requiredMarkers": ["readyForABCD", "promotionAllowed", "does-not-authorize-execution"]
+    },
+    {
+      "id": "web-ui-evidence-aggregate",
+      "path": "ES/Automation/WebPageStudio/Invoke-ESWebUiEvidenceAggregate.ps1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["evidencePolicy", "accepted-requires-four-layer-runtime-receipts", "does-not-authorize-network-browser-or-release"]
+    },
+    {
+      "id": "governance-route-probe",
+      "path": ".agents/skills/es-codex-session-bootstrap/scripts/Invoke-ESGovernanceRouteProbe.ps1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["probeStatus = 'ReadOnly'", "never declares production completion", "productionRouteIntegrated = $false"]
+    },
+    {
+      "id": "aitest-scene-capability-provider",
+      "path": "Assets/Scripts/ESLogic/Runtime/Developer/AITest/ESAITestSceneValidationProvider.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["Capability admission only", "never declares task", "conditionMet"]
+    },
+    {
+      "id": "aitest-input-capability-provider",
+      "path": "Assets/Scripts/ESLogic/Runtime/Developer/AITest/ESAITestInputCapabilityProvider.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["Capability admission only", "never declares task", "TaskContext/ABCD owns"]
+    },
+    {
+      "id": "es-command-palette-registry",
+      "path": "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteRegistry.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["Palette admission only", "never declares task completion", "grants execution authority"]
+    },
+    {
+      "id": "userspace-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESUserSpaceAutomation.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["Worker Completed is an execution result only", "TaskContext/ABCD remains the final decision authority"]
+    },
+    {
+      "id": "teamspace-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESTeamSpaceAutomation.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["Worker Completed is an execution result only", "TaskContext/ABCD remains the final decision authority"]
+    },
+    {
+      "id": "codex-multilaunch-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESCodexMultiLaunchAutomation.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["Invocation Completed/Accepted is orchestration status only", "authoritative downstream decision"]
+    },
+    {
+      "id": "agent-graph-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESAgentGraphAutomationEndpoint.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["orchestration status only", "downstream decision"]
+    },
+    {
+      "id": "automation-ai-bridge",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["orchestration status only", "downstream decision"]
+    },
+    {
+      "id": "feishu-identity-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuIdentityAutomation.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["orchestration status only", "downstream decision"]
+    },
+    {
+      "id": "ui-materializer-endpoint",
+      "path": "Assets/Scripts/ESLogic/Editor/UI/ESUIAutomationMaterializerEndpoint.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["authorityDomain = \"editor-tooling\"", "never declares task completion"]
+    },
+    {
+      "id": "deepseek-harness-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESDeepSeekHarnessAutomation.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["orchestration status only", "downstream decision", "never declares task completion"]
+    },
+    {
+      "id": "codex-app-server-automation",
+      "path": "Assets/Plugins/ES/Editor/ESAutomation/ESCodexAppServerAutomation.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["ES 保留用户授权", "候选", "ESAutomationRunStatus.Completed"]
+    }
+  ]
+}

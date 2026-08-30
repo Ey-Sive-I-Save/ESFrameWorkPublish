@@ -5,7 +5,9 @@ param(
     [ValidateNotNullOrEmpty()][string]$PrimaryAction = 'Learn more',
     [string]$Audience = 'unspecified audience',
     [ValidateSet('en','zh-CN','ar')][string]$Language = 'en',
-    [string]$VisualStyle = 'premium-tech',
+    [ValidateSet('premium-tech','editorial','aurora','minimal')][string]$VisualStyle = 'premium-tech',
+    [ValidateSet('none','subtle','expressive')][string]$MotionLevel = 'subtle',
+    [ValidateSet('airy','balanced','compact')][string]$LayoutDensity = 'balanced',
     [switch]$EnableNetwork,
     [string]$ApiBase = '',
     [string[]]$Allowlist = @(),
@@ -42,7 +44,7 @@ $request = [ordered]@{
     audience = $Audience
     primaryAction = $PrimaryAction
     language = $Language
-    visualDirection = [ordered]@{ style = $VisualStyle; referencePaths = @() }
+    visualDirection = [ordered]@{ style = $VisualStyle; motion = $MotionLevel; density = $LayoutDensity; referencePaths = @() }
     responsiveProfiles = @(
         [ordered]@{ id = 'desktop'; width = 1440; height = 900 },
         [ordered]@{ id = 'mobile'; width = 390; height = 844 }

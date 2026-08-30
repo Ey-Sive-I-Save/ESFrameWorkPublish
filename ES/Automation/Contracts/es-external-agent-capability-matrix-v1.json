@@ -16,6 +16,12 @@
     {"featureId":"openhands.tool-boundary","status":"adapted","adapterId":"es-adapter.openhands.v1","evidenceRef":"Test-ESAgentLoopAdapters"},
     {"featureId":"swe-agent.aci","status":"reference-only","adapterId":null,"evidenceRef":null},
     {"featureId":"swe-agent.patch-test-loop","status":"adapted","adapterId":"es-adapter.swe-agent.v1","evidenceRef":"Test-ESAgentLoopAdapters"},
-    {"featureId":"swe-agent.environment-trust","status":"adapted","adapterId":"es-adapter.swe-agent.v1","evidenceRef":"Test-ESAgentLoopAdapters"}
+    {"featureId":"swe-agent.environment-trust","status":"adapted","adapterId":"es-adapter.swe-agent.v1","evidenceRef":"Test-ESAgentLoopAdapters"},
+    {"featureId":"deepseek-harness.agent-loop","providerDeclaration":"es-deepseek","status":"adapted","adapterId":"es-adapter.deepseek-harness.v1","evidenceRef":"ESDeepSeekHarnessStaticChain"},
+    {"featureId":"deepseek-harness.provider-bridge","providerDeclaration":"es-deepseek","status":"source-available","adapterId":"es-adapter.deepseek-harness.v1","evidenceRef":"ESDeepSeekHarnessLocalChain"},
+    {"featureId":"deepseek-harness.jsonrpc-server","providerDeclaration":"es-deepseek","status":"reference-only","adapterId":"es-adapter.deepseek-harness.v1","evidenceRef":"DeepSeekHarnessOfficialSdkProtocol"},
+    {"featureId":"codex-app-server.thread-turn-stream","providerDeclaration":"es-codex","status":"adapted","adapterId":"es-adapter.codex-app-server.v1","evidenceRef":"ESCodexAppServerStaticChain"},
+    {"featureId":"codex-app-server.approval-boundary","providerDeclaration":"es-codex","status":"adapted","adapterId":"es-adapter.codex-app-server.v1","evidenceRef":"ESCodexAppServerAuthorityReview"},
+    {"featureId":"codex-app-server.thread-resume","providerDeclaration":"es-codex","status":"adapted","adapterId":"es-adapter.codex-app-server.v1","evidenceRef":"ESCodexAppServerStaticChain"}
   ]
 }

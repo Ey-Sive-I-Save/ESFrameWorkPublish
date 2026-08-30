@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/codex-app-server/v1",
+  "schemaVersion": 1,
+  "title": "ES Codex App Server Harness 受管请求",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["projectRoot", "providerDeclaration", "workerId", "workerVersion", "taskId", "runId", "dryRun", "operation", "prompt", "brainPlanHash", "commandId", "commandHash", "taskContractHash", "invocationId"],
+  "properties": {
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "providerDeclaration": { "const": "es-codex" },
+    "workerId": { "const": "es.codex.app-server" },
+    "workerVersion": { "const": "1.0.0" },
+    "taskId": { "const": "es.codex.app-server" },
+    "runId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "dryRun": { "type": "boolean" },
+    "operation": { "enum": ["dry-run", "check-local", "start-thread", "turn"] },
+    "prompt": { "type": "string", "minLength": 0, "maxLength": 12000 },
+    "brainPlanHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "commandId": { "const": "codex.appserver.execute" },
+    "commandHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "taskContractHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "invocationId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "idempotencyKey": { "type": "string", "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "threadId": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "model": { "type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[A-Za-z0-9._:-]+$" }
+  }
+}

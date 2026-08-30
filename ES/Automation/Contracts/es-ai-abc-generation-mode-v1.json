@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/ai-abc/generation-modes/v1",
+  "authority": "ABC-generation-core",
+  "purpose": "Separate solution-generation objectives from audit strictness profiles.",
+  "sharedGenerationPipeline": {
+    "pipelineId": "ab-seed-abcd-expand-audit-playability-finalize-v1",
+    "stages": [
+      { "stageId": "ab-fast-seed", "owner": "AB", "purpose": "produce a compact creative or engineering seed before deep governance constraints" },
+      { "stageId": "abcd-expand", "owner": "ABCD", "purpose": "make visible divergent branches and amplify the seed into distinct mechanisms" },
+      { "stageId": "abcd-audit", "owner": "ABCD", "purpose": "audit authority, counterplay, failure recovery, lifecycle, and implementation boundaries" },
+      { "stageId": "playability-backpressure", "owner": "AB-plus-player-lens", "purpose": "remove complexity that delays the first payoff or obscures the primary decision" },
+      { "stageId": "finalize", "owner": "ABCD", "purpose": "select one bounded candidate and preserve rejected reasons and residual risks" }
+    ],
+    "appliesTo": ["creative-divergence", "engineering"],
+    "stageOrderIsMandatory": true,
+    "noSilentStageSkip": true,
+    "stageEvidenceRequired": ["seedDraft", "expansionSet", "auditFindings", "playabilityBackpressure", "finalDecision"]
+  },
+  "modeExecutionContract": {
+    "allModesMustExecute": true,
+    "mandatoryCapabilities": ["multiBranchDivergence", "counterArgument", "developerStrategyTestRegression", "modeSpecificGate", "baseEvaluation"],
+    "mandatoryEvidence": ["divergenceTree", "rebuttalRecord", "regressionMatrix", "gateDecision", "baseDimensionScores", "rejectedBranches"],
+    "baseEvaluation": { "required": true, "mustScoreEveryDimension": true, "missingDimensionEffect": "unknown-and-claim-cap", "uniformDefaultForbidden": true, "minimumObservedSpread": 10, "minimumIndependentRecomputes": 3 },
+    "rebuttalLenses": ["developer", "strategy", "test"],
+    "rule": "fast-bounds-budget-only; it may not omit ABCD divergence, rebuttal, regression or gate stages"
+  },
+  "innovationIntegrity": {
+    "anchorContinuity": {
+      "rule": "preserve-character-identity-role-and-requested-form-factor-while-changing-mechanism",
+      "requiredEvidence": ["preservedIdentity", "preservedRole", "requestedFormFactor", "formFactorPreserved", "mechanismDelta"],
+      "rejectWhen": ["unrelated-role-substitution", "form-factor-substitution", "novelty-is-only-abstract-language"]
+    },
+    "concreteDivergence": {
+      "requiredEvidence": ["concretePlayerScenario", "inputSequence", "visibleFeedback", "acceptabilityRationale"],
+      "minimumConcretenessScore": 70,
+      "minimumAcceptabilityScore": 60,
+      "rule": "each-branch-must-show-a-specific-player-action-and-observable-payoff-before-ranking"
+    },
+    "iterativeDivergence": {
+      "minimumRounds": 12,
+      "recommendedRounds": 20,
+      "maximumRounds": 24,
+      "branchingPerRound": { "minimum": 2, "maximum": 4 },
+      "beamWidth": 4,
+      "roundEvidence": ["roundId", "parentCandidateId", "branchReason", "concreteChange", "playerAcceptability", "keepOrDiscardReason"],
+      "rule": "recursive-tree-search: every parent branches into concrete alternatives, scores player acceptability, keeps the strongest and records discarded siblings before deepening; never equate abstraction-or-extremeness-with-innovation",
+      "lineageRequired": true,
+      "branchDecisionRequired": true,
+      "discardReasonsAreEvidence": true
+    }
+  },
+  "modes": [
+    {
+      "modeId": "creative-divergence",
+      "objective": "player-delight-and-mechanic-novelty",
+      "focus": ["爽感", "丝滑", "表现力", "操作上限"],
+      "amplificationLoop": "take-one-action-and-chain-it-into-multiple-mechanics-and-payoffs",
+      "selfCritiqueLoop": "generate-visible-branches->score-player-feel->amplify-weakest-payoff->rank-with-counterplay",
+      "rankingPriority": ["playerDelight", "smoothness", "expression", "skillCeiling"],
+      "minimumFocusScore": 60,
+      "minimumFocusSpread": 3,
+      "minimumDirections": 7,
+      "maximumDirections": 16,
+      "pruningPolicy": "annotate-risk-never-hide-before-collaborator-choice",
+      "requiredAxes": ["moment-to-moment-feel", "flow-continuity", "presentation-beat", "expressive-input", "skill-ceiling", "novelty-delta", "counterplay-clarity", "mechanic-amplification"],
+      "acceptanceProfile": "shallow-fast",
+      "outputStatus": "creative-candidate",
+      "requiresRejectedReasons": true,
+      "pipelineProfile": {
+        "seedDirections": 3,
+        "expansionMinimum": 7,
+        "deepAuditShortlist": 3,
+        "playabilityGate": "first-use-affordance-and-visible-payoff-within-10-seconds; mastery-depth-is-not-a-first-use-failure",
+        "playabilityPrinciples": ["first-input-must-produce-readable-feedback", "partial-understanding-must-still-be-playable", "mastery-depth-is-layered-after-first-use", "onboarding-burden-is-observed-not-an-automatic-failure"],
+        "complexityBudget": { "coreResources": 2, "coreStates": 4, "primaryDecisions": 3 },
+        "rankingAdjustment": "surprise-and-first10s-before-implementation-cost",
+        "modeGate": { "gateId": "CREATIVE_PLAYER_NOVELTY_GATE", "requires": ["noveltyDelta", "playerDelight", "firstUseAffordance", "counterplay"] },
+        "noveltyGuard": {
+          "minimumDeletedAnchors": 2,
+          "requiredEvidence": ["deletedAnchors", "novelMechanism", "plausibilityRationale", "counterplayInvariant"],
+          "minimumSurpriseScore": 70,
+          "minimumPlausibilityScore": 60,
+          "scoreDerivation": {
+            "surprise": "60 + min(20, deletedAnchorCount*10) + (novelMechanismLength>=40 ? 10 : 0)",
+            "plausibility": "40 + (plausibilityRationaleLength>=40 ? 20 : 0) + (counterplayInvariantLength>=40 ? 20 : 0) + (amplificationStages>=4 ? 10 : 0)",
+            "reportedScoreMayNotExceedDerivedBy": 10
+          },
+          "rule": "boldness-must-change-a-core-assumption-and-explain-player-readable-causality-and-counterplay"
+        }
+      }
+    },
+    {
+      "modeId": "engineering",
+      "objective": "industry-benchmark-depth-and-technical-expression",
+      "focus": ["真实深度", "机制突破", "可复用理念", "长生命周期"],
+      "amplificationLoop": "deepen-one-mechanism-through-state-ownership-recovery-and-reuse",
+      "selfCritiqueLoop": "generate-visible-branches->audit-state-depth->repair-ownership-or-recovery-gap->rank-for-reuse",
+      "rankingPriority": ["depth", "breakthrough", "reusability", "longevity"],
+      "minimumFocusScore": 60,
+      "minimumFocusSpread": 3,
+      "minimumDirections": 5,
+      "maximumDirections": 12,
+      "pruningPolicy": "retain-novelty-while-bounding-state-performance-and-authority-risk",
+      "requiredAxes": ["state-machine-integrity", "ownership-lifecycle", "determinism", "performance-peak-budget", "failure-recovery", "reuse-surface", "breakthrough-novelty", "longevity", "counterplay"],
+      "acceptanceProfile": "core-high-risk",
+      "outputStatus": "engineering-candidate",
+      "requiresRejectedReasons": true,
+      "pipelineProfile": {
+        "seedDirections": 2,
+        "expansionMinimum": 5,
+        "deepAuditShortlist": 3,
+        "playabilityGate": "first-use-affordance-and-observable-payoff-within-10-seconds; complexity-is-blocked-only-when-no-partial-use-path-or-recovery-exists",
+        "playabilityPrinciples": ["first-input-must-produce-readable-feedback", "partial-understanding-must-reach-a-valid-safe-state", "mastery-depth-may-be-deferred", "complexity-burden-is-not-equal-to-unplayability"],
+        "complexityBudget": { "coreResources": 2, "coreStates": 6, "primaryDecisions": 4 },
+        "rankingAdjustment": "depth-and-reuse-after-correctness-and-playability-gates",
+        "modeGate": { "gateId": "ENGINEERING_STATE_REUSE_GATE", "requires": ["stateIntegrity", "ownershipLifecycle", "determinism", "failureRecovery", "reusability"] }
+      }
+    },
+    {
+      "modeId": "stable",
+      "objective": "commercial-throughput-reuse-and-regression-safety",
+      "focus": ["项目接纳", "内容完整", "安全闭环", "丰富可持续"],
+      "amplificationLoop": "turn-one-content-unit-into-a-safe-reusable-complete-loop",
+      "selfCritiqueLoop": "generate-visible-branches->check-project-fit-and-closure->repair-safety-or-regression-gap->rank-for-throughput",
+      "rankingPriority": ["projectFit", "completeness", "safety", "closure"],
+      "minimumFocusScore": 60,
+      "minimumFocusSpread": 3,
+      "minimumDirections": 5,
+      "maximumDirections": 8,
+      "pruningPolicy": "template-first-with-bounded-variation",
+      "requiredAxes": ["contract-completeness", "integration-fit", "compatibility", "regression-fixture", "rollback", "security-boundary", "observability", "content-throughput", "complete-loop"],
+      "acceptanceProfile": "full-depth",
+      "outputStatus": "stable-candidate",
+      "requiresRejectedReasons": true,
+      "pipelineProfile": { "divergenceMinimum": 5, "rebuttalRequired": true, "regressionRequired": ["projectFit", "compatibility", "regression", "rollback", "completeLoop"], "modeGate": { "gateId": "STABLE_WORKFLOW_CLOSURE_GATE", "requires": ["projectFit", "completeness", "compatibility", "rollback", "throughput", "closure"] } }
+    }
+  ],
+  "orthogonality": {
+    "generationModeIsIndependentFromAcceptanceProfile": true,
+    "coreHighRiskIsFinalAuditOnly": true,
+    "candidateSuppressionRequiresExplicitReason": true,
+    "graphIsNotFinalAuthority": true
+  },
+  "externalInvocationPolicy": {
+    "required": true,
+    "requiredSkill": ".agents/skills/es-ai-abc-core/SKILL.md",
+    "requiredEntrypoint": "ES/Automation/ABCD/ESABCInnovationRun.psm1",
+    "profilesAreNotBypasses": true,
+    "profiles": ["shallow-fast", "core-high-risk", "full-depth"],
+    "requiredReceiptFields": ["skillName", "skillVersion", "modeProfile", "runId", "executedStageIds", "stageUsage", "stateTransitions", "claimLevel"],
+    "missingInvocationEffect": "ABCD_SKILL_INVOCATION_UNPROVEN",
+    "syntheticReceiptEffect": "claim-cap",
+    "rawModelOnlyEffect": "unverifiable",
+    "rule": "every-external-ABCD-call-must-execute-the-skill-state-machine; shallow-fast-bounds-budget-only"
+  },
+  "discoverabilityAuthority": {
+    "authorityId": "es.ai-abc.discoverability.v1",
+    "routeAliasAuthority": ".agents/SKILL_ROUTE_ALIASES.zh-CN.json",
+    "routeResolver": ".agents/scripts/Resolve-ESChineseSkillRoute.ps1",
+    "modeIdentityAuthority": "ES/Automation/Contracts/es-ai-abc-mode.registry.json",
+    "executionAuthority": ".agents/skills/es-ai-abc-core/SKILL.md",
+    "capabilityAuthority": "ES/Automation/Contracts/es-ai-abc-core-v1.json",
+    "uiAndCatalogAreNavigationOnly": true,
+    "globalSkillDirectoriesAreNotAuthoritative": true,
+    "discoveryDoesNotGrantPermission": true,
+    "rule": "resolve-one-stable-route-before-execution; ambiguity-is-replan; missing-route-is-NoSkillRoute"
+  },
+  "candidateOutputContract": {
+    "schemaRef": "ES/Automation/Contracts/es-ai-abc-generation-response-v1.schema.json",
+    "status": "candidate",
+    "requiredFields": ["candidateId", "mechanism", "playerValue", "playerDelightScore", "modeScores", "amplificationChain", "selfCritique", "selfCritiquePasses", "seedDraft", "expansionSet", "auditFindings", "playabilityBackpressure", "finalDecision", "deletedAnchors", "novelMechanism", "plausibilityRationale", "counterplayInvariant", "surpriseScore", "plausibilityScore", "firstUseAffordance", "partialUnderstandingPath", "masteryDepth", "onboardingBurden", "firstPayoffSeconds", "firstInputCount", "preservedIdentity", "preservedRole", "requestedFormFactor", "formFactorPreserved", "mechanismDelta", "concretePlayerScenario", "inputSequence", "visibleFeedback", "acceptabilityRationale", "concretenessScore", "acceptabilityScore", "iterationTrace", "lineageRoot", "lineageDepth", "risks", "counterplay", "validationMetric"],
+    "proposedChanges": {
+      "optional": true,
+      "pathPolicy": "project-relative-existing-file-only",
+      "maxFilesPerCandidate": 32,
+      "maxContentCharactersPerFile": 2000000,
+      "requiresChangeId": true,
+      "requiresExplicitAbcdAudit": true
+    }
+  },
+  "transitions": [
+    { "from": "creative-divergence", "to": "engineering", "condition": "collaborator-selects-candidate" },
+    { "from": "engineering", "to": "stable", "condition": "design-contract-and-regression-fixture-ready" },
+    { "from": "stable", "to": "engineering", "condition": "variation-exceeds-template-boundary" }
+  ]
+}

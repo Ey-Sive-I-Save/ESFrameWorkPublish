@@ -1,0 +1,23 @@
+schemaVersion: 1
+matrixId: es-web-ui-validation-matrix-v1
+profiles:
+  - profileId: desktop
+    width: 1440
+    height: 900
+  - profileId: tablet
+    width: 1024
+    height: 768
+  - profileId: mobile
+    width: 390
+    height: 844
+themes: [light, dark, forced-colors]
+motionModes: [full, reduced]
+states: [default, loading, empty, error, success]
+requiredPairs:
+  - [desktop, light]
+  - [desktop, dark]
+  - [tablet, light]
+  - [mobile, light]
+  - [mobile, dark]
+  - [mobile, forced-colors]
+evidencePolicy: each-pair-needs-screenshot-dom-aria-and-hash

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "title": "ES ABCD approved apply request v1",
+  "type": "object",
+  "required": ["schemaVersion", "contractId", "requestStatus", "patchPlanHash", "finalGateId", "finalGateHash", "currentHead", "applyAuthorizationRef", "oneShot", "effects", "rollback", "requestHash"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "contractId": {"const": "es://automation/contracts/abcd/approved-apply-request/v1"}, "requestStatus": {"const": "awaiting-explicit-apply"},
+    "patchPlanHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "finalGateId": {"type": "string", "minLength": 1}, "finalGateHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "currentHead": {"type": "string", "pattern": "^[a-f0-9]{40}$"}, "applyAuthorizationRef": {"type": "string", "minLength": 1}, "oneShot": {"const": true},
+    "effects": {"type": "object", "required": ["writesAllowed", "runtimeAllowed", "gitAllowed", "releaseAllowed"], "properties": {"writesAllowed": {"const": true}, "runtimeAllowed": {"const": false}, "gitAllowed": {"const": false}, "releaseAllowed": {"const": false}}},
+    "rollback": {"type": "object", "required": ["available", "action", "sourceHashesPinned"], "properties": {"available": {"const": true}, "action": {"type": "string"}, "sourceHashesPinned": {"const": true}}},
+    "requestHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": true
+}

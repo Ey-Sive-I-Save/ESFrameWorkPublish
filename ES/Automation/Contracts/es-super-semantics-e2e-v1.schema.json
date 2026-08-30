@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ES Super Semantics End-to-End Receipt",
+  "type": "object",
+  "required": ["correlationId", "promptHash", "resolverReceiptHash", "decisionStatus", "executionIntent", "canExecute", "hostConsumerId", "consumedAtUtc"],
+  "properties": {
+    "correlationId": {"type": "string", "minLength": 1},
+    "promptHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "resolverReceiptHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "decisionStatus": {"type": "string", "enum": ["StaticPassed", "HostConsumptionUnverified", "RuntimeNotRun", "ClaimCap", "Blocked", "Accepted"]},
+    "executionIntent": {"type": "string"},
+    "canExecute": {"type": "boolean"},
+    "hostConsumerId": {"type": ["string", "null"]},
+    "consumedAtUtc": {"type": ["string", "null"]},
+    "completionAccepted": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

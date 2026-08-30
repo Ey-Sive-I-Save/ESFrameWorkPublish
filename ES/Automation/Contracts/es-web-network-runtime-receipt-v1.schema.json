@@ -1,0 +1,23 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"esframework://automation/contracts/web/network-runtime-receipt/v1",
+  "title":"ES Web Network Runtime Receipt",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","recordType","receiptId","contractId","status","method","targetHost","allowlist","timeoutSeconds","retry","recovery","attempts","networkCalls","cancellation","redaction","runtimeStatus","nonClaims"],
+  "properties":{
+    "schemaVersion":{"const":1},"recordType":{"const":"WebPageStudioBackendRuntimeReceipt"},
+    "receiptId":{"type":"string","pattern":"^[a-z][a-z0-9._-]{1,127}$"},"contractId":{"type":"string","minLength":1},
+    "status":{"enum":["passed","failed","cancelled","timeout","not-run"]},"method":{"enum":["GET","HEAD"]},
+    "targetHost":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._-]{0,253}$"},
+    "allowlist":{"type":"object","additionalProperties":false,"required":["decision","matchedHost"],"properties":{"decision":{"enum":["allowed","denied","not-evaluated"]},"matchedHost":{"type":"string"}}},
+    "timeoutSeconds":{"type":"integer","minimum":1,"maximum":300},
+    "retry":{"type":"object","additionalProperties":false,"required":["maxAttempts","retryable","exhausted"],"properties":{"maxAttempts":{"type":"integer","minimum":0,"maximum":6},"retryable":{"type":"boolean"},"exhausted":{"type":"boolean"}}},
+    "recovery":{"type":"object","additionalProperties":false,"required":["action","outcome"],"properties":{"action":{"enum":["none","retry","fallback","manual","rollback"]},"outcome":{"enum":["recovered","not-needed","failed","not-run"]}}},
+    "attempts":{"type":"integer","minimum":0,"maximum":6},"networkCalls":{"type":"integer","minimum":0,"maximum":6},
+    "httpStatus":{"type":"integer","minimum":0,"maximum":599},"error":{"type":"string"},
+    "cancellation":{"type":"object","additionalProperties":false,"required":["requested","observed"],"properties":{"requested":{"type":"boolean"},"observed":{"type":"boolean"}}},
+    "redaction":{"type":"object","additionalProperties":false,"required":["applied","responseBodyPersisted","sensitiveHeadersPersisted"],"properties":{"applied":{"const":true},"responseBodyPersisted":{"const":false},"sensitiveHeadersPersisted":{"const":false}}},
+    "runtimeStatus":{"enum":["runtime-passed","runtime-failed","runtime-cancelled","runtime-timeout","runtime-not-run"]},
+    "nonClaims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}

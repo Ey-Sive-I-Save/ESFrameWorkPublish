@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/codex-app-server-integration-declaration/v1",
+  "schemaVersion": 1,
+  "declarationId": "es-codex-app-server",
+  "providerDeclaration": "es-codex",
+  "provider": "codex",
+  "frameworkId": "codex-app-server",
+  "adapterId": "es-adapter.codex-app-server.v1",
+  "taskId": "es.codex.app-server",
+  "taskVersion": 1,
+  "workerId": "es.codex.app-server",
+  "workerVersion": "1.0.0",
+  "role": "external-execution-plane",
+  "authority": "ESFramework/ESAI",
+  "authorityLevel": "candidate-contributor-not-final-acceptance",
+  "boundSkills": [
+    "es-aicommand-contract-authoring",
+    "es-automation-worker-authoring",
+    "es-aibrain-route-authoring",
+    "es-api-contract-review",
+    "es-security-input-audit",
+    "es-use-ai-command"
+  ],
+  "boundKnowledge": ["es.codex.app-server.integration.v1"],
+  "requiredReads": [
+    "AGENTS.md",
+    "ES/AISpace/README.md",
+    "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+    "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+    "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+    "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+    "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+    "Documentation/AIKnowledge/entries/codex-app-server-integration.md",
+    "ES/Automation/Contracts/es-codex-app-server-integration-declaration-v1.json",
+    "ES/Automation/Contracts/es-codex-app-server-v1.schema.json",
+    ".agents/skills/es-codex-session-bootstrap/SKILL.md"
+  ],
+  "operations": ["dry-run", "check-local", "start-thread", "turn", "collect-receipt", "cancel"],
+  "routeKeys": ["automation", "worker", "external-agent", "codex", "app-server", "harness", "authority", "evidence", "editor", "session", "thread", "turn"],
+  "status": "implemented-unverified",
+  "runtimeStatus": "runtime-not-run",
+  "policy": {
+    "esOwns": [
+      "task-authorization",
+      "allowed-roots",
+      "read-only-sandbox",
+      "approval-boundary",
+      "evidence",
+      "completion-decision",
+      "cancellation",
+      "recovery"
+    ],
+    "codexOwns": ["model-provider", "thread-turn-reasoning", "candidate-answer"],
+    "forbidden": [
+      "direct-assets-write",
+      "direct-git-write",
+      "implicit-path-expansion",
+      "arbitrary-executable-input",
+      "credential-output",
+      "automatic-es-acceptance",
+      "unbounded-process",
+      "guessed-thread-resume"
+    ]
+  },
+  "boundary": {
+    "inputSchema": "ES/Automation/Contracts/es-codex-app-server-v1.schema.json",
+    "workerEntrypoint": "ES/Automation/Workers/PowerShell/Invoke-ESCodexAppServerWorker.ps1",
+    "readOnlySandbox": true,
+    "approvalHandling": "fail-closed",
+    "exactThreadResume": true,
+    "arbitraryExecutableInput": false,
+    "arbitraryOutputPathInput": false
+  },
+  "evidence": {
+    "runRecordRoot": "ES/Automation/Runs/CodexAppServer",
+    "resultFile": "codex-app-server-result.json",
+    "runtimeNotRunLabel": "runtime-not-run",
+    "candidateOnlyLabel": "candidate-only-not-final-acceptance"
+  },
+  "nonClaims": [
+    "does-not-prove-Unity",
+    "does-not-prove-PlayMode",
+    "does-not-prove-provider-availability",
+    "does-not-promote-Codex-output-to-ES-acceptance"
+  ]
+}

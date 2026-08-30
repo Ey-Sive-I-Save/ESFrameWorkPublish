@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"esframework://automation/contracts/web/preview-runtime-receipt/v1",
+  "title":"ES Web Preview Runtime Receipt",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","recordType","receiptId","status","browser","environment","viewport","artifact","snapshot","visualChecks","runtimeStatus","nonClaims"],
+  "properties":{
+    "schemaVersion":{"const":1},"recordType":{"const":"WebPageStudioRuntimeReceipt"},"receiptId":{"type":"string","pattern":"^[a-z][a-z0-9._-]{1,127}$"},
+    "status":{"enum":["passed","review","failed","not-run"]},
+    "browser":{"type":"object","additionalProperties":false,"required":["executablePath","version","engine"],"properties":{"executablePath":{"type":"string","minLength":1},"version":{"type":"string","minLength":1},"engine":{"enum":["chromium","webkit","firefox"]}}},
+    "environment":{"type":"object","additionalProperties":false,"required":["os","locale","timezone","fontManifestHash","network"],"properties":{"os":{"type":"string","minLength":1},"locale":{"type":"string","minLength":1},"timezone":{"type":"string","minLength":1},"fontManifestHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"network":{"const":"disabled"},"environmentLockHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}}},
+    "viewport":{"type":"object","additionalProperties":false,"required":["profileId","width","height","theme","motion"],"properties":{"profileId":{"type":"string","minLength":1},"width":{"type":"integer","minimum":1},"height":{"type":"integer","minimum":1},"theme":{"enum":["light","dark","forced-colors"]},"motion":{"enum":["full","reduced"]}}},
+    "artifact":{"type":"object","additionalProperties":false,"required":["entryFile","htmlHash"],"properties":{"entryFile":{"type":"string","minLength":1},"htmlHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}}},
+    "snapshot":{"type":"object","additionalProperties":false,"required":["screenshotPath","screenshotHash","domPath","domHash","ariaPath","ariaHash","nodeCount","interactiveCount"],"properties":{"screenshotPath":{"type":"string","minLength":1},"screenshotHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"domPath":{"type":"string","minLength":1},"domHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"ariaPath":{"type":"string","minLength":1},"ariaHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"nodeCount":{"type":"integer","minimum":0},"interactiveCount":{"type":"integer","minimum":0}}},
+    "visualChecks":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["checkId","category","status"],"properties":{"checkId":{"type":"string","minLength":1},"category":{"enum":["geometry","token","asset","pixel","motion","human-review"]},"status":{"enum":["passed","failed","review","not-run"]}}}},
+    "runtimeStatus":{"enum":["runtime-passed","runtime-failed","runtime-not-run"]},"nonClaims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}

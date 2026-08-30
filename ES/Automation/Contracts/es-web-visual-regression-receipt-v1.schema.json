@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"esframework://automation/contracts/web/visual-regression-receipt/v1",
+  "title":"ES Web Visual Regression Receipt",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","recordType","receiptId","status","matrix","baselines","comparisons","humanReview","runtimeStatus","nonClaims"],
+  "properties":{
+    "schemaVersion":{"const":1},"recordType":{"const":"WebPageStudioVisualRegressionReceipt"},"receiptId":{"type":"string","pattern":"^[a-z][a-z0-9._-]{1,127}$"},"status":{"enum":["passed","review","failed","not-run"]},
+    "matrix":{"type":"object","additionalProperties":false,"required":["matrixId","profiles","themes","states"],"properties":{"matrixId":{"type":"string","minLength":1},"matrixHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"profiles":{"type":"array","minItems":2,"uniqueItems":true,"items":{"type":"string","minLength":1}},"themes":{"type":"array","minItems":2,"uniqueItems":true,"items":{"enum":["light","dark","forced-colors"]}},"states":{"type":"array","minItems":2,"uniqueItems":true,"items":{"type":"string","minLength":1}}}},
+    "baselines":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["baselineId","profileId","theme","state","screenshotPath","screenshotHash","domPath","domHash","ariaPath","ariaHash","environmentHash","artifactHash"],"properties":{"baselineId":{"type":"string","minLength":1},"profileId":{"type":"string","minLength":1},"theme":{"enum":["light","dark","forced-colors"]},"state":{"type":"string","minLength":1},"screenshotPath":{"type":"string","pattern":"^[^?#]+\\.png$"},"screenshotHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"domPath":{"type":"string","pattern":"^[^?#]+\\.(html|json)$"},"domHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"ariaPath":{"type":"string","pattern":"^[^?#]+\\.(yaml|yml|json)$"},"ariaHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"environmentHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"artifactHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}}}},
+    "comparisons":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["comparisonId","baselineId","status","diffPixels","maxDiffPixels"],"properties":{"comparisonId":{"type":"string","minLength":1},"baselineId":{"type":"string","minLength":1},"status":{"enum":["passed","failed","not-run"]},"diffPixels":{"type":"integer","minimum":0},"maxDiffPixels":{"type":"integer","minimum":0}}}},
+    "humanReview":{"type":"object","additionalProperties":false,"required":["status","reviewerId","notes"],"properties":{"status":{"enum":["passed","review","not-run"]},"reviewerId":{"type":"string","minLength":1},"notes":{"type":"string","minLength":1}}},
+    "runtimeStatus":{"enum":["runtime-passed","runtime-failed","runtime-not-run"]},"nonClaims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}

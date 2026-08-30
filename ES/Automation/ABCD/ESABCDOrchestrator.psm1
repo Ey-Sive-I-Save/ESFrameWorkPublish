@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'ESABCDEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'ESABCDEvidence.psm1')
+Import-Module (Join-Path $PSScriptRoot 'ESABCDAuthorityKernel.psm1')
 
 $script:HashPattern = '^[a-f0-9]{64}$'
 $script:IdPattern = '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
@@ -455,8 +456,23 @@ function Test-ESABCDCompletionEligibility {
     }
     $claimCap = ($null -ne $decision -and [string]$decision.claimLevel -ceq 'claim-cap') -or ($null -ne $cycle -and [string]$cycle.claimLevel -ceq 'claim-cap')
     $eligible = ($null -ne $cycle -and $null -ne $audit -and (([string]$audit.verdict) -ceq 'pass') -and -not [string]::IsNullOrWhiteSpace([string]$audit.verifierRef) -and -not [string]::IsNullOrWhiteSpace([string]$audit.authorizationProof) -and $null -ne $decision -and (([string]$decision.nextAction) -notin @('stop-and-report','await-collaborator-choice')) -and -not $claimCap -and $null -ne $v -and (([string]$v.verificationStatus) -ceq 'passed') -and -not [string]::IsNullOrWhiteSpace([string]$v.verificationReceiptRef) -and (([string]$v.verificationReceiptHash) -match '^[a-f0-9]{64}$') -and $contextMatch -and $bindingMatch -and $entityMatch -and $eventStoreMatch)
+    # Completion is a core-high-risk decision.  Route it through the same
+    # kernel that selects capabilities so a future completion path cannot
+    # accept a receipt without the six-capability closure and an explicit
+    # authority result.
+    $kernelEvidence = [pscustomobject][ordered]@{
+        cycleId = $CycleId
+        completionEligible = [bool]$eligible
+        requiredCapabilities = @(Get-ESABCDCoreCapabilities)
+        selectedCapabilities = @(Get-ESABCDCoreCapabilities)
+        evidenceStatus = if ($eligible) { 'complete' } else { 'incomplete' }
+    }
+    $kernelMissing = if ($eligible) { @() } else { @('completionPrerequisite') }
+    $authority = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Evidence $kernelEvidence -MissingFields $kernelMissing
+    if ($eligible -and $authority.status -ne 'accepted') { $eligible = $false }
     $reason = if ($null -eq $cycle) { 'CYCLE_MISSING' } elseif ($null -eq $audit -or [string]$audit.verdict -ne 'pass') { 'AUDIT_PASS_REQUIRED' } elseif ($null -eq $decision) { 'DECISION_REQUIRED' } elseif ($claimCap) { 'CLAIM_CAP_BLOCKS_COMPLETION' } elseif ([string]$decision.nextAction -eq 'await-collaborator-choice') { 'COLLABORATOR_CHOICE_REQUIRED' } elseif ($null -eq $v) { 'VERIFICATION_MISSING' } elseif (-not $bindingMatch) { 'VERIFICATION_BINDING_MISMATCH' } elseif (-not $contextMatch) { 'VERIFICATION_CONTEXT_MISMATCH' } elseif ($entityReason) { $entityReason } elseif (-not $eventStoreMatch) { $eventStoreReason } elseif (-not $eligible) { 'VERIFICATION_BINDING_MISMATCH' } else { 'ELIGIBLE' }
-    [pscustomobject][ordered]@{ cycleId = $CycleId; eligible = $eligible; reasonCode = $reason }
+    if (-not $eligible -and $reason -eq 'ELIGIBLE') { $reason = 'AUTHORITY_KERNEL_BLOCKED' }
+    [pscustomobject][ordered]@{ cycleId = $CycleId; eligible = $eligible; reasonCode = $reason; authorityKernel = $authority }
 }
 
 Export-ModuleMember -Function ConvertTo-ESABCDCanonical,Get-ESABCDHash,New-ESABCDOrchestrationStore,Get-ESABCDSnapshot,Save-ESABCDOrchestrationSnapshot,Restore-ESABCDOrchestrationSnapshot,Test-ESABCDEventStoreIntegrity,New-ESABCDIdempotencyKey,Start-ESABCDIterationRound,Add-ESABCDCandidate,Prune-ESABCDCandidate,Backtrack-ESABCDCandidate,Add-ESABCDAuditRecord,Select-ESABCDDecision,Start-ESABCDCorrectionCycle,Add-ESABCDVerificationReceipt,Advance-ESABCDIterationRound,Stop-ESABCDIteration,Test-ESABCDCompletionEligibility,Add-ESABCDEvent

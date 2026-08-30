@@ -1,0 +1,39 @@
+schemaVersion: 1
+fixtureId: es-web-ui-closure-failure-matrix-v1
+cases:
+  - caseId: network-timeout
+    layer: network
+    input: timeout
+    expected: timeout
+    recovery: bounded-retry-then-redacted-failure
+  - caseId: network-cancel
+    layer: network
+    input: cancel-before-response
+    expected: cancelled
+    recovery: no-retry-and-no-response-persistence
+  - caseId: preview-browser-drift
+    layer: preview
+    input: font-manifest-mismatch
+    expected: blocked
+    recovery: refresh-environment-lock
+  - caseId: visual-pixel-over-budget
+    layer: visual
+    input: diffPixels-greater-than-maxDiffPixels
+    expected: review
+    recovery: emit-diff-and-human-review
+  - caseId: visual-baseline-stale
+    layer: visual
+    input: artifact-hash-mismatch
+    expected: blocked
+    recovery: regenerate-baseline
+  - caseId: release-budget-exceeded
+    layer: release
+    input: lcp-or-inp-or-cls-over-budget
+    expected: blocked
+    recovery: optimize-or-approved-budget-change
+  - caseId: release-rollback
+    layer: release
+    input: rollback-check-failed
+    expected: blocked
+    recovery: preserve-staging-and-stop-release
+evidenceBoundary: static-fixture-definition

@@ -79,6 +79,20 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
 
 Feishu 第一阶段只读任务的结构相同，例如 `taskId: "es.feishu.read"`、`taskVersion: 1`，并将 `input` 限制在已注册的 `operation`（`auth-status`、`knowledge-search`、`document-pull`）及其 Schema 内。它仍必须先经过 AIBrain、ESAutomationFacade 和 Feishu TaskContract；不得把 Node Worker 路径或凭据放入请求。
 
+## DeepSeek Harness 受管开发入口
+
+DeepSeek Harness 通过 `deepseek.harness.execute` AICommand 和 `es.deepseek.harness@1` 接入 ES Automation。前置条件是本机已有 Node.js 22+ 与 npm；项目不会静默安装全局 Node、修改 PATH 或使用用户默认 `~/.dsh`。GitHub 拉取后，在项目根执行一次：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\ES\Automation\Workers\Node\DeepSeekHarness\Install-ESDeepSeekHarness.ps1
+```
+
+随后运行 `Test-ESDeepSeekHarness.ps1 -RequireProvider` 或打开 `【ES】/自动化与开发/自动化中心/打开自动化中心` 查看 DSH 图标。通过 AIBrain 执行时先选择 `deepseek.harness.execute`，再提交 `es.deepseek.harness@1`；显示 `NotConnected` 时只说明需要按 `reasonCode` 接入，不会把 DSH 源码存在或旧回执当作成功。
+
+DSH 是高权威开发贡献层，不是 ES 最终裁决层。它可提供分析、实现候选和 Agent Loop；ES 仍控制任务授权、允许目录、凭据边界、RunRecord、Evidence、恢复以及 `CompletionDecision`。DSH 任务的 `dry-run` 不启动进程；`check-local` 不调用 Provider API；只有本地状态为 `Connected` 后才允许受管 `headless-prompt`。
+
+与 DSH 强绑定的 Skill、AIKnowledge 或合同必须声明 `es-deepseek`，见 `ES/Automation/Contracts/es-deepseek-integration-declaration-v1.json` 和 `Documentation/AIKnowledge/entries/deepseek-harness-integration.md`。
+
 `dryRun` 是可选布尔字段，默认 `false`。对于声明支持 DryRun 的任务（例如 `es.feishu.read`），它会沿 AI Bridge 传递到 TaskContract；不支持 DryRun 的任务会由 Facade 拒绝。
 
 默认预设会直接启动：不包含未激活对象、摘要模式、组件 Top 10；不会弹人类对话框。响应中的 `runId` 可继续用于：

@@ -1,9 +1,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'ESABCDDynamicController.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'ESABCDLearning.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1')
+Import-Module (Join-Path $PSScriptRoot 'ESABCDDynamicController.psm1')
+Import-Module (Join-Path $PSScriptRoot 'ESABCDLearning.psm1')
+Import-Module (Join-Path $PSScriptRoot 'ESABCDDivergence.psm1')
 
 $script:DecisionMap = [ordered]@{
     retry = 'retry-same-plan'
@@ -65,14 +66,17 @@ function New-ESABCDDeterministicCandidateProposals {
         [Parameter(Mandatory)][ValidateRange(1, 256)][int]$RoundNo,
         [Parameter(Mandatory)][string]$Seed,
         [string[]]$CandidateHints,
-        [ValidateRange(1, 16)][int]$MaxCandidates = 3
+        [ValidateRange(1, 16)][int]$MaxCandidates = 3,
+        [ValidateSet('creative-divergence','engineering','stable')][string]$GenerationMode = 'stable'
     )
     if ([string]::IsNullOrWhiteSpace($Seed) -or $Seed.Length -gt 256) { throw 'SELF_ITERATION_SEED_INVALID' }
     if ($RoundNo -ne ([int]$Store.currentRound + 1)) { throw 'SELF_ITERATION_ROUND_SEQUENCE_INVALID' }
     if ($RoundNo -gt [int]$Store.maxRounds) { throw 'SELF_ITERATION_ROUND_BUDGET_EXHAUSTED' }
     $hintCount = if ($null -eq $CandidateHints) { 0 } else { @($CandidateHints).Count }
     if ($hintCount -gt 64) { throw 'SELF_ITERATION_HINT_BUDGET_EXCEEDED' }
-    $defaultHints = @('baseline-contract', 'alternate-route', 'reduced-capability')
+    $generationRoot = if ([string]::IsNullOrWhiteSpace([string]$Store.projectRoot)) { (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path } else { [string]$Store.projectRoot }
+    $generationProfile = Get-ESABCGenerationMode -Mode $GenerationMode -ProjectRoot $generationRoot
+    $defaultHints = @($generationProfile.requiredAxes)
     $proposals = [Collections.Generic.List[object]]::new()
     $seenSnapshots = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     for ($index = 0; $index -lt $MaxCandidates; $index++) {
@@ -90,6 +94,10 @@ function New-ESABCDDeterministicCandidateProposals {
             changedAssumption = ('{0}; seed={1}; candidate={2}' -f $hint, $Seed, ($index + 1))
             verificationPredicate = 'snapshot-hash-equals:' + $snapshotHash
             generationIndex = $index
+            generationMode = $GenerationMode
+            innovationAxis = $hint
+            hidden = $false
+            pruningPolicy = [string]$generationProfile.pruningPolicy
             generationHash = Get-ESABCDSelfIterationHash $seedInput
         })
     }

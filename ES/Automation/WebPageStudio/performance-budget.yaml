@@ -1,0 +1,21 @@
+schemaVersion: 1
+budgetId: es-web-release-performance-v1
+metrics:
+  lcpMs: 2500
+  inpMs: 200
+  cls: 0.1
+  p75: true
+resourceBudgets:
+  jsBytes: 250000
+  fontBytes: 150000
+  imageBytes: 1200000
+lighthouseScores:
+  performance: 90
+  accessibility: 95
+  seo: 95
+  bestPractices: 95
+staging:
+  httpsRequired: true
+  deploymentHashRequired: true
+  rollbackTestRequired: true
+evidenceBoundary: staging-runtime-only

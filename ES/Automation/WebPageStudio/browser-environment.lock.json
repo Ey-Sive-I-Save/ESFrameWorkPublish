@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "lockId": "es-web-browser-environment-v1",
+  "engine": "chromium",
+  "executablePath": "<explicit-local-browser-path-required>",
+  "version": "<record-at-runtime>",
+  "os": "<record-at-runtime>",
+  "locale": "zh-CN",
+  "timezone": "Asia/Shanghai",
+  "fontManifestHash": "<sha256-at-runtime>",
+  "network": "disabled",
+  "extensions": [],
+  "gpu": "disabled-for-deterministic-capture",
+  "installAllowed": false,
+  "processBudgetSeconds": 30,
+  "staleWhen": ["browser-version-change", "font-manifest-change", "os-change", "viewport-matrix-change"]
+}

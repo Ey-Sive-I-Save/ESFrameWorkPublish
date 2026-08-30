@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'ESABCDEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1')
+Import-Module (Join-Path $PSScriptRoot 'ESABCDEvidence.psm1')
 $script:DecisionMap = [ordered]@{ retry = 'retry-same-plan'; replan = 'create-new-plan'; branch = 'await-collaborator-choice'; stop = 'stop-and-report' }
 
 function Invoke-ESABCDDynamicIteration {

@@ -5,6 +5,8 @@
   "taskVersion": 1,
   "commandId": "userspace.profile.manage",
   "skillName": "es-ai-space-organization",
+  "workflowAuthority": ".agents/skills/es-ai-space-organization/SKILL.md",
+  "documentationRole": "pointer-only",
   "operations": ["initialize", "update", "discover", "validate"],
   "inputContract": {
     "path": "ES/Automation/UserSpace/es-userspace-request-v1.schema.json",

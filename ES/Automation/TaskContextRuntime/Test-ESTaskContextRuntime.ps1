@@ -330,6 +330,14 @@ Invoke-Case 'quarantine-recovers-partially-invalidated-context' {
     $s=Invoke-ESTaskContextTransition -ProjectRoot $root -StoreRoot 'state' -TaskId 'task' -Transition Recover -ExpectedTaskRevision $s.taskRevision -ExpectedContextVersion $s.contextVersion -IdempotencyKey 'recover'
     Assert-Equal $s.contextStatus 'PartiallyInvalidated' 'recovered ContextStatus'
 }
+Invoke-Case 'strict-authority-domain-blocks-without-abcd-event' {
+    $root=New-Fixture 'strict-authority';$goal=New-ESGoalRevision -ProjectRoot $root -StoreRoot 'state' -GoalId 'goal-strict' -GoalRevision 'r1' -Scope @('source.txt') -AcceptanceIntent 'static' -Budget ([ordered]@{maxReads=8})
+    $route=New-ESTestRoutePlan -Root $root -Goal $goal
+    $s=New-ESTaskContextTask -ProjectRoot $root -StoreRoot 'state' -TaskId 'strict-task' -PlanHash $route.routePlanHash -RoutePlanPath $route.path -GoalRevisionPath $goal.path -AcceptanceProfileId 'static' -OutcomeEvaluatorId 'platform.task-context-outcome-v1' -RequiredClaim 'source-integrity' -RequiredClaimVerifier ([ordered]@{'source-integrity'='platform.file-hash-manifest-v1'}) -RequestedSourceScope 'source.txt' -AuthorityDomain 'game-logic' -AuthorityRiskClass 'critical' -IdempotencyKey 'create'
+    $s=Confirm-State $root $s; $s=Submit-State $root $s
+    $blocked=Complete-State $root $s 'strict-complete'
+    Assert-Equal $blocked.completionDecision 'undetermined' 'strict domain completionDecision';Assert-Equal $blocked.taskStatus 'Active' 'strict domain taskStatus';Assert-True ($null -eq $blocked.completionReceipt) 'strict domain created a completion receipt'
+}
 
 $failed=@($results|Where-Object status -eq 'failed')
 $report=[pscustomobject][ordered]@{schemaVersion=1;validator='Test-ESTaskContextRuntime';status=if($failed.Count){'failed'}else{'passed'};testRoot=$testRoot;caseCount=$results.Count;passedCount=@($results|Where-Object status -eq 'passed').Count;failedCount=$failed.Count;cases=$results;runtimeStatus='runtime-not-run';claimsNotProven=@('Unity Runtime','Worker Runtime','adapter integration Runtime','release acceptance')}

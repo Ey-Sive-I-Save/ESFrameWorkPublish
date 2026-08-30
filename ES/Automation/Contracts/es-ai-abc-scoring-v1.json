@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/ai-abc/scoring/v1",
+  "authority": "ABC-scoring-core",
+  "scoreRange": { "minimum": 0, "maximum": 100 },
+  "strictModeRubric": {
+    "scale": { "minimum": 0, "maximum": 5, "allowDecimals": true },
+    "mapping": { "0": -20, "1": 0, "2": 20, "3": 40, "4": 70, "5": 90 },
+    "interpolation": "piecewise-linear-between-anchors",
+    "incrementalGainOnly": true,
+    "minimumGenerations": 3,
+    "traditionalBranchRegressionRequired": true,
+    "profiles": {
+      "creative-divergence": ["本质无优化","仅数值和效率","体系联动或长期反馈或爆发","不可替代理由与戒断反应","突破设计锚点且业界罕见","现实绝迹角度、首次震撼与世界观重塑"],
+      "engineering": ["套用项目已有","业界常见","对标爆款且可实现","真实维度与概念创新且边界清晰","全面技术表现力与业界标杆潜力","概念级延伸、深度闭环、大幅构筑核心"],
+      "stable": ["几乎无法实现","大量协调重做且冲突","项目支持但繁琐低收益难复用","标准可用但可能敷衍","完整闭环、体验表现、低成本高收益","可直接建成工作流且长期收益极大"]
+    },
+    "baseAndAbcpConstrained": true,
+    "failureCode": "ABC_STRICT_RUBRIC_REGRESSION_FAILED"
+  },
+  "strictCore": {
+    "authority": "ABC-scoring-core",
+    "entryPoint": "Invoke-ESABCStrictModeScore",
+    "requiredForFormalAcceptance": true,
+    "inputScale": "0-5-band",
+    "legacyCanonicalScoresAreAdvisoryOnly": true,
+    "allLayersConstrained": true
+  },
+  "weightPolicy": {
+    "default": { "general": 0.30, "mode": 0.40, "abcp": 0.30 },
+    "sumRequired": 1.0,
+    "dynamic": true,
+    "requestSignals": ["riskLevel", "evidenceCompleteness", "abcpExtensionRequest", "playerValueGap", "noveltyGap", "counterplayGap", "complexityGap"],
+    "bounds": { "general": { "minimum": 0.20, "maximum": 0.50 }, "mode": { "minimum": 0.20, "maximum": 0.60 }, "abcp": { "minimum": 0.10, "maximum": 0.50 } }
+  },
+  "comparisonPolicy": {
+    "enabled": true,
+    "evaluandRole": "only-formal-score-target",
+    "comparisonRole": "reference-only",
+    "referenceCanonicalScore": 60,
+    "perDimensionRequired": true,
+    "sameDimensionSetRequired": true,
+    "largeGapThreshold": 30,
+    "largeGapImpact": 10,
+    "largeGapDirection": "signed",
+    "missingDimensionEffect": "ABC_COMPARISON_DIMENSION_MISSING",
+    "scaleMismatchEffect": "ABC_COMPARISON_SCALE_MISMATCH",
+    "comparisonCannotReplaceEvaluand": true
+  },
+  "normalization": {
+    "authority": "ABC-scoring-core",
+    "canonicalScale": { "minimum": 0, "maximum": 100 },
+    "profiles": {
+      "score-0-100": { "inputMinimum": 0, "inputMaximum": 100 },
+      "score-0-5": { "inputMinimum": 0, "inputMaximum": 5 },
+      "score-0-130": { "inputMinimum": 0, "inputMaximum": 130 }
+    },
+    "formula": "((rawScore-inputMinimum)/(inputMaximum-inputMinimum))*100",
+    "rounding": "half-up-2-decimal",
+    "direction": "higher-is-better",
+    "provenanceRequired": true,
+    "rawScoreMustBePreserved": true
+  },
+  "creativeGate": {
+    "required": true,
+    "mode": "creative-divergence",
+    "minimumNoveltyDelta": 70,
+    "minimumJoyLoop": 60,
+    "mechanismChangeEvidenceRequired": true,
+    "surpriseCannotSubstituteForNovelty": true,
+    "failureCode": "ABC_CREATIVE_INNOVATION_REQUIRED",
+    "failureDisposition": "needs-rework"
+  },
+  "innovationFusion": {
+    "required": true,
+    "minimumActiveFactors": 3,
+    "minimumFactorScore": 60,
+    "factors": ["supernaturalPhenomenon", "mutationLimitBreak", "reversalInformationGap", "specialBurstPoint", "oppressionDespair", "masteryCeiling", "foundationalLogicShift", "trajectoryInfluence", "controlledRandomness", "suppressionDramaticExperience"],
+    "factorDefinitions": {
+      "supernaturalPhenomenon": "引入超出常规规则但仍可理解、可反制的异常现象",
+      "mutationLimitBreak": "让既有能力发生异化、越界或突破上限，而非简单数值提升",
+      "reversalInformationGap": "通过隐藏信息、误导或反转改变判断顺序，并保留可推理线索",
+      "specialBurstPoint": "构造高密度、可准备、可识别的特殊爆发时刻",
+      "oppressionDespair": "制造压迫、绝望和资源窒息感，同时保留逃生或翻盘路径",
+      "masteryCeiling": "提高熟练者的操作、时机和组合表达上限",
+      "foundationalLogicShift": "改变底层交互或因果规则，而非只换表现层",
+      "trajectoryInfluence": "玩家的思维、选择或预判会改变后续局势走向",
+      "controlledRandomness": "使用有边界、可感知、可管理的随机性制造变化",
+      "suppressionDramaticExperience": "通过压制、对抗和戏剧化转折形成强烈体验峰值"
+    },
+    "formula": "weighted-mean-with-diversity-floor",
+    "surpriseIsSupportOnly": true,
+    "failureCode": "ABC_INNOVATION_FACTOR_FUSION_FAILED"
+  },
+  "creativeComposition": {
+    "outcomeWeight": 0.50,
+    "sourceFusionWeight": 0.50,
+    "requiresSourceFactors": true,
+    "missingSourceEffect": "ABC_INNOVATION_FACTOR_FUSION_FAILED"
+  },
+  "deepInnovationRegression": {
+    "required": true,
+    "minimumDecisionRounds": 3,
+    "baselineRequired": true,
+    "baselineKinds": ["original", "mundane"],
+    "perFactorComparisonRequired": true,
+    "quality": { "minimumQualitativeDelta": 10, "zeroIfNoQualitativeDelta": true },
+    "failureCode": "ABC_INNOVATION_DEPTH_REGRESSION_FAILED"
+  },
+  "baseEvaluationPolicy": { "authority": "ABC-scoring-core", "required": true, "allGeneralDimensionsRequired": true, "missingDimensionEffect": "unknown-and-claim-cap", "uniformDefaultForbidden": true, "minimumObservedSpread": 10, "minimumIndependentRecomputes": 3, "rule": "base-evaluation-must-produce-real-high-low-separation; mode-or-extension-scores-may-not-hide-base-failure" },
+  "layers": {
+    "general": {
+      "weight": 0.30,
+      "missingScore": 50,
+      "dimensions": ["playerValue", "causalClarity", "counterplay", "complexityControl", "roleFit", "accessibility", "feedbackQuality", "replayability", "abuseResistance", "implementationRisk"]
+    },
+    "mode": {
+      "weight": 0.4,
+      "missingScore": 50,
+      "modes": {
+        "creative-divergence": ["joyLoop", "first10sMoment", "expressionCeiling", "noveltyDelta", "surprise", "smoothness"],
+        "engineering": ["depth", "stateIntegrity", "ownershipLifecycle", "determinism", "performance", "failureRecovery", "reusability", "longevity"],
+        "stable": ["projectFit", "completeness", "safety", "closure", "compatibility", "regression", "rollback", "throughput"]
+      }
+    },
+    "creativeGate": {
+      "required": true,
+      "mode": "creative-divergence",
+      "minimumNoveltyDelta": 70,
+      "minimumJoyLoop": 60,
+      "mechanismChangeEvidenceRequired": true,
+      "surpriseCannotSubstituteForNovelty": true,
+      "failureCode": "ABC_CREATIVE_INNOVATION_REQUIRED",
+      "failureDisposition": "needs-rework"
+    },
+    "abcp": {
+      "weight": 0.30,
+      "missingScore": 50,
+      "maxDimensions": 16,
+      "dimensionPattern": "^[A-Za-z][A-Za-z0-9._:-]{1,63}$",
+      "missingExtensionPolicy": "neutral-50",
+      "duplicateDimensionPolicy": "reject",
+      "domainPartOwnsDimensionNames": true
+    }
+  },
+  "review": {
+    "minimumRounds": 3,
+    "defaultRounds": 5,
+    "maximumRounds": 8,
+    "maximumScoreDrift": 1.0,
+    "roundMustRecord": ["round", "generalScore", "modeScore", "abcpScore", "totalScore", "challengeScore", "dimensionSnapshot", "changedEvidence", "driftFromPrevious"],
+    "driftFailureCode": "ABC_SCORING_DRIFT_EXCEEDED",
+    "independentRecomputeRequired": true,
+    "sameInputsMustBeIdempotent": true
+  },
+  "regression": {
+    "required": true,
+    "levels": [
+      "schema-and-range",
+      "dimension-sensitivity",
+      "weight-application",
+      "creative-gate-negative",
+      "missing-evidence",
+      "boundary-and-drift"
+    ],
+    "failureCode": "ABC_SCORING_REGRESSION_FAILED",
+    "stableRequiresAllLevels": true
+  },
+  "challenge": {
+    "minimumLenses": 10,
+    "requiredForFinalization": true,
+    "lowLensScoreThreshold": 40,
+    "reworkScoreThreshold": 60
+  },
+  "finalScore": {
+    "formula": "general*dynamic.general + mode*dynamic.mode + abcp*dynamic.abcp",
+    "rounding": "half-up-2-decimal",
+    "missingLayer": "neutral-50",
+    "rawAndRoundedBothRecorded": true
+  }
+}

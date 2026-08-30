@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ES Web UI WorkerHandle v1",
+  "type": "object",
+  "required": ["schemaVersion", "recordType", "handleId", "runId", "state", "processTree", "cancellation", "timeout", "disposal", "runtimeStatus", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "WebPageStudioWorkerHandle"},
+    "handleId": {"type": "string", "minLength": 1},
+    "runId": {"type": "string", "minLength": 1},
+    "state": {"enum": ["created", "starting", "running", "terminating", "exited", "timed-out", "cancelled", "disposed", "orphaned"]},
+    "processTree": {"type": "object", "required": ["rootPid", "descendantPids", "terminationRequired"]},
+    "cancellation": {"type": "object", "required": ["requested", "reasonCode", "propagation"]},
+    "timeout": {"type": "object", "required": ["budgetSeconds", "observedSeconds", "enforced"]},
+    "disposal": {"type": "object", "required": ["requested", "handleReleased"]},
+    "runtimeStatus": {"enum": ["runtime-not-run", "runtime-passed", "runtime-failed"]},
+    "nonClaims": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

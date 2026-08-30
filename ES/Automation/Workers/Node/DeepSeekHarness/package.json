@@ -1,0 +1,12 @@
+{
+  "name": "es-deepseek-harness-worker",
+  "private": true,
+  "version": "0.2.0",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.1-rc.2"
+  }
+}

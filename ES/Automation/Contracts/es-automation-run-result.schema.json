@@ -60,6 +60,9 @@
         "decisionId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
         "runId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
         "accepted": { "type": "boolean" },
+        "authorityDomain": { "type": "string", "enum": ["", "ai-collaboration", "game-logic", "editor-tooling", "release"] },
+        "authorityRiskClass": { "type": "string", "enum": ["", "standard", "high", "critical"] },
+        "authorityPolicyStatus": { "type": "string" },
         "executionStatus": { "type": "string", "enum": ["", "Passed", "Failed", "Blocked", "Cancelled", "DryRun"] },
         "freshnessPolicy": { "$ref": "#/$defs/freshnessPolicyOrNull" },
         "criterionResults": { "type": "array", "items": { "$ref": "#/$defs/criterionResult" } },
@@ -72,7 +75,7 @@
         "traceReconciled": { "type": "boolean" },
         "traceReconciliation": { "anyOf": [ { "type": "null" }, { "$ref": "#/$defs/traceReconciliation" } ] },
         "decisionStatus": { "type": "string", "enum": ["", "Unverified", "PartiallyDone", "StaticReviewComplete", "Accepted", "Blocked"] },
-        "blockingLayer": { "type": "string", "enum": ["", "none", "static-code", "static-contract", "static-boundary", "evidence", "runtime"] },
+        "blockingLayer": { "type": "string", "enum": ["", "none", "authority", "static-code", "static-contract", "static-boundary", "evidence", "runtime"] },
         "staticCodeStatus": { "type": "string", "enum": ["", "passed", "blocked", "partial", "not-run"] },
         "staticContractStatus": { "type": "string", "enum": ["", "passed", "blocked", "partial", "not-run"] },
         "staticBoundaryStatus": { "type": "string", "enum": ["", "passed", "blocked", "partial", "not-run"] },
@@ -82,6 +85,10 @@
         "nextAction": { "type": "string" }
       },
       "allOf": [
+        {
+          "if": { "properties": { "authorityRiskClass": { "enum": ["high", "critical"] } } },
+          "then": { "required": ["authorityDomain"], "properties": { "authorityDomain": { "enum": ["ai-collaboration", "game-logic", "editor-tooling", "release"] } } }
+        },
         {
           "if": { "properties": { "accepted": { "const": true } } },
           "then": { "required": ["decisionStatus", "executionStatus"], "properties": { "decisionStatus": { "const": "Accepted" }, "executionStatus": { "const": "Passed" } } }

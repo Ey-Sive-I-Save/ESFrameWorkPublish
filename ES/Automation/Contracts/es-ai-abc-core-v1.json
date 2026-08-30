@@ -5,6 +5,26 @@
   "contractId": "es://automation/contracts/ai-abc/interface/v1",
   "adapterVersion": "v1",
   "executionEnabled": false,
+  "generationModesContractRef": "ES/Automation/Contracts/es-ai-abc-generation-mode-v1.json",
+  "generationResponseContractRef": "ES/Automation/Contracts/es-ai-abc-generation-response-v1.schema.json",
+  "scoringContractRef": "ES/Automation/Contracts/es-ai-abc-scoring-v1.json",
+  "scoringAuthority": "ABC-scoring-core",
+  "canonicalScoreScale": "score-0-100",
+  "patchPlanningContractRef": "ES/Automation/Contracts/es-abcd-candidate-patch-plan-v1.schema.json",
+  "approvedApplyContractRef": "ES/Automation/Contracts/es-abcd-approved-apply-request-v1.schema.json",
+  "generationCore": {
+    "modeIds": ["creative-divergence", "engineering", "stable"],
+    "purpose": "create-new-rework-first",
+    "creationFirst": true,
+    "reworkCreationRequired": true,
+    "seedSelectionAuthority": "ABCD",
+    "externalInputRole": "constraints-preferences-and-forbidden-changes-only",
+    "generationBeforeAudit": true,
+    "candidateVisibility": "all-candidates-and-explicit-rejection-reasons",
+    "acceptanceProfileOrthogonal": true,
+    "graphAuthority": "candidate-only",
+    "postApplyEvidence": "required-before-completion"
+  },
   "independence": { "ownsContract": true, "ownsCapabilityRegistry": true, "ownsAdapters": true, "researchProvenanceOnly": ["es-agent-mechanism-replication"], "runtimeDependencyOnResearchSkill": false },
   "capabilities": [
     { "capabilityId": "bounded-tool-action", "sourceMechanismId": "swe-agent-aci", "inputSemantics": "bounded action request with explicit scope", "outputSemantics": "action result plus changed-file evidence", "preconditions": ["scope declared", "authorization present"], "evidence": ["read/write receipt", "diff or no-change proof"], "failureCodes": ["scope-missing", "action-denied"], "selectionPredicate": "goal requires a bounded project action" },
@@ -15,7 +35,7 @@
     { "capabilityId": "audit-evidence-chain", "sourceMechanismId": "auditbench", "inputSemantics": "claims, sources and verification results", "outputSemantics": "auditable completion decision", "preconditions": ["sources addressable", "non-claims declared"], "evidence": ["source hashes", "receipt", "completion decision"], "failureCodes": ["evidence-missing", "claim-overreach"], "selectionPredicate": "any completion or readiness claim is requested" }
   ],
   "interfacePairs": [
-    { "direction": "A-to-B", "fields": ["semanticGoal", "constraints", "requestedCapabilities", "evidenceExpectations"], "result": "capability offer or explicit mismatch" },
+    { "direction": "A-to-B", "fields": ["semanticGoal", "generationMode", "acceptanceProfile", "constraints", "requestedCapabilities", "evidenceExpectations"], "result": "capability offer or explicit mismatch" },
     { "direction": "B-to-A", "fields": ["providerId", "inputSchemaRef", "outputSchemaRef", "preconditions", "effects", "evidenceProduced", "failureCodes"], "result": "normalized result with evidence" }
   ],
   "parityContract": { "requiredCapabilities": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "missingCapabilityEffect": "blocked", "semanticMismatchEffect": "replan", "evidenceMissingEffect": "claim-cap", "dynamicFallback": "explicit-only" },

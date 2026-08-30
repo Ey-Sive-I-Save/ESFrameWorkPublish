@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ES Web UI Worker RunRecord v1",
+  "type": "object",
+  "required": ["schemaVersion", "recordType", "runId", "taskId", "attempt", "status", "lease", "handleId", "timeline", "terminalEvidence", "runtimeStatus", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "WebPageStudioWorkerRunRecord"},
+    "runId": {"type": "string", "minLength": 1},
+    "taskId": {"type": "string", "minLength": 1},
+    "attempt": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["planned", "queued", "running", "retry-waiting", "succeeded", "failed", "cancelled", "orphaned", "recovery-pending"]},
+    "lease": {"type": "object", "required": ["leaseId", "taskRevision", "contextVersion", "expiresUtc"]},
+    "handleId": {"type": "string", "minLength": 1},
+    "timeline": {"type": "array", "items": {"type": "object", "required": ["event", "utc"]}},
+    "terminalEvidence": {"type": "object", "required": ["handleState", "processTreeObserved", "handleReleased"]},
+    "outputHash": {"type": ["string", "null"]},
+    "errorCode": {"type": ["string", "null"]},
+    "runtimeStatus": {"enum": ["runtime-not-run", "runtime-passed", "runtime-failed"]},
+    "nonClaims": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

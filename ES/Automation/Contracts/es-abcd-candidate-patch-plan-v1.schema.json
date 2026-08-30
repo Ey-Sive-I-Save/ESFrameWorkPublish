@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "title": "ES ABCD candidate patch plan v1",
+  "type": "object",
+  "required": ["schemaVersion", "contractId", "planStatus", "candidateStatus", "scenario", "currentHead", "authorizationRef", "candidateSetHash", "sourceFiles", "effects", "rollback", "requiresExplicitApply", "auditRequired", "planHash"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "contractId": {"const": "es://automation/contracts/abcd/candidate-patch-plan/v1"}, "planStatus": {"const": "awaiting-abcd-audit"}, "candidateStatus": {"const": "candidate"},
+    "scenario": {"type": "string"}, "currentHead": {"type": "string", "pattern": "^[a-f0-9]{40}$"}, "authorizationRef": {"type": "string", "minLength": 1}, "candidateSetHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "sourceFiles": {"type": "array", "items": {"type": "object", "required": ["path", "beforeHash", "changeState"], "properties": {"path": {"type": "string"}, "beforeHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "changeState": {"const": "candidate-only"}}}},
+    "effects": {"type": "object", "required": ["writesAllowed", "runtimeAllowed", "gitAllowed", "releaseAllowed"], "properties": {"writesAllowed": {"const": false}, "runtimeAllowed": {"const": false}, "gitAllowed": {"const": false}, "releaseAllowed": {"const": false}}},
+    "rollback": {"type": "object", "required": ["available", "action", "sourceHashesPinned"], "properties": {"available": {"const": true}, "action": {"type": "string"}, "sourceHashesPinned": {"const": true}}},
+    "requiresExplicitApply": {"const": true}, "auditRequired": {"const": true}, "planHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": true
+}

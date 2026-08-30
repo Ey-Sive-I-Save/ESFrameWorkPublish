@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es://automation/contracts/web-ui/static-replay-report/v1",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","recordType","validator","status","testCount","passedCount","failedCount","tests","runtimeStatus","nonClaims","sourceHashes","reportHash"],
+  "properties":{
+    "schemaVersion":{"const":1},"recordType":{"const":"WebPageStudioStaticReplayReport"},"validator":{"const":"web-ui-closure-static-replay"},
+    "status":{"enum":["passed","failed"]},"testCount":{"type":"integer","minimum":1},"passedCount":{"type":"integer","minimum":0},"failedCount":{"type":"integer","minimum":0},
+    "tests":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["test","status","runtimeStatus"],"properties":{"test":{"type":"string","minLength":1},"status":{"enum":["passed","failed"]},"runtimeStatus":{"const":"runtime-not-run"},"error":{"type":"string"}}}},
+    "schemaCoverage":{"type":"object","additionalProperties":false,"required":["validator","status","schemaCount"],"properties":{"validator":{"const":"web-ui-receipt-schemas"},"status":{"enum":["passed","failed","not-run"]},"schemaCount":{"const":4}}},
+    "configurationCoverage":{"type":"object","additionalProperties":false,"properties":{"environmentLock":{"enum":["passed","failed","not-run"]},"visualMatrixHash":{"enum":["passed","failed","not-run"]},"releaseBudgetHash":{"enum":["passed","failed","not-run"]},"releaseStagingIdentity":{"enum":["passed","failed","not-run"]}}},
+    "sourceHashes":{"type":"object","minProperties":1,"patternProperties":{"^.+$":{"type":"string","pattern":"^[a-f0-9]{64}$"}},"additionalProperties":false},
+    "runtimeStatus":{"const":"runtime-not-run"},"nonClaims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"reportHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+  }
+}

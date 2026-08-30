@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/ai-abc/innovation-run/v1",
+  "recordType": "ABCInnovationRun",
+  "stages": [
+    "requirement-facts", "player-outcomes", "lexical-deanchor", "seed-divergence",
+    "tree-expansion", "global-convergence", "interaction-graph", "adaptive-weighting",
+    "player-replay", "counterplay-audit", "complexity-prune", "candidate-tournament", "final-decision"
+  ],
+  "requiredStageOutputs": ["stagePlan", "seedSelection", "divergenceTree", "convergenceHistory", "interactionGraph", "branchWeights", "weightHistory", "rejectedBranches", "finalDecision"],
+  "resourceBudget": { "maxRounds": 24, "maxBranches": 256, "maxModelCalls": 128, "maxEvaluations": 512, "stageResourceBudgetsRequired": true, "stageUsageRequired": true, "weightAllocationRequired": true },
+  "stageResourceBudgets": {
+    "tree-expansion": { "purpose": "deep model branching and concrete player-scenario evaluation", "minimumModelCalls": 16, "minimumEvaluations": 32 },
+    "global-convergence": { "purpose": "cross-branch re-score and rejection", "minimumEvaluations": 32 },
+    "player-replay": { "purpose": "first-use and layered mastery replay", "minimumEvaluations": 32 },
+    "counterplay-audit": { "purpose": "counterplay and failure-path audit", "minimumEvaluations": 32 },
+    "candidate-tournament": { "purpose": "final candidate comparison", "minimumEvaluations": 16 }
+  },
+  "transitionPolicy": { "ordered": true, "noSilentSkip": true, "parentContentRequired": true, "resourceBudgetRequired": true, "seedSelectionAuthority": "ABCD", "externalSeedsAreConstraintsOnly": true },
+  "runtimeBoundary": "static orchestration contract only; no Unity/player claim"
+}

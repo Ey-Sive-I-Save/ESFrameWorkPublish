@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/authority-ai-decision-policy/v1",
+  "domains": {
+    "ai-collaboration": {
+      "safeDefaultFields": ["capturedUtc", "timestampUtc", "receiptPath"],
+      "strictOnUnresolved": false,
+      "description": "Continue bounded work when non-semantic metadata is missing; cap claims when evidence is incomplete."
+    },
+    "game-logic": {
+      "safeDefaultFields": ["capturedUtc", "timestampUtc", "receiptPath"],
+      "strictOnUnresolved": true,
+      "description": "Block when ownership, lifecycle, state, identity, scope, rollback or evidence closure is unresolved."
+    },
+    "editor-tooling": {
+      "safeDefaultFields": ["capturedUtc", "timestampUtc", "receiptPath"],
+      "strictOnUnresolved": true,
+      "description": "Block unsafe editor state or asset ownership gaps; allow metadata normalization only."
+    },
+    "release": {
+      "safeDefaultFields": ["capturedUtc", "timestampUtc", "receiptPath"],
+      "strictOnUnresolved": true,
+      "description": "Block artifact, provenance, environment and rollback gaps."
+    }
+  }
+}

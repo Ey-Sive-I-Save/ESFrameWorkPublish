@@ -30,5 +30,6 @@
     { "modeId": "ABCC.Core", "displayName": "ABCC (Core)", "independent": true, "orchestration": "semantic-adapter", "dependsOnCore": false, "capabilityCoverage": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "fallback": "explicit-only", "contractRef": "ES/Automation/Contracts/es-ai-abc-core-v1.json" },
     { "modeId": "ABCP.Part", "displayName": "ABCP (Part)", "independent": false, "orchestration": "bounded-domain", "dependsOnCore": true, "capabilityCoverage": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "fallback": "explicit-only", "contractRef": "ES/Automation/Contracts/es-ai-abc-part-v1.schema.json" }
   ],
-  "parityRule": { "coreMustCoverDynamic": true, "missingCapabilityEffect": "blocked", "partMaySelectSubset": true, "silentFallback": false, "textCopying": false }
+  "parityRule": { "coreMustCoverDynamic": true, "missingCapabilityEffect": "blocked", "partMaySelectSubset": true, "silentFallback": false, "textCopying": false },
+  "generationModesContractRef": "ES/Automation/Contracts/es-ai-abc-generation-mode-v1.json"
 }

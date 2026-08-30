@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"esframework://automation/contracts/web/dynamic-state-replay/v1",
+  "title":"ES Web Dynamic State Replay",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","recordType","replayId","routeId","cachePolicyId","events","finalState","runtimeStatus","nonClaims"],
+  "properties":{
+    "schemaVersion":{"const":1},"recordType":{"const":"WebPageStudioDynamicStateReplay"},"replayId":{"type":"string","pattern":"^[a-z][a-z0-9._-]{2,127}$"},"routeId":{"type":"string","minLength":1},"cachePolicyId":{"type":"string","minLength":1},
+    "events":{"type":"array","minItems":4,"items":{"type":"object","additionalProperties":false,"required":["sequence","state","cache","action"],"properties":{"sequence":{"type":"integer","minimum":0},"state":{"enum":["idle","loading","success","empty","error"]},"cache":{"enum":["miss","hit","stale","revalidated","serve-stale","bypass"]},"action":{"enum":["request","render","revalidate","fallback","retry","cancel"]},"detail":{"type":"string"}}}},
+    "finalState":{"enum":["success","empty","error","serve-stale","cancelled"]},"runtimeStatus":{"const":"runtime-not-run"},"nonClaims":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  }
+}

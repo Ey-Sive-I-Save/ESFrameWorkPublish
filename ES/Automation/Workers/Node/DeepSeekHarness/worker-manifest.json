@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "workerType": "Node",
+  "workerId": "es.deepseek-harness",
+  "workerVersion": "0.2.0",
+  "entrypoint": "ES/Automation/Workers/Node/DeepSeekHarness/worker.js",
+  "taskId": "es.deepseek.harness",
+  "operations": ["dry-run", "check-local", "headless-prompt"],
+  "permissionBoundary": ["ES-managed-run-root-only", "no-implicit-git", "no-automatic-completion", "no-credential-output", "no-implicit-path-or-profile"],
+  "requiredEnvironment": ["ES_DEEPSEEK_NODE_PATH or ES_AUTOMATION_NODE_PATH (absolute node.exe)", "runtime.local.json (created by installer)", "DeepSeek provider credentials (runtime only)"],
+  "status": "source-available",
+  "runtimeStatus": "not-run",
+  "completionAuthority": "ESAutomation/AIBrain",
+  "declaration": "es-deepseek",
+  "providerDeclaration": "es-deepseek",
+  "authority": "ESFramework/ESAI",
+  "authorityLevel": "high-contributor-not-final-acceptance",
+  "nonClaims": ["No Unity runtime claim", "No automatic ES task acceptance", "No provider credential validation in dry-run", "No sdk JSON-RPC runtime claim"]
+}

@@ -1,5 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'ESABCDAuthorityKernel.psm1') -Force
 
 $script:Profiles = [ordered]@{
     DesignChange = [ordered]@{ required = @('bounded-tool-action','branch-evaluation','audit-evidence-chain'); minimumEvidence = 'S1'; negative = @('invalid-input','authority-conflict','stale-source','forged-receipt') }
@@ -60,8 +61,60 @@ function Test-ESABCDAuthorityGraph { param([Parameter(Mandatory)]$Graph)
     $issues=[Collections.Generic.List[string]]::new(); if (@($Graph.nodes|Where-Object canAuthorizeWrite).Count -lt 1){[void]$issues.Add('AUTHORITY_USER_PROOF_MISSING')}; if (@($Graph.nodes|Where-Object {$_.kind -eq 'unclassified'}).Count -gt 0){[void]$issues.Add('AUTHORITY_NODE_UNCLASSIFIED')}; if (@($Graph.forbidden).Count -lt 3){[void]$issues.Add('AUTHORITY_FORBIDDEN_RULES_INCOMPLETE')}; [pscustomobject][ordered]@{status=if($issues.Count){'failed'}else{'passed'};issues=@($issues);graphHash=(Get-ESABCDAuditHash $Graph)}
 }
 
-function New-ESABCDFinalGateReceipt { param([Parameter(Mandatory)]$Plan,[Parameter(Mandatory)]$AuthorityGraph,[Parameter(Mandatory)]$Divergence,[Parameter(Mandatory)]$Audit,[Parameter(Mandatory)]$Verification,[object]$FrameworkCoverage,[string]$ObservedHead='',[ValidateSet('S1','S2','S3','S4','S5','S6')][string]$EvidenceLevel='S1')
-    $issues=[Collections.Generic.List[string]]::new(); $p=Test-ESABCDAuditPlan $Plan; if($p.status-ne'passed'){[void]$issues.Add('AUDIT_PLAN_INVALID')}; $a=Test-ESABCDAuthorityGraph $AuthorityGraph; if($a.status-ne'passed'){[void]$issues.Add('AUTHORITY_GRAPH_INVALID')}; if([string]$ObservedHead -and [string]$ObservedHead -cne [string]$Plan.currentHead){[void]$issues.Add('AUDIT_HEAD_DRIFT')}; if([int]$EvidenceLevel.Substring(1) -lt [int]$Plan.minimumEvidenceLevel.Substring(1)){[void]$issues.Add('EVIDENCE_LEVEL_INSUFFICIENT')}; if(-not [bool]$Divergence.complete -or [int]$Divergence.distinctAssumptions -lt 2 -or -not [bool]$Divergence.rollbackVerified){[void]$issues.Add('DIVERGENCE_REQUIREMENTS_UNSATISFIED')}; if(-not [bool]$Audit.independent -or [string]$Audit.status -ne 'passed'){[void]$issues.Add('INDEPENDENT_AUDIT_REQUIRED')}; if([string]$Verification.status -ne 'passed' -or @($Verification.requiredCasesMissing).Count -gt 0 -or [bool]$Verification.stale){[void]$issues.Add('VERIFICATION_INCOMPLETE')}; if($null -ne $FrameworkCoverage -and -not [bool]$FrameworkCoverage.allMeetThreshold){[void]$issues.Add('FRAMEWORK_COVERAGE_BELOW_THRESHOLD')}; $status=if($issues.Count){'blocked'}else{'accepted'}; [pscustomobject][ordered]@{schemaVersion=1;contractId='es://automation/contracts/abcd/final-gate/v1';gateId='gate-'+(Get-ESABCDAuditHash ([ordered]@{plan=$Plan.planId;authority=$AuthorityGraph.graphId;status=$status;issues=@($issues)})).Substring(0,24);status=$status;decisionStatus=if($status-eq'accepted'){'Accepted'}else{'Blocked'};planId=[string]$Plan.planId;planHash=Get-ESABCDAuditHash $Plan;authorityGraphHash=Get-ESABCDAuditHash $AuthorityGraph;evidenceLevel=$EvidenceLevel;issues=@($issues);frameworkCoverage=$FrameworkCoverage;claimsNotProven=@('Unity/Player/IL2CPP/Release behavior')}
+function New-ESABCDFinalGateReceipt {
+    param(
+        [Parameter(Mandatory)]$Plan,
+        [Parameter(Mandatory)]$AuthorityGraph,
+        [Parameter(Mandatory)]$Divergence,
+        [Parameter(Mandatory)]$Audit,
+        [Parameter(Mandatory)]$Verification,
+        [object]$FrameworkCoverage,
+        [string]$ObservedHead = '',
+        [ValidateSet('S1', 'S2', 'S3', 'S4', 'S5', 'S6')]
+        [string]$EvidenceLevel = 'S1'
+    )
+    $issues = [Collections.Generic.List[string]]::new()
+    $p = Test-ESABCDAuditPlan $Plan
+    if ($p.status -ne 'passed') { [void]$issues.Add('AUDIT_PLAN_INVALID') }
+    $a = Test-ESABCDAuthorityGraph $AuthorityGraph
+    if ($a.status -ne 'passed') { [void]$issues.Add('AUTHORITY_GRAPH_INVALID') }
+    if ([string]$ObservedHead -and [string]$ObservedHead -cne [string]$Plan.currentHead) { [void]$issues.Add('AUDIT_HEAD_DRIFT') }
+    if ([int]$EvidenceLevel.Substring(1) -lt [int]$Plan.minimumEvidenceLevel.Substring(1)) { [void]$issues.Add('EVIDENCE_LEVEL_INSUFFICIENT') }
+    if (-not [bool]$Divergence.complete -or [int]$Divergence.distinctAssumptions -lt 2 -or -not [bool]$Divergence.rollbackVerified) { [void]$issues.Add('DIVERGENCE_REQUIREMENTS_UNSATISFIED') }
+    if (-not [bool]$Audit.independent -or [string]$Audit.status -ne 'passed') { [void]$issues.Add('INDEPENDENT_AUDIT_REQUIRED') }
+    if ([string]$Verification.status -ne 'passed' -or @($Verification.requiredCasesMissing).Count -gt 0 -or [bool]$Verification.stale) { [void]$issues.Add('VERIFICATION_INCOMPLETE') }
+    if ($null -ne $FrameworkCoverage -and -not [bool]$FrameworkCoverage.allMeetThreshold) { [void]$issues.Add('FRAMEWORK_COVERAGE_BELOW_THRESHOLD') }
+
+    # The final receipt is itself an authority decision.  Existing checks
+    # produce the evidence issues; the kernel remains the only acceptance
+    # outlet and records the six-capability closure in the receipt.
+    $kernelEvidence = [pscustomobject][ordered]@{
+        planId = [string]$Plan.planId
+        issueCount = $issues.Count
+        requiredCapabilities = @(Get-ESABCDCoreCapabilities)
+        selectedCapabilities = @(Get-ESABCDCoreCapabilities)
+        evidenceLevel = $EvidenceLevel
+    }
+    $kernelMissing = if ($issues.Count) { @('finalGatePrerequisite') } else { @() }
+    $authority = Resolve-ESABCDAuthorityDecision -Mode core-high-risk -Evidence $kernelEvidence -MissingFields $kernelMissing
+    if ($authority.status -ne 'accepted' -and $issues -notcontains 'AUTHORITY_KERNEL_BLOCKED') { [void]$issues.Add('AUTHORITY_KERNEL_BLOCKED') }
+    $status = if ($authority.status -eq 'accepted' -and $issues.Count -eq 0) { 'accepted' } else { 'blocked' }
+    $gateId = 'gate-' + (Get-ESABCDAuditHash ([ordered]@{ plan = $Plan.planId; authority = $AuthorityGraph.graphId; status = $status; issues = @($issues) })).Substring(0, 24)
+    [pscustomobject][ordered]@{
+        schemaVersion = 1
+        contractId = 'es://automation/contracts/abcd/final-gate/v1'
+        gateId = $gateId
+        status = $status
+        decisionStatus = if ($status -eq 'accepted') { 'Accepted' } else { 'Blocked' }
+        planId = [string]$Plan.planId
+        planHash = Get-ESABCDAuditHash $Plan
+        authorityGraphHash = Get-ESABCDAuditHash $AuthorityGraph
+        evidenceLevel = $EvidenceLevel
+        issues = @($issues)
+        frameworkCoverage = $FrameworkCoverage
+        authorityKernel = $authority
+        claimsNotProven = @('Unity/Player/IL2CPP/Release behavior')
+    }
 }
 
 Export-ModuleMember -Function New-ESABCDAuditPlan,Test-ESABCDAuditPlan,Test-ESABCDAuditSourceRegistry,New-ESABCDAuthorityGraph,Test-ESABCDAuthorityGraph,New-ESABCDFinalGateReceipt,Get-ESABCDAuditHash,Get-ESABCDValidationProfile

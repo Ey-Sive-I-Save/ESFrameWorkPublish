@@ -141,3 +141,27 @@
 - Allowed next write scope: `none`。
 - Invalidation triggers: Skill Definition/ConfigKey/Table/Runtime、Graph 接入、相关测试、AIWarnings、branch/HEAD 或证据层变化后立即 `stale`。
 <!-- ES-AUDIT-STATE:END module=es-skill-definition-runtime -->
+
+<!-- ES-AUDIT-STATE:BEGIN module=es-ui-prefab-authoring -->
+### Audit continuation state
+
+- Snapshot ID: `es-ui-prefab-authoring-archived-20260828`
+- Updated at: `2026-08-28 00:00:00 +08:00` (`Asia/Shanghai`)
+- Module and committed scope: `es-ui-prefab-authoring`；参考图到 ScreenSpec、Sprite 资产、Unity UI Prefab/Fixture 的生成与物化链路；本次将该能力整体归档，不删除实现、资产或历史产物。
+- Maturity state: `Archived`
+- Blocked reason: 当前 26 个分解 PNG 全部为全不透明截图片段，带入原界面背景，不能作为独立可复用 Sprite；Prefab 视觉验收失败，且现有物化链路存在未解决的 Unity 编译/证据问题。
+- Authority entry: `F:/aaProject/ESFrameWorkPublish/.agents/skills/es-ui-prefab-authoring/SKILL.md`；实现入口 `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs`；当前 Spec/Prefab 仅作为历史产物保留。
+- Activation mode: `none`；不再把该生成链路视为可用默认能力，不新增注册、自动初始化或发布入口。
+- Upstream dependencies: 参考图资产、ScreenSpec 合同、透明 Sprite/9-slice 资产、Unity Editor 编译与物化证据。
+- Downstream consumers: `none`（不得将当前生成 Prefab 宣称为正式 UI 依赖）。
+- Unfinished-code leakage: 历史 Spec、Prefab、Fixture 和临时裁剪资产仍在工作树中；归档不等于删除，后续使用前必须重新验证并明确解除归档。
+- Evidence present: 26/26 PNG Alpha 全不透明；代表性资产仍包含截图底板/邻接背景；此前视觉与快照证据未通过。
+- Evidence missing: 可复用透明前景、独立按钮层、Unity 最终视觉验收、完整交互验收、发布级证据。
+- Branch / HEAD: `main` / `bce09c32dad3bc345514ba50502e055b4925e8f0`
+- Relevant worktree state: UI 相关路径存在大量未提交新增/修改；本次只追加本归档状态块，未覆盖或清理既有改动。
+- Last completed action: 对当前分解资产执行 Alpha 审计并确认整体不可用；按用户指令将 UI 构建能力标记为 `Archived`。
+- Smallest next action: 若要恢复，先新建透明资产分离与独立交互验收方案，再由用户明确授权解除归档；不得直接复用当前 Prefab/Spec。
+- Resume read list: AIWarnings Start/CurrentStatus/RuleIndex；`es-ui-prefab-authoring/SKILL.md`；当前 Spec、Prefab、Materializer 源码；Unity 编译与视觉证据。
+- Allowed next write scope: `none`；归档状态不授予实现、删除、Git、Unity、发布或外部操作权限。
+- Invalidation triggers: 解除归档的明确用户指令、素材/Spec/Materializer/验证器/规则或分支 HEAD 变化后，均须重新审计。
+<!-- ES-AUDIT-STATE:END module=es-ui-prefab-authoring -->

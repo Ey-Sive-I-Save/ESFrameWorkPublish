@@ -69,7 +69,11 @@
         "changedAssumption": { "type": "string", "minLength": 1 },
         "verificationPredicate": { "type": "string", "minLength": 1 },
         "generationIndex": { "type": "integer", "minimum": 0 },
-        "generationHash": { "$ref": "#/$defs/hash" }
+        "generationHash": { "$ref": "#/$defs/hash" },
+        "generationMode": { "enum": ["creative-divergence", "engineering", "stable"] },
+        "innovationAxis": { "type": "string", "minLength": 1 },
+        "hidden": { "const": false },
+        "pruningPolicy": { "type": "string", "minLength": 1 }
       }
     },
     "audit": {

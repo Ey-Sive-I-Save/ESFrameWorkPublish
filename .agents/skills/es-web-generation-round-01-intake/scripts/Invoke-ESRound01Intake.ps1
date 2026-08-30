@@ -15,6 +15,7 @@ $interpretation=$null
 if([string]::IsNullOrWhiteSpace($AiInterpretationPath)){throw 'blocked.round-01.ai-interpretation-required'}
 if($AiInterpretationPath){
   $ip=[IO.Path]::GetFullPath((Join-Path $root $AiInterpretationPath))
+  if(-not $ip.StartsWith($root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'blocked.round-01.ai-interpretation-path-boundary'}
   if(-not(Test-Path -LiteralPath $ip -PathType Leaf)){throw 'blocked.round-01.ai-interpretation-missing'}
   $interpretation=([Text.UTF8Encoding]::new($false,$true).GetString([IO.File]::ReadAllBytes($ip))|ConvertFrom-Json)
   foreach($field in @('objectiveBrief','userGoals','nonGoals','acceptanceSignals','unknowns','interactionIntent','analysis','execution','returnReceipt','provenance')){if($null -eq $interpretation.PSObject.Properties[$field] -or [string]::IsNullOrWhiteSpace([string]$interpretation.$field)){throw "blocked.round-01.ai-interpretation-incomplete:$field"}}

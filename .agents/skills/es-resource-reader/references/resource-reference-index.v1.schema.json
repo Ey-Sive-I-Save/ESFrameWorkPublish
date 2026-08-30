@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-resource-reader.reference-index.v1",
+  "type": "object",
+  "required": ["schemaVersion", "indexId", "capturedUtc", "projectionCount", "guidCount", "edgeCount", "references", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "indexId": {"const": "es-resource-reader.reference-index.v1"},
+    "capturedUtc": {"type": "string", "minLength": 1},
+    "projectionCount": {"type": "integer", "minimum": 0},
+    "guidCount": {"type": "integer", "minimum": 0},
+    "edgeCount": {"type": "integer", "minimum": 0},
+    "invalidProjectionCount": {"type": "integer", "minimum": 0},
+    "references": {"type": "array", "items": {"type": "object", "required": ["guid", "referenceCount", "references"], "properties": {"guid": {"type": "string", "pattern": "^[a-f0-9]{32}$"}, "referenceCount": {"type": "integer", "minimum": 0}, "references": {"type": "array", "items": {"type": "object", "required": ["sourcePath", "sourceSha256", "objectStableId"], "properties": {"sourcePath": {"type": "string", "minLength": 1}, "sourceSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "objectStableId": {"type": "string", "minLength": 1}}, "additionalProperties": false}}}, "additionalProperties": false}},
+    "nonClaims": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

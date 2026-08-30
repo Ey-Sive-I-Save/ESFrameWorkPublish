@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-markup-batch.v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "parserId", "elapsedMilliseconds", "items"],
+  "properties": {
+    "status": {"const": "passed"},
+    "parserId": {"const": "markup.batch.v1"},
+    "elapsedMilliseconds": {"type": "number", "minimum": 0},
+    "items": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["status", "path"],
+        "properties": {
+          "status": {"enum": ["passed", "failed"]},
+          "path": {"type": "string", "minLength": 1},
+          "parserId": {"enum": ["yaml.batch.v1", "html.batch.v1", "markdown.batch.v1", "xml.batch.v1", "unity-yaml.batch.v1"]},
+          "summary": {"type": "object", "additionalProperties": true},
+          "entries": {"type": "array", "maxItems": 200},
+          "error": {"type": "string", "minLength": 1}
+        },
+        "allOf": [
+          {"if": {"properties": {"status": {"const": "passed"}}, "required": ["status"]},
+           "then": {"required": ["parserId", "summary", "entries"]}},
+          {"if": {"properties": {"status": {"const": "failed"}}, "required": ["status"]},
+           "then": {"required": ["error"]}}
+        ]
+      }
+    }
+  }
+}

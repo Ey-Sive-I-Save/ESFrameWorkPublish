@@ -1,0 +1,23 @@
+[CmdletBinding()]
+param([string]$ProjectRoot='.')
+$ErrorActionPreference='Stop'
+$root=(Resolve-Path $ProjectRoot).Path
+$data=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESResourceReaderCatalogRegistryData.cs'
+$importer=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESResourceReaderCatalogRegistryImporter.cs'
+$diffData=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESResourceReaderCatalogDiffData.cs'
+$diffImporter=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESResourceReaderCatalogDiffImporter.cs'
+$shardData=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESResourceReaderReferenceShardManifestData.cs'
+$shardImporter=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESResourceReaderReferenceShardManifestImporter.cs'
+$window=Join-Path $root 'Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/ESAssetPackageBakeWindow.cs'
+$issues=New-Object Collections.Generic.List[string]
+foreach($p in @($data,$importer,$diffData,$diffImporter,$shardData,$shardImporter,$window)){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){$issues.Add("missing: $p")}}
+if(Test-Path -LiteralPath $data){$t=Get-Content -LiteralPath $data -Raw -Encoding UTF8; foreach($needle in @('ESResourceReaderCatalogRegistryData','CreateAssetMenu','ComputeRegistryHash','IsValid','Seal','LabelText(' ,'sourceId')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("data missing token: $needle")}}}
+if(Test-Path -LiteralPath $importer){$t=Get-Content -LiteralPath $importer -Raw -Encoding UTF8; foreach($needle in @('ImportSelectedCatalog','CreateFromCatalogFile','sourceId','sourceIndexPath','AssetDatabase.SaveAssets')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("importer missing token: $needle")}}}
+if(Test-Path -LiteralPath $diffData){$t=Get-Content -LiteralPath $diffData -Raw -Encoding UTF8; foreach($needle in @('ESResourceReaderCatalogDiffData','ComputeObjectHash','IsValid','Seal','addedCount','changedCount','LabelText(')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("diff data missing token: $needle")}}}
+if(Test-Path -LiteralPath $diffImporter){$t=Get-Content -LiteralPath $diffImporter -Raw -Encoding UTF8; foreach($needle in @('ImportSelectedDiff','CreateFromDiffFile','AssetDatabase.SaveAssets','catalog-diff.asset')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("diff importer missing token: $needle")}}}
+if(Test-Path -LiteralPath $shardData){$t=Get-Content -LiteralPath $shardData -Raw -Encoding UTF8; foreach($needle in @('ESResourceReaderReferenceShardManifestData','ComputeObjectHash','IsValid','Seal','prefixLength','LabelText(')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("shard data missing token: $needle")}}}
+if(Test-Path -LiteralPath $shardImporter){$t=Get-Content -LiteralPath $shardImporter -Raw -Encoding UTF8; foreach($needle in @('ImportSelectedManifest','RefreshSelectedManifest','CreateFromManifestFile','AssetDatabase.SaveAssets','reference-shards.asset')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("shard importer missing token: $needle")}}}
+if(Test-Path -LiteralPath $window){$t=Get-Content -LiteralPath $window -Raw -Encoding UTF8; foreach($needle in @('asset-package.import-reader-catalog-registry','DrawReaderCatalogRegistrySummary','ResolveReaderCatalogSourcePath','readerCatalogRegistryStaleCount','asset-package.open-reader-reference-index','LocateReaderReferenceIndex','DrawReaderReferenceFilters','LocateReaderReferenceSource','ESReaderReferenceIndexDto','asset-package.open-reader-reference-catalog','LocateReaderReferenceCatalog','DrawReaderReferenceCatalogFilters','ReadProjectOutputText','MatchOrUnknown','ESReaderReferenceCatalogDto','resource-reference-catalog-diff.json','DrawReaderReferenceDiffDetails','DrawReaderReferenceDiffGroup','ESReaderReferenceDiffDto','DrawReaderReferenceShardFastPath','readerShardCache','ESReaderShardManifestDto','asset-package.import-reader-reference-shards','asset-package.refresh-reader-reference-shards','ESResourceReaderReferenceShardManifestImporter')){if($t.IndexOf($needle,[StringComparison]::Ordinal) -lt 0){$issues.Add("window missing token: $needle")}}}
+$out=[ordered]@{validator='Test-ESResourceReaderCatalogRegistry';valid=($issues.Count -eq 0);issueCount=$issues.Count;issues=$issues;runtimeStatus='runtime-not-run'}
+$out|ConvertTo-Json -Depth 6
+if($issues.Count){exit 1}else{exit 0}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schemaVersion", "revision", "sites"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "sites": {"type": "array", "items": {"type": "object", "required": ["siteId", "status", "updatedAtUtc"], "properties": {"siteId": {"type": "string", "minLength": 1}, "displayName": {"type": "string"}, "categories": {"type": "array", "items": {"type": "string"}}, "status": {"enum": ["active", "removed"]}, "updatedAtUtc": {"type": "string", "format": "date-time"}, "reason": {"type": "string"}}, "additionalProperties": false}}
+  },
+  "additionalProperties": false
+}

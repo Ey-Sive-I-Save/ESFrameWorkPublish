@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Resource Collection"
+  short_description: "收集、分组、校验并为 AssetPackage 准备可回滚资源输入"
+  default_prompt: "使用 $es-resource-collection 规划或执行受边界约束的项目资源收集、去重、分类与 AssetPackage 聚合。"

@@ -1,0 +1,5 @@
+[CmdletBinding()]
+param([string]$IndexPath='ES/Output/ResourceReader/resource-reference-index.json',[string]$Guid,[string]$SourcePath='',[int]$MaxResults=256)
+$ErrorActionPreference='Stop'; if([string]::IsNullOrWhiteSpace($Guid) -or $Guid -notmatch '^[0-9a-fA-F]{32}$'){throw 'Guid must be a 32-character hexadecimal value'}; $index=Get-Content -LiteralPath (Resolve-Path -LiteralPath $IndexPath) -Raw -Encoding UTF8|ConvertFrom-Json; if($index.indexId -ne 'es-resource-reader.reference-index.v1'){throw 'invalid reference index'}
+$key=$Guid.ToLowerInvariant(); $hit=@($index.references|Where-Object {$_.guid -eq $key}|ForEach-Object {$_.references}|Where-Object {[string]::IsNullOrWhiteSpace($SourcePath) -or $_.sourcePath -like $SourcePath}|Sort-Object sourcePath,objectStableId|Select-Object -First ([Math]::Max(1,$MaxResults)))
+[ordered]@{queryId='es-resource-reader.reference-query.v1';guid=$key;matchedCount=$hit.Count;references=$hit;nonClaims=@('semantic completeness','Unity import','runtime behavior')}|ConvertTo-Json -Depth 10

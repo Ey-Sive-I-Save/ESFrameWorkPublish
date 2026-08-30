@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-resource-collection",
+  "sourceRoots": [".agents/skills/es-resource-collection"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["structure", "governance", "collection-contract", "deep-json-schema", "assetpackage-boundary", "deterministic-replay"],
+  "runtimeClaimsNotProven": ["Unity import", "network download", "AssetPackage window behavior", "Provider/Manifest runtime", "Player/IL2CPP/release"],
+  "runtimeEscalation": {"required": false, "reason": "External execution is required for runtime claims."},
+  "responsibilityProfile": "authoring",
+  "responsibilityChecks": ["change-boundary", "resource-projection", "deterministic-replay", "evidence-contract"],
+  "responsibilityScope": "Static acceptance for bounded collection authoring and AssetPackage projection; it does not authorize import, movement, download, runtime loading, or release.",
+  "caseAssertions": {
+    "normal-input": "valid collection descriptors produce stable group and item identities",
+    "invalid-input": "invalid paths, missing provenance, and malformed identities are rejected",
+    "denied-expansion": "download, import, move, delete, build, and publish expansion is denied",
+    "repeat-idempotency": "same input fingerprint replays to the same snapshot",
+    "hash-change-cache-invalidation": "changed source or dependency hashes invalidate stale state",
+    "interruption-recovery": "staging interruption preserves transaction and rollback state",
+    "deterministic-output": "items, dependencies, and decisions are emitted in stable order",
+    "deep-json-schema": "valid fixture passes and malformed fixture fails closed with actionable errors"
+  }
+}

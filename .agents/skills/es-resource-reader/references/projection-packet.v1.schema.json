@@ -1,0 +1,9 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es-resource-reader.projection-packet.v1",
+  "type":"object","additionalProperties":false,
+  "required":["projectionVersion","sourcePath","sourceSha256","parserId","detectedFormat","summary","entries","warnings","errors","nonClaims"],
+  "properties":{
+    "projectionVersion":{"const":1},"sourcePath":{"type":"string","minLength":1},"sourceSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},"parserId":{"type":"string","pattern":"^[a-z0-9.-]+$"},"detectedFormat":{"type":"string","minLength":1},"summary":{"type":"object"},"entries":{"type":"array"},"warnings":{"type":"array","items":{"type":"string"}},"errors":{"type":"array","items":{"type":"string"}},"nonClaims":{"type":"array","items":{"type":"string"}},"projectionHash":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}

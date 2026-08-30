@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "groupId": "example-core",
+  "groupName": "Example Core",
+  "lifecycleState": "Verified",
+  "authorityStage": "ProvenanceVerified",
+  "source": {"sourceId":"example-source","sourceKind":"local","sourceReference":"fixtures/example","provenance":"ESFramework sample","license":"internal-sample","observedUtc":"2026-08-30T00:00:00Z","sizeBytes":12,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "classification": "editor-asset",
+  "deliveryIntent": "assetpackage-candidate",
+  "targetPath": "Assets/ES/Resources",
+  "items": [{"itemId":"mat-a","guid":"0123456789abcdef0123456789abcdef","localFileId":1,"contentSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","dependencySha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","assetType":"Material","relativePath":"Materials/mat-a.mat"}],
+  "dependencies": [],
+  "verification": {"status":"verified","checks":["utf8","schema","provenance"],"receiptId":"receipt-example"},
+  "rollback": {"transactionId":"tx-example","status":"not-started"}
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-resource-collection-batch.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "batchId", "root", "maxParallel", "effectiveParallel", "fileCount", "reusedCount", "parsedCount", "canceled", "files", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "batchId": {"const": "es-resource-collection.batch.v1"},
+    "root": {"type": "string", "minLength": 1},
+    "maxParallel": {"type": "integer", "minimum": 1, "maximum": 32},
+    "effectiveParallel": {"type": "integer", "minimum": 1, "maximum": 32},
+    "autoParallel": {"type": "boolean"},
+    "parallelReason": {"type": "string", "minLength": 1},
+    "maxFiles": {"type": "integer", "minimum": 1, "maximum": 10000},
+    "maxTotalBytes": {"type": "integer", "minimum": 1048576, "maximum": 1073741824},
+    "totalBytes": {"type": "integer", "minimum": 0},
+    "delimitedBatchElapsedMilliseconds": {"type": "number", "minimum": 0},
+    "fileCount": {"type": "integer", "minimum": 0},
+    "reusedCount": {"type": "integer", "minimum": 0},
+    "parsedCount": {"type": "integer", "minimum": 0},
+    "failedCount": {"type": "integer", "minimum": 0},
+    "incrementalHitRate": {"type": "number", "minimum": 0, "maximum": 1},
+    "elapsedMilliseconds": {"type": "integer", "minimum": 0},
+    "filesPerSecond": {"type": "number", "minimum": 0},
+    "canceled": {"type": "boolean"},
+    "files": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256", "status", "projection"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "status": {"enum": ["parsed", "reused", "failed"]}, "error": {"type": "string"}, "projection": {"type": ["object", "null"]}}}},
+    "nonClaims": {"type": "array", "items": {"type": "string"}}
+  }
+}

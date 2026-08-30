@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-resource-reader.resource-catalog.v1",
+  "type": "object",
+  "required": ["schemaVersion", "catalogId", "capturedUtc", "sourceCount", "itemCount", "sources", "items", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "catalogId": {"const": "es-resource-reader.resource-catalog.v1"},
+    "capturedUtc": {"type": "string", "minLength": 1},
+    "sourceCount": {"type": "integer", "minimum": 0},
+    "itemCount": {"type": "integer", "minimum": 0},
+    "sources": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "items": {"type": "array", "items": {"type": "object", "required": ["globalKey", "sourceId", "sourceIndexPath", "sourcePath", "sourceSha256", "detectedFormat", "parserId", "parserVersion", "byteCount", "entryCount", "status"], "properties": {"globalKey": {"type": "string", "minLength": 1}, "sourceId": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$"}, "sourceIndexPath": {"type": "string", "minLength": 1}, "sourcePath": {"type": "string", "minLength": 1}, "sourceSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "detectedFormat": {"type": "string", "minLength": 1}, "parserId": {"type": "string", "minLength": 1}, "parserVersion": {"type": "string", "minLength": 1}, "byteCount": {"type": "integer", "minimum": 0}, "entryCount": {"type": "integer", "minimum": 0}, "status": {"enum": ["ready", "error"]}}, "additionalProperties": false}},
+    "nonClaims": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Resource Reader"
+  short_description: "通过有界解析、缓存与格式路由为 AI 生成稳定资源投影"
+  default_prompt: "使用 $es-resource-reader 读取并投影 JSON、表格、HTML、bytes 和 Unity 资源。"

@@ -1,0 +1,9 @@
+[CmdletBinding()]
+param([string]$ManifestPath='ES/Output/ResourceReader/reference-shards/manifest.json',[string]$GuidPrefix='',[string]$SourceId='',[int]$MaxResults=64)
+$ErrorActionPreference='Stop';if($MaxResults -lt 1 -or $MaxResults -gt 4096){throw 'MaxResults must be between 1 and 4096'}
+$manifestFull=(Resolve-Path -LiteralPath $ManifestPath).Path;$manifest=Get-Content -LiteralPath $manifestFull -Raw -Encoding UTF8|ConvertFrom-Json
+if($manifest.manifestId -ne 'es-resource-reader.reference-catalog-shards.v1'){throw 'invalid shard manifest'}
+$prefix=([string]$GuidPrefix).Trim().ToLowerInvariant();if($prefix -and $prefix -notmatch '^[0-9a-f]+$'){throw 'GuidPrefix must be hexadecimal'}
+$base=Split-Path $manifestFull -Parent;$projectRoot=(Get-Item -LiteralPath $base).Parent.Parent.Parent.Parent.FullName;$shards=@($manifest.shards|Where-Object {(-not $prefix) -or ([string]$_.prefix).StartsWith($prefix.Substring(0,[Math]::Min($manifest.prefixLength,$prefix.Length)),[StringComparison]::OrdinalIgnoreCase)})
+$groups=@();foreach($s in $shards){$full=Join-Path $projectRoot ([string]$s.path);if(-not(Test-Path -LiteralPath $full)){continue};$obj=Get-Content -LiteralPath $full -Raw -Encoding UTF8|ConvertFrom-Json;foreach($g in @($obj.references)){if($prefix -and -not([string]$g.guid).StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){continue};$items=@($g.references|Where-Object {-not $SourceId -or $_.sourceId -eq $SourceId});if($items.Count){$groups+=[ordered]@{guid=$g.guid;referenceCount=$items.Count;references=$items}}}}
+$groups=@($groups|Sort-Object guid|Select-Object -First $MaxResults);[ordered]@{queryId='es-resource-reader.reference-catalog-shard-query.v1';manifestSha256=(Get-FileHash -LiteralPath $manifestFull -Algorithm SHA256).Hash.ToLowerInvariant();guidPrefix=$prefix;sourceId=$SourceId;matchedCount=$groups.Count;maxResults=$MaxResults;references=$groups;runtimeStatus='runtime-not-run'}|ConvertTo-Json -Depth 14

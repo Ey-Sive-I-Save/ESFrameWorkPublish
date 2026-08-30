@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es-resource-reader.reference-catalog-diff.v1",
+  "type":"object",
+  "required":["schemaVersion","diffId","capturedUtc","baselineSha256","currentSha256","addedCount","removedCount","changedCount","maxItems","added","removed","changed","nonClaims"],
+  "properties":{
+    "schemaVersion":{"const":1},"diffId":{"const":"es-resource-reader.reference-catalog-diff.v1"},"capturedUtc":{"type":"string","minLength":1},
+    "baselineSha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},"currentSha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "addedCount":{"type":"integer","minimum":0},"removedCount":{"type":"integer","minimum":0},"changedCount":{"type":"integer","minimum":0},"maxItems":{"type":"integer","minimum":1,"maximum":4096},
+    "added":{"type":"array"},"removed":{"type":"array"},"changed":{"type":"array"},"nonClaims":{"type":"array","items":{"type":"string"}}
+  },
+  "additionalProperties":false
+}

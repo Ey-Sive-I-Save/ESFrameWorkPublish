@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-resource-reader",
+  "maxReferenceDepth": 2,
+  "maxReads": 256,
+  "maxTotalBytes": 536870912,
+  "parsers": {
+    "json": {"parserId":"json.v1","contract":"json-reader.contract.md"},
+    "csv": {"parserId":"table.csv.v1","contract":"table-reader.contract.md"},
+    "tsv": {"parserId":"table.tsv.v1","contract":"table-reader.contract.md"},
+    "html": {"parserId":"html.v1","contract":"html-reader.contract.md"},
+    "bytes": {"parserId":"bytes.probe.v1","contract":"bytes-reader.contract.md"},
+    "unityyaml": {"parserId":"unity-yaml.v1","contract":"bytes-reader.contract.md"},
+    "unitypackage": {"parserId":"unitypackage.python-tar.v1","contract":"bytes-reader.contract.md"},
+    "yaml": {"parserId":"yaml.v1","contract":"bytes-reader.contract.md"},
+    "jsonl": {"parserId":"jsonl.v1","contract":"json-reader.contract.md"},
+    "markdown": {"parserId":"markdown.v1","contract":"json-reader.contract.md"},
+    "xml": {"parserId":"xml.v1","contract":"json-reader.contract.md"},
+    "log": {"parserId":"log.v1","contract":"bytes-reader.contract.md"},
+    "archive": {"parserId":"archive-probe.v1","contract":"bytes-reader.contract.md"}
+    ,"xlsx": {"parserId":"xlsx.probe.v1","contract":"bytes-reader.contract.md"}
+    ,"pdf": {"parserId":"pdf.probe.v1","contract":"bytes-reader.contract.md"}
+    ,"media": {"parserId":"media.probe.v1","contract":"bytes-reader.contract.md"}
+    ,"sqlite": {"parserId":"sqlite.probe.v1","contract":"structured-reader.contract.md"}
+    ,"toml": {"parserId":"toml.probe.v1","contract":"structured-reader.contract.md"}
+    ,"ini": {"parserId":"ini.probe.v1","contract":"structured-reader.contract.md"}
+    ,"zip": {"parserId":"zip.probe.v1","contract":"structured-reader.contract.md"}
+  },
+  "cacheRoot": "ES/Output/FileProjectionCache",
+  "requiredFields": ["sourceSha256","parserId","projectionVersion","detectedFormat","summary","warnings","errors","nonClaims"],
+  "failurePolicy": "fail-closed"
+}

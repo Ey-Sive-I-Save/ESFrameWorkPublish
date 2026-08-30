@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-resource-group-state.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "groupId", "groupName", "lifecycleState", "authorityStage", "source", "classification", "deliveryIntent", "targetPath", "items", "dependencies", "verification", "rollback"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "groupId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+    "groupName": {"type": "string", "minLength": 1},
+    "lifecycleState": {"enum": ["Discovered", "Verified", "Classified", "Staged", "ReadyForAggregation", "NeedsReview", "Quarantined", "Failed", "Canceled"]},
+    "authorityStage": {"enum": ["Unverified", "ProvenanceVerified", "UserAuthorized", "AssetPackageAccepted"]},
+    "source": {"type": "object", "additionalProperties": false, "required": ["sourceId", "sourceKind", "sourceReference", "provenance", "license", "observedUtc"], "properties": {"sourceId": {"type": "string", "minLength": 1}, "sourceKind": {"enum": ["local", "network", "unitypackage", "aispace"]}, "sourceReference": {"type": "string", "minLength": 1}, "provenance": {"type": "string", "minLength": 1}, "license": {"type": "string", "minLength": 1}, "observedUtc": {"type": "string", "format": "date-time"}, "sizeBytes": {"type": "integer", "minimum": 0}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "classification": {"type": "string", "minLength": 1}, "deliveryIntent": {"type": "string", "minLength": 1}, "targetPath": {"type": "string"},
+    "items": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["itemId", "guid", "localFileId", "contentSha256", "dependencySha256", "assetType", "relativePath"], "properties": {"itemId": {"type": "string", "minLength": 1}, "guid": {"type": "string", "pattern": "^[0-9a-fA-F]{32}$"}, "localFileId": {"type": "integer", "minimum": 0}, "contentSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "dependencySha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "assetType": {"type": "string", "minLength": 1}, "relativePath": {"type": "string", "minLength": 1}, "dependencies": {"type": "array", "items": {"type": "string"}}}}},
+    "dependencies": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to"], "properties": {"from": {"type": "string"}, "to": {"type": "string"}}}},
+    "verification": {"type": "object", "additionalProperties": false, "required": ["status", "checks"], "properties": {"status": {"enum": ["unverified", "verified", "needs-review", "failed"]}, "checks": {"type": "array", "items": {"type": "string"}}, "receiptId": {"type": "string"}}},
+    "rollback": {"type": "object", "additionalProperties": false, "required": ["transactionId"], "properties": {"transactionId": {"type": "string", "minLength": 1}, "status": {"type": "string"}}}
+  }
+}

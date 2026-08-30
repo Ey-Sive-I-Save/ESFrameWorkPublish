@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"es-resource-collection-batch-perf.v1",
+  "type":"object","additionalProperties":false,
+  "required":["schemaVersion","benchmarkId","root","statePath","maxFiles","maxParallel","autoParallel","cold","incremental","speedupRatio","runtimeStatus","nonClaims"],
+  "properties":{
+    "schemaVersion":{"const":1},"benchmarkId":{"const":"es-resource-collection.batch-perf.v1"},
+    "root":{"type":"string","minLength":1},"packageId":{"type":"string"},"statePath":{"type":"string","minLength":1},
+    "maxFiles":{"type":"integer","minimum":1},"maxParallel":{"type":"integer","minimum":1,"maximum":32},"autoParallel":{"type":"boolean"},"schedulePath":{"type":"string"},
+    "cold":{"$ref":"#/$defs/phase"},"incremental":{"$ref":"#/$defs/phase"},"speedupRatio":{"type":"number","minimum":0},"runtimeStatus":{"const":"runtime-not-run"},"nonClaims":{"type":"array","items":{"type":"string"}}
+  },
+  "$defs":{"phase":{"type":"object","additionalProperties":false,"required":["fileCount","effectiveParallel","elapsedMilliseconds","filesPerSecond","failedCount"],"properties":{"fileCount":{"type":"integer","minimum":0},"effectiveParallel":{"type":"integer","minimum":1,"maximum":32},"elapsedMilliseconds":{"type":"integer","minimum":0},"filesPerSecond":{"type":"number","minimum":0},"hitRate":{"type":"number","minimum":0,"maximum":1},"failedCount":{"type":"integer","minimum":0}}}}
+}

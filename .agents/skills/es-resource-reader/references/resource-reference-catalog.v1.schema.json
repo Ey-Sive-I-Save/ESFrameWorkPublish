@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-resource-reader.reference-catalog.v1",
+  "type": "object",
+  "required": ["schemaVersion", "catalogId", "capturedUtc", "sourceCount", "guidCount", "edgeCount", "conflictCount", "conflicts", "changeSummary", "references", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "catalogId": {"const": "es-resource-reader.reference-catalog.v1"},
+    "capturedUtc": {"type": "string", "minLength": 1},
+    "sourceCount": {"type": "integer", "minimum": 0},
+    "guidCount": {"type": "integer", "minimum": 0},
+    "edgeCount": {"type": "integer", "minimum": 0},
+    "conflictCount": {"type": "integer", "minimum": 0},
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["guid", "sourceCount", "hashCount", "hashes", "paths"],
+        "properties": {
+          "guid": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "sourceCount": {"type": "integer", "minimum": 1},
+          "hashCount": {"type": "integer", "minimum": 0},
+          "hashes": {"type": "array", "items": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+          "paths": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "changeSummary": {
+      "type": "object",
+      "required": ["baselinePresent", "baselineSha256", "addedCount", "removedCount", "changedCount"],
+      "properties": {
+        "baselinePresent": {"type": "boolean"},
+        "baselineSha256": {"type": "string"},
+        "addedCount": {"type": "integer", "minimum": 0},
+        "removedCount": {"type": "integer", "minimum": 0},
+        "changedCount": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["guid", "referenceCount", "references"],
+        "properties": {
+          "guid": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "referenceCount": {"type": "integer", "minimum": 0},
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["sourceId", "sourcePath", "sourceSha256", "objectStableId"],
+              "properties": {
+                "sourceId": {"type": "string", "minLength": 1},
+                "sourcePath": {"type": "string", "minLength": 1},
+                "sourceSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                "objectStableId": {"type": "string", "minLength": 1}
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "nonClaims": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

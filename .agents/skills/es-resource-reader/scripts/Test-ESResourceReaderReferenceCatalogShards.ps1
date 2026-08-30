@@ -1,0 +1,6 @@
+[CmdletBinding()]
+param([string]$ManifestPath='ES/Output/ResourceReader/reference-shards/manifest.json')
+$ErrorActionPreference='Stop';$full=(Resolve-Path -LiteralPath $ManifestPath).Path;$m=Get-Content -LiteralPath $full -Raw -Encoding UTF8|ConvertFrom-Json;$issues=New-Object Collections.Generic.List[string]
+if($m.manifestId -ne 'es-resource-reader.reference-catalog-shards.v1'){$issues.Add('invalid manifestId')};$shards=@($m.shards);if($m.shardCount -ne $shards.Count){$issues.Add('shardCount mismatch')};$seen=@{}
+foreach($s in $shards){if($seen.ContainsKey($s.prefix)){$issues.Add('duplicate prefix')}else{$seen[$s.prefix]=$true};if($s.sha256 -notmatch '^[a-f0-9]{64}$'){$issues.Add('invalid shard sha256')};$projectRoot=(Get-Item -LiteralPath (Split-Path $full -Parent)).Parent.Parent.Parent.Parent.FullName;$p=Join-Path $projectRoot ([string]$s.path);if(-not(Test-Path -LiteralPath $p)){$issues.Add("missing shard: $($s.prefix)")}}
+$out=[ordered]@{validator='Test-ESResourceReaderReferenceCatalogShards';valid=($issues.Count -eq 0);shardCount=$shards.Count;issueCount=$issues.Count;issues=$issues;runtimeStatus='runtime-not-run'};$out|ConvertTo-Json -Depth 8;if($issues.Count){exit 1}else{exit 0}

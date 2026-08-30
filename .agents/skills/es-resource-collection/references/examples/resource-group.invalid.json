@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "groupId": "../escape",
+  "groupName": "Invalid",
+  "lifecycleState": "Verified",
+  "authorityStage": "ProvenanceVerified",
+  "source": {"sourceId":"s","sourceKind":"local","sourceReference":"x","provenance":"","license":"unknown","observedUtc":"not-a-date"},
+  "classification": "editor-asset",
+  "deliveryIntent": "assetpackage-candidate",
+  "targetPath": "Assets",
+  "items": [{"itemId":"z","guid":"0123456789abcdef0123456789abcdef","localFileId":1,"contentSha256":"bad","dependencySha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","assetType":"Material","relativePath":"../escape.mat"},{"itemId":"z","guid":"0123456789abcdef0123456789abcdef","localFileId":1,"contentSha256":"bad","dependencySha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","assetType":"Material","relativePath":"b.mat"}],
+  "dependencies": [{"from":"z","to":"missing"}],
+  "verification": {"status":"verified","checks":[]},
+  "rollback": {"transactionId":""}
+}

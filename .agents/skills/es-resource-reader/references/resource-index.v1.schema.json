@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es-resource-reader.resource-index.v1",
+  "type": "object",
+  "required": ["schemaVersion", "indexId", "projectRoot", "capturedUtc", "fileCount", "items", "nonClaims"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "indexId": {"const": "es-resource-reader.resource-index.v1"},
+    "projectRoot": {"type": "string", "minLength": 1},
+    "capturedUtc": {"type": "string", "minLength": 1},
+    "fileCount": {"type": "integer", "minimum": 0},
+    "maxFiles": {"type": "integer", "minimum": 1},
+    "maxParallel": {"type": "integer", "minimum": 1},
+    "reparsedCount": {"type": "integer", "minimum": 0},
+    "reusedCount": {"type": "integer", "minimum": 0},
+    "removedCount": {"type": "integer", "minimum": 0},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sourcePath", "sourceSha256", "detectedFormat", "parserId", "parserVersion", "byteCount", "entryCount", "warningCount", "errorCount", "status"],
+        "properties": {
+          "sourcePath": {"type": "string", "minLength": 1},
+          "sourceSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "detectedFormat": {"type": "string", "minLength": 1},
+          "parserId": {"type": "string", "minLength": 1},
+          "parserVersion": {"type": "string", "minLength": 1},
+          "byteCount": {"type": "integer", "minimum": 0},
+          "entryCount": {"type": "integer", "minimum": 0},
+          "objectCount": {"type": "integer", "minimum": 0},
+          "dependencyCount": {"type": "integer", "minimum": 0},
+          "warningCount": {"type": "integer", "minimum": 0},
+          "errorCount": {"type": "integer", "minimum": 0},
+          "status": {"enum": ["ready", "error"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "nonClaims": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

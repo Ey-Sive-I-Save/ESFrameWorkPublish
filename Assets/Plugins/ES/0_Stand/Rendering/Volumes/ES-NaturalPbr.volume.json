@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1, "volumeId": "es.urp.volume.NaturalPbr", "style": "NaturalPbr",
+  "postExposure": 0.0, "bloomIntensity": 0.15, "contrast": 1.0,
+  "toneMapping": "Neutral", "ambientOcclusion": true, "depthOfField": false, "vignette": 0.05
+}

@@ -13,8 +13,11 @@ namespace ES
     /// </summary>
     internal sealed class ESAssetPackagePreviewSession : IDisposable
     {
-        private readonly ESEditorPreviewRenderContext renderContext;
+        private readonly ESEditorPreviewSceneMode sceneMode;
+        private ESEditorPreviewEnhancerSet enhancerSet;
+        private ESEditorPreviewRenderContext renderContext;
         private bool disposed;
+        private string lastFailureReason;
         private readonly List<GameObject> markedInstances = new List<GameObject>(4);
         private AudioListener audioListener;
         private bool audioListenerPlaying;
@@ -23,18 +26,26 @@ namespace ES
             ESEditorPreviewSceneMode sceneMode,
             ESEditorPreviewEnhancerSet enhancerSet = ESEditorPreviewEnhancerSet.Full)
         {
-            renderContext = new ESEditorPreviewRenderContext("ES AssetPackage", sceneMode,
-                ESEditorPreviewUtility.DefaultPreviewLayer, enhancerSet);
+            this.sceneMode = sceneMode;
+            this.enhancerSet = enhancerSet;
+            renderContext = CreateRenderContext();
         }
 
         public Vector3 GroupOrigin => renderContext.GroupOrigin;
-        public bool IsReady => !disposed && renderContext.IsReady;
-        public bool IsDisposed => disposed || renderContext.IsDisposed;
-        public bool UsePreviewScene => renderContext.SceneMode == ESEditorPreviewSceneMode.PreviewScene;
-        public ESEditorPreviewEnhancerSet EnhancerSet => renderContext.EnhancerSet;
-        public string LastStatus => disposed ? "AssetPackage preview session disposed." : renderContext.LastStatus;
-        public string IsolationReport => renderContext.IsolationReport;
-        public string LastObjectFlowStatus => renderContext.LastObjectFlowStatus;
+        public bool IsReady => !disposed && renderContext != null && renderContext.IsReady;
+        public bool IsDisposed => disposed || renderContext == null || renderContext.IsDisposed;
+        public bool UsePreviewScene => sceneMode == ESEditorPreviewSceneMode.PreviewScene;
+        public ESEditorPreviewEnhancerSet EnhancerSet => renderContext != null ? renderContext.EnhancerSet : enhancerSet;
+        public string LastStatus => disposed
+            ? "AssetPackage preview session disposed."
+            : !string.IsNullOrEmpty(lastFailureReason) ? "AssetPackage preview failed: " + lastFailureReason
+            : renderContext != null ? renderContext.LastStatus : "AssetPackage preview context not created.";
+        public string IsolationReport => renderContext != null ? renderContext.IsolationReport : "AssetPackage preview context not created.";
+        public string LastObjectFlowStatus => renderContext != null
+            ? renderContext.LastObjectFlowStatus
+            : "AssetPackage preview context not created.";
+        public bool IsSceneBindingHealthy => !disposed && renderContext != null && renderContext.IsSceneBindingHealthy;
+        public string SceneBindingStatus => renderContext != null ? renderContext.SceneBindingStatus : "AssetPackage preview context not created.";
         public bool CleanupMarkerAvailable => GetLiveMarkedCount() > 0;
         public string LastMarkerStatus => CleanupMarkerAvailable ? "公共 Preview ownership marker 已登记。" : "尚未登记预览对象。";
         public int MarkedObjectCount => GetLiveMarkedCount();
@@ -44,13 +55,36 @@ namespace ES
         public void Ensure()
         {
             ThrowIfDisposed();
+            EnsureRenderContext();
             renderContext.Ensure();
+            RebindMarkedInstances();
+        }
+
+        public bool TryEnsure(out string failureReason)
+        {
+            try
+            {
+                Ensure();
+                lastFailureReason = null;
+                failureReason = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failureReason = exception.GetBaseException().Message;
+                lastFailureReason = failureReason;
+                return false;
+            }
         }
 
         public bool TryConfigureEnhancers(ESEditorPreviewEnhancerSet set)
         {
             ThrowIfDisposed();
-            return renderContext.TryConfigureEnhancers(set);
+            EnsureRenderContext();
+            bool configured = renderContext.TryConfigureEnhancers(set);
+            if (configured)
+                enhancerSet = set;
+            return configured;
         }
 
         public bool PreparePreviewObject(GameObject instance)
@@ -63,19 +97,35 @@ namespace ES
             if (EditorUtility.IsPersistent(instance))
                 return false;
 
-            instance.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
-            bool prepared = renderContext.PreparePreviewObject(instance, "AssetPackage preview model.", samplingTarget: true);
-            instance.transform.position = GroupOrigin;
-            if (!prepared)
+            if (!TryEnsure(out _))
                 return false;
-            markedInstances.Add(instance);
-            return true;
+
+            try
+            {
+                instance.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                bool prepared = renderContext.PreparePreviewObject(instance, "AssetPackage preview model.", samplingTarget: true);
+                instance.transform.position = GroupOrigin;
+                if (!prepared)
+                {
+                    lastFailureReason = renderContext.LastObjectFlowStatus;
+                    return false;
+                }
+                if (!markedInstances.Contains(instance))
+                    markedInstances.Add(instance);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                lastFailureReason = exception.GetBaseException().Message;
+                return false;
+            }
         }
 
         public AudioListener EnsurePreviewAudioListener()
         {
             ThrowIfDisposed();
-            Ensure();
+            if (!TryEnsure(out string ensureError))
+                throw new InvalidOperationException("预览上下文不可用：" + ensureError);
             if (audioListener != null)
                 return audioListener;
 
@@ -90,6 +140,8 @@ namespace ES
                 if (audioListener == null)
                     throw new InvalidOperationException("无法创建预览 AudioListener。");
                 audioListener.enabled = false;
+                if (!markedInstances.Contains(listenerObject))
+                    markedInstances.Add(listenerObject);
                 return audioListener;
             }
             catch
@@ -134,20 +186,31 @@ namespace ES
             float zoom,
             ESAssetPackagePreviewBaselinePlatform baselinePlatform)
         {
-            ThrowIfDisposed();
+            try
+            {
+                ThrowIfDisposed();
 
-            ESEditorPreviewQuality quality = baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Fast
-                ? ESEditorPreviewQuality.Fast
-                : baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Mobile
-                    ? ESEditorPreviewQuality.Balanced
-                    : ESEditorPreviewQuality.High;
+                ESEditorPreviewQuality quality = baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Fast
+                    ? ESEditorPreviewQuality.Fast
+                    : baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Mobile
+                        ? ESEditorPreviewQuality.Balanced
+                        : ESEditorPreviewQuality.High;
 
-            TryConfigureEnhancers(ESEditorPreviewEnhancerBudgets.ForQuality(quality));
-            Ensure();
+                TryConfigureEnhancers(ESEditorPreviewEnhancerBudgets.ForQuality(quality));
+                if (!TryEnsure(out _))
+                    return null;
 
-            Vector3 localCenter = renderContext.WorldToPreviewLocalPoint(worldCenter);
-            ESEditorPreviewCameraPose pose = renderContext.CreateCameraPose(localCenter, radius, yaw, pitch, zoom);
-            return renderContext.Snapshot(width, height, pose, quality, "ES AssetPackage Preview Snapshot");
+                Vector3 localCenter = renderContext.WorldToPreviewLocalPoint(worldCenter);
+                ESEditorPreviewCameraPose pose = renderContext.CreateCameraPose(localCenter, radius, yaw, pitch, zoom);
+                Texture2D snapshot = renderContext.Snapshot(width, height, pose, quality, "ES AssetPackage Preview Snapshot");
+                lastFailureReason = snapshot == null ? renderContext.LastStatus : null;
+                return snapshot;
+            }
+            catch (Exception exception)
+            {
+                lastFailureReason = exception.GetBaseException().Message;
+                return null;
+            }
         }
 
         public bool Render(
@@ -161,17 +224,31 @@ namespace ES
             ESAssetPackagePreviewBaselinePlatform baselinePlatform,
             double minRenderInterval)
         {
-            ThrowIfDisposed();
-            ESEditorPreviewQuality quality = baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Fast
-                ? ESEditorPreviewQuality.Fast
-                : baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Mobile
-                    ? ESEditorPreviewQuality.Balanced
-                    : ESEditorPreviewQuality.High;
-            TryConfigureEnhancers(ESEditorPreviewEnhancerBudgets.ForQuality(quality));
-            Ensure();
-            Vector3 localCenter = renderContext.WorldToPreviewLocalPoint(worldCenter);
-            ESEditorPreviewCameraPose pose = renderContext.CreateCameraPose(localCenter, radius, yaw, pitch, zoom);
-            return renderContext.RenderGUI(rect, pose, new ESEditorPreviewRenderOptions(quality, renderScale, minRenderInterval));
+            try
+            {
+                ThrowIfDisposed();
+                ESEditorPreviewQuality quality = baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Fast
+                    ? ESEditorPreviewQuality.Fast
+                    : baselinePlatform == ESAssetPackagePreviewBaselinePlatform.Mobile
+                        ? ESEditorPreviewQuality.Balanced
+                        : ESEditorPreviewQuality.High;
+                TryConfigureEnhancers(ESEditorPreviewEnhancerBudgets.ForQuality(quality));
+                if (!TryEnsure(out _))
+                    return false;
+                Vector3 localCenter = renderContext.WorldToPreviewLocalPoint(worldCenter);
+                ESEditorPreviewCameraPose pose = renderContext.CreateCameraPose(localCenter, radius, yaw, pitch, zoom);
+                bool rendered = renderContext.RenderGUI(rect, pose, new ESEditorPreviewRenderOptions(quality, renderScale, minRenderInterval));
+                if (rendered)
+                    lastFailureReason = null;
+                else if (string.IsNullOrEmpty(lastFailureReason))
+                    lastFailureReason = renderContext.LastStatus;
+                return rendered;
+            }
+            catch (Exception exception)
+            {
+                lastFailureReason = exception.GetBaseException().Message;
+                return false;
+            }
         }
 
         public void Dispose()
@@ -179,8 +256,9 @@ namespace ES
             if (disposed)
                 return;
 
-            renderContext.Dispose();
-            disposed = renderContext.IsDisposed;
+            if (renderContext != null)
+                renderContext.Dispose();
+            disposed = renderContext == null || renderContext.IsDisposed;
             if (disposed)
             {
                 if (audioListener != null)
@@ -188,6 +266,62 @@ namespace ES
                 audioListener = null;
                 audioListenerPlaying = false;
                 markedInstances.Clear();
+            }
+        }
+
+        private ESEditorPreviewRenderContext CreateRenderContext()
+        {
+            return new ESEditorPreviewRenderContext(
+                "ES AssetPackage",
+                sceneMode,
+                ESEditorPreviewUtility.DefaultPreviewLayer,
+                enhancerSet);
+        }
+
+        private void EnsureRenderContext()
+        {
+            if (renderContext != null && !renderContext.IsDisposed)
+                return;
+
+            // 生命周期 Hub 可能直接清理了 Context，而业务 Session 尚未收到 Dispose。
+            // 清掉已被 Unity 销毁或仍绑定旧场景的业务对象，让下一次入口重建完整链路。
+            for (int i = markedInstances.Count - 1; i >= 0; i--)
+            {
+                GameObject instance = markedInstances[i];
+                if (instance != null)
+                {
+                    try { ESEditorPreviewUtility.DestroyObject(instance); }
+                    catch (Exception exception) { Debug.LogException(exception); }
+                }
+                markedInstances.RemoveAt(i);
+            }
+            audioListener = null;
+            audioListenerPlaying = false;
+            renderContext = CreateRenderContext();
+        }
+
+        private void RebindMarkedInstances()
+        {
+            for (int i = markedInstances.Count - 1; i >= 0; i--)
+            {
+                GameObject instance = markedInstances[i];
+                if (instance == null)
+                {
+                    markedInstances.RemoveAt(i);
+                    continue;
+                }
+
+                bool samplingTarget = audioListener == null || audioListener.gameObject != instance;
+                if (!renderContext.PreparePreviewObject(instance, "AssetPackage preview session rebind.", samplingTarget))
+                {
+                    try { ESEditorPreviewUtility.DestroyObject(instance); }
+                    catch (Exception exception) { Debug.LogException(exception); }
+                    if (audioListener != null && audioListener.gameObject == instance)
+                        audioListener = null;
+                    markedInstances.RemoveAt(i);
+                    continue;
+                }
+                instance.transform.position = GroupOrigin;
             }
         }
 

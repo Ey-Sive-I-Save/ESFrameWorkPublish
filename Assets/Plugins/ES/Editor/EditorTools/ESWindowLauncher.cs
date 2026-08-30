@@ -188,6 +188,7 @@ namespace ES
             RegisterPeripheral("entity_interaction_monitor", "交互运行时面板", "验证与诊断", MenuItemPathDefine.INTERACTION_RUNTIME_PANEL_PATH, "Entity Interaction IK 交互 监视");
             RegisterPeripheral("dynamic_atlas_monitor", "动态图集监视器", "验证与诊断", MenuItemPathDefine.VALIDATION_RUNTIME_MONITORING_PATH + "动态图集/打开动态图集监视器", "Dynamic Atlas GPU 页面 上传 监视");
             RegisterPeripheral("camera_track_preview", "轨道相机预览", "内容制作", MenuItemPathDefine.CONTENT_CREATION_PATH + "相机/打开轨道相机预览", "Camera TrackView 相机 轨道 预览");
+            RegisterPeripheral("urp_render_control", "ES URP 渲染控制台", "验证与诊断", MenuItemPathDefine.VALIDATION_DIAGNOSTICS_PATH + "渲染质量/打开 ES URP 渲染控制台", "URP Render Quality Renderer Feature Volume Shader 性能");
         }
 
         private static void RegisterPeripheral(

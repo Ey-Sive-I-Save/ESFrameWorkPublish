@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1, "volumeId": "es.urp.volume.StylizedToon", "style": "StylizedToon",
+  "postExposure": 0.05, "bloomIntensity": 0.1, "contrast": 1.1,
+  "toneMapping": "Neutral", "ambientOcclusion": true, "depthOfField": false, "vignette": 0.08
+}

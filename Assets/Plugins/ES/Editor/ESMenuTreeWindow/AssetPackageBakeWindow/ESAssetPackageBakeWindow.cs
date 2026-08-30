@@ -59,6 +59,12 @@ namespace ES
         [NonSerialized] private Page_AssetPackageBakeIndex indexPage;
         [NonSerialized] private Dictionary<ESAssetPackageCategory, Page_AssetPackageBakeCategory> categoryPages;
         private static ESAssetPackageBakeData selectedBake;
+        private static readonly Dictionary<string, string> ReaderProjectionHashByStableId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static double readerProjectionHashCacheCapturedAt = -1d;
+        private static double readerCatalogRegistryCacheCapturedAt = -1d;
+        private static int readerCatalogRegistryCount;
+        private static int readerCatalogRegistrySourceCount;
+        private static int readerCatalogRegistryStaleCount;
 
         [MenuItem(MenuItemPathDefine.RESOURCE_DELIVERY_PATH + "构建与发布/资产包分离窗口", false, 20)]
         public static void TryOpenWindow()
@@ -93,9 +99,130 @@ namespace ES
                 ES_RefreshWindow();
         }
 
+        internal static ESAssetPackageBakeData GetSelectedBakeForResourceCollection()
+        {
+            LoadSelectedBakeFromPrefs();
+            return selectedBake;
+        }
+
         public static string GetCategoryPageId(ESAssetPackageCategory category)
         {
             return PageIdCategoryPrefix + category.ToString().ToLowerInvariant();
+        }
+
+        private static void RepaintAssetPackageWindow()
+        {
+            ESAssetPackagePreviewUtility.RepaintAssetPackageWindow();
+        }
+
+        private static void LocateReaderPerformanceReport()
+        {
+            const string path = "ES/Output/Benchmarks/resource-reader-perf.json";
+            var report = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (report == null)
+            {
+                Debug.LogWarning("未找到资源读取性能报告，请先运行 Measure-ESResourceReaderPerf.ps1。");
+                return;
+            }
+            Selection.activeObject = report;
+            EditorGUIUtility.PingObject(report);
+        }
+
+        private static void LocateReaderParallelCacheReport()
+        {
+            const string path = "ES/Output/Benchmarks/resource-reader-cache-parallel-perf.json";
+            var report = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (report == null)
+            {
+                Debug.LogWarning("未找到并行缓存性能报告，请先运行 Measure-ESProjectionCacheParallelPerf.ps1。");
+                return;
+            }
+            Selection.activeObject = report;
+            EditorGUIUtility.PingObject(report);
+        }
+
+        private static void LocateReaderIndex()
+        {
+            const string path = "ES/Output/ResourceReader/resource-index.json";
+            var index = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (index == null)
+            {
+                Debug.LogWarning("未找到资源读取索引，请先运行 Build-ESResourceReaderIndex.ps1。");
+                return;
+            }
+            Selection.activeObject = index;
+            EditorGUIUtility.PingObject(index);
+        }
+
+        private static void LocateReaderCatalog()
+        {
+            const string path = "ES/Output/ResourceReader/resource-catalog.json";
+            var catalog = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (catalog == null)
+            {
+                Debug.LogWarning("未找到资源 Catalog，请先运行 Build-ESResourceReaderCatalog.ps1。");
+                return;
+            }
+            Selection.activeObject = catalog;
+            EditorGUIUtility.PingObject(catalog);
+        }
+
+        private static void LocateReaderReferenceIndex()
+        {
+            const string path = "ES/Output/ResourceReader/resource-reference-index.json";
+            var index = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (index == null)
+            {
+                Debug.LogWarning("未找到 GUID 反向引用索引，请先运行 Build-ESResourceReaderReferenceIndex.ps1。");
+                return;
+            }
+            Selection.activeObject = index;
+            EditorGUIUtility.PingObject(index);
+        }
+
+        private static void LocateReaderReferenceCatalog()
+        {
+            const string path = "ES/Output/ResourceReader/resource-reference-catalog.json";
+            var catalog = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (catalog != null)
+            {
+                Selection.activeObject = catalog;
+                EditorGUIUtility.PingObject(catalog);
+                return;
+            }
+
+            string fullPath = Path.Combine(Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty, path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(fullPath))
+            {
+                EditorUtility.RevealInFinder(fullPath);
+                return;
+            }
+            Debug.LogWarning("未找到跨源 GUID Reference Catalog，请先运行 Merge-ESResourceReaderReferenceCatalog.ps1。");
+        }
+
+        private static void LocateResourceCollectionBatch()
+        {
+            const string path = "ES/Output/ResourceCollection/collection-batch.json";
+            var snapshot = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (snapshot != null)
+            {
+                Selection.activeObject = snapshot;
+                EditorGUIUtility.PingObject(snapshot);
+                return;
+            }
+            string fullPath = Path.Combine(Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty, path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(fullPath)) { EditorUtility.RevealInFinder(fullPath); return; }
+            Debug.LogWarning("未找到资源收集批处理快照，请先运行 Invoke-ESResourceCollectionBatch.ps1。");
+        }
+
+        private static void LocateResourceCollectionBatchPerf()
+        {
+            const string path = "ES/Output/Benchmarks/resource-collection-batch-perf.json";
+            var report = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (report != null) { Selection.activeObject = report; EditorGUIUtility.PingObject(report); return; }
+            string fullPath = Path.Combine(Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty, path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(fullPath)) { EditorUtility.RevealInFinder(fullPath); return; }
+            Debug.LogWarning("未找到资源收集批处理性能报告，请先运行 Measure-ESResourceCollectionBatchPerf.ps1。");
         }
 
         protected override void ESWindow_OnOpen()
@@ -105,7 +232,7 @@ namespace ES
 
         protected override void ESWindow_OnHostDisable()
         {
-            EditorApplication.delayCall -= ESAssetPackagePreviewUtility.RepaintAssetPackageWindow;
+            EditorApplication.delayCall -= RepaintAssetPackageWindow;
             ReleaseInstancePreviewResources();
             SaveSelectedBakeGuid(selectedBake);
             base.ESWindow_OnHostDisable();
@@ -135,6 +262,104 @@ namespace ES
                 .WithUnityIcon("d_Search Icon")
                 .When(() => selectedBake != null)
                 .WithPriority(90));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.import-reader-projection",
+                    "导入 Projection JSON",
+                    "将当前选中的 Projection JSON 持久化为资源读取数据对象。",
+                    ESResourceReaderProjectionImporter.ImportSelectedProjection)
+                .WithUnityIcon("d_TextAsset Icon")
+                .WithPriority(80));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.import-reader-catalog-registry",
+                    "注册 Catalog 来源",
+                    "将当前选中的 Catalog JSON 持久化为可序列化来源注册对象。",
+                    ESResourceReaderCatalogRegistryImporter.ImportSelectedCatalog)
+                .WithUnityIcon("d_Folder Icon")
+                .WithPriority(75));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.import-reader-catalog-diff",
+                    "导入 Catalog Diff",
+                    "将当前选中的 Catalog Diff JSON 持久化为可序列化差异对象。",
+                    ESResourceReaderCatalogDiffImporter.ImportSelectedDiff)
+                .WithUnityIcon("d_TextAsset Icon")
+                .WithPriority(73));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.import-reader-reference-shards",
+                    "导入 GUID 分片 Manifest",
+                    "将当前选中的 GUID 分片 Manifest 持久化为可序列化对象。",
+                    ESResourceReaderReferenceShardManifestImporter.ImportSelectedManifest)
+                .WithUnityIcon("d_Folder Icon")
+                .WithPriority(72));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.refresh-reader-reference-shards",
+                    "刷新 GUID 分片 Manifest",
+                    "从当前选中的 Manifest JSON 更新已有或创建新的持久化分片对象。",
+                    ESResourceReaderReferenceShardManifestImporter.RefreshSelectedManifest)
+                .WithUnityIcon("Refresh")
+                .WithPriority(71));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-resource-collection-batch",
+                    "打开资源收集批快照",
+                    "定位增量并行资源收集生成的可恢复 JSON 快照。",
+                    LocateResourceCollectionBatch)
+                .WithUnityIcon("d_TextAsset Icon")
+                .WithPriority(69));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.import-resource-collection-candidates",
+                    "导入批快照聚合候选",
+                    "将已验证且位于 Assets 下的批快照条目加入当前 AssetPackage 候选。",
+                    ESResourceCollectionBatchImporter.ImportValidatedBatchToSelectedBake)
+                .WithUnityIcon("d_Toolbar Plus")
+                .WithPriority(68));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-resource-collection-perf",
+                    "打开资源收集性能基准",
+                    "定位资源收集冷读与增量复用性能报告。",
+                    LocateResourceCollectionBatchPerf)
+                .WithUnityIcon("d_Profiler.Pipeline")
+                .WithPriority(67));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-reader-performance",
+                    "打开读取性能基准",
+                    "定位资源读取器生成的冷读性能 JSON 报告。",
+                    LocateReaderPerformanceReport)
+                .WithUnityIcon("d_Profiler.Pipeline")
+                .WithPriority(70));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-reader-parallel-cache",
+                    "打开并行缓存基准",
+                    "定位资源读取器生成的并行缓存性能 JSON 报告。",
+                    LocateReaderParallelCacheReport)
+                .WithUnityIcon("d_Profiler.UIDetails")
+                .WithPriority(60));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-reader-index",
+                    "打开资源快速索引",
+                    "定位资源读取器生成的轻量索引 JSON。",
+                    LocateReaderIndex)
+                .WithUnityIcon("d_Search Icon")
+                .WithPriority(50));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-reader-catalog",
+                    "打开资源 Catalog",
+                    "定位源包与稳定输出地的统一资源 Catalog。",
+                    LocateReaderCatalog)
+                .WithUnityIcon("d_Folder Icon")
+                .WithPriority(40));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-reader-reference-index",
+                    "打开 GUID 反向索引",
+                    "定位 Unity YAML 对象 GUID 反向引用索引。",
+                    LocateReaderReferenceIndex)
+                .WithUnityIcon("d_Search Icon")
+                .WithPriority(30));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.open-reader-reference-catalog",
+                    "打开跨源 GUID Catalog",
+                    "定位源包与稳定输出地合并后的 GUID 反向引用 Catalog。",
+                    LocateReaderReferenceCatalog)
+                .WithUnityIcon("d_Search Icon")
+                .WithPriority(25));
         }
 
         protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
@@ -793,6 +1018,211 @@ namespace ES
         [HideInInspector]
         public ESAssetPackageBakeData bake;
         [NonSerialized] private Vector2 scroll;
+        [NonSerialized] private string readerIndexSearch = string.Empty;
+        [NonSerialized] private int readerIndexFormatSelection;
+        [NonSerialized] private int readerIndexStatusSelection;
+        [NonSerialized] private string readerIndexHashPrefix = string.Empty;
+        [NonSerialized] private string readerIndexCachedJson;
+        [NonSerialized] private ESReaderIndexDto readerIndexCachedData;
+        [NonSerialized] private string readerReferenceSearch = string.Empty;
+        [NonSerialized] private string readerReferenceCachedJson;
+        [NonSerialized] private ESReaderReferenceIndexDto readerReferenceCachedData;
+        [NonSerialized] private string readerReferenceCatalogSearch = string.Empty;
+        [NonSerialized] private string readerReferenceCatalogSource = string.Empty;
+        [NonSerialized] private string readerReferenceCatalogCachedJson;
+        [NonSerialized] private ESReaderReferenceCatalogDto readerReferenceCatalogCachedData;
+        [NonSerialized] private string readerReferenceDiffCachedJson;
+        [NonSerialized] private ESReaderReferenceDiffDto readerReferenceDiffCachedData;
+        [NonSerialized] private string readerShardSearch = string.Empty;
+        [NonSerialized] private string readerShardSource = string.Empty;
+        [NonSerialized] private string readerShardManifestJson;
+        [NonSerialized] private ESReaderShardManifestDto readerShardManifest;
+        [NonSerialized] private readonly Dictionary<string, ESReaderReferenceCatalogDto> readerShardCache = new Dictionary<string, ESReaderReferenceCatalogDto>(StringComparer.OrdinalIgnoreCase);
+        [NonSerialized] private string readerShardQueryCacheKey;
+        [NonSerialized] private ESReaderReferenceCatalogGroupDto[] readerShardGroupsCache = Array.Empty<ESReaderReferenceCatalogGroupDto>();
+        [NonSerialized] private string[] readerShardSourceIdsCache = Array.Empty<string>();
+        [NonSerialized] private string[] readerShardSourceOptionsCache = new[] { "全部来源" };
+        [NonSerialized] private string collectionBatchCachedJson;
+        [NonSerialized] private ESResourceCollectionBatchDto collectionBatchCachedData;
+        [NonSerialized] private string collectionBatchPerfCachedJson;
+        [NonSerialized] private ESResourceCollectionBatchPerfDto collectionBatchPerfCachedData;
+
+        [Serializable]
+        private sealed class ESResourceCollectionBatchDto
+        {
+            public string batchId;
+            public int fileCount;
+            public int reusedCount;
+            public int parsedCount;
+            public int failedCount;
+            public int effectiveParallel;
+            public bool autoParallel;
+            public string parallelReason;
+            public long totalBytes;
+            public float incrementalHitRate;
+            public int elapsedMilliseconds;
+            public float filesPerSecond;
+            public bool canceled;
+            public ESResourceCollectionBatchFileDto[] files;
+        }
+
+        [Serializable]
+        private sealed class ESResourceCollectionBatchFileDto
+        {
+            public string path;
+            public string status;
+            public string sha256;
+        }
+
+        [Serializable]
+        private sealed class ESResourceCollectionBatchPerfDto
+        {
+            public string packageId;
+            public bool autoParallel;
+            public double speedupRatio;
+            public ESResourceCollectionBatchPerfPhaseDto cold;
+            public ESResourceCollectionBatchPerfPhaseDto incremental;
+        }
+
+        [Serializable]
+        private sealed class ESResourceCollectionBatchPerfPhaseDto
+        {
+            public int effectiveParallel;
+            public int elapsedMilliseconds;
+            public float filesPerSecond;
+            public float hitRate;
+        }
+
+        [Serializable]
+        private sealed class ESResourceCollectionPerfTrendDto
+        {
+            public int reportCount;
+        }
+
+        [Serializable]
+        private sealed class ESResourceCollectionScheduleDto
+        {
+            public int schemaVersion;
+            public string packageId;
+            public bool autoParallel;
+            public int maxFiles;
+            public int maxParallel;
+            public int maxFileSizeMb;
+        }
+
+        [Serializable]
+        private sealed class ESReaderIndexDto
+        {
+            public ESReaderIndexItemDto[] items;
+        }
+
+        [Serializable]
+        private sealed class ESReaderIndexItemDto
+        {
+            public string sourcePath;
+            public string sourceSha256;
+            public string detectedFormat;
+            public string status;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceIndexDto
+        {
+            public ESReaderReferenceDto[] references;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceDto
+        {
+            public string guid;
+            public ESReaderReferenceItemDto[] references;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceItemDto
+        {
+            public string sourceId;
+            public string sourcePath;
+            public string sourceSha256;
+            public string objectStableId;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceCatalogDto
+        {
+            public int sourceCount;
+            public int guidCount;
+            public int edgeCount;
+            public int conflictCount;
+            public ESReaderReferenceConflictDto[] conflicts;
+            public ESReaderReferenceChangeSummaryDto changeSummary;
+            public ESReaderReferenceCatalogGroupDto[] references;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceConflictDto
+        {
+            public string guid;
+            public int sourceCount;
+            public int hashCount;
+            public string[] hashes;
+            public string[] paths;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceChangeSummaryDto
+        {
+            public bool baselinePresent;
+            public int addedCount;
+            public int removedCount;
+            public int changedCount;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceDiffEntryDto
+        {
+            public string guid;
+            public string sourceId;
+            public string sourcePath;
+            public string objectStableId;
+            public string beforeSha256;
+            public string afterSha256;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceDiffDto
+        {
+            public int addedCount;
+            public int removedCount;
+            public int changedCount;
+            public int maxItems;
+            public ESReaderReferenceDiffEntryDto[] added;
+            public ESReaderReferenceDiffEntryDto[] removed;
+            public ESReaderReferenceDiffEntryDto[] changed;
+        }
+
+        [Serializable]
+        private sealed class ESReaderShardManifestDto
+        {
+            public string manifestId;
+            public int prefixLength;
+            public ESReaderShardManifestItemDto[] shards;
+        }
+
+        [Serializable]
+        private sealed class ESReaderShardManifestItemDto
+        {
+            public string prefix;
+            public string path;
+        }
+
+        [Serializable]
+        private sealed class ESReaderReferenceCatalogGroupDto
+        {
+            public string guid;
+            public int referenceCount;
+            public ESReaderReferenceItemDto[] references;
+        }
 
         public Page_AssetPackageBakeIndex(ESAssetPackageBakeData bake)
         {
@@ -822,6 +1252,12 @@ namespace ES
                 DrawCategorySummary(pageWidth - 8f);
                 EditorGUILayout.Space(8);
                 DrawAnalysisSummary(pageWidth - 8f);
+                EditorGUILayout.Space(8);
+                DrawReaderPerformanceSummary(pageWidth - 8f);
+                EditorGUILayout.Space(8);
+                DrawReaderIndexSummary(pageWidth - 8f);
+                EditorGUILayout.Space(8);
+                DrawResourceCollectionBatchSummary(pageWidth - 8f);
                 EditorGUILayout.Space(8);
                 DrawExportSummary(pageWidth - 8f);
             }
@@ -1024,9 +1460,569 @@ namespace ES
                         continue;
 
                     int selected = bake.records != null ? bake.records.Count(r => r != null && r.category == category && r.selectedForUse) : 0;
-                    EditorGUILayout.LabelField(ESAssetPackageBakeWindow.GetCategoryDisplayName(category), $"总数 {count} | 已使用 {selected}");
+                    int projections = bake.records != null ? bake.records.Count(r => r != null && r.category == category && !string.IsNullOrEmpty(r.readerProjectionStableId)) : 0;
+                    int stale = CountStaleProjectionRecords(category);
+                    EditorGUILayout.LabelField(ESAssetPackageBakeWindow.GetCategoryDisplayName(category), $"总数 {count} | 已使用 {selected} | Projection {projections} | 待校验 {stale}");
                 }
             }
+        }
+
+        private void DrawResourceCollectionBatchSummary(float width)
+        {
+            const string path = "ES/Output/ResourceCollection/collection-batch.json";
+            string text = ReadProjectOutputText(path);
+            if (string.IsNullOrWhiteSpace(text)) return;
+            if (!string.Equals(collectionBatchCachedJson, text, StringComparison.Ordinal))
+            {
+                collectionBatchCachedJson = text;
+                try { collectionBatchCachedData = JsonUtility.FromJson<ESResourceCollectionBatchDto>(text); }
+                catch { collectionBatchCachedData = null; }
+            }
+            if (collectionBatchCachedData == null || collectionBatchCachedData.batchId != "es-resource-collection.batch.v1") return;
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
+            {
+                EditorGUILayout.LabelField("资源收集批处理", EditorStyles.boldLabel);
+                string state = collectionBatchCachedData.canceled ? "已取消（可恢复）" : "可聚合候选";
+                EditorGUILayout.LabelField(state, $"文件 {collectionBatchCachedData.fileCount} | 复用 {collectionBatchCachedData.reusedCount} | 新解析 {collectionBatchCachedData.parsedCount} | 失败 {collectionBatchCachedData.failedCount}");
+                EditorGUILayout.LabelField("性能", $"耗时 {collectionBatchCachedData.elapsedMilliseconds} ms | 吞吐 {collectionBatchCachedData.filesPerSecond:0.##}/s | 命中率 {collectionBatchCachedData.incrementalHitRate:P1} | 总大小 {FormatBytes(collectionBatchCachedData.totalBytes)}");
+                if (!string.IsNullOrWhiteSpace(collectionBatchCachedData.parallelReason))
+                    EditorGUILayout.LabelField("调度证据", $"{collectionBatchCachedData.parallelReason} | 实际并行 {collectionBatchCachedData.effectiveParallel}");
+                if (bake != null)
+                {
+                    bake.EnsureResourceCollectionSchedule();
+                    var schedule = bake.resourceCollectionSchedule;
+                    EditorGUILayout.LabelField("调度配置", $"自适应 {(schedule.autoParallel ? "开启" : "关闭")} | 文件上限 {schedule.maxFiles} | 并行上限 {schedule.maxParallel} | 单文件上限 {schedule.maxFileSizeMb} MB");
+                    if (GUILayout.Button("导出资源收集调度 JSON", GUILayout.Width(180f)))
+                        ExportResourceCollectionSchedule();
+                }
+                string perfText = ReadProjectOutputText("ES/Output/Benchmarks/resource-collection-batch-perf.json");
+                if (!string.IsNullOrWhiteSpace(perfText) && !string.Equals(collectionBatchPerfCachedJson, perfText, StringComparison.Ordinal))
+                {
+                    collectionBatchPerfCachedJson = perfText;
+                    try { collectionBatchPerfCachedData = JsonUtility.FromJson<ESResourceCollectionBatchPerfDto>(perfText); }
+                    catch { collectionBatchPerfCachedData = null; }
+                }
+                if (collectionBatchPerfCachedData != null)
+                    EditorGUILayout.LabelField("最近基准", $"自适应 {(collectionBatchPerfCachedData.autoParallel ? "开启" : "关闭")} | 冷读 {collectionBatchPerfCachedData.cold?.filesPerSecond:0.##}/s (并行 {collectionBatchPerfCachedData.cold?.effectiveParallel}) | 增量 {collectionBatchPerfCachedData.incremental?.filesPerSecond:0.##}/s (并行 {collectionBatchPerfCachedData.incremental?.effectiveParallel}) | 加速 {collectionBatchPerfCachedData.speedupRatio:0.###}x");
+                string trendText = ReadProjectOutputText("ES/Output/Benchmarks/resource-collection-perf-trend.json");
+                if (!string.IsNullOrWhiteSpace(trendText))
+                {
+                    try { var trend = JsonUtility.FromJson<ESResourceCollectionPerfTrendDto>(trendText); if (trend != null) EditorGUILayout.LabelField("性能趋势", $"已汇总 {trend.reportCount} 份格式/批次报告"); }
+                    catch { }
+                }
+            }
+        }
+
+        private void ExportResourceCollectionSchedule()
+        {
+            if (bake == null)
+                return;
+
+            bake.EnsureResourceCollectionSchedule();
+            var schedule = bake.resourceCollectionSchedule;
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            if (string.IsNullOrWhiteSpace(projectRoot))
+                return;
+
+            string outputPath = Path.Combine(projectRoot, "ES", "Output", "ResourceCollection", "collection-schedule.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+            var dto = new ESResourceCollectionScheduleDto
+            {
+                schemaVersion = 1,
+                packageId = bake.packageId ?? string.Empty,
+                autoParallel = schedule.autoParallel,
+                maxFiles = schedule.maxFiles,
+                maxParallel = schedule.maxParallel,
+                maxFileSizeMb = schedule.maxFileSizeMb
+            };
+            File.WriteAllText(outputPath, JsonUtility.ToJson(dto, true), new UTF8Encoding(false));
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("资源收集调度", "已导出 collection-schedule.json。", "确定");
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024) return bytes + " B";
+            double value = bytes;
+            string[] units = { "KB", "MB", "GB" };
+            int index = -1;
+            while (value >= 1024 && index < units.Length - 1)
+            {
+                value /= 1024d;
+                index++;
+            }
+            return $"{value:0.##} {units[index]}";
+        }
+
+        private void DrawReaderIndexSummary(float width)
+        {
+            const string indexPath = "ES/Output/ResourceReader/resource-index.json";
+            var index = AssetDatabase.LoadAssetAtPath<TextAsset>(indexPath);
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
+            {
+                EditorGUILayout.LabelField("资源快速索引", EditorStyles.boldLabel);
+                if (index == null)
+                {
+                    EditorGUILayout.LabelField("尚未生成资源快速索引。", EditorStyles.miniLabel);
+                    return;
+                }
+                string text = index.text ?? string.Empty;
+                var count = System.Text.RegularExpressions.Regex.Match(text, "\\\"fileCount\\\"\\s*:\\s*(\\d+)");
+                var reparsed = System.Text.RegularExpressions.Regex.Match(text, "\\\"reparsedCount\\\"\\s*:\\s*(\\d+)");
+                var reused = System.Text.RegularExpressions.Regex.Match(text, "\\\"reusedCount\\\"\\s*:\\s*(\\d+)");
+                var captured = System.Text.RegularExpressions.Regex.Match(text, "\\\"capturedUtc\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
+                EditorGUILayout.LabelField("索引文件", indexPath, EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("资源数", count.Success ? count.Groups[1].Value : "未知", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("本次重解析/复用", (reparsed.Success ? reparsed.Groups[1].Value : "0") + " / " + (reused.Success ? reused.Groups[1].Value : "0"), EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("采集时间", captured.Success ? captured.Groups[1].Value : "未知", EditorStyles.miniLabel);
+                const string catalogPath = "ES/Output/ResourceReader/resource-catalog.json";
+                var catalog = AssetDatabase.LoadAssetAtPath<TextAsset>(catalogPath);
+                if (catalog != null)
+                {
+                    string catalogText = catalog.text ?? string.Empty;
+                    var sourceCount = System.Text.RegularExpressions.Regex.Match(catalogText, "\\\"sourceCount\\\"\\s*:\\s*(\\d+)");
+                    var itemCount = System.Text.RegularExpressions.Regex.Match(catalogText, "\\\"itemCount\\\"\\s*:\\s*(\\d+)");
+                    EditorGUILayout.LabelField("统一 Catalog", (sourceCount.Success ? sourceCount.Groups[1].Value : "?") + " 来源 / " + (itemCount.Success ? itemCount.Groups[1].Value : "?") + " 条", EditorStyles.miniLabel);
+                    const string duplicatePath = "ES/Output/ResourceReader/resource-catalog-duplicates.json";
+                    var duplicateReport = AssetDatabase.LoadAssetAtPath<TextAsset>(duplicatePath);
+                    if (duplicateReport != null)
+                    {
+                        string duplicateText = duplicateReport.text ?? string.Empty;
+                        var duplicateCount = System.Text.RegularExpressions.Regex.Match(duplicateText, "\\\"duplicateHashCount\\\"\\s*:\\s*(\\d+)");
+                        var conflictCount = System.Text.RegularExpressions.Regex.Match(duplicateText, "\\\"conflictCount\\\"\\s*:\\s*(\\d+)");
+                        EditorGUILayout.LabelField("重复 hash / 冲突", (duplicateCount.Success ? duplicateCount.Groups[1].Value : "?") + " / " + (conflictCount.Success ? conflictCount.Groups[1].Value : "?"), EditorStyles.miniLabel);
+                    }
+                }
+                const string referenceIndexPath = "ES/Output/ResourceReader/resource-reference-index.json";
+                var referenceIndex = AssetDatabase.LoadAssetAtPath<TextAsset>(referenceIndexPath);
+                if (referenceIndex != null)
+                {
+                    string referenceText = referenceIndex.text ?? string.Empty;
+                    var guidCount = System.Text.RegularExpressions.Regex.Match(referenceText, "\\\"guidCount\\\"\\s*:\\s*(\\d+)");
+                    var edgeCount = System.Text.RegularExpressions.Regex.Match(referenceText, "\\\"edgeCount\\\"\\s*:\\s*(\\d+)");
+                    EditorGUILayout.LabelField("GUID 反向引用", (guidCount.Success ? guidCount.Groups[1].Value : "?") + " GUID / " + (edgeCount.Success ? edgeCount.Groups[1].Value : "?") + " 边", EditorStyles.miniLabel);
+                }
+                DrawReaderCatalogRegistrySummary();
+                DrawReaderReferenceFilters();
+                if (!DrawReaderReferenceShardFastPath())
+                    DrawReaderReferenceCatalogFilters();
+                DrawReaderIndexFilters(index, text);
+            }
+        }
+
+        private void DrawReaderReferenceFilters()
+        {
+            const string path = "ES/Output/ResourceReader/resource-reference-index.json";
+            var asset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (asset == null) return;
+            var text = asset.text ?? string.Empty;
+            if (!ReferenceEquals(readerReferenceCachedData, null) && !string.Equals(readerReferenceCachedJson, text, StringComparison.Ordinal)) readerReferenceCachedData = null;
+            if (readerReferenceCachedData == null)
+            {
+                try { readerReferenceCachedData = JsonUtility.FromJson<ESReaderReferenceIndexDto>(text) ?? new ESReaderReferenceIndexDto(); }
+                catch { readerReferenceCachedData = new ESReaderReferenceIndexDto(); }
+                readerReferenceCachedJson = text;
+            }
+            readerReferenceSearch = EditorGUILayout.TextField("GUID 反向查询", readerReferenceSearch ?? string.Empty).Trim().ToLowerInvariant();
+            var groups = readerReferenceCachedData.references ?? Array.Empty<ESReaderReferenceDto>();
+            var filtered = groups.Where(x => x != null && (string.IsNullOrEmpty(readerReferenceSearch) || (x.guid ?? string.Empty).StartsWith(readerReferenceSearch, StringComparison.OrdinalIgnoreCase))).ToList();
+            EditorGUILayout.LabelField("GUID 引用组", filtered.Count + " / " + groups.Length, EditorStyles.miniLabel);
+            foreach (var group in filtered.Take(4))
+            {
+                EditorGUILayout.LabelField(group.guid ?? "<未知 GUID>", "引用 " + (group.references != null ? group.references.Length : 0) + " 个对象", EditorStyles.miniLabel);
+                foreach (var item in (group.references ?? Array.Empty<ESReaderReferenceItemDto>()).Take(3))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField("  " + (item.sourcePath ?? "<未知路径>"), item.objectStableId ?? "<未知对象>", EditorStyles.miniLabel);
+                        if (GUILayout.Button("定位", GUILayout.Width(48f))) LocateReaderReferenceSource(item.sourcePath);
+                    }
+                }
+            }
+        }
+
+        private bool DrawReaderReferenceShardFastPath()
+        {
+            readerShardSearch = EditorGUILayout.TextField("GUID 分片快速查询", readerShardSearch ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(readerShardSearch)) return false;
+            if (readerShardSearch.Any(c => !Uri.IsHexDigit(c)))
+            {
+                EditorGUILayout.HelpBox("GUID 前缀只能包含十六进制字符。", MessageType.Warning);
+                return true;
+            }
+            string manifestText = ReadProjectOutputText("ES/Output/ResourceReader/reference-shards/manifest.json");
+            if (string.IsNullOrWhiteSpace(manifestText))
+            {
+                EditorGUILayout.HelpBox("尚未生成 GUID 分片 Manifest，将回退到完整 Catalog。", MessageType.Info);
+                return false;
+            }
+            if (!string.Equals(readerShardManifestJson, manifestText, StringComparison.Ordinal))
+            {
+                readerShardManifestJson = manifestText;
+                readerShardCache.Clear();
+                readerShardQueryCacheKey = null;
+                readerShardGroupsCache = Array.Empty<ESReaderReferenceCatalogGroupDto>();
+                readerShardSourceIdsCache = Array.Empty<string>();
+                readerShardSourceOptionsCache = new[] { "全部来源" };
+                try { readerShardManifest = JsonUtility.FromJson<ESReaderShardManifestDto>(manifestText); }
+                catch { readerShardManifest = null; }
+            }
+            if (readerShardManifest == null || readerShardManifest.manifestId != "es-resource-reader.reference-catalog-shards.v1") return false;
+            int length = Mathf.Clamp(readerShardManifest.prefixLength, 1, 2);
+            string shardPrefix = readerShardSearch.Substring(0, Mathf.Min(length, readerShardSearch.Length));
+            var shard = (readerShardManifest.shards ?? Array.Empty<ESReaderShardManifestItemDto>()).FirstOrDefault(x => string.Equals(x?.prefix, shardPrefix, StringComparison.OrdinalIgnoreCase));
+            if (shard == null) return false;
+            if (!readerShardCache.TryGetValue(shard.path, out var shardData))
+            {
+                string shardText = ReadProjectOutputText(shard.path);
+                try { shardData = JsonUtility.FromJson<ESReaderReferenceCatalogDto>(shardText); }
+                catch { shardData = null; }
+                if (shardData != null)
+                {
+                    readerShardCache[shard.path] = shardData;
+                    readerShardQueryCacheKey = null;
+                }
+            }
+            if (shardData == null) return false;
+            EditorGUILayout.LabelField("分片命中", $"{shardPrefix}｜仅读取 {shard.path}", EditorStyles.miniLabel);
+            string queryKey = shard.path + "|" + readerShardSearch;
+            if (!string.Equals(readerShardQueryCacheKey, queryKey, StringComparison.Ordinal))
+            {
+                readerShardQueryCacheKey = queryKey;
+                readerShardGroupsCache = (shardData.references ?? Array.Empty<ESReaderReferenceCatalogGroupDto>())
+                    .Where(x => x != null && (x.guid ?? string.Empty).StartsWith(readerShardSearch, StringComparison.OrdinalIgnoreCase)).ToArray();
+                readerShardSourceIdsCache = readerShardGroupsCache
+                    .SelectMany(x => x.references ?? Array.Empty<ESReaderReferenceItemDto>())
+                    .Where(x => x != null && !string.IsNullOrWhiteSpace(x.sourceId))
+                    .Select(x => x.sourceId).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToArray();
+                readerShardSourceOptionsCache = new string[readerShardSourceIdsCache.Length + 1];
+                readerShardSourceOptionsCache[0] = "全部来源";
+                Array.Copy(readerShardSourceIdsCache, 0, readerShardSourceOptionsCache, 1, readerShardSourceIdsCache.Length);
+            }
+            int sourceIndex = string.IsNullOrEmpty(readerShardSource) ? 0 : Array.FindIndex(readerShardSourceOptionsCache, x => string.Equals(x, readerShardSource, StringComparison.OrdinalIgnoreCase));
+            sourceIndex = EditorGUILayout.Popup("分片来源", Mathf.Clamp(sourceIndex < 0 ? 0 : sourceIndex, 0, readerShardSourceOptionsCache.Length - 1), readerShardSourceOptionsCache);
+            readerShardSource = sourceIndex == 0 ? string.Empty : readerShardSourceOptionsCache[sourceIndex];
+            foreach (var group in readerShardGroupsCache.Take(6))
+            {
+                var items = (group.references ?? Array.Empty<ESReaderReferenceItemDto>()).Where(x => string.IsNullOrEmpty(readerShardSource) || string.Equals(x.sourceId, readerShardSource, StringComparison.OrdinalIgnoreCase)).Take(4).ToArray();
+                if (items.Length == 0) continue;
+                EditorGUILayout.LabelField(group.guid, "引用 " + items.Length + " 个", EditorStyles.miniLabel);
+                foreach (var item in items)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField($"  [{item.sourceId}] {item.sourcePath}", item.objectStableId ?? "<未知对象>", EditorStyles.miniLabel);
+                        if (GUILayout.Button("定位", GUILayout.Width(48f))) LocateReaderReferenceSource(item.sourcePath);
+                    }
+                }
+            }
+            return true;
+        }
+
+        private void DrawReaderReferenceCatalogFilters()
+        {
+            const string path = "ES/Output/ResourceReader/resource-reference-catalog.json";
+            string text = ReadProjectOutputText(path);
+            if (string.IsNullOrWhiteSpace(text)) return;
+            if (!string.Equals(readerReferenceCatalogCachedJson, text, StringComparison.Ordinal))
+                readerReferenceCatalogCachedData = null;
+            if (readerReferenceCatalogCachedData == null)
+            {
+                try { readerReferenceCatalogCachedData = JsonUtility.FromJson<ESReaderReferenceCatalogDto>(text); }
+                catch { readerReferenceCatalogCachedData = null; }
+                readerReferenceCatalogCachedJson = text;
+            }
+            if (readerReferenceCatalogCachedData == null) return;
+
+            EditorGUILayout.LabelField("跨源 GUID Catalog", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                $"来源 {readerReferenceCatalogCachedData.sourceCount} | GUID {readerReferenceCatalogCachedData.guidCount} | 边 {readerReferenceCatalogCachedData.edgeCount} | 冲突 {readerReferenceCatalogCachedData.conflictCount}",
+                EditorStyles.miniLabel);
+            var changes = readerReferenceCatalogCachedData.changeSummary;
+            if (changes != null && changes.baselinePresent)
+                EditorGUILayout.LabelField($"相对基线：新增 {changes.addedCount}｜移除 {changes.removedCount}｜变更 {changes.changedCount}", EditorStyles.miniLabel);
+            string diffText = ReadProjectOutputText("ES/Output/ResourceReader/resource-reference-catalog-diff.json");
+            if (!string.IsNullOrWhiteSpace(diffText))
+            {
+                var added = System.Text.RegularExpressions.Regex.Match(diffText, "\\\"addedCount\\\"\\s*:\\s*(\\d+)");
+                var removed = System.Text.RegularExpressions.Regex.Match(diffText, "\\\"removedCount\\\"\\s*:\\s*(\\d+)");
+                var changed = System.Text.RegularExpressions.Regex.Match(diffText, "\\\"changedCount\\\"\\s*:\\s*(\\d+)");
+                EditorGUILayout.LabelField($"独立差异 JSON：新增 {MatchOrUnknown(added)}｜移除 {MatchOrUnknown(removed)}｜变更 {MatchOrUnknown(changed)}", EditorStyles.miniLabel);
+                DrawReaderReferenceDiffDetails(diffText);
+            }
+            var conflicts = readerReferenceCatalogCachedData.conflicts ?? Array.Empty<ESReaderReferenceConflictDto>();
+            foreach (var conflict in conflicts.Take(3))
+            {
+                EditorGUILayout.HelpBox($"GUID 冲突 {conflict.guid}：{conflict.hashCount} 个 hash / {conflict.sourceCount} 个来源", MessageType.Warning);
+                foreach (var conflictPath in (conflict.paths ?? Array.Empty<string>()).Take(2))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField("  " + conflictPath, EditorStyles.miniLabel);
+                        if (GUILayout.Button("定位", GUILayout.Width(48f))) LocateReaderReferenceSource(conflictPath);
+                    }
+                }
+            }
+            readerReferenceCatalogSearch = EditorGUILayout.TextField("GUID 查询", readerReferenceCatalogSearch ?? string.Empty).Trim().ToLowerInvariant();
+            var groups = readerReferenceCatalogCachedData.references ?? Array.Empty<ESReaderReferenceCatalogGroupDto>();
+            var sourceIds = groups.SelectMany(x => x?.references ?? Array.Empty<ESReaderReferenceItemDto>())
+                .Where(x => x != null && !string.IsNullOrWhiteSpace(x.sourceId))
+                .Select(x => x.sourceId).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList();
+            sourceIds.Insert(0, "全部来源");
+            int sourceIndex = string.IsNullOrWhiteSpace(readerReferenceCatalogSource) ? 0 : sourceIds.FindIndex(x => string.Equals(x, readerReferenceCatalogSource, StringComparison.OrdinalIgnoreCase));
+            sourceIndex = Mathf.Clamp(sourceIndex < 0 ? 0 : sourceIndex, 0, sourceIds.Count - 1);
+            sourceIndex = EditorGUILayout.Popup("来源过滤", sourceIndex, sourceIds.ToArray());
+            readerReferenceCatalogSource = sourceIndex == 0 ? string.Empty : sourceIds[sourceIndex];
+
+            var filtered = groups.Where(x => x != null
+                && (string.IsNullOrEmpty(readerReferenceCatalogSearch) || (x.guid ?? string.Empty).StartsWith(readerReferenceCatalogSearch, StringComparison.OrdinalIgnoreCase)))
+                .Select(x => new
+                {
+                    Group = x,
+                    Items = (x.references ?? Array.Empty<ESReaderReferenceItemDto>())
+                        .Where(item => item != null && (string.IsNullOrEmpty(readerReferenceCatalogSource) || string.Equals(item.sourceId, readerReferenceCatalogSource, StringComparison.OrdinalIgnoreCase)))
+                        .ToArray()
+                })
+                .Where(x => x.Items.Length > 0).ToList();
+            EditorGUILayout.LabelField("跨源筛选结果", filtered.Count + " / " + groups.Length, EditorStyles.miniLabel);
+            foreach (var result in filtered.Take(4))
+            {
+                bool multiSource = result.Group.references != null && result.Group.references.Select(x => x?.sourceId).Where(x => !string.IsNullOrEmpty(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+                EditorGUILayout.LabelField(result.Group.guid ?? "<未知 GUID>", $"引用 {result.Items.Length} 个" + (multiSource ? "｜多源" : string.Empty), EditorStyles.miniLabel);
+                foreach (var item in result.Items.Take(3))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField($"  [{item.sourceId}] {item.sourcePath}", item.objectStableId ?? "<未知对象>", EditorStyles.miniLabel);
+                        if (GUILayout.Button("定位", GUILayout.Width(48f))) LocateReaderReferenceSource(item.sourcePath);
+                    }
+                }
+            }
+        }
+
+        private static string ReadProjectOutputText(string projectRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(projectRelativePath)) return string.Empty;
+            var asset = AssetDatabase.LoadAssetAtPath<TextAsset>(projectRelativePath);
+            if (asset != null) return asset.text ?? string.Empty;
+            var project = Directory.GetParent(Application.dataPath);
+            if (project == null) return string.Empty;
+            string fullPath = Path.Combine(project.FullName, projectRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            try { return File.Exists(fullPath) ? File.ReadAllText(fullPath, Encoding.UTF8) : string.Empty; }
+            catch (IOException) { return string.Empty; }
+            catch (UnauthorizedAccessException) { return string.Empty; }
+        }
+
+        private static string MatchOrUnknown(System.Text.RegularExpressions.Match match)
+        {
+            return match != null && match.Success ? match.Groups[1].Value : "?";
+        }
+
+        private void DrawReaderReferenceDiffDetails(string text)
+        {
+            if (!string.Equals(readerReferenceDiffCachedJson, text, StringComparison.Ordinal))
+                readerReferenceDiffCachedData = null;
+            if (readerReferenceDiffCachedData == null)
+            {
+                try { readerReferenceDiffCachedData = JsonUtility.FromJson<ESReaderReferenceDiffDto>(text); }
+                catch { readerReferenceDiffCachedData = null; }
+                readerReferenceDiffCachedJson = text;
+            }
+            if (readerReferenceDiffCachedData == null) return;
+            DrawReaderReferenceDiffGroup("新增详情", readerReferenceDiffCachedData.added);
+            DrawReaderReferenceDiffGroup("移除详情", readerReferenceDiffCachedData.removed);
+            DrawReaderReferenceDiffGroup("变更详情", readerReferenceDiffCachedData.changed);
+        }
+
+        private static void DrawReaderReferenceDiffGroup(string title, ESReaderReferenceDiffEntryDto[] entries)
+        {
+            var items = entries ?? Array.Empty<ESReaderReferenceDiffEntryDto>();
+            if (items.Length == 0) return;
+            EditorGUILayout.LabelField(title + "（有界样本 " + items.Length + " 条）", EditorStyles.miniLabel);
+            foreach (var item in items.Take(4))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField($"[{item.sourceId}] {item.sourcePath}", item.guid ?? "<未知 GUID>", EditorStyles.miniLabel);
+                    if (GUILayout.Button("定位", GUILayout.Width(48f))) LocateReaderReferenceSource(item.sourcePath);
+                }
+            }
+        }
+
+        private static void LocateReaderReferenceSource(string sourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath)) return;
+            var normalized = sourcePath.Replace('\\', '/');
+            var project = Directory.GetParent(Application.dataPath);
+            if (Path.IsPathRooted(normalized) && project != null)
+            {
+                var projectRoot = project.FullName.Replace('\\', '/').TrimEnd('/');
+                if (normalized.StartsWith(projectRoot + "/", StringComparison.OrdinalIgnoreCase)) normalized = normalized.Substring(projectRoot.Length + 1);
+            }
+            var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(normalized);
+            if (asset == null)
+            {
+                Debug.LogWarning("无法定位 GUID 引用源资源：" + sourcePath);
+                return;
+            }
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+        }
+
+        private static void DrawReaderCatalogRegistrySummary()
+        {
+            if (readerCatalogRegistryCacheCapturedAt < 0d || EditorApplication.timeSinceStartup - readerCatalogRegistryCacheCapturedAt > 2d)
+            {
+                readerCatalogRegistryCount = 0;
+                readerCatalogRegistrySourceCount = 0;
+                readerCatalogRegistryStaleCount = 0;
+                foreach (var guid in AssetDatabase.FindAssets("t:ESResourceReaderCatalogRegistryData"))
+                {
+                    var registry = AssetDatabase.LoadAssetAtPath<ESResourceReaderCatalogRegistryData>(AssetDatabase.GUIDToAssetPath(guid));
+                    if (registry == null) continue;
+                    readerCatalogRegistryCount++;
+                    foreach (var source in registry.sources ?? new List<ESResourceReaderCatalogSource>())
+                    {
+                        if (source == null) continue;
+                        readerCatalogRegistrySourceCount++;
+                        if (source.enabled && (string.IsNullOrWhiteSpace(source.sourceIndexPath) || !File.Exists(ResolveReaderCatalogSourcePath(source.sourceIndexPath)))) readerCatalogRegistryStaleCount++;
+                    }
+                }
+                readerCatalogRegistryCacheCapturedAt = EditorApplication.timeSinceStartup;
+            }
+            EditorGUILayout.LabelField("Catalog 来源注册", readerCatalogRegistryCount + " 个注册表 / " + readerCatalogRegistrySourceCount + " 个来源", EditorStyles.miniLabel);
+            if (readerCatalogRegistryStaleCount > 0)
+                EditorGUILayout.HelpBox("有 " + readerCatalogRegistryStaleCount + " 个启用来源索引不存在或已失效。", MessageType.Warning);
+        }
+
+        private static string ResolveReaderCatalogSourcePath(string sourcePath)
+        {
+            if (Path.IsPathRooted(sourcePath)) return sourcePath;
+            var project = Directory.GetParent(Application.dataPath);
+            return project == null ? sourcePath : Path.Combine(project.FullName, sourcePath.Replace('/', Path.DirectorySeparatorChar));
+        }
+
+        private void DrawReaderIndexFilters(TextAsset index, string text)
+        {
+            if (!ReferenceEquals(readerIndexCachedData, null) && !string.Equals(readerIndexCachedJson, text, StringComparison.Ordinal))
+                readerIndexCachedData = null;
+            if (readerIndexCachedData == null)
+            {
+                try { readerIndexCachedData = JsonUtility.FromJson<ESReaderIndexDto>(text) ?? new ESReaderIndexDto(); }
+                catch { readerIndexCachedData = new ESReaderIndexDto(); }
+                readerIndexCachedJson = text;
+            }
+            var items = readerIndexCachedData.items ?? Array.Empty<ESReaderIndexItemDto>();
+            readerIndexSearch = EditorGUILayout.TextField("路径过滤", readerIndexSearch ?? string.Empty);
+            var formats = items.Where(x => x != null && !string.IsNullOrEmpty(x.detectedFormat)).Select(x => x.detectedFormat).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToList();
+            formats.Insert(0, "全部格式");
+            readerIndexFormatSelection = Mathf.Clamp(readerIndexFormatSelection, 0, formats.Count - 1);
+            readerIndexFormatSelection = EditorGUILayout.Popup("格式过滤", readerIndexFormatSelection, formats.ToArray());
+            string selectedFormat = readerIndexFormatSelection > 0 ? formats[readerIndexFormatSelection] : string.Empty;
+            readerIndexStatusSelection = EditorGUILayout.Popup("状态过滤", Mathf.Clamp(readerIndexStatusSelection, 0, 2), new[] { "全部状态", "ready", "error" });
+            string selectedStatus = readerIndexStatusSelection > 0 ? (readerIndexStatusSelection == 1 ? "ready" : "error") : string.Empty;
+            readerIndexHashPrefix = EditorGUILayout.TextField("Hash 前缀", readerIndexHashPrefix ?? string.Empty).Trim().ToLowerInvariant();
+            var filtered = items.Where(x => x != null &&
+                (string.IsNullOrEmpty(readerIndexSearch) || (x.sourcePath ?? string.Empty).IndexOf(readerIndexSearch, StringComparison.OrdinalIgnoreCase) >= 0) &&
+                (string.IsNullOrEmpty(selectedFormat) || string.Equals(x.detectedFormat, selectedFormat, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrEmpty(selectedStatus) || string.Equals(x.status, selectedStatus, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrEmpty(readerIndexHashPrefix) || (x.sourceSha256 ?? string.Empty).StartsWith(readerIndexHashPrefix, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(x => x.sourcePath).ToList();
+            EditorGUILayout.LabelField("当前筛选结果", filtered.Count + " / " + items.Length, EditorStyles.miniLabel);
+            foreach (var item in filtered.Take(6))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(item.sourcePath ?? "<未知>", item.detectedFormat ?? "未知", EditorStyles.miniLabel);
+                    if (GUILayout.Button("定位", GUILayout.Width(48f)))
+                    {
+                        string assetPath = (item.sourcePath ?? string.Empty).Replace('\\', '/');
+                        if (!assetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)) assetPath = "Assets/" + assetPath.TrimStart('/');
+                        var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+                        if (asset != null) { Selection.activeObject = asset; EditorGUIUtility.PingObject(asset); }
+                    }
+                }
+            }
+        }
+
+        private void DrawReaderPerformanceSummary(float width)
+        {
+            const string reportPath = "ES/Output/Benchmarks/resource-reader-perf.json";
+            var report = AssetDatabase.LoadAssetAtPath<TextAsset>(reportPath);
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
+            {
+                EditorGUILayout.LabelField("资源读取性能", EditorStyles.boldLabel);
+                if (report == null)
+                {
+                    EditorGUILayout.LabelField("尚未生成性能报告。", EditorStyles.miniLabel);
+                    return;
+                }
+                var text = report.text ?? string.Empty;
+                var fileMatch = System.Text.RegularExpressions.Regex.Match(text, "\\\"fileCount\\\"\\s*:\\s*(\\d+)");
+                var captured = System.Text.RegularExpressions.Regex.Match(text, "\\\"capturedUtc\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
+                var throughput = System.Text.RegularExpressions.Regex.Matches(text, "\\\"throughputMiBPerSec\\\"\\s*:\\s*([0-9.]+)");
+                var p50 = System.Text.RegularExpressions.Regex.Matches(text, "\\\"p50Ms\\\"\\s*:\\s*([0-9.]+)");
+                var p95 = System.Text.RegularExpressions.Regex.Matches(text, "\\\"p95Ms\\\"\\s*:\\s*([0-9.]+)");
+                EditorGUILayout.LabelField("报告文件", reportPath, EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("采集时间", captured.Success ? captured.Groups[1].Value : "未知", EditorStyles.miniLabel);
+                if (captured.Success && DateTime.TryParse(captured.Groups[1].Value, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var capturedUtc))
+                    EditorGUILayout.LabelField("报告新鲜度", DateTime.UtcNow - capturedUtc > TimeSpan.FromHours(24) ? "过期（超过 24 小时）" : "新鲜", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("样本文件数", fileMatch.Success ? fileMatch.Groups[1].Value : "未知", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("分组吞吐记录", throughput.Count.ToString(), EditorStyles.miniLabel);
+                if (throughput.Count > 0)
+                {
+                    string best = throughput[0].Groups[1].Value + " MiB/s";
+                    EditorGUILayout.LabelField("首组吞吐", best, EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("首组 P50/P95", (p50.Count > 0 ? p50[0].Groups[1].Value : "未知") + " / " + (p95.Count > 0 ? p95[0].Groups[1].Value : "未知") + " ms", EditorStyles.miniLabel);
+                }
+                const string cacheReportPath = "ES/Output/Benchmarks/resource-reader-cache-batch-perf.json";
+                var cacheReport = AssetDatabase.LoadAssetAtPath<TextAsset>(cacheReportPath);
+                if (cacheReport != null)
+                {
+                    var cacheText = cacheReport.text ?? string.Empty;
+                    var hitRate = System.Text.RegularExpressions.Regex.Match(cacheText, "\\\"hitRate\\\"\\s*:\\s*([0-9.]+)");
+                    var hitCount = System.Text.RegularExpressions.Regex.Match(cacheText, "\\\"hitCount\\\"\\s*:\\s*(\\d+)");
+                    var missCount = System.Text.RegularExpressions.Regex.Match(cacheText, "\\\"missCount\\\"\\s*:\\s*(\\d+)");
+                    EditorGUILayout.LabelField("批量缓存命中率", hitRate.Success ? hitRate.Groups[1].Value : "未知", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("命中/未命中", (hitCount.Success ? hitCount.Groups[1].Value : "?") + " / " + (missCount.Success ? missCount.Groups[1].Value : "?"), EditorStyles.miniLabel);
+                }
+                const string parallelReportPath = "ES/Output/Benchmarks/resource-reader-cache-parallel-perf.json";
+                var parallelReport = AssetDatabase.LoadAssetAtPath<TextAsset>(parallelReportPath);
+                if (parallelReport != null)
+                {
+                    var parallelText = parallelReport.text ?? string.Empty;
+                    var elapsed = System.Text.RegularExpressions.Regex.Match(parallelText, "\\\"elapsedMilliseconds\\\"\\s*:\\s*(\\d+)");
+                    var parallelRate = System.Text.RegularExpressions.Regex.Match(parallelText, "\\\"hitRate\\\"\\s*:\\s*([0-9.]+)");
+                    EditorGUILayout.LabelField("并行缓存总耗时", elapsed.Success ? elapsed.Groups[1].Value + " ms" : "未知", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("并行缓存命中率", parallelRate.Success ? parallelRate.Groups[1].Value : "未知", EditorStyles.miniLabel);
+                }
+            }
+        }
+
+        private static int CountStaleProjectionRecords(ESAssetPackageCategory category)
+        {
+            if (readerProjectionHashCacheCapturedAt < 0d || EditorApplication.timeSinceStartup - readerProjectionHashCacheCapturedAt > 2d)
+            {
+                ReaderProjectionHashByStableId.Clear();
+                foreach (var guid in AssetDatabase.FindAssets("t:ESResourceReaderProjectionData"))
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    var projection = AssetDatabase.LoadAssetAtPath<ESResourceReaderProjectionData>(path);
+                    if (projection == null || string.IsNullOrEmpty(projection.projectionHash)) continue;
+                    foreach (var entry in projection.entries ?? new List<ESResourceReaderProjectionEntry>())
+                    {
+                        if (entry == null || string.IsNullOrEmpty(entry.stableId)) continue;
+                        ReaderProjectionHashByStableId[entry.stableId] = projection.projectionHash;
+                    }
+                }
+                readerProjectionHashCacheCapturedAt = EditorApplication.timeSinceStartup;
+            }
+            if (bake == null || bake.records == null) return 0;
+            return bake.records.Count(r =>
+                r != null && r.category == category && !string.IsNullOrEmpty(r.readerProjectionStableId) &&
+                (string.IsNullOrEmpty(r.readerProjectionHash) ||
+                 !ReaderProjectionHashByStableId.TryGetValue(r.readerProjectionStableId, out var currentHash) ||
+                 !string.Equals(currentHash, r.readerProjectionHash, StringComparison.OrdinalIgnoreCase)));
         }
 
         private void DrawExportSummary(float width)
@@ -1134,6 +2130,7 @@ namespace ES
             Undo.RecordObject(bake, "保存资产包索引");
             bake.EnsureIdentity();
             bake.EnsureCategoryFolderSettings();
+            bake.EnsureResourceCollectionSchedule();
             bake.RebuildStats();
             EditorUtility.SetDirty(bake);
             AssetDatabase.SaveAssetIfDirty(bake);
@@ -3312,10 +4309,10 @@ namespace ES
                 Stop();
                 currentClip = clip;
                 failureReason = null;
-                EnsurePreviewAudioSource();
+                TryEnsurePreviewAudioSource();
             }
 
-            EnsurePreviewAudioSource();
+            TryEnsurePreviewAudioSource();
             ApplyAudioSettings();
 
             using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
@@ -3323,6 +4320,8 @@ namespace ES
                 EditorGUILayout.LabelField("ES 音频预览", ESAssetPackagePresentation.Header);
                 EditorGUILayout.LabelField("时长", clip.length.ToString("F2") + " 秒", ESAssetPackagePresentation.Meta);
                 EditorGUILayout.LabelField("音频格式", clip.channels + " 声道 | " + clip.frequency + " Hz | " + clip.samples + " 采样", ESAssetPackagePresentation.Meta);
+                if (!string.IsNullOrEmpty(failureReason))
+                    EditorGUILayout.HelpBox("音频预览暂不可用：" + failureReason + "\n源音频未被修改，可重试或使用 UnityEditor.AudioUtil 降级播放。", MessageType.Warning);
                 float position = GetPosition(clip);
                 float next = EditorGUILayout.Slider("进度", position, 0f, Mathf.Max(0.01f, clip.length));
                 if (!Mathf.Approximately(next, position))
@@ -3458,7 +4457,8 @@ namespace ES
         private void PlayFromCurrent()
         {
             if (currentClip == null) return;
-            EnsurePreviewAudioSource();
+            if (!TryEnsurePreviewAudioSource())
+                return;
             offset = Mathf.Clamp(offset, 0f, currentClip.length);
             startedAt = EditorApplication.timeSinceStartup;
             lastSpatialUpdate = startedAt;
@@ -3624,6 +4624,29 @@ namespace ES
                     }
                     throw;
                 }
+            }
+        }
+
+        private bool TryEnsurePreviewAudioSource()
+        {
+            try
+            {
+                EnsurePreviewAudioSource();
+                if (previewAudioObject == null || previewSource == null)
+                {
+                    failureReason = "受管音频对象尚未创建。";
+                    status = "音频预览暂不可用";
+                    return false;
+                }
+                failureReason = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                playing = false;
+                status = "音频预览暂不可用";
+                failureReason = exception.GetBaseException().Message;
+                return false;
             }
         }
 
@@ -5526,12 +6549,24 @@ namespace ES
         private void StartPlayback(string path, AnimationClip clip, UnityEngine.Object model, Material fallbackMaterial, Avatar overrideAvatar)
         {
             Stop(false);
+            if (!EnsurePreviewUtility())
+                return;
+
             playingPath = path;
             playingClip = clip;
             playingModel = model;
             startTime = EditorApplication.timeSinceStartup;
-            EnsurePreviewUtility();
             EnsureInstance(model, fallbackMaterial, clip, overrideAvatar);
+            if (previewInstance == null)
+            {
+                LastStatus = string.IsNullOrEmpty(lastInstanceError)
+                    ? "动画预览模型不可用。"
+                    : "动画预览模型不可用：" + lastInstanceError;
+                playingPath = null;
+                playingClip = null;
+                playingModel = null;
+                return;
+            }
             DestroyPlayableGraph();
             DestroyHumanPoseSampler();
             LastStatus = "播放中（AnimationMode主采样）";
@@ -5581,7 +6616,11 @@ namespace ES
                 return;
             }
 
-            EnsurePreviewUtility();
+            if (!EnsurePreviewUtility())
+            {
+                GUI.Label(rect, "预览上下文不可用：" + LastStatus, EditorStyles.centeredGreyMiniLabel);
+                return;
+            }
             EnsureInstance(model, fallbackMaterial, clip, overrideAvatar);
 
             if (previewInstance == null)
@@ -5621,7 +6660,8 @@ namespace ES
 
         public Texture2D RenderSnapshot(AnimationClip clip, UnityEngine.Object model, Material fallbackMaterial, Avatar overrideAvatar, float time, int pixels, float yaw)
         {
-            EnsurePreviewUtility();
+            if (!EnsurePreviewUtility())
+                return null;
             EnsureInstance(model, fallbackMaterial, clip, overrideAvatar);
             if (previewInstance == null || clip == null || model == null)
                 return null;
@@ -5631,7 +6671,8 @@ namespace ES
 
         public int RenderSnapshotBatch(AnimationClip clip, UnityEngine.Object model, Material fallbackMaterial, Avatar overrideAvatar, int pixels, float yaw, int startFrame, int totalFrames, int maxFrames, Texture2D[] destination)
         {
-            EnsurePreviewUtility();
+            if (!EnsurePreviewUtility())
+                return 0;
             EnsureInstance(model, fallbackMaterial, clip, overrideAvatar);
             if (previewInstance == null || clip == null || model == null || destination == null || totalFrames <= 0)
                 return 0;
@@ -6084,9 +7125,13 @@ namespace ES
             editorUpdateRegistered = false;
         }
 
-        private void EnsurePreviewUtility()
+        private bool EnsurePreviewUtility()
         {
-            previewContext.Ensure();
+            if (previewContext.TryEnsure(out string failureReason))
+                return true;
+
+            LastStatus = "动画预览上下文不可用：" + failureReason;
+            return false;
         }
 
         private void RenderPreviewCamera(Rect rect, Vector3 center, float radius)

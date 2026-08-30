@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "es.urp.rendering.content-types",
+  "pipeline": "URP",
+  "minimumUnity": "2022.3.0",
+  "maximumUnity": "6000.99.99",
+  "profiles": [
+    { "contentType": "Action", "style": "StylizedToon", "intent": "Combat", "transparencyBudgetScale": 0.75, "particleBudgetScale": 0.8, "prioritizeReadability": true },
+    { "contentType": "RolePlaying", "style": "NaturalPbr", "intent": "Exploration", "transparencyBudgetScale": 1.0, "particleBudgetScale": 1.0, "prioritizeReadability": true },
+    { "contentType": "Strategy", "style": "TacticalRealism", "intent": "Exploration", "transparencyBudgetScale": 0.8, "particleBudgetScale": 0.65, "prioritizeReadability": true },
+    { "contentType": "Horror", "style": "HorrorGrit", "intent": "Cinematic", "transparencyBudgetScale": 0.9, "particleBudgetScale": 0.75, "prioritizeReadability": true },
+    { "contentType": "Cozy", "style": "CozyPastel", "intent": "Social", "transparencyBudgetScale": 0.7, "particleBudgetScale": 0.7, "prioritizeReadability": true },
+    { "contentType": "Racing", "style": "NeonSciFi", "intent": "Combat", "transparencyBudgetScale": 0.85, "particleBudgetScale": 0.9, "prioritizeReadability": false },
+    { "contentType": "Simulation", "style": "NaturalPbr", "intent": "Exploration", "transparencyBudgetScale": 0.65, "particleBudgetScale": 0.6, "prioritizeReadability": true },
+    { "contentType": "Stylized", "style": "RetroPixel", "intent": "Menu", "transparencyBudgetScale": 0.5, "particleBudgetScale": 0.5, "prioritizeReadability": true }
+  ]
+}

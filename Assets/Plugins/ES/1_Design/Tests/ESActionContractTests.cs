@@ -120,7 +120,7 @@ namespace ES.Tests
                 Phase(ESActionPhaseKind.Recovery, 0.2f));
             InjectLocal(info);
 
-            var events = new ESActionEventHub();
+            var events = new ESActionEventChannel();
             var eventsSeen = new List<ESActionEvent>();
             events.Published += eventsSeen.Add;
 
@@ -157,7 +157,7 @@ namespace ES.Tests
             var otherTable = new ESActionConfigKeyTable(4);
             InjectLocal(info, otherTable);
 
-            var runtime = new ESActionRuntime(localTable, new ESActionEventHub());
+            var runtime = new ESActionRuntime(localTable, new ESActionEventChannel());
             var intent = new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 1, null);
 
             Assert.That(runtime.TrySubmit(intent, out string error), Is.False);
@@ -174,7 +174,7 @@ namespace ES.Tests
                 Phase(ESActionPhaseKind.Recovery, 0.2f));
             InjectLocal(info);
 
-            var runtime = new ESActionRuntime(localTable, new ESActionEventHub());
+            var runtime = new ESActionRuntime(localTable, new ESActionEventChannel());
             var first = new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 1, null);
             Assert.That(runtime.TrySubmit(first, out _), Is.True);
 
@@ -199,7 +199,7 @@ namespace ES.Tests
                 Phase(ESActionPhaseKind.Recovery, 0.1f));
             InjectLocal(info);
 
-            var events = new ESActionEventHub();
+            var events = new ESActionEventChannel();
             var eventsSeen = new List<ESActionEvent>();
             events.Published += eventsSeen.Add;
             var runtime = new ESActionRuntime(localTable, events);
@@ -260,7 +260,7 @@ namespace ES.Tests
             });
             InjectLocal(info);
 
-            var runtime = new ESActionRuntime(localTable, new ESActionEventHub());
+            var runtime = new ESActionRuntime(localTable, new ESActionEventChannel());
             var intent = new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 1, null);
             Assert.That(runtime.TrySubmit(intent, out _), Is.True);
 
@@ -295,9 +295,9 @@ namespace ES.Tests
         [Test]
         public void Bridge_PoolReEnableRebindsOwnerAndResolver()
         {
-            var firstHub = new ESActionEventHub();
+            var firstChannel = new ESActionEventChannel();
             var firstBridge = new ESActionPresentationBridge(
-                firstHub,
+                firstChannel,
                 null,
                 null,
                 null,
@@ -307,9 +307,9 @@ namespace ES.Tests
             firstBridge.Dispose();
             Assert.That(firstBridge.HasOwnerDependencies, Is.False);
 
-            var secondHub = new ESActionEventHub();
+            var secondChannel = new ESActionEventChannel();
             var secondBridge = new ESActionPresentationBridge(
-                secondHub,
+                secondChannel,
                 null,
                 null,
                 null,

@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1, "volumeId": "es.urp.volume.NeonSciFi", "style": "NeonSciFi",
+  "postExposure": 0.1, "bloomIntensity": 0.65, "contrast": 1.15,
+  "toneMapping": "ACES", "ambientOcclusion": true, "depthOfField": true, "vignette": 0.12
+}

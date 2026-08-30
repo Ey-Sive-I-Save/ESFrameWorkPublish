@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "es.urp.rendering.templates",
+  "manifestVersion": "1.0.0",
+  "pipeline": "URP",
+  "urpPackageVersion": "14.0.11",
+  "templates": [
+    { "style": "NaturalPbr", "quality": "Balanced", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NaturalPbr.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NaturalPbr.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "StylizedToon", "quality": "CombatReadability", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-StylizedToon.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-StylizedToon.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "NoirContrast", "quality": "HighFidelity", "renderer": "Assets/Settings/URP-HighFidelity-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NoirContrast.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NoirContrast.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "NeonSciFi", "quality": "HighFidelity", "renderer": "Assets/Settings/URP-HighFidelity-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NeonSciFi.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NeonSciFi.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "FantasyAtmosphere", "quality": "CinematicShowcase", "renderer": "Assets/Settings/URP-HighFidelity-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-FantasyAtmosphere.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-FantasyAtmosphere.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "MobileFlat", "quality": "MobileStable", "renderer": "Assets/Settings/URP-Performant-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-MobileFlat.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-MobileFlat.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "RetroPixel", "quality": "Performant", "renderer": "Assets/Settings/URP-Performant-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-RetroPixel.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-RetroPixel.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "HorrorGrit", "quality": "HighFidelity", "renderer": "Assets/Settings/URP-HighFidelity-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-HorrorGrit.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-HorrorGrit.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "CozyPastel", "quality": "Balanced", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-CozyPastel.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-CozyPastel.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "style": "TacticalRealism", "quality": "CombatReadability", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-TacticalRealism.volume.json", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-TacticalRealism.mat", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" }
+  ]
+}

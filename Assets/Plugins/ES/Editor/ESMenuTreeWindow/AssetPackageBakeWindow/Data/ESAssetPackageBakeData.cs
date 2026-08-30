@@ -466,6 +466,12 @@ namespace ES
         [LabelText("大小"), ReadOnly]
         public string fileSize;
 
+        [LabelText("Reader Projection ID"), ReadOnly]
+        public string readerProjectionStableId;
+
+        [LabelText("Reader Projection Hash"), ReadOnly]
+        public string readerProjectionHash;
+
         [LabelText("导出子目录"), ReadOnly]
         public string exportSubFolder;
 
@@ -745,6 +751,29 @@ namespace ES
         public string fixedAssetFolderPath;
     }
 
+    [Serializable]
+    public sealed class ESAssetPackageResourceCollectionSchedule
+    {
+        [LabelText("启用自适应并行")]
+        public bool autoParallel = true;
+
+        [LabelText("最大文件数"), Range(1, 100000)]
+        public int maxFiles = 256;
+
+        [LabelText("最大并行度"), Range(1, 32)]
+        public int maxParallel = 4;
+
+        [LabelText("单文件上限 MB"), Range(1, 1024)]
+        public int maxFileSizeMb = 100;
+
+        public void Normalize()
+        {
+            maxFiles = Mathf.Clamp(maxFiles, 1, 100000);
+            maxParallel = Mathf.Clamp(maxParallel, 1, 32);
+            maxFileSizeMb = Mathf.Clamp(maxFileSizeMb, 1, 1024);
+        }
+    }
+
     [ESOnlyEditorSO("资产包烘焙数据只保存编辑器复制/收集状态，不应进入运行时构建或AB资源包。")]
     [CreateAssetMenu(fileName = "资产包烘焙数据", menuName = MenuItemPathDefine.ASSET_DEV_MANAGEMENT_PATH + "资产包烘焙数据")]
     public class ESAssetPackageBakeData : ESSO
@@ -821,6 +850,16 @@ namespace ES
 
         [FoldoutGroup("扫描配置"), LabelText("排除目录")]
         public List<string> excludedFolders = new List<string>();
+
+        [FoldoutGroup("扫描配置"), LabelText("资源收集调度")]
+        public ESAssetPackageResourceCollectionSchedule resourceCollectionSchedule = new ESAssetPackageResourceCollectionSchedule();
+
+        public void EnsureResourceCollectionSchedule()
+        {
+            if (resourceCollectionSchedule == null)
+                resourceCollectionSchedule = new ESAssetPackageResourceCollectionSchedule();
+            resourceCollectionSchedule.Normalize();
+        }
 
         [FoldoutGroup("导出配置"), LabelText("导出文件名前缀")]
         public string exportFileNamePrefix = "ES选用_";
@@ -928,8 +967,7 @@ namespace ES
                 else if (string.IsNullOrWhiteSpace(setting.folderName))
                 {
                     setting.folderName = GetDefaultExportSubFolder(category);
-                }
-            }
+    }
 
             categoryFolderSettings.RemoveAll(x => x == null);
             categoryFolderSettings.Sort((a, b) => a.category.CompareTo(b.category));

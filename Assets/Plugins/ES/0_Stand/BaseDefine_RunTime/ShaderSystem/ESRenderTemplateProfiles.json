@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "profileSetId": "es.urp.rendering.style-profiles",
+  "profiles": [
+    { "style": "NaturalPbr", "quality": "Balanced", "saturation": 1.0, "contrast": 1.0, "exposure": 0.0, "bloom": 0.15, "shadowSoftness": 0.55, "preserveSilhouette": true },
+    { "style": "StylizedToon", "quality": "CombatReadability", "saturation": 1.15, "contrast": 1.1, "exposure": 0.05, "bloom": 0.1, "shadowSoftness": 0.35, "preserveSilhouette": true },
+    { "style": "NoirContrast", "quality": "HighFidelity", "saturation": 0.2, "contrast": 1.35, "exposure": -0.1, "bloom": 0.05, "shadowSoftness": 0.2, "preserveSilhouette": true },
+    { "style": "NeonSciFi", "quality": "HighFidelity", "saturation": 1.35, "contrast": 1.15, "exposure": 0.1, "bloom": 0.65, "shadowSoftness": 0.45, "preserveSilhouette": true },
+    { "style": "FantasyAtmosphere", "quality": "CinematicShowcase", "saturation": 1.2, "contrast": 1.05, "exposure": 0.15, "bloom": 0.4, "shadowSoftness": 0.65, "preserveSilhouette": true },
+    { "style": "MobileFlat", "quality": "MobileStable", "saturation": 1.05, "contrast": 1.0, "exposure": 0.0, "bloom": 0.0, "shadowSoftness": 0.5, "preserveSilhouette": true },
+    { "style": "RetroPixel", "quality": "Performant", "saturation": 1.1, "contrast": 1.2, "exposure": 0.0, "bloom": 0.0, "shadowSoftness": 0.25, "preserveSilhouette": true },
+    { "style": "HorrorGrit", "quality": "HighFidelity", "saturation": 0.65, "contrast": 1.3, "exposure": -0.25, "bloom": 0.08, "shadowSoftness": 0.15, "preserveSilhouette": true },
+    { "style": "CozyPastel", "quality": "Balanced", "saturation": 1.25, "contrast": 0.9, "exposure": 0.2, "bloom": 0.2, "shadowSoftness": 0.7, "preserveSilhouette": true },
+    { "style": "TacticalRealism", "quality": "CombatReadability", "saturation": 0.9, "contrast": 1.15, "exposure": -0.05, "bloom": 0.05, "shadowSoftness": 0.4, "preserveSilhouette": true }
+  ]
+}

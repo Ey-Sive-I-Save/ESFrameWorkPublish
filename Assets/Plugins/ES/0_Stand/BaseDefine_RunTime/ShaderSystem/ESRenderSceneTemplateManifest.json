@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "es.urp.rendering.scene-templates",
+  "pipeline": "URP",
+  "minimumUnity": "2022.3.0",
+  "maximumUnity": "6000.99.99",
+  "templates": [
+    { "templateId": "es.scene.action", "contentType": "Action", "style": "StylizedToon", "intent": "Combat", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-StylizedToon.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-StylizedToon.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.role-playing", "contentType": "RolePlaying", "style": "NaturalPbr", "intent": "Exploration", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NaturalPbr.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NaturalPbr.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.strategy", "contentType": "Strategy", "style": "TacticalRealism", "intent": "Exploration", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-TacticalRealism.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-TacticalRealism.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.horror", "contentType": "Horror", "style": "HorrorGrit", "intent": "Cinematic", "renderer": "Assets/Settings/URP-HighFidelity-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-HorrorGrit.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-HorrorGrit.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.cozy", "contentType": "Cozy", "style": "CozyPastel", "intent": "Social", "renderer": "Assets/Settings/URP-Balanced-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-CozyPastel.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-CozyPastel.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.racing", "contentType": "Racing", "style": "NeonSciFi", "intent": "Combat", "renderer": "Assets/Settings/URP-HighFidelity-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NeonSciFi.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NeonSciFi.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.simulation", "contentType": "Simulation", "style": "NaturalPbr", "intent": "Exploration", "renderer": "Assets/Settings/URP-Performant-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NaturalPbr.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NaturalPbr.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" },
+    { "templateId": "es.scene.stylized", "contentType": "Stylized", "style": "RetroPixel", "intent": "Menu", "renderer": "Assets/Settings/URP-Performant-Renderer.asset", "material": "Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-RetroPixel.mat", "volume": "Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-RetroPixel.volume.json", "shader": "Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader" }
+  ]
+}

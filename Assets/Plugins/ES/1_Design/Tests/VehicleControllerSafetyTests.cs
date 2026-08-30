@@ -23,8 +23,14 @@ namespace ES.Tests
         private static readonly MethodInfo ClearExpiredDriverInputMethod = typeof(VehicleController).GetMethod(
             "ClearExpiredDriverInput",
             BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly MethodInfo OnDestroyMethod = typeof(VehicleController).GetMethod(
+            "OnDestroy",
+            BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo InputStateField = typeof(VehicleController).GetField(
             "inputState",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo CurrentDriverSeatField = typeof(VehicleController).GetField(
+            "currentDriverSeat",
             BindingFlags.Instance | BindingFlags.NonPublic);
 
         private GameObject vehicleObject;
@@ -63,6 +69,31 @@ namespace ES.Tests
 
             Assert.That(controller.InputState.frameIndex, Is.EqualTo(-1));
             Assert.That(controller.InputState.moveWorld, Is.EqualTo(Vector3.zero));
+        }
+
+        [Test]
+        public void Controller_OnDestroy_ClearsDriverInputAndIsIdempotent()
+        {
+            var input = new VehicleInputState();
+            input.Set(Vector3.forward, Vector3.right, 1f);
+            Assert.That(OnDestroyMethod, Is.Not.Null);
+            Assert.That(CurrentDriverSeatField, Is.Not.Null);
+            InputStateField.SetValue(controller, input);
+            EntityMountable seat = vehicleObject.AddComponent<EntityMountable>();
+            CurrentDriverSeatField.SetValue(controller, seat);
+
+            // 直接覆盖“对象已禁用后销毁”场景，不能依赖 Unity 先调用 OnDisable。
+            OnDestroyMethod.Invoke(controller, null);
+
+            Assert.That(controller.InputState.frameIndex, Is.EqualTo(-1));
+            Assert.That(controller.InputState.moveWorld, Is.EqualTo(Vector3.zero));
+            Assert.That(controller.InputState.lookWorld, Is.EqualTo(Vector3.zero));
+            Assert.That(controller.InputState.verticalInput, Is.EqualTo(0f));
+            Assert.That(CurrentDriverSeatField.GetValue(controller), Is.Null);
+
+            // OnDisable 随后可能再次触发；清理必须幂等且不抛异常。
+            Assert.DoesNotThrow(() => OnDestroyMethod.Invoke(controller, null));
+            Assert.That(controller.InputState.frameIndex, Is.EqualTo(-1));
         }
 
         [Test]

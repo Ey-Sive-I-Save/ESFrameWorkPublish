@@ -719,6 +719,10 @@ namespace ES
                         });
                     case "listCapabilities":
                         return HandleListCapabilities(requestId, action, payload);
+                    case "prepareWebDesignPrompt":
+                        return HandlePrepareWebDesignPrompt(requestId, action, payload);
+                    case "dispatchWebDesignPrompt":
+                        return HandleDispatchWebDesignPrompt(requestId, action, payload);
                     case "runKnowledgeRouteProbes":
                     {
                         RequireExactProperties(payload, Array.Empty<string>(), "runKnowledgeRouteProbes payload");
@@ -833,6 +837,51 @@ namespace ES
                 ESAIBrainFailureTelemetry.Record("TaskExecutionFailure", "runTask",
                     result.status + "|" + result.message, result.runId);
             return FromTaskResultWithPlan(requestId, action, result, plan);
+        }
+
+        private static ESAutomationAiResponse HandlePrepareWebDesignPrompt(string requestId, string action, JObject payload)
+        {
+            RequireExactProperties(payload,
+                new[] { "objective", "generationMode", "acceptanceProfile", "context" },
+                Array.Empty<string>(), "prepareWebDesignPrompt payload");
+            string objective = ReadString(payload, "objective");
+            string mode = ReadString(payload, "generationMode");
+            string profile = ReadString(payload, "acceptanceProfile");
+            string context = ReadString(payload, "context", allowEmpty: true);
+            if (!ESABCModelProviderAdapter.TryBuildGenerationPrompt(objective, mode, profile,
+                    context, out string prompt, out string error))
+                return ESAutomationAiResponse.Rejected(requestId, action, error);
+            JObject data = new JObject
+            {
+                ["generationMode"] = mode,
+                ["acceptanceProfile"] = profile,
+                ["prompt"] = prompt,
+                ["dispatchRequired"] = true,
+                ["runtimeStarted"] = false,
+                ["nonClaims"] = JArray.FromObject(new[] { "未发送到 Provider", "未生成候选", "未写入项目", "未获得页面或运行时验收" })
+            };
+            return ESAutomationAiResponse.Completed(requestId, action,
+                "已生成受合同约束的 Web 设计提示词；尚未发送 Provider。", string.Empty, data);
+        }
+
+        private static ESAutomationAiResponse HandleDispatchWebDesignPrompt(string requestId, string action, JObject payload)
+        {
+            RequireExactProperties(payload,
+                new[] { "objective", "generationMode", "acceptanceProfile", "context", "correlationId", "timeoutSeconds", "userDirected" },
+                Array.Empty<string>(), "dispatchWebDesignPrompt payload");
+            if (payload["userDirected"].Type != JTokenType.Boolean || !(bool)payload["userDirected"])
+                return ESAutomationAiResponse.Rejected(requestId, action, "dispatchWebDesignPrompt 必须由当前用户明确设置 userDirected=true。");
+            int timeout = ReadInteger(payload, "timeoutSeconds");
+            if (timeout < 1 || timeout > 1800) return ESAutomationAiResponse.Rejected(requestId, action, "timeoutSeconds 必须在 1 到 1800 秒之间。");
+            string objective = ReadString(payload, "objective");
+            string mode = ReadString(payload, "generationMode");
+            string profile = ReadString(payload, "acceptanceProfile");
+            string context = ReadString(payload, "context", allowEmpty: true);
+            string correlation = ReadString(payload, "correlationId");
+            ESCmdAgentPromptDispatchResult dispatch = ESABCModelProviderAdapter.DispatchGenerationPrompt(objective, mode, profile, context, correlation, timeout);
+            JObject data = new JObject { ["state"] = dispatch.State.ToString(), ["message"] = dispatch.Message, ["sessionId"] = dispatch.SessionId, ["messageId"] = dispatch.MessageId, ["operationDirectory"] = dispatch.OperationDirectory, ["startedAtUtc"] = dispatch.StartedAtUtc, ["responseConsumptionRequired"] = true };
+            if (!dispatch.Accepted) return ESAutomationAiResponse.Rejected(requestId, action, "Provider dispatch 未进入 Sent 状态：" + dispatch.Message);
+            return ESAutomationAiResponse.Completed(requestId, action, "Provider 已接收 Web 设计提示词；必须继续消费精确受管回执。", string.Empty, data);
         }
 
         private static ESAutomationAiResponse HandleListCapabilities(string requestId, string action, JObject payload)

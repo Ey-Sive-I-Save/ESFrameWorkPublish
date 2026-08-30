@@ -26,6 +26,7 @@ if($AiInterpretationPath){
 $status='accepted'
 $r=[ordered]@{
  schemaVersion=1;recordType='RequirementIntakeReceipt';roundId='web-generation-round-01';stageId='requirement-intake';status=$status;inputHash=$hex;rawPrompt=$PromptText
+ objectiveBrief=if($interpretation){[string]$interpretation.objectiveBrief}else{$null};userGoals=if($interpretation){@($interpretation.userGoals)}else{@()};nonGoals=if($interpretation){@($interpretation.nonGoals)}else{@()};interactionIntent=if($interpretation){[string]$interpretation.interactionIntent}else{$null}
  allowedScope=@('requirement intake receipt');forbiddenScope=@('FocusContext','TaskContext','Knowledge','SubAgent','ABCD','generation','runtime','network','Unity','Git','release')
  unknowns=if($interpretation){@()}else{@('objective intent','acceptance signals','interaction scope')};aiInterpretation=$interpretation
  acceptanceSignals=if($interpretation){@($interpretation.acceptanceSignals)}else{@('raw prompt preserved','strict UTF-8 hash','explicit AI interpretation required')}

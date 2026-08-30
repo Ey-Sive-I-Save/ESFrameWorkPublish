@@ -58,6 +58,7 @@ namespace ES
         private readonly ESWorkbenchEdgePanSession edgePanSession =
             new ESWorkbenchEdgePanSession();
         private ESEditorPreviewRenderContext preview;
+        private string previewFailureReason;
         private ESEditorPreviewResourceScope contentScope;
         private readonly List<GameObject> previewObjects = new List<GameObject>();
         private readonly List<string> previewStableIds = new List<string>();
@@ -283,7 +284,11 @@ namespace ES
                 return;
             }
 
-            EnsurePreview();
+            if (!EnsurePreview())
+            {
+                renderHost.MarkDirtyRepaint();
+                return;
+            }
             contentScope = new ESEditorPreviewResourceScope(
                 "ES World Authoring Viewport",
                 readOnlyGameView ? "游戏构图预览内容" : "世界作者内容");
@@ -632,7 +637,12 @@ namespace ES
             if (preview?.IsReady != true || draft?.Definition == null)
             {
                 ESWorkbenchViewportRenderStyle.DrawGuiBackdrop(rect);
-                GUI.Label(rect, "选择地图资产以启动 3D 作者视口", EditorStyles.centeredGreyMiniLabel);
+                string message = draft?.Definition == null
+                    ? "选择地图资产以启动 3D 作者视口"
+                    : string.IsNullOrWhiteSpace(previewFailureReason)
+                        ? "预览上下文暂不可用"
+                        : "预览上下文暂不可用：" + previewFailureReason;
+                GUI.Label(rect, message, EditorStyles.centeredGreyMiniLabel);
                 return;
             }
 
@@ -2588,9 +2598,13 @@ namespace ES
                 }
         }
 
-        private void EnsurePreview()
+        private bool EnsurePreview()
         {
-            if (preview?.IsReady == true) return;
+            if (preview?.IsReady == true)
+            {
+                previewFailureReason = null;
+                return true;
+            }
             preview?.Dispose();
             preview = new ESEditorPreviewRenderContext(
                 "ES World Authoring Viewport",
@@ -2601,19 +2615,30 @@ namespace ES
                 | ESEditorPreviewEnhancerSet.HighQualityLighting);
             try
             {
-                preview.Ensure();
+                if (!preview.TryEnsure(out string ensureError))
+                {
+                    previewFailureReason = string.IsNullOrWhiteSpace(ensureError)
+                        ? preview.LastStatus
+                        : ensureError;
+                    preview.Dispose();
+                    preview = null;
+                    return false;
+                }
                 if (preview.Camera != null)
                 {
                     preview.Camera.fieldOfView = feel.VerticalFieldOfViewDegrees;
                     preview.Camera.nearClipPlane = 0.1f;
                     preview.Camera.backgroundColor = new Color(0.055f, 0.07f, 0.08f, 1f);
                 }
+                previewFailureReason = null;
+                return true;
             }
-            catch
+            catch (Exception exception)
             {
+                previewFailureReason = exception.GetBaseException().Message;
                 preview.Dispose();
                 preview = null;
-                throw;
+                return false;
             }
         }
 

@@ -8599,6 +8599,7 @@ namespace ES
         private readonly ESWorkbenchViewportFeelSettings feel;
         private readonly ESWorkbenchHoverState hover = new ESWorkbenchHoverState();
         private ESEditorPreviewRenderContext preview;
+        private string previewFailureReason;
         private bool moving;
         private bool rotating;
         private bool scaling;
@@ -8758,6 +8759,8 @@ namespace ES
             hover.Clear();
             ClearInstances();
             EnsurePreview();
+            if (preview == null || !preview.IsReady)
+                return;
             IReadOnlyList<ESWorkbenchHierarchyDescriptor> hierarchy = context.Hierarchy;
             if (hierarchy == null) return;
             for (int i = 0; i < hierarchy.Count; i++)
@@ -8845,7 +8848,11 @@ namespace ES
 
         private bool EnsurePreview()
         {
-            if (preview?.IsReady == true) return false;
+            if (preview?.IsReady == true)
+            {
+                previewFailureReason = null;
+                return false;
+            }
             preview?.Dispose();
             preview = new ESEditorPreviewRenderContext(
                 "ES Workbench 3D Viewport",
@@ -8856,18 +8863,28 @@ namespace ES
                 | ESEditorPreviewEnhancerSet.HighQualityLighting);
             try
             {
-                preview.Ensure();
+                if (!preview.TryEnsure(out string ensureError))
+                {
+                    previewFailureReason = string.IsNullOrWhiteSpace(ensureError)
+                        ? preview.LastStatus
+                        : ensureError;
+                    preview.Dispose();
+                    preview = null;
+                    return false;
+                }
                 if (preview.Camera != null)
                 {
                     preview.Camera.fieldOfView = feel.VerticalFieldOfViewDegrees;
                     preview.Camera.backgroundColor = new Color(0.045f, 0.052f, 0.058f, 1f);
                 }
+                previewFailureReason = null;
             }
-            catch
+            catch (Exception exception)
             {
+                previewFailureReason = exception.GetBaseException().Message;
                 preview.Dispose();
                 preview = null;
-                throw;
+                return false;
             }
             return true;
         }
@@ -8876,6 +8893,17 @@ namespace ES
         {
             Rect rect = GUILayoutUtility.GetRect(1f, 1f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
             bool recreated = EnsurePreview();
+            if (preview == null || !preview.IsReady)
+            {
+                ESWorkbenchViewportRenderStyle.DrawGuiBackdrop(rect);
+                GUI.Label(
+                    rect,
+                    string.IsNullOrWhiteSpace(previewFailureReason)
+                        ? "预览上下文暂不可用"
+                        : "预览上下文暂不可用：" + previewFailureReason,
+                    EditorStyles.centeredGreyMiniLabel);
+                return;
+            }
             if (recreated && instances.Count > 0) RebuildInstances();
             preview.RenderGUI(
                 rect,

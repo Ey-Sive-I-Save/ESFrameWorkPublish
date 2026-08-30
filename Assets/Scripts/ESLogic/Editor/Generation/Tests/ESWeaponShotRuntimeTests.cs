@@ -10,6 +10,243 @@ namespace ES.Tests
     [Parallelizable(ParallelScope.None)]
     public sealed class ESWeaponShotRuntimeTests
     {
+        private static void ConsumeEffectTrigger(ESEffectTriggerEvent evt)
+        {
+        }
+
+        [Test]
+        public void EffectTriggerHub_SteadyStatePublishDoesNotAllocate()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            hub.Subscribe(ESEffectTriggerKind.Attack, ConsumeEffectTrigger);
+            EntityPrimaryAttackEvent attack = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Started,
+                1201,
+                default,
+                null,
+                null,
+                null);
+            ESEffectTriggerEvent trigger = new ESEffectTriggerEvent(null, attack);
+            hub.Publish(trigger);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int i = 0; i < 1024; i++)
+                hub.Publish(trigger);
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.That(allocated, Is.EqualTo(0L),
+                "Hub 稳态发布不应产生托管分配；若失败请检查热路径新增对象/委托/容器。");
+        }
+
+        [Test]
+        public void AttackSpecialInfo_IsOptionalAndValueOnly()
+        {
+            EntityPrimaryAttackEvent empty = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Started, 1202, default, null, null, null);
+            Assert.That(empty.specialInfo.IsValid, Is.False);
+
+            ESAttackSpecialInfo special = new ESAttackSpecialInfo(
+                7, flags: 3, int0: 2, int1: 5, float0: 1.25f, float1: 0.5f,
+                vector: new Vector3(0f, 1f, 0f));
+            EntityPrimaryAttackEvent enriched = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.HitResolved, 1203, default, null, null, null,
+                specialInfo: special);
+
+            Assert.That(enriched.specialInfo.IsValid, Is.True);
+            Assert.That(enriched.specialInfo.schemaId, Is.EqualTo(7));
+            Assert.That(enriched.specialInfo.flags, Is.EqualTo(3u));
+            Assert.That(enriched.specialInfo.vector, Is.EqualTo(Vector3.up));
+            Assert.That(enriched.payload.attackId, Is.EqualTo(1203));
+            Assert.That(enriched.payload.specialInfo.schemaId, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void EntityInteractionStream_IsBoundedAndReusable()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            ESEntityInteractionStream stream = new ESEntityInteractionStream(2);
+            EntityPrimaryAttackEvent first = new EntityPrimaryAttackEvent(EntityPrimaryAttackEventKind.Started, 1, default, null, null, null);
+            EntityPrimaryAttackEvent second = new EntityPrimaryAttackEvent(EntityPrimaryAttackEventKind.Started, 2, default, null, null, null);
+            EntityPrimaryAttackEvent third = new EntityPrimaryAttackEvent(EntityPrimaryAttackEventKind.Started, 3, default, null, null, null);
+            hub.Warmup();
+            hub.Publish(new ESEffectTriggerEvent(null, first));
+            stream.Append(new ESEffectTriggerEvent(null, first));
+            stream.Append(new ESEffectTriggerEvent(null, second));
+            stream.Append(new ESEffectTriggerEvent(null, third));
+
+            Assert.That(stream.Count, Is.EqualTo(2));
+            Assert.That(stream.FirstSequence, Is.EqualTo(1UL));
+            Assert.That(stream.TryRead(0, out ESEffectTriggerEvent value), Is.True);
+            Assert.That(value.attack.attackId, Is.EqualTo(2));
+            stream.Clear();
+            Assert.That(stream.Count, Is.EqualTo(0));
+            Assert.That(stream.TryRead(0, out _), Is.False);
+        }
+
+        [Test]
+        public void GameplayInteractionHub_PublishAppendsToEntityStream()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            hub.Warmup();
+            ESEntityInteractionStream stream = hub.Stream;
+            EntityPrimaryAttackEvent attack = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.HitResolved, 4040, default, null, null, null);
+
+            hub.Publish(new ESEffectTriggerEvent(null, attack));
+
+            Assert.That(stream.Count, Is.EqualTo(1));
+            Assert.That(stream.TryRead(0, out ESEffectTriggerEvent recorded), Is.True);
+            Assert.That(recorded.kind, Is.EqualTo(ESEffectTriggerKind.Attack));
+            Assert.That(recorded.attack.attackId, Is.EqualTo(4040));
+            Assert.That(recorded.traceId, Is.Not.EqualTo(0UL));
+        }
+
+        [Test]
+        public void EffectTriggerHub_SupportsChainedDelegatesAndAggregation()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            int attackCalls = 0;
+            int damageCalls = 0;
+            ulong attackTrace = 0;
+            ulong damageTrace = 0;
+            ulong damageParentTrace = 0;
+            Action<ESEffectTriggerEvent> attack = evt =>
+            {
+                attackCalls++;
+                attackTrace = evt.traceId;
+                hub.Publish(new ESEffectTriggerEvent(
+                    null,
+                    new ESEntityDamageRequest(null, 1f, 0f, null, Vector3.zero, Vector3.forward, 1204),
+                    new ESEntityDamageResult(true, false, 10f, 9f)));
+            };
+            Action<ESEffectTriggerEvent> damage = evt =>
+            {
+                damageCalls++;
+                damageTrace = evt.traceId;
+                damageParentTrace = evt.parentTraceId;
+            };
+
+            hub.Subscribe(ESEffectTriggerKind.Attack, attack);
+            hub.Subscribe(ESEffectTriggerKind.Damage, damage);
+            hub.Publish(new ESEffectTriggerEvent(
+                null,
+                new EntityPrimaryAttackEvent(EntityPrimaryAttackEventKind.Started, 1204, default, null, null, null)));
+
+            Assert.That(attackCalls, Is.EqualTo(1));
+            Assert.That(damageCalls, Is.EqualTo(1));
+            Assert.That(hub.GetPublishedCount(ESEffectTriggerKind.Attack), Is.EqualTo(1));
+            Assert.That(hub.GetPublishedCount(ESEffectTriggerKind.Damage), Is.EqualTo(1));
+            Assert.That(attackTrace, Is.Not.EqualTo(0UL));
+            Assert.That(damageTrace, Is.Not.EqualTo(0UL));
+            Assert.That(damageTrace, Is.Not.EqualTo(attackTrace));
+            Assert.That(damageParentTrace, Is.EqualTo(attackTrace));
+        }
+
+        [Test]
+        public void EffectTriggerHub_BoundsRecursiveComposition()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            int calls = 0;
+            EntityPrimaryAttackEvent attack = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Started, 9090, default, null, null, null);
+            Action<ESEffectTriggerEvent> loop = _ =>
+            {
+                calls++;
+                hub.Publish(new ESEffectTriggerEvent(null, attack));
+            };
+            hub.Subscribe(ESEffectTriggerKind.Attack, loop);
+
+            hub.Publish(new ESEffectTriggerEvent(null, attack));
+
+            Assert.That(calls, Is.EqualTo(EntityGameplayInteractionHub.MaxDispatchDepth));
+            Assert.That(hub.DispatchDepthRejectCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void EffectTriggerAggregate_ComposesWithoutPerConsumeAllocation()
+        {
+            ESEffectTriggerSummary aggregate = new ESEffectTriggerSummary();
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            ESEffectTriggerEvent damage = new ESEffectTriggerEvent(
+                null,
+                new ESEntityDamageRequest(null, 4f, 0f, null, Vector3.zero, Vector3.forward, 77),
+                new ESEntityDamageResult(true, false, 20f, 16f));
+            hub.Resolved += evt => aggregate.Consume(in evt);
+            hub.Publish(in damage);
+            hub.Publish(in damage);
+
+            Assert.That(aggregate.DamageCount, Is.EqualTo(2));
+            Assert.That(aggregate.AppliedDamage, Is.EqualTo(8f));
+            Assert.That(aggregate.LastTraceId, Is.Not.EqualTo(0UL));
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int index = 0; index < 1024; index++)
+                hub.Publish(in damage);
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.That(allocated, Is.EqualTo(0L));
+
+            aggregate.Reset();
+            Assert.That(aggregate.DamageCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void HealthDamageAndUnifiedTrigger_SteadyStateDoesNotAllocate()
+        {
+            GameObject targetObject = new GameObject("DamageGcTarget");
+            Entity target = targetObject.AddComponent<Entity>();
+            try
+            {
+                EntityBasicHealthModule health = AddBasicModule(target, new EntityBasicHealthModule());
+                health.maxHealth = 100000f;
+                health.OnPoolSpawned();
+                target.GameplayInteractionHub.Warmup();
+                target.GameplayInteractionHub.Resolved += ConsumeEffectTrigger;
+                ESEntityDamageRequest request = new ESEntityDamageRequest(
+                    null, 0.1f, 0f, null, Vector3.zero, Vector3.forward, 1301);
+                health.TryApplyDamage(request, out _);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 256; i++)
+                    health.TryApplyDamage(request, out _);
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+                Assert.That(allocated, Is.EqualTo(0L),
+                    "Health + unified damage trigger 稳态不应产生托管分配。");
+            }
+            finally
+            {
+                target.OnPoolDespawned();
+                UnityEngine.Object.DestroyImmediate(targetObject);
+            }
+        }
+
+        [Test]
+        public void AuthorityContracts_DoNotExposeDirectShotLaunchOrBuffMutation()
+        {
+            Assert.That(typeof(ItemShotModule).GetMethod("Launch", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ItemShotModule).GetMethod("LaunchTo", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ItemShotModule).GetMethod("Internal_InitializeSpawn", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ItemShotModule).GetMethod("Internal_Stop", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+
+            Assert.That(typeof(ESActiveBuffRuntime).GetMethod("TryApply", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ESActiveBuffRuntime).GetMethod("Apply", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ESActiveBuffRuntime).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(EntityBasicHealthModule).GetMethod("Internal_SetCurrentHealth", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(EntityBasicCombatModule).GetMethod("Internal_TryFireWeapon", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(EntityBasicCombatModule).GetMethod("Internal_CancelPrimaryAttack", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ESItemInstanceTable).GetMethod("Internal_TrySetWeaponState", BindingFlags.Instance | BindingFlags.Public), Is.Null);
+            Assert.That(typeof(ESShotSpawner).GetMethod("TrySpawn", BindingFlags.Static | BindingFlags.Public), Is.Not.Null);
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -122,6 +359,224 @@ namespace ES.Tests
             {
                 target.OnPoolDespawned();
                 UnityEngine.Object.DestroyImmediate(targetObject);
+            }
+        }
+
+        [Test]
+        public void HealthDamage_ProducesUnifiedDamageTriggerWithOriginalContext()
+        {
+            GameObject targetObject = new GameObject("EffectHubHealthTarget");
+            Entity target = targetObject.AddComponent<Entity>();
+            try
+            {
+                EntityBasicHealthModule health = AddBasicModule(target, new EntityBasicHealthModule());
+                health.maxHealth = 50f;
+                health.OnPoolSpawned();
+
+                int receivedAttackId = 0;
+                float receivedAmount = 0f;
+                ESEffectTriggerKind receivedKind = ESEffectTriggerKind.Attack;
+                target.GameplayInteractionHub.Resolved += evt =>
+                {
+                    receivedKind = evt.kind;
+                    receivedAttackId = evt.damageRequest.attackId;
+                    receivedAmount = evt.damageRequest.amount;
+                };
+
+                ESEntityDamageRequest request = new ESEntityDamageRequest(
+                    null,
+                    13f,
+                    2f,
+                    null,
+                    new Vector3(1f, 2f, 3f),
+                    Vector3.forward,
+                    1001);
+                Assert.That(health.TryApplyDamage(request, out ESEntityDamageResult result), Is.True);
+                Assert.That(result.applied, Is.True);
+                Assert.That(receivedKind, Is.EqualTo(ESEffectTriggerKind.Damage));
+                Assert.That(receivedAttackId, Is.EqualTo(1001));
+                Assert.That(receivedAmount, Is.EqualTo(13f));
+            }
+            finally
+            {
+                target.OnPoolDespawned();
+                UnityEngine.Object.DestroyImmediate(targetObject);
+            }
+        }
+
+        [Test]
+        public void EffectTriggerHub_DispatchesTypedResultsInOrderAndClears()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            List<ESEffectTriggerKind> kinds = new List<ESEffectTriggerKind>();
+            hub.Resolved += evt => kinds.Add(evt.kind);
+
+            EntityPrimaryAttackSelection selection = new EntityPrimaryAttackSelection(
+                EntityPrimaryAttackRoute.Action,
+                EntityPrimaryAttackSource.PrimaryWeapon);
+            EntityPrimaryAttackEvent attack = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Started,
+                801,
+                selection,
+                null,
+                null,
+                null);
+            hub.Publish(new ESEffectTriggerEvent(null, attack));
+            hub.Publish(new ESEffectTriggerEvent(
+                null,
+                new ESEntityDamageRequest(null, 1f, 0f, null, Vector3.zero, Vector3.forward, 802),
+                new ESEntityDamageResult(true, false, 10f, 9f)));
+            ESEntityMovementResult movement = new ESEntityMovementResult(
+                null,
+                Vector3.zero,
+                Vector3.right,
+                Vector3.right,
+                true,
+                803);
+            hub.Publish(new ESEffectTriggerEvent(null, movement));
+            hub.Publish(new ESEffectTriggerEvent(
+                null,
+                new ESShotLifecycleEvent(
+                    ESShotLifecycleKind.Launched,
+                    null,
+                    default,
+                    default)));
+
+            Assert.That(kinds, Is.EqualTo(new[]
+            {
+                ESEffectTriggerKind.Attack,
+                ESEffectTriggerKind.Damage,
+                ESEffectTriggerKind.Movement,
+                ESEffectTriggerKind.Spawn
+            }));
+            Assert.That(hub.TotalPublished, Is.EqualTo(4));
+            Assert.That(hub.GetPublishedCount(ESEffectTriggerKind.Damage), Is.EqualTo(1));
+
+            hub.Clear();
+            hub.Publish(new ESEffectTriggerEvent(null, attack));
+            Assert.That(kinds.Count, Is.EqualTo(4));
+            Assert.That(hub.TotalPublished, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void EffectTriggerHub_RoutedSubscriptionReceivesOnlySelectedKind()
+        {
+            EntityGameplayInteractionHub hub = new EntityGameplayInteractionHub();
+            int damageCount = 0;
+            Action<ESEffectTriggerEvent> onDamage = _ => damageCount++;
+            hub.Subscribe(ESEffectTriggerKind.Damage, onDamage);
+
+            EntityPrimaryAttackEvent attack = new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Started,
+                811,
+                default,
+                null,
+                null,
+                null);
+            hub.Publish(new ESEffectTriggerEvent(null, attack));
+            hub.Publish(new ESEffectTriggerEvent(
+                null,
+                new ESEntityDamageRequest(null, 2f, 0f, null, Vector3.zero, Vector3.forward, 812),
+                new ESEntityDamageResult(true, false, 10f, 8f)));
+
+            Assert.That(damageCount, Is.EqualTo(1));
+            hub.Unsubscribe(ESEffectTriggerKind.Damage, onDamage);
+            hub.Publish(new ESEffectTriggerEvent(
+                null,
+                new ESEntityDamageRequest(null, 3f, 0f, null, Vector3.zero, Vector3.forward, 813),
+                new ESEntityDamageResult(true, false, 8f, 5f)));
+            Assert.That(damageCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void CombatPrimaryAttack_ForwardsToEntityGameplayInteractionHub()
+        {
+            GameObject ownerObject = new GameObject("EffectHubCombatOwner");
+            Entity owner = ownerObject.AddComponent<Entity>();
+            try
+            {
+                EntityBasicCombatModule combat = AddBasicModule(owner, new EntityBasicCombatModule());
+                int attackId = 0;
+                ESEffectTriggerKind kind = ESEffectTriggerKind.Damage;
+                owner.GameplayInteractionHub.Resolved += evt =>
+                {
+                    kind = evt.kind;
+                    attackId = evt.attack.attackId;
+                };
+
+                EntityPrimaryAttackSelection selection = new EntityPrimaryAttackSelection(
+                    EntityPrimaryAttackRoute.Action,
+                    EntityPrimaryAttackSource.PrimaryWeapon);
+                EntityPrimaryAttackEvent attack = new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.Started,
+                    901,
+                    selection,
+                    null,
+                    null,
+                    null);
+                InvokePrivate<object>(combat, "PublishPrimaryAttackEvent", attack);
+
+                Assert.That(kind, Is.EqualTo(ESEffectTriggerKind.Attack));
+                Assert.That(attackId, Is.EqualTo(901));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(ownerObject);
+            }
+        }
+
+        [Test]
+        public void ShotLifecycle_LaunchedForwardsToEntityGameplayInteractionHub()
+        {
+            GameObject ownerObject = new GameObject("EffectHubShotOwner");
+            Entity owner = ownerObject.AddComponent<Entity>();
+            try
+            {
+                EntityBasicCombatModule combat = AddBasicModule(owner, new EntityBasicCombatModule());
+                ESEffectTriggerKind receivedKind = ESEffectTriggerKind.Attack;
+                owner.GameplayInteractionHub.Resolved += evt => receivedKind = evt.kind;
+
+                ESShotLaunchContext context = new ESShotLaunchContext(
+                    902,
+                    owner,
+                    default,
+                    null,
+                    default,
+                    lifecycleObserver: null,
+                    publishesAttackFinish: false);
+                ESShotLifecycleEvent launched = new ESShotLifecycleEvent(
+                    ESShotLifecycleKind.Launched,
+                    null,
+                    context,
+                    default);
+                InvokePrivate<object>(combat, "HandleShotLifecycle", launched);
+
+                Assert.That(receivedKind, Is.EqualTo(ESEffectTriggerKind.Spawn));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(ownerObject);
+            }
+        }
+
+        [Test]
+        public void KccMovementResolved_ForwardsToEntityGameplayInteractionHub()
+        {
+            GameObject ownerObject = new GameObject("EffectHubMovementOwner");
+            Entity owner = ownerObject.AddComponent<Entity>();
+            try
+            {
+                owner.kcc.motor = owner.GetComponent<KinematicCharacterMotor>();
+                ESEffectTriggerKind receivedKind = ESEffectTriggerKind.Attack;
+                owner.GameplayInteractionHub.Resolved += evt => receivedKind = evt.kind;
+
+                InvokePrivate<object>(owner.kcc, "PublishMovementResolved", owner);
+
+                Assert.That(receivedKind, Is.EqualTo(ESEffectTriggerKind.Movement));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(ownerObject);
             }
         }
 

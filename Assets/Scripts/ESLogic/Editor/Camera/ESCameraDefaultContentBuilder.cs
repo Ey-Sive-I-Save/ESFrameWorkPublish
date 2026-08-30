@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using Cinemachine;
 using UnityEditor;
 using UnityEngine;
@@ -21,6 +23,7 @@ namespace ES
         public const string DefinitionCatalogPath = ContentFolder + "/ESCameraViewDefinitionCatalog.asset";
         public const string RigCatalogPath = ContentFolder + "/ESCameraRigCatalog.asset";
         public const string BlenderSettingsPath = ContentFolder + "/ESCameraBlenderSettings.asset";
+        public const string GlobalPolicyPath = ContentFolder + "/ESCameraGlobalPolicy.asset";
 
         public const string PlayerThirdPersonDefinitionKey = "player.third_person";
         public const string PlayerThirdPersonRigKey = "player.third_person";
@@ -32,10 +35,196 @@ namespace ES
         [MenuItem("【ES】/内容制作/相机/创建或刷新默认玩家与载具相机内容", false, 140)]
         public static void EnsureDefaultPlayerCameraContentMenu()
         {
+            if (!EditorUtility.DisplayDialog(
+                "创建或刷新默认相机内容",
+                "此操作会更新默认 Player/Vehicle ViewDefinition、Rig Prefab、Catalog 和全局策略资产。已有生成内容可能被覆盖，是否继续？",
+                "继续",
+                "取消"))
+                return;
+
             EnsureDefaultPlayerCameraContent();
             Selection.activeObject = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
             EditorGUIUtility.PingObject(Selection.activeObject);
             Debug.Log("[ESCamera] 已创建默认玩家第三人称与载具追逐相机定义、Rig 与索引。", Selection.activeObject);
+        }
+
+        [MenuItem("【ES】/内容制作/相机/一键创建并验证默认内容", false, 139)]
+        public static void EnsureAndValidateDefaultPlayerCameraContentMenu()
+        {
+            if (!EditorUtility.DisplayDialog(
+                "一键创建并验证默认相机内容",
+                "此操作会更新默认 Player/Vehicle 相机资产并立即执行静态验证。已有生成内容可能被覆盖，是否继续？",
+                "继续",
+                "取消"))
+                return;
+
+            EnsureDefaultPlayerCameraContent();
+            ValidateDefaultPlayerCameraContentMenu();
+        }
+
+        [MenuItem("【ES】/内容制作/相机/验证默认相机内容", false, 141)]
+        public static void ValidateDefaultPlayerCameraContentMenu()
+        {
+            ESCameraGlobalPolicy policy = AssetDatabase.LoadAssetAtPath<ESCameraGlobalPolicy>(GlobalPolicyPath);
+            ESCameraViewDefinitionCatalog definitions = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
+            ESCameraRigCatalog rigs = AssetDatabase.LoadAssetAtPath<ESCameraRigCatalog>(RigCatalogPath);
+            if (policy == null || definitions == null || rigs == null)
+            {
+                Debug.LogError("[ESCamera] 默认相机内容不完整：请先执行“创建或刷新默认玩家与载具相机内容”。");
+                return;
+            }
+
+            if (!policy.TryValidate(out string policyError))
+            {
+                Debug.LogError("[ESCamera] 全局策略无效：" + policyError, policy);
+                return;
+            }
+
+            if (!definitions.IsValid || !rigs.IsValid)
+            {
+                Debug.LogError("[ESCamera] 默认相机内容验证失败：请检查 ViewDefinition Catalog、Rig Catalog 和 Prefab 组件合同。");
+                return;
+            }
+
+            Debug.Log("[ESCamera] 默认相机内容验证通过：全局策略、ViewDefinition Catalog 与 Rig Catalog 静态合同有效。", policy);
+        }
+
+        [MenuItem("【ES】/内容制作/相机/迁移视图到全局策略", false, 142)]
+        public static void MigrateDefinitionsToGlobalPolicyMenu()
+        {
+            ESCameraGlobalPolicy policy = AssetDatabase.LoadAssetAtPath<ESCameraGlobalPolicy>(GlobalPolicyPath);
+            ESCameraViewDefinitionCatalog catalog = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
+            if (policy == null || catalog == null)
+            {
+                Debug.LogError("[ESCamera] 找不到全局策略或 ViewDefinition Catalog；请先创建默认相机内容。");
+                return;
+            }
+
+            if (!policy.TryValidate(out string policyError))
+            {
+                Debug.LogError("[ESCamera] 迁移中止：全局策略无效：" + policyError, policy);
+                return;
+            }
+
+            List<ESCameraViewDefinition> definitions = new List<ESCameraViewDefinition>();
+            if (!catalog.TryCopyDefinitionsForAuthoring(definitions, out string catalogError))
+            {
+                Debug.LogError("[ESCamera] 迁移中止：" + catalogError, catalog);
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                "迁移相机全局字段",
+                "将把全局输入与避障策略同步到 " + definitions.Count + " 个旧 ViewDefinition 的兼容字段。此操作支持 Undo。",
+                "继续迁移",
+                "取消"))
+                return;
+
+            Undo.RecordObject(policy, "迁移相机全局策略");
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                ESCameraViewDefinition definition = definitions[i];
+                if (definition == null)
+                    continue;
+
+                Undo.RecordObject(definition, "迁移相机全局策略");
+                SyncLegacyDefinitionDefaults(definition, policy);
+                EditorUtility.SetDirty(definition);
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log("[ESCamera] 已迁移 " + definitions.Count + " 个 ViewDefinition；旧字段仍保留为兼容缓存。", policy);
+        }
+
+        [MenuItem("【ES】/内容制作/相机/报告全局策略一致性", false, 143)]
+        public static void ReportGlobalPolicyConsistencyMenu()
+        {
+            ESCameraGlobalPolicy policy = AssetDatabase.LoadAssetAtPath<ESCameraGlobalPolicy>(GlobalPolicyPath);
+            ESCameraViewDefinitionCatalog catalog = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
+            if (policy == null || catalog == null)
+            {
+                Debug.LogError("[ESCamera] 找不到全局策略或 ViewDefinition Catalog；无法生成一致性报告。");
+                return;
+            }
+
+            List<ESCameraViewDefinition> definitions = new List<ESCameraViewDefinition>();
+            if (!catalog.TryCopyDefinitionsForAuthoring(definitions, out string catalogError))
+            {
+                Debug.LogError("[ESCamera] 一致性报告中止：" + catalogError, catalog);
+                return;
+            }
+
+            int mismatchCount = 0;
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                ESCameraViewDefinition definition = definitions[i];
+                if (definition == null || IsLegacyDefinitionSynchronized(definition, policy))
+                    continue;
+
+                mismatchCount++;
+                Debug.LogWarning("[ESCamera] ViewDefinition '" + definition.Definition
+                    + "' 的隐藏兼容字段与 GlobalPolicy 不一致；建议执行迁移菜单。", definition);
+            }
+
+            if (mismatchCount == 0)
+                Debug.Log("[ESCamera] 全局策略一致性报告通过：" + definitions.Count + " 个 ViewDefinition 均已同步。", policy);
+            else
+                Debug.LogWarning("[ESCamera] 全局策略一致性报告发现 " + mismatchCount + " 个不同步的 ViewDefinition（共 " + definitions.Count + " 个）。", policy);
+        }
+
+        [MenuItem("【ES】/内容制作/相机/生成相机配置报告", false, 144)]
+        public static void GenerateCameraConfigurationReportMenu()
+        {
+            ESCameraGlobalPolicy policy = AssetDatabase.LoadAssetAtPath<ESCameraGlobalPolicy>(GlobalPolicyPath);
+            ESCameraViewDefinitionCatalog catalog = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
+            ESCameraRigCatalog rigs = AssetDatabase.LoadAssetAtPath<ESCameraRigCatalog>(RigCatalogPath);
+            StringBuilder report = new StringBuilder(512);
+            report.AppendLine("[ESCamera] 配置报告");
+            report.AppendLine("全局策略：" + (policy != null && policy.IsValid ? "有效" : "缺失或无效"));
+            report.AppendLine("ViewDefinition Catalog：" + (catalog != null && catalog.IsValid ? "有效" : "缺失或无效"));
+            report.AppendLine("Rig Catalog：" + (rigs != null && rigs.IsValid ? "有效" : "缺失或无效"));
+
+            int definitionCount = 0;
+            int mismatchCount = 0;
+            if (catalog != null)
+            {
+                List<ESCameraViewDefinition> definitions = new List<ESCameraViewDefinition>();
+                if (catalog.TryCopyDefinitionsForAuthoring(definitions, out _))
+                {
+                    definitionCount = definitions.Count;
+                    if (policy != null)
+                    {
+                        for (int i = 0; i < definitions.Count; i++)
+                        {
+                            if (definitions[i] != null && !IsLegacyDefinitionSynchronized(definitions[i], policy))
+                                mismatchCount++;
+                        }
+                    }
+                }
+            }
+
+            report.AppendLine("View 数量：" + definitionCount);
+            report.AppendLine("Rig 数量：" + (rigs != null ? rigs.EntryCount : 0));
+            report.AppendLine("隐藏兼容字段漂移：" + mismatchCount);
+            report.AppendLine("下一步：" + (mismatchCount > 0 ? "执行“迁移视图到全局策略”" : "进入 Unity/PlayMode 验收"));
+            Debug.Log(report.ToString(), policy != null ? policy : catalog);
+        }
+
+        private static bool IsLegacyDefinitionSynchronized(ESCameraViewDefinition definition, ESCameraGlobalPolicy policy)
+        {
+            return definition.povLookSensitivity == policy.povLookSensitivity
+                && definition.freeLookSensitivity == policy.freeLookSensitivity
+                && Mathf.Approximately(definition.pointerLookScale, policy.pointerLookScale)
+                && definition.maxPovLookRate == policy.maxPovLookRate
+                && definition.maxFreeLookRate == policy.maxFreeLookRate
+                && definition.invertVerticalLook == policy.invertVerticalLook
+                && definition.enableObstruction == policy.enableObstruction
+                && definition.obstructionMask.value == policy.obstructionMask.value
+                && Mathf.Approximately(definition.obstructionCameraRadius, policy.obstructionCameraRadius)
+                && Mathf.Approximately(definition.obstructionMinimumDistance, policy.obstructionMinimumDistance)
+                && definition.obstructionMaximumEffort == policy.obstructionMaximumEffort
+                && Mathf.Approximately(definition.obstructionDamping, policy.obstructionDamping)
+                && Mathf.Approximately(definition.obstructionDampingWhenOccluded, policy.obstructionDampingWhenOccluded);
         }
 
         public static void EnsureDefaultPlayerCameraContent()
@@ -61,6 +250,13 @@ namespace ES
                 VehicleChaseRigKey,
                 65f,
                 new Vector2(200f, 0.45f));
+
+            ESCameraGlobalPolicy globalPolicy = LoadOrCreate<ESCameraGlobalPolicy>(GlobalPolicyPath);
+            SyncLegacyDefinitionDefaults(playerDefinition, globalPolicy);
+            SyncLegacyDefinitionDefaults(vehicleDefinition, globalPolicy);
+            EditorUtility.SetDirty(playerDefinition);
+            EditorUtility.SetDirty(vehicleDefinition);
+            EditorUtility.SetDirty(globalPolicy);
 
             GameObject playerRigPrefab = RebuildPlayerThirdPersonRig();
             GameObject vehicleRigPrefab = RebuildVehicleChaseRig();
@@ -103,10 +299,32 @@ namespace ES
             EditorUtility.SetDirty(blenderSettings);
             AssetDatabase.SaveAssetIfDirty(playerDefinition);
             AssetDatabase.SaveAssetIfDirty(vehicleDefinition);
+            AssetDatabase.SaveAssetIfDirty(globalPolicy);
             AssetDatabase.SaveAssetIfDirty(definitionCatalog);
             AssetDatabase.SaveAssetIfDirty(rigCatalog);
             AssetDatabase.SaveAssetIfDirty(blenderSettings);
             AssetDatabase.Refresh();
+        }
+
+        private static void SyncLegacyDefinitionDefaults(ESCameraViewDefinition definition, ESCameraGlobalPolicy policy)
+        {
+            if (definition == null || policy == null)
+                return;
+
+            // 保留旧字段的序列化兼容值；正式运行时由 GlobalPolicy 优先覆盖。
+            definition.povLookSensitivity = policy.povLookSensitivity;
+            definition.freeLookSensitivity = policy.freeLookSensitivity;
+            definition.pointerLookScale = policy.pointerLookScale;
+            definition.maxPovLookRate = policy.maxPovLookRate;
+            definition.maxFreeLookRate = policy.maxFreeLookRate;
+            definition.invertVerticalLook = policy.invertVerticalLook;
+            definition.enableObstruction = policy.enableObstruction;
+            definition.obstructionMask = policy.obstructionMask;
+            definition.obstructionCameraRadius = policy.obstructionCameraRadius;
+            definition.obstructionMinimumDistance = policy.obstructionMinimumDistance;
+            definition.obstructionMaximumEffort = policy.obstructionMaximumEffort;
+            definition.obstructionDamping = policy.obstructionDamping;
+            definition.obstructionDampingWhenOccluded = policy.obstructionDampingWhenOccluded;
         }
 
         public static bool TryLoadDefaultPlayerCameraContent(
@@ -142,6 +360,15 @@ namespace ES
                 throw new InvalidOperationException(error);
             }
 
+            // SceneBinding must receive the same project-wide policy asset used by the
+            // generated catalogs.  Do not pass an editor-only/uninitialized local variable:
+            // a null policy silently reactivates per-definition legacy fields at runtime.
+            ESCameraGlobalPolicy globalPolicy = AssetDatabase.LoadAssetAtPath<ESCameraGlobalPolicy>(GlobalPolicyPath);
+            string policyError = string.Empty;
+            bool policyValid = globalPolicy != null && globalPolicy.TryValidate(out policyError);
+            if (!policyValid)
+                throw new InvalidOperationException("默认相机全局策略缺失或无效：" + (policyError ?? GlobalPolicyPath));
+
             GameObject cameraObject = new GameObject("ES Camera System (MainView)");
             Transform rigRoot = null;
             try
@@ -168,7 +395,8 @@ namespace ES
                     definitionCatalog,
                     rigCatalog,
                     AssetDatabase.LoadAssetAtPath<CinemachineBlenderSettings>(BlenderSettingsPath),
-                    rigRoot);
+                    rigRoot,
+                    globalPolicy);
                 return camera;
             }
             catch
@@ -255,24 +483,30 @@ namespace ES
             float fieldOfView,
             Vector2 freeLookSensitivity)
         {
+            bool preserveAuthoredValues = definition != null
+                && definition.Definition.IsConfigured
+                && !string.IsNullOrWhiteSpace(definition.rigKey);
             definition.name = name;
             definition.SetDefinitionForAuthoring(definitionReference);
             definition.rigKey = rigKey;
-            definition.freeLookSensitivity = freeLookSensitivity;
-            definition.povLookSensitivity = new Vector2(220f, 90f);
-            definition.pointerLookScale = 0.001f;
-            definition.invertVerticalLook = false;
-            definition.baseFieldOfView = fieldOfView;
-            definition.baseDistanceScale = 1f;
-            definition.baseShoulderOffset = Vector3.zero;
-            definition.baseShakeAmplitude = 0f;
-            definition.enableObstruction = true;
-            definition.obstructionMask = ESPhysicsLayers.CameraObstacleMask;
-            definition.obstructionCameraRadius = 0.2f;
-            definition.obstructionMinimumDistance = 0.25f;
-            definition.obstructionMaximumEffort = 4;
-            definition.obstructionDamping = 0.12f;
-            definition.obstructionDampingWhenOccluded = 0.05f;
+            if (!preserveAuthoredValues)
+            {
+                definition.freeLookSensitivity = freeLookSensitivity;
+                definition.povLookSensitivity = new Vector2(220f, 90f);
+                definition.pointerLookScale = 0.001f;
+                definition.invertVerticalLook = false;
+                definition.baseFieldOfView = fieldOfView;
+                definition.baseDistanceScale = 1f;
+                definition.baseShoulderOffset = Vector3.zero;
+                definition.baseShakeAmplitude = 0f;
+                definition.enableObstruction = true;
+                definition.obstructionMask = ESPhysicsLayers.CameraObstacleMask;
+                definition.obstructionCameraRadius = 0.2f;
+                definition.obstructionMinimumDistance = 0.25f;
+                definition.obstructionMaximumEffort = 4;
+                definition.obstructionDamping = 0.12f;
+                definition.obstructionDampingWhenOccluded = 0.05f;
+            }
             EditorUtility.SetDirty(definition);
         }
 

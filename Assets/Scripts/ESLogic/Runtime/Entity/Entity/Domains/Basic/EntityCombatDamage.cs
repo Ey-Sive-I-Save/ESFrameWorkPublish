@@ -14,6 +14,7 @@ namespace ES
         public readonly Vector3 hitPoint;
         public readonly Vector3 forceDirection;
         public readonly int attackId;
+        public readonly ESAttackSpecialInfo specialInfo;
 
         public ESEntityDamageRequest(
             Entity source,
@@ -22,7 +23,8 @@ namespace ES
             Collider hitCollider,
             Vector3 hitPoint,
             Vector3 forceDirection,
-            int attackId)
+            int attackId,
+            ESAttackSpecialInfo specialInfo = default)
         {
             this.source = source;
             this.amount = amount;
@@ -31,6 +33,7 @@ namespace ES
             this.hitPoint = hitPoint;
             this.forceDirection = forceDirection;
             this.attackId = attackId;
+            this.specialInfo = specialInfo;
         }
     }
 
@@ -82,6 +85,8 @@ namespace ES
         [NonSerialized] private Animator hitReactionAnimator;
         [NonSerialized] private Action<ESEntityDamageResult> damageApplied;
         [NonSerialized] private Delegate[] damageAppliedSnapshot = Array.Empty<Delegate>();
+        [NonSerialized] private Action<ESEntityDamageRequest, ESEntityDamageResult> damageResolved;
+        [NonSerialized] private Delegate[] damageResolvedSnapshot = Array.Empty<Delegate>();
 
         public float CurrentHealth => currentHealth;
         public float MaxHealth => Mathf.Max(0.01f, maxHealth);
@@ -116,6 +121,38 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 统一伤害效果触发通知。与 DamageApplied 的兼容事件不同，该事件保留
+        /// 原始请求上下文，使攻击来源、attackId、命中点和冲击方向能够被效果/表现
+        /// 消费者确定性地关联，而不把 Combat 变成第二套效果系统。
+        /// </summary>
+        public event Action<ESEntityDamageRequest, ESEntityDamageResult> DamageResolved
+        {
+            add
+            {
+                if (value == null)
+                    return;
+                damageResolved += value;
+                damageResolvedSnapshot = damageResolved.GetInvocationList();
+            }
+            remove
+            {
+                if (value == null || damageResolved == null)
+                    return;
+
+                Action<ESEntityDamageRequest, ESEntityDamageResult> before = damageResolved;
+                Action<ESEntityDamageRequest, ESEntityDamageResult> after =
+                    (Action<ESEntityDamageRequest, ESEntityDamageResult>)Delegate.Remove(before, value);
+                if (ReferenceEquals(before, after))
+                    return;
+
+                damageResolved = after;
+                damageResolvedSnapshot = after != null
+                    ? after.GetInvocationList()
+                    : Array.Empty<Delegate>();
+            }
+        }
+
         public override void Start()
         {
             base.Start();
@@ -144,6 +181,8 @@ namespace ES
             hitReactionAnimator = null;
             damageApplied = null;
             damageAppliedSnapshot = Array.Empty<Delegate>();
+            damageResolved = null;
+            damageResolvedSnapshot = Array.Empty<Delegate>();
         }
 
         public override void OnDestroy()
@@ -151,6 +190,8 @@ namespace ES
             MyCore?.Internal_UnbindBasicHealth(this);
             damageApplied = null;
             damageAppliedSnapshot = Array.Empty<Delegate>();
+            damageResolved = null;
+            damageResolvedSnapshot = Array.Empty<Delegate>();
             base.OnDestroy();
         }
 
@@ -169,6 +210,7 @@ namespace ES
                     || float.IsInfinity(amount))
                 {
                     result = new ESEntityDamageResult(false, false, currentHealth, currentHealth);
+                    PublishDamageResolved(request, result);
                     return false;
                 }
 
@@ -203,11 +245,33 @@ namespace ES
                         Debug.LogException(exception, MyCore);
                     }
                 }
+                PublishDamageResolved(request, result);
                 return true;
             }
         }
 
-        public void Internal_SetCurrentHealth(float value)
+        [ESHotPath]
+        private void PublishDamageResolved(
+            in ESEntityDamageRequest request,
+            in ESEntityDamageResult result)
+        {
+            MyCore?.GameplayInteractionHub.Publish(new ESEffectTriggerEvent(MyCore, request, result));
+            Delegate[] invocationList = damageResolvedSnapshot;
+            for (int index = 0; index < invocationList.Length; index++)
+            {
+                try
+                {
+                    ((Action<ESEntityDamageRequest, ESEntityDamageResult>)invocationList[index])
+                        .Invoke(request, result);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, MyCore);
+                }
+            }
+        }
+
+        internal void Internal_SetCurrentHealth(float value)
         {
             if (float.IsNaN(value) || float.IsInfinity(value))
                 return;

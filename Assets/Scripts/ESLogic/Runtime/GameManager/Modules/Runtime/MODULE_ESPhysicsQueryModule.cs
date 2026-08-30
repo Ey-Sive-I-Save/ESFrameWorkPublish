@@ -103,16 +103,22 @@ namespace ES
     {
         public int raycastCount;
         public int sphereCastCount;
+        public int boxCastCount;
+        public int capsuleCastCount;
         public int overlapSphereCount;
         public int overlapBoxCount;
+        public int overlapCapsuleCount;
         public int overflowCount;
 
         public void Clear()
         {
             raycastCount = 0;
             sphereCastCount = 0;
+            boxCastCount = 0;
+            capsuleCastCount = 0;
             overlapSphereCount = 0;
             overlapBoxCount = 0;
+            overlapCapsuleCount = 0;
             overflowCount = 0;
         }
     }
@@ -316,6 +322,47 @@ namespace ES
         {
             EnsureColliderBuffer();
             return OverlapBox(center, halfExtents, orientation, layerMask, sharedColliders, defaultTriggerInteraction);
+        }
+
+        public int OverlapCapsule(Vector3 point0, Vector3 point1, float radius, LayerMask layerMask,
+            Collider[] results, QueryTriggerInteraction triggerInteraction)
+        {
+            if (results == null || results.Length == 0)
+                return 0;
+
+            stats.overlapCapsuleCount++;
+            int count = Physics.OverlapCapsuleNonAlloc(point0, point1, Mathf.Max(0f, radius), results,
+                layerMask, triggerInteraction);
+            TrackOverflow(count, results.Length);
+            return count;
+        }
+
+        public int BoxCast(Vector3 origin, Vector3 halfExtents, Vector3 direction, float distance,
+            Quaternion orientation, LayerMask layerMask, RaycastHit[] results,
+            QueryTriggerInteraction triggerInteraction)
+        {
+            if (results == null || results.Length == 0 || direction.sqrMagnitude <= 0.0001f)
+                return 0;
+
+            stats.boxCastCount++;
+            int count = Physics.BoxCastNonAlloc(origin, halfExtents, results, direction.normalized,
+                orientation, Mathf.Max(0f, distance), layerMask, triggerInteraction);
+            TrackOverflow(count, results.Length);
+            return count;
+        }
+
+        public int CapsuleCast(Vector3 point0, Vector3 point1, float radius, Vector3 direction,
+            float distance, LayerMask layerMask, RaycastHit[] results,
+            QueryTriggerInteraction triggerInteraction)
+        {
+            if (results == null || results.Length == 0 || direction.sqrMagnitude <= 0.0001f)
+                return 0;
+
+            stats.capsuleCastCount++;
+            int count = Physics.CapsuleCastNonAlloc(point0, point1, Mathf.Max(0f, radius),
+                direction.normalized, results, Mathf.Max(0f, distance), layerMask, triggerInteraction);
+            TrackOverflow(count, results.Length);
+            return count;
         }
 
         public int ShotCast(Vector3 from, Vector3 to, float radius, LayerMask layerMask, RaycastHit[] results, QueryTriggerInteraction triggerInteraction)

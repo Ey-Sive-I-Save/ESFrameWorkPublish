@@ -20,6 +20,7 @@ namespace ES
         private readonly Camera outputCamera;
         private readonly CinemachineBrain brain;
         private readonly ESCameraViewDefinitionCatalog definitionCatalog;
+        private readonly ESCameraGlobalPolicy globalPolicy;
         private readonly ESCameraSceneRigRegistry rigs;
         private readonly ESInputSchemeResolver inputSchemeResolver;
         private readonly HashSet<string> reportedDefinitionErrors = new HashSet<string>(StringComparer.Ordinal);
@@ -40,11 +41,13 @@ namespace ES
             CinemachineBrain brain,
             ESCameraViewDefinitionCatalog definitionCatalog,
             ESCameraRigCatalog rigCatalog,
-            Transform rigRoot)
+            Transform rigRoot,
+            ESCameraGlobalPolicy globalPolicy = null)
         {
             this.outputCamera = outputCamera;
             this.brain = brain;
             this.definitionCatalog = definitionCatalog;
+            this.globalPolicy = globalPolicy;
             rigs = new ESCameraSceneRigRegistry(rigCatalog, rigRoot);
             inputSchemeResolver = ESGameManager.InputModule?.SchemeResolver;
             UpdateLookInputMode(inputSchemeResolver != null ? inputSchemeResolver.ActiveSchemeId : null);
@@ -80,6 +83,22 @@ namespace ES
             {
             if (!IsReady || !resolved.hasWinner)
             {
+                Clear();
+                return false;
+            }
+
+            if (!resolved.configurationChanged && activeRig == null)
+            {
+                Clear();
+                return false;
+            }
+
+            if (!resolved.configurationChanged
+                && activeDefinition != null
+                && (globalPolicy != null ? globalPolicy.enableObstruction : activeDefinition.enableObstruction)
+                && activeObstruction == null)
+            {
+                ReportDefinitionError(activeDefinition.Definition.ToString(), "运行时 Rig 避障组件已失效。");
                 Clear();
                 return false;
             }
@@ -123,7 +142,13 @@ namespace ES
                 // definition policy, so a winner change must refresh them even when the VCam instance is unchanged.
                 if (definitionChanged)
                 {
-                    ConfigureRigForDirector(activeRig, activePov, activeObstruction, definition);
+                    if (!ConfigureRigForDirector(activeRig, activePov, activeObstruction, definition))
+                    {
+                        ReportDefinitionError(resolved.definition.ToString(), "Rig 未满足当前相机定义的制作期组件合同。");
+                        Clear();
+                        return false;
+                    }
+
                     activeDefinition = definition;
                     activeDefinitionHandle = resolved.definitionHandle;
                     hasAppliedModifiers = false;
@@ -212,7 +237,7 @@ namespace ES
                 obstruction.enabled = false;
         }
 
-        private static void ConfigureRigForDirector(
+        private bool ConfigureRigForDirector(
             CinemachineVirtualCameraBase rig,
             CinemachinePOV pov,
             CinemachineCollider obstruction,
@@ -222,8 +247,7 @@ namespace ES
             {
                 DisableLegacyInput(ref freeLook.m_XAxis);
                 DisableLegacyInput(ref freeLook.m_YAxis);
-                ConfigureObstruction(rig, obstruction, definition);
-                return;
+                return ConfigureObstruction(rig, obstruction, definition);
             }
 
             if (pov != null)
@@ -232,19 +256,20 @@ namespace ES
                 DisableLegacyInput(ref pov.m_VerticalAxis);
             }
 
-            ConfigureObstruction(rig, obstruction, definition);
+            return ConfigureObstruction(rig, obstruction, definition);
         }
 
-        private static void ConfigureObstruction(
+        private bool ConfigureObstruction(
             CinemachineVirtualCameraBase rig,
             CinemachineCollider obstruction,
             ESCameraViewDefinition definition)
         {
-            if (definition == null || !definition.enableObstruction)
+            bool enableObstruction = globalPolicy != null ? globalPolicy.enableObstruction : definition != null && definition.enableObstruction;
+            if (definition == null || !enableObstruction)
             {
                 if (obstruction != null)
                     obstruction.enabled = false;
-                return;
+                return true;
             }
 
             if (obstruction == null)
@@ -253,16 +278,17 @@ namespace ES
                     "[ESCamera] 相机定义 '" + definition.Definition + "' 启用了避障，但 Rig '" + rig.name
                     + "' 缺少 CinemachineCollider。请在制作期补齐 Rig。",
                     rig);
-                return;
+                return false;
             }
 
             obstruction.enabled = true;
-            obstruction.m_CollideAgainst = definition.obstructionMask;
-            obstruction.m_CameraRadius = Mathf.Max(0.01f, definition.obstructionCameraRadius);
-            obstruction.m_MinimumDistanceFromTarget = Mathf.Max(0.01f, definition.obstructionMinimumDistance);
-            obstruction.m_MaximumEffort = Mathf.Clamp(definition.obstructionMaximumEffort, 1, 8);
-            obstruction.m_Damping = Mathf.Max(0f, definition.obstructionDamping);
-            obstruction.m_DampingWhenOccluded = Mathf.Max(0f, definition.obstructionDampingWhenOccluded);
+            obstruction.m_CollideAgainst = globalPolicy != null ? globalPolicy.obstructionMask : definition.obstructionMask;
+            obstruction.m_CameraRadius = Mathf.Max(0.01f, globalPolicy != null ? globalPolicy.obstructionCameraRadius : definition.obstructionCameraRadius);
+            obstruction.m_MinimumDistanceFromTarget = Mathf.Max(0.01f, globalPolicy != null ? globalPolicy.obstructionMinimumDistance : definition.obstructionMinimumDistance);
+            obstruction.m_MaximumEffort = Mathf.Clamp(globalPolicy != null ? globalPolicy.obstructionMaximumEffort : definition.obstructionMaximumEffort, 1, 8);
+            obstruction.m_Damping = Mathf.Max(0f, globalPolicy != null ? globalPolicy.obstructionDamping : definition.obstructionDamping);
+            obstruction.m_DampingWhenOccluded = Mathf.Max(0f, globalPolicy != null ? globalPolicy.obstructionDampingWhenOccluded : definition.obstructionDampingWhenOccluded);
+            return true;
         }
 
         private static void DisableLegacyInput(ref AxisState axis)
@@ -290,26 +316,30 @@ namespace ES
             ESCameraViewDefinition definition)
         {
             float inputStep = ResolveLookInputStep(definition);
-            float verticalSign = definition.invertVerticalLook ? 1f : -1f;
+            float verticalSign = (globalPolicy != null ? globalPolicy.invertVerticalLook : definition.invertVerticalLook) ? 1f : -1f;
+            Vector2 freeSensitivity = globalPolicy != null ? globalPolicy.freeLookSensitivity : definition.freeLookSensitivity;
+            Vector2 povSensitivity = globalPolicy != null ? globalPolicy.povLookSensitivity : definition.povLookSensitivity;
+            Vector2 freeMaxRate = globalPolicy != null ? globalPolicy.maxFreeLookRate : definition.maxFreeLookRate;
+            Vector2 povMaxRate = globalPolicy != null ? globalPolicy.maxPovLookRate : definition.maxPovLookRate;
             if (rig is CinemachineFreeLook freeLook)
             {
-                ApplyAxisDelta(ref freeLook.m_XAxis, lookInput.x * definition.freeLookSensitivity.x * inputStep);
-                ApplyAxisDelta(ref freeLook.m_YAxis, lookInput.y * definition.freeLookSensitivity.y * verticalSign * inputStep);
+                ApplyAxisDelta(ref freeLook.m_XAxis, lookInput.x * freeSensitivity.x * inputStep, freeMaxRate.x * inputStep);
+                ApplyAxisDelta(ref freeLook.m_YAxis, lookInput.y * freeSensitivity.y * verticalSign * inputStep, freeMaxRate.y * inputStep);
                 return;
             }
 
             if (pov == null)
                 return;
 
-            ApplyAxisDelta(ref pov.m_HorizontalAxis, lookInput.x * definition.povLookSensitivity.x * inputStep);
-            ApplyAxisDelta(ref pov.m_VerticalAxis, lookInput.y * definition.povLookSensitivity.y * verticalSign * inputStep);
+            ApplyAxisDelta(ref pov.m_HorizontalAxis, lookInput.x * povSensitivity.x * inputStep, povMaxRate.x * inputStep);
+            ApplyAxisDelta(ref pov.m_VerticalAxis, lookInput.y * povSensitivity.y * verticalSign * inputStep, povMaxRate.y * inputStep);
         }
 
         private float ResolveLookInputStep(ESCameraViewDefinition definition)
         {
             return lookInputUsesRate
                 ? Time.deltaTime
-                : Mathf.Max(0.0001f, definition.pointerLookScale);
+                : Mathf.Max(0.0001f, globalPolicy != null ? globalPolicy.pointerLookScale : definition.pointerLookScale);
         }
 
         private static bool ModifiersEqual(ESCameraResolvedModifiers left, ESCameraResolvedModifiers right)
@@ -335,8 +365,10 @@ namespace ES
                    && left.additiveValue == right.additiveValue;
         }
 
-        private static void ApplyAxisDelta(ref AxisState axis, float delta)
+        private static void ApplyAxisDelta(ref AxisState axis, float delta, float maxDelta)
         {
+            if (!float.IsNaN(maxDelta) && !float.IsInfinity(maxDelta) && maxDelta > 0f)
+                delta = Mathf.Clamp(delta, -maxDelta, maxDelta);
             float value = axis.Value + delta;
             float range = axis.m_MaxValue - axis.m_MinValue;
             if (axis.m_Wrap && range > Mathf.Epsilon)
@@ -513,13 +545,17 @@ namespace ES
     {
         private readonly ESCameraRigCatalog catalog;
         private readonly Transform rigRoot;
-        private readonly Dictionary<string, CinemachineVirtualCameraBase> instances = new Dictionary<string, CinemachineVirtualCameraBase>(StringComparer.Ordinal);
+        private readonly Dictionary<string, CinemachineVirtualCameraBase> instances;
         private bool disposed;
 
         public ESCameraSceneRigRegistry(ESCameraRigCatalog catalog, Transform rigRoot)
         {
             this.catalog = catalog;
             this.rigRoot = rigRoot;
+            // ES owns the catalog cardinality. Reserve its current capacity up front so
+            // first-use Rig resolution does not repeatedly resize the per-Binding map.
+            int capacity = catalog != null ? Mathf.Max(4, catalog.EntryCount) : 4;
+            instances = new Dictionary<string, CinemachineVirtualCameraBase>(capacity, StringComparer.Ordinal);
         }
 
         public bool IsReady => !disposed && catalog != null && catalog.IsValid && rigRoot != null;

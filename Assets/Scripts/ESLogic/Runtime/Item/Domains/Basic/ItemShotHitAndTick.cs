@@ -104,6 +104,7 @@ namespace ES
         public readonly IESShotHitResolver hitResolver;
         public readonly Action<ESShotLifecycleEvent> lifecycleObserver;
         public readonly bool publishesAttackFinish;
+        public readonly ESAttackSpecialInfo specialInfo;
 
         public ESShotLaunchContext(
             int attackId,
@@ -114,7 +115,8 @@ namespace ES
             Transform target = null,
             IESShotHitResolver hitResolver = null,
             Action<ESShotLifecycleEvent> lifecycleObserver = null,
-            bool publishesAttackFinish = true)
+            bool publishesAttackFinish = true,
+            ESAttackSpecialInfo specialInfo = default)
         {
             this.attackId = attackId;
             this.owner = owner;
@@ -125,6 +127,7 @@ namespace ES
             this.hitResolver = hitResolver;
             this.lifecycleObserver = lifecycleObserver;
             this.publishesAttackFinish = publishesAttackFinish;
+            this.specialInfo = specialInfo;
         }
     }
 
@@ -489,9 +492,20 @@ namespace ES
                 return 0;
 
             LayerMask hitLayers = ESPhysicsLayers.GetShotHitMask(query.hitLayers);
+            ESSpaceProbe spaceProbe = ESGameManager.SpaceProbe;
             ESPhysicsQueryModule physicsQuery = ESGameManager.PhysicsQueryModule;
             int count;
-            if (physicsQuery != null)
+            if (spaceProbe != null)
+            {
+                count = spaceProbe.Cast(
+                    query.from,
+                    query.to,
+                    query.radius,
+                    hitLayers,
+                    _hitBuffer,
+                    query.triggerInteraction);
+            }
+            else if (physicsQuery != null)
             {
                 count = physicsQuery.ShotCast(
                     query.from,

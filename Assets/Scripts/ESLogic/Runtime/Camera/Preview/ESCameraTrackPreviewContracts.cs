@@ -82,6 +82,7 @@ namespace ES
 
         public static ICameraTrackPreviewFactory Factory => factory;
 
+#if UNITY_EDITOR
         public static void Install(ICameraTrackPreviewFactory newFactory)
         {
             factory = newFactory;
@@ -92,5 +93,6 @@ namespace ES
             if (ReferenceEquals(factory, expectedFactory))
                 factory = null;
         }
+#endif
     }
 }

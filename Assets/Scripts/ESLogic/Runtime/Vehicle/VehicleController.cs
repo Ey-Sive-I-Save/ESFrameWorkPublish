@@ -254,7 +254,26 @@ namespace ES
         private void OnDisable()
         {
             motionInfluences?.ClearPendingVelocityDelta();
-            // 单独禁用控制器也必须撤销座位占用；不能只清输入而留下 Mounted 骑手。
+            CleanupDriverLifecycle();
+            UnbindKinematicMotor();
+        }
+
+        private void OnDestroy()
+        {
+            // 销毁路径不能依赖 Unity 先回调 OnDisable；幂等清理座位、驾驶输入和驾驶相机。
+            CleanupDriverLifecycle();
+            // KCC 不保存弱引用；销毁载具时清掉自己登记的控制器，避免 Motor 保留已销毁的 owner。
+            UnbindKinematicMotor();
+            motionInfluences?.Reset();
+        }
+
+        /// <summary>
+        /// 收口车辆驾驶生命周期。OnDisable/OnDestroy 都会调用，允许重复调用且不重复触发座位释放。
+        /// </summary>
+        private void CleanupDriverLifecycle()
+        {
+            // 先摘下座位；正常路径由 ReleaseDriver 清掉 currentDriver/currentDriverSeat，
+            // 销毁或异常路径即使未成功释放也由下面的显式清理兜底。
             EntityMountable driverSeat = currentDriverSeat;
             if (driverSeat != null)
                 driverSeat.Unmount();
@@ -263,15 +282,6 @@ namespace ES
             ReleaseDriverCameraRequest();
             currentDriver = null;
             currentDriverSeat = null;
-            UnbindKinematicMotor();
-        }
-
-        private void OnDestroy()
-        {
-            // KCC 不保存弱引用；销毁载具时清掉自己登记的控制器，避免 Motor 保留已销毁的 owner。
-            ReleaseDriverCameraRequest();
-            UnbindKinematicMotor();
-            motionInfluences?.Reset();
         }
 
         private void OnValidate()
@@ -296,6 +306,7 @@ namespace ES
             }
 
             EnsureSchedulers();
+            EnsureMotionInfluences().Warmup();
             if (UsesKinematicMotor)
                 BindKinematicMotor();
             else

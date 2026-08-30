@@ -108,7 +108,7 @@ namespace ES
                     ? ESGameManager.Audio.PlayLoop(cue, emitter, cueRequest)
                     : ESGameManager.Audio.PlayAttached(cue, emitter, cueRequest);
                 if (handle.IsValid)
-                    support?.SetAudioVoiceHandle(this, handle);
+                    support?.AddAudioVoiceHandle(this, handle);
                 return;
             }
 
@@ -139,9 +139,8 @@ namespace ES
                 ? obj.transform
                 : target != null ? target.GetTransform() : null;
             if (ESGameManager.Audio != null && support != null
-                && support.TryTakeAudioVoiceHandle(this, out ESAudioVoiceHandle handle))
+                && support.StopAudioVoices(this) > 0)
             {
-                ESGameManager.Audio.Stop(handle);
                 return;
             }
 
@@ -151,9 +150,7 @@ namespace ES
 
         private void StopOwnedVoice(ESOpSupport support)
         {
-            if (support != null && support.TryTakeAudioVoiceHandle(this, out ESAudioVoiceHandle handle)
-                && ESGameManager.Audio != null)
-                ESGameManager.Audio.Stop(handle);
+            support?.StopAudioVoices(this);
         }
     }
 }

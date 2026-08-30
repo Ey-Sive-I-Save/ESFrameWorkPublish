@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace ES
@@ -11,6 +12,8 @@ namespace ES
         IReceiveChannelLink_Context_Float,
         IReceiveChannelLink_Context_Bool
     {
+        private static readonly ProfilerMarker ApplyMarker =
+            new ProfilerMarker("ES.Entity.Buff.Apply");
         public static readonly ESSimplePool<ESActiveBuffRuntime> Pool = new ESSimplePool<ESActiveBuffRuntime>(
             factoryMethod: () => new ESActiveBuffRuntime(),
             resetMethod: null,
@@ -158,6 +161,7 @@ namespace ES
             this.domain = domain;
             this.definition = definition;
             this.sharedData = sharedData;
+            PrepareTrackerCapacity(sharedData);
 
             this.stateTimeSource = stateTimeSource;
             variableData.remainingTime = duration;
@@ -292,8 +296,10 @@ namespace ES
         /// Applies this Buff as one runtime unit. A failed Tag write, ValueChange evaluation or
         /// output operation never leaves a half-applied Buff owned by the domain.
         /// </summary>
-        public bool TryApply()
+        internal bool TryApply()
         {
+            using (ApplyMarker.Auto())
+            {
             try
             {
                 ReleaseGameTags();
@@ -322,10 +328,11 @@ namespace ES
                 LogLifecycleFailure("Apply", exception);
                 return AbortApply();
             }
+            }
         }
 
         /// <summary>Compatibility entry. New Buff-domain code must use <see cref="TryApply"/>.</summary>
-        public void Apply()
+        internal void Apply()
         {
             TryApply();
         }
@@ -484,7 +491,7 @@ namespace ES
             CreatedFrame = 0;
         }
 
-        public void Remove()
+        internal void Remove()
         {
             Deactivate(true);
         }
@@ -811,6 +818,19 @@ namespace ES
                     token = AddPermitByEffectLease(set, law, sourceId, binding.change.priority, binding.change.enabled)
                 });
             }
+        }
+
+        private void PrepareTrackerCapacity(BuffSharedData data)
+        {
+            int floatCount = data != null && data.floatChanges != null ? data.floatChanges.Count : 0;
+            int permitCount = data != null && data.permitChanges != null ? data.permitChanges.Count : 0;
+            if (floatChanges.Capacity < floatCount)
+                floatChanges.Capacity = floatCount;
+            if (permitChanges.Capacity < permitCount)
+                permitChanges.Capacity = permitCount;
+            int dependencyCapacity = floatCount + permitCount;
+            if (valueChangeDependencies.Capacity < dependencyCapacity)
+                valueChangeDependencies.Capacity = dependencyCapacity;
         }
 
         private void RefreshValueChangesFor(ESBuffValueChangeRefreshMode trigger)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace ES
 {
@@ -26,6 +27,7 @@ namespace ES
         [SerializeField] private string rootKey = ESUI.MainRootKey;
         [SerializeField] private ESUIWindowCatalog catalog;
         [SerializeField, Min(0)] private int maxRetainedInactiveWindows = 8;
+        [SerializeField, Min(0.1f)] private float transitionTimeoutSeconds = 10f;
 
         [Header("Layer Hosts（可分别放在不同 Canvas 下）")]
         [SerializeField] private Transform hudHost;
@@ -55,12 +57,30 @@ namespace ES
         private int nextLeaseToken;
         private long nextOperationId;
         private bool isShuttingDown;
+        private ESUIPageNavigator pageNavigator;
+        private ESUIFocusCoordinator focusCoordinator;
+        private ESUIOverlayArbiter overlayArbiter;
+        private ESUITransitionCoordinator transitionCoordinator;
+        private ESUIWindowLifecycleEvents lifecycleEvents;
+        private ESUIBootstrapCoordinator bootstrapCoordinator;
 
         internal string RootKey => rootKey;
         public string ResourceScopeKey => resourceScopeKey;
         public ESUIWindowCatalog Catalog => catalog;
         public bool IsRegistered => rootRegistration != null && rootRegistration.IsValid;
         public int RootGeneration => rootGeneration;
+        public ESUIPageNavigator PageNavigator => pageNavigator;
+        public ESUIFocusCoordinator FocusCoordinator => focusCoordinator;
+        public ESUIOverlayArbiter OverlayArbiter => overlayArbiter;
+        public ESUITransitionCoordinator TransitionCoordinator => transitionCoordinator;
+        public ESUIWindowLifecycleEvents LifecycleEvents => lifecycleEvents;
+        public ESUIBootstrapCoordinator BootstrapCoordinator => bootstrapCoordinator;
+
+        public bool NotifyFocus(ESUIWindowLease lease) => TryNotifyLifecycle(lease, c => lifecycleEvents?.RaiseFocused(c));
+        public bool NotifyBlur(ESUIWindowLease lease) => TryNotifyLifecycle(lease, c => lifecycleEvents?.RaiseBlurred(c));
+        public bool NotifyPause(ESUIWindowLease lease) => TryNotifyLifecycle(lease, c => lifecycleEvents?.RaisePaused(c));
+        public bool NotifyResume(ESUIWindowLease lease) => TryNotifyLifecycle(lease, c => lifecycleEvents?.RaiseResumed(c));
+        public bool NotifyRebind(ESUIWindowLease lease) => TryNotifyLifecycle(lease, c => lifecycleEvents?.RaiseRebound(c));
 
         public UniTask<ESUIWindowLease> OpenAsync(
             ESUIWindowId windowId,
@@ -236,11 +256,102 @@ namespace ES
         private void Awake()
         {
             ConfigureLanes();
+            lifecycleEvents = new ESUIWindowLifecycleEvents();
+            pageNavigator = new ESUIPageNavigator(
+                (identity, data, token) => OpenAsync(identity, data, token),
+                ResolveCanonicalIdentity);
+            overlayArbiter = new ESUIOverlayArbiter();
+            transitionCoordinator = new ESUITransitionCoordinator();
+            focusCoordinator = new ESUIFocusCoordinator(EventSystem.current);
+            bootstrapCoordinator = new ESUIBootstrapCoordinator();
+        }
+
+        /// <summary>Starts one idempotent asynchronous bootstrap for this registered root.</summary>
+        public UniTask<ESUIBootstrapResult> BootstrapAsync(
+            Func<CancellationToken, UniTask> prepare,
+            CancellationToken cancellationToken = default)
+        {
+            if (prepare == null) throw new ArgumentNullException(nameof(prepare));
+            if (!IsRegistered)
+                return UniTask.FromResult(ESUIBootstrapResult.Create(
+                    rootKey, ESUIBootstrapState.Stopped, null, 0));
+
+            string bootstrapKey = rootKey + "#registration:" + rootGeneration;
+            return bootstrapCoordinator.StartAsync(bootstrapKey, prepare, cancellationToken);
+        }
+
+        /// <summary>
+        /// Bootstraps a root with an optional staged context. The snapshot is only consumed when
+        /// the caller's prepare/restore delegate completes successfully.
+        /// </summary>
+        public UniTask<ESUIBootstrapResult> BootstrapAsync(
+            ESUICanonicalId canonicalId,
+            string scopeKey,
+            int schemaVersion,
+            ESUIContextStore contextStore,
+            Func<ESUIContextSnapshot?, CancellationToken, UniTask> prepare,
+            CancellationToken cancellationToken = default)
+        {
+            if (contextStore == null) throw new ArgumentNullException(nameof(contextStore));
+            if (prepare == null) throw new ArgumentNullException(nameof(prepare));
+
+            return BootstrapAsync(async token =>
+            {
+                ESUIContextSnapshot staged;
+                ESUIContextSnapshot? context = contextStore.TryPeek(
+                    canonicalId, scopeKey, schemaVersion, out staged)
+                    ? staged
+                    : (ESUIContextSnapshot?)null;
+                await prepare(context, token);
+                if (context.HasValue)
+                    contextStore.Consume(context.Value);
+            }, cancellationToken);
+        }
+
+        /// <summary>Restores navigation entries from a staged context using caller-owned decoding.</summary>
+        public UniTask<ESUIBootstrapResult> RestoreNavigationAsync(
+            ESUICanonicalId canonicalId,
+            string scopeKey,
+            int schemaVersion,
+            ESUIContextStore contextStore,
+            Func<string, IReadOnlyList<ESUIPageNavigationEntry>> deserialize,
+            CancellationToken cancellationToken = default)
+        {
+            if (contextStore == null) throw new ArgumentNullException(nameof(contextStore));
+            if (deserialize == null) throw new ArgumentNullException(nameof(deserialize));
+            if (pageNavigator == null)
+                return UniTask.FromResult(ESUIBootstrapResult.Create(rootKey, ESUIBootstrapState.Stopped, null, 0));
+
+            return BootstrapAsync(canonicalId, scopeKey, schemaVersion, contextStore,
+                async (snapshot, token) =>
+                {
+                    if (!snapshot.HasValue) return;
+                    IReadOnlyList<ESUIPageNavigationEntry> entries = deserialize(snapshot.Value.Payload);
+                    if (entries == null || !await pageNavigator.RestoreAsync(entries, token))
+                        throw new InvalidOperationException("UI 导航上下文为空或恢复失败。");
+                }, cancellationToken);
+        }
+
+        private ESUICanonicalId ResolveCanonicalIdentity(ESUIWindowIdentity identity)
+        {
+            if (!ESUIWindowIdentityResolver.TryResolve(catalog, identity, out ESUICanonicalId canonicalId, out _, out string error))
+                throw new InvalidOperationException(error);
+            return canonicalId;
+        }
+
+        private bool TryNotifyLifecycle(ESUIWindowLease lease, Action<ESUIWindowContext> callback)
+        {
+            if (callback == null || !TryGetCurrentLeaseInstance(lease, out ESUIWindowInstance instance) || instance.context == null)
+                return false;
+            callback(instance.context);
+            return true;
         }
 
         private void OnEnable()
         {
             ConfigureLanes();
+            if (focusCoordinator != null && EventSystem.current != null)
+                focusCoordinator.Attach(EventSystem.current);
             if (Application.isPlaying)
                 TryRegister();
         }
@@ -263,6 +374,27 @@ namespace ES
         {
             if (Application.isPlaying)
                 UnregisterAndShutdown();
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            if (!Application.isPlaying || lifecycleEvents == null)
+                return;
+
+            instanceBuffer.Clear();
+            foreach (ESUIWindowInstance instance in allInstances)
+                instanceBuffer.Add(instance);
+            for (int i = 0; i < instanceBuffer.Count; i++)
+            {
+                ESUIWindowInstance instance = instanceBuffer[i];
+                if (instance?.context == null || instance.state == ESUIWindowState.Closed)
+                    continue;
+                if (pauseStatus)
+                    lifecycleEvents.RaisePaused(instance.context);
+                else
+                    lifecycleEvents.RaiseResumed(instance.context);
+            }
+            instanceBuffer.Clear();
         }
 
         private async UniTask<ESUIWindowLease> OpenCoreAsync(
@@ -432,11 +564,23 @@ namespace ES
             CancellationToken cancellationToken)
         {
             ESUIWindowLease lease = CreateLease(instance);
-            instance.context = new ESUIWindowContext(this, instance.definition, lease, userData, instance.operationId);
+            if (!ESUIWindowIdentityResolver.TryResolve(catalog, instance.definition.Identity, out ESUICanonicalId canonicalId, out _, out string identityError))
+                throw new InvalidOperationException(identityError);
+            instance.context = new ESUIWindowContext(this, instance.definition, lease, userData, instance.operationId, canonicalId);
             instance.lifetimeCancellation = new CancellationTokenSource();
+            bool templatePrepared = false;
 
             try
             {
+                using (CancellationTokenSource prepareCancellation =
+                       CancellationTokenSource.CreateLinkedTokenSource(
+                           cancellationToken,
+                           instance.lifetimeCancellation.Token))
+                {
+                    await instance.view.PrepareTemplateAsync(prepareCancellation.Token);
+                    templatePrepared = true;
+                }
+
                 if (instance.definition.AcquireRuntimeMode)
                 {
                     ESRuntimeModeService runtimeMode = ESGameManager.RuntimeMode;
@@ -450,6 +594,9 @@ namespace ES
                 instance.gameObject.SetActive(true);
                 instance.gameObject.transform.SetAsLastSibling();
                 instance.view.Bind(instance.context);
+                lifecycleEvents?.RaiseOpened(instance.context);
+                EnsureCanContinue(instance);
+                await instance.view.CommitTemplateAsync(instance.lifetimeCancellation.Token);
                 EnsureCanContinue(instance);
 
                 instance.state = ESUIWindowState.Entering;
@@ -458,15 +605,26 @@ namespace ES
                            cancellationToken,
                            instance.lifetimeCancellation.Token))
                 {
-                    await instance.view.EnterAsync(instance.context, linkedCancellation.Token);
+                    await transitionCoordinator.EnterAsync(
+                        instance.view,
+                        instance.context,
+                        TimeSpan.FromSeconds(transitionTimeoutSeconds),
+                        linkedCancellation.Token);
                 }
                 EnsureCanContinue(instance);
 
                 instance.state = ESUIWindowState.Visible;
+                lifecycleEvents?.RaiseShown(instance.context);
+                lifecycleEvents?.RaiseFocused(instance.context);
                 return lease;
             }
             catch
             {
+                if (templatePrepared)
+                {
+                    try { await instance.view.RollbackTemplateAsync(CancellationToken.None); }
+                    catch (Exception rollbackException) { Debug.LogException(rollbackException, this); }
+                }
                 ReleaseLeaseToken(instance, lease);
                 throw;
             }
@@ -500,7 +658,11 @@ namespace ES
                     CancellationToken cancellationToken = instance.lifetimeCancellation != null
                         ? instance.lifetimeCancellation.Token
                         : CancellationToken.None;
-                    await instance.view.ExitAsync(effect, cancellationToken);
+                    await transitionCoordinator.ExitAsync(
+                        instance.view,
+                        effect,
+                        TimeSpan.FromSeconds(transitionTimeoutSeconds),
+                        cancellationToken);
                 }
             }
             catch (Exception exception)
@@ -509,6 +671,10 @@ namespace ES
             }
             finally
             {
+                if (instance.context != null)
+                    lifecycleEvents?.RaiseBlurred(instance.context);
+                if (instance.context != null)
+                    lifecycleEvents?.RaiseClosed(instance.context, effect);
                 closeEffectApplied = CloseInstanceImmediately(instance, effect);
             }
 
@@ -871,6 +1037,8 @@ namespace ES
             {
                 rootRegistration = module.RegisterRoot(this);
                 rootGeneration = NextPositive(ref rootGeneration);
+                if (bootstrapCoordinator == null)
+                    bootstrapCoordinator = new ESUIBootstrapCoordinator();
                 lifetimeCancellation?.Cancel();
                 lifetimeCancellation = new CancellationTokenSource();
             }
@@ -900,6 +1068,13 @@ namespace ES
                 return false;
             }
 
+            if (float.IsNaN(transitionTimeoutSeconds) || float.IsInfinity(transitionTimeoutSeconds)
+                || transitionTimeoutSeconds <= 0f)
+            {
+                error = "UI 转场超时必须是有限正数。";
+                return false;
+            }
+
             if (!catalog.TryBuild(out error))
                 return false;
 
@@ -925,6 +1100,8 @@ namespace ES
             rootGeneration = NextPositive(ref rootGeneration);
             lifetimeCancellation?.Cancel();
             lifetimeCancellation = null;
+            bootstrapCoordinator?.Dispose();
+            bootstrapCoordinator = null;
             instanceBuffer.Clear();
             foreach (ESUIWindowInstance instance in allInstances)
                 instanceBuffer.Add(instance);

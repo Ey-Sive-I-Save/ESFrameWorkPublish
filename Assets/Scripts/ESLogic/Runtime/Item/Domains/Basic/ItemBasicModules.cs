@@ -35,13 +35,15 @@ namespace ES
         [NonSerialized] private ESMotionInfluenceAccumulator _motionInfluences;
         [NonSerialized] private RaycastHit[] _transformSweepHits;
 
-        private const int InitialTransformSweepCapacity = 8;
         private const int MaxTransformSweepCapacity = 64;
 
         public override void Start()
         {
             base.Start();
             CacheComponents();
+            EnsureMotionInfluences().Warmup();
+            // Reserve the bounded sweep buffer during lifecycle setup, never on movement.
+            _transformSweepHits ??= new RaycastHit[MaxTransformSweepCapacity];
             if (MyCore != null)
             {
                 currentPosition = MyCore.transform.position;
@@ -209,25 +211,16 @@ namespace ES
 
             Vector3 direction = displacement / distance;
             RaycastHit[] sweepHits = EnsureTransformSweepBuffer();
-            int hitCount;
-            while (true)
-            {
-                hitCount = Physics.SphereCastNonAlloc(
-                    position,
-                    Mathf.Max(0.001f, transformSweepRadius),
-                    direction,
-                    sweepHits,
-                    distance,
-                    transformSweepMask,
-                    QueryTriggerInteraction.Ignore);
-                if (hitCount < sweepHits.Length
-                    || sweepHits.Length >= MaxTransformSweepCapacity)
-                    break;
-
-                int nextCapacity = Mathf.Min(MaxTransformSweepCapacity, sweepHits.Length * 2);
-                Array.Resize(ref _transformSweepHits, nextCapacity);
-                sweepHits = _transformSweepHits;
-            }
+            // The sweep buffer is fixed at MaxTransformSweepCapacity by the lifecycle
+            // warmup below. NonAlloc returns a bounded result set without hot-path growth.
+            int hitCount = Physics.SphereCastNonAlloc(
+                position,
+                Mathf.Max(0.001f, transformSweepRadius),
+                direction,
+                sweepHits,
+                distance,
+                transformSweepMask,
+                QueryTriggerInteraction.Ignore);
 
             float nearestDistance = float.PositiveInfinity;
             Vector3 nearestNormal = Vector3.zero;
@@ -258,7 +251,7 @@ namespace ES
 
         private RaycastHit[] EnsureTransformSweepBuffer()
         {
-            return _transformSweepHits ??= new RaycastHit[InitialTransformSweepCapacity];
+            return _transformSweepHits ??= new RaycastHit[MaxTransformSweepCapacity];
         }
 
         private ESMotionInfluenceAccumulator EnsureMotionInfluences()
@@ -417,7 +410,7 @@ namespace ES
             ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
         }
 
-        public bool Launch(Vector3 direction)
+        internal bool Launch(Vector3 direction)
         {
             if (MyCore == null || state.launched || _lifecycleActive)
                 return false;
@@ -455,7 +448,7 @@ namespace ES
             return true;
         }
 
-        public bool LaunchTo(Vector3 targetPosition)
+        internal bool LaunchTo(Vector3 targetPosition)
         {
             if (MyCore == null || state.launched || _lifecycleActive)
                 return false;
@@ -495,12 +488,12 @@ namespace ES
             return true;
         }
 
-        public bool LaunchTo(Transform target)
+        internal bool LaunchTo(Transform target)
         {
             return LaunchTo(target, aimMode == ShotAimMode.MustHit);
         }
 
-        public bool LaunchTo(Transform target, bool mustHit)
+        internal bool LaunchTo(Transform target, bool mustHit)
         {
             if (target == null || state.launched || _lifecycleActive)
                 return false;
@@ -519,7 +512,7 @@ namespace ES
             return launched;
         }
 
-        public void Internal_InitializeSpawn(
+        internal void Internal_InitializeSpawn(
             ESShotRuntimeData runtimeData,
             int runtimeDefinitionKey,
             in ItemShotVariableData spawnVariableData,
@@ -547,7 +540,7 @@ namespace ES
             _pendingTickDeltaTime = 0f;
         }
 
-        public void Internal_Stop(bool publishStopped = true)
+        internal void Internal_Stop(bool publishStopped = true)
         {
             if (state.launched)
             {
@@ -984,12 +977,12 @@ namespace ES
             if (colliders == null || colliders.Length == 0 || targetLimit <= 0)
                 return;
 
-            int count = Physics.OverlapSphereNonAlloc(
-                sourceHit.point,
-                radius,
-                colliders,
-                hitLayers,
-                QueryTriggerInteraction.Collide);
+            ESSpaceProbe spaceProbe = ESGameManager.SpaceProbe;
+            int count = spaceProbe != null
+                ? spaceProbe.OverlapSphere(sourceHit.point, radius, hitLayers, colliders,
+                    QueryTriggerInteraction.Collide)
+                : Physics.OverlapSphereNonAlloc(sourceHit.point, radius, colliders, hitLayers,
+                    QueryTriggerInteraction.Collide);
             if (count >= colliders.Length)
                 impactOverflowCount++;
             int published = 0;
@@ -1036,12 +1029,12 @@ namespace ES
             Vector3 chainOrigin = sourceHit.point;
             for (int hop = 0; hop < targetLimit; hop++)
             {
-                int count = Physics.OverlapSphereNonAlloc(
-                    chainOrigin,
-                    radius,
-                    colliders,
-                    hitLayers,
-                    QueryTriggerInteraction.Collide);
+                ESSpaceProbe spaceProbe = ESGameManager.SpaceProbe;
+                int count = spaceProbe != null
+                    ? spaceProbe.OverlapSphere(chainOrigin, radius, hitLayers, colliders,
+                        QueryTriggerInteraction.Collide)
+                    : Physics.OverlapSphereNonAlloc(chainOrigin, radius, colliders, hitLayers,
+                        QueryTriggerInteraction.Collide);
                 if (count >= colliders.Length)
                     impactOverflowCount++;
                 if (!TrySelectNearestImpactTarget(

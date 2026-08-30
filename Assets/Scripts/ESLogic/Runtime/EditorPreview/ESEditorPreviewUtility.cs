@@ -235,9 +235,14 @@ namespace ES
             }
             finally
             {
-                RenderTexture.active = previous;
-                if (temporary != null)
-                    RenderTexture.ReleaseTemporary(temporary);
+                try { RenderTexture.active = previous; }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try
+                {
+                    if (temporary != null)
+                        RenderTexture.ReleaseTemporary(temporary);
+                }
+                catch (Exception exception) { Debug.LogException(exception); }
             }
         }
 
@@ -277,9 +282,14 @@ namespace ES
                 // UnityEngine.Object may become a fake-null object while Render/ReadPixels
                 // is unwinding (domain reload, preview teardown, or external destruction).
                 // Do not let cleanup mask the original render exception.
-                if (camera != null)
-                    camera.targetTexture = oldTarget;
-                RenderTexture.active = oldActive;
+                try
+                {
+                    if (camera != null)
+                        camera.targetTexture = oldTarget;
+                }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try { RenderTexture.active = oldActive; }
+                catch (Exception exception) { Debug.LogException(exception); }
             }
         }
 
@@ -569,7 +579,12 @@ namespace ES
             HideFlags ownershipFlags = HideFlags.HideAndDontSave
                 | HideFlags.DontSaveInEditor
                 | HideFlags.DontSaveInBuild;
-            return (obj.hideFlags & ownershipFlags) == ownershipFlags;
+            // 预览对象有两种合法的声明形态：完整的 HideAndDontSave，或
+            // 明确的采样安全组合。后者故意不包含 NotEditable，但仍禁止保存、构建
+            // 和卸载；统一入口接管后会再提升为 PreviewHideFlags 并登记清理标记。
+            HideFlags samplingSafeFlags = SamplingSafeHideFlags;
+            return (obj.hideFlags & ownershipFlags) == ownershipFlags
+                || (obj.hideFlags & samplingSafeFlags) == samplingSafeFlags;
         }
 
         private static void SetProperty(object target, string propertyName, object value)

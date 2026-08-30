@@ -7,6 +7,35 @@ using ReadOnlyAttribute = Sirenix.OdinInspector.ReadOnlyAttribute;
 
 namespace ES
 {
+    /// <summary>One authoritative post-KCC movement result for effect/feedback consumers.</summary>
+    public readonly struct ESEntityMovementResult
+    {
+        public readonly Entity source;
+        public readonly Vector3 previousPosition;
+        public readonly Vector3 currentPosition;
+        public readonly Vector3 displacement;
+        public readonly Vector3 velocity;
+        public readonly bool isStableOnGround;
+        public readonly int frame;
+
+        public ESEntityMovementResult(
+            Entity source,
+            Vector3 previousPosition,
+            Vector3 currentPosition,
+            Vector3 velocity,
+            bool isStableOnGround,
+            int frame)
+        {
+            this.source = source;
+            this.previousPosition = previousPosition;
+            this.currentPosition = currentPosition;
+            displacement = currentPosition - previousPosition;
+            this.velocity = velocity;
+            this.isStableOnGround = isStableOnGround;
+            this.frame = frame;
+        }
+    }
+
     // Entity：直接接入 KCC 的角色核心（不走模块，超高频）
     [Serializable, TypeRegistryItem("实体核心")]
     [RequireComponent(typeof(KinematicCharacterMotor))]
@@ -22,6 +51,22 @@ namespace ES
         [NonSerialized] private bool _shotHitCollidersPrepared;
         [NonSerialized] private int lifecycleGeneration = 1;
         [NonSerialized] private EntityBasicHealthModule runtimeBasicHealth;
+        [NonSerialized] private EntityGameplayInteractionHub gameplayInteractionHub;
+
+        public EntityGameplayInteractionHub GameplayInteractionHub
+        {
+            get
+            {
+                if (gameplayInteractionHub == null)
+                    gameplayInteractionHub = new EntityGameplayInteractionHub(this);
+                else
+                    gameplayInteractionHub.BindOwner(this);
+                return gameplayInteractionHub;
+            }
+        }
+
+        /// <summary>当前 Entity 的长期交互事实流；实际存储仍由唯一 Hub 管理。</summary>
+        public ESEntityInteractionStream InteractionStream => GameplayInteractionHub.Stream;
 
         /// <summary>
         /// 角色稳定挂点的运行时入口。首次绑定后只读取缓存，不允许业务代码在热路径重新 Find 层级。
@@ -165,6 +210,10 @@ namespace ES
         protected override void OnBeforeAwakeRegister()
         {
             EnsureEntityStructure();
+            // Warm the per-Entity effect fan-out before any gameplay callback can publish.
+            // Pool-spawned instances are warmed again in OnPoolSpawned; this covers ordinary
+            // scene-instantiated Entities so their first hot-path result cannot allocate.
+            GameplayInteractionHub.Warmup();
             CaptureAuthoringMotionBaseline();
             EnsureEntityOpSupport();
             Tags.Warmup();
@@ -182,6 +231,14 @@ namespace ES
         private void OnValidate()
         {
             EnsureEntityStructure();
+        }
+
+        protected override void OnDisable()
+        {
+            // A disabled Entity is no longer a valid local-control target. Release before
+            // domain teardown so LocalControl and camera/input consumers observe the boundary.
+            ESGameManager.LocalControl?.Release(this);
+            base.OnDisable();
         }
 
         protected override void OnAwakeRegisterOnly()
@@ -210,9 +267,15 @@ namespace ES
         /// </summary>
         public void OnPoolDespawned()
         {
+            // Pool return ends local control before the Entity can be reused.  Without this
+            // release, ESLocalControlService keeps a stale owner and no change notification
+            // reaches Camera/Input consumers.
+            ESGameManager.LocalControl?.Release(this);
             Internal_UnregisterShotHitColliders();
             AdvanceLifecycleGeneration();
             kcc?.ResetMotionInfluences();
+            kcc?.ClearMovementResolvedSubscribers();
+            gameplayInteractionHub?.Clear();
             ESActionPoolLifecycleDiagnostics.RecordDespawn();
             basicDomain?.NotifyPoolDespawned();
             equipmentDomain?.NotifyPoolDespawned();
@@ -241,6 +304,7 @@ namespace ES
             AdvanceLifecycleGeneration();
             ESActionPoolLifecycleDiagnostics.RecordSpawn();
             EnsureEntityStructure();
+            GameplayInteractionHub.Warmup();
             Internal_ReRegisterShotHitColliders();
             equipmentDomain?.NotifyPoolSpawned();
             basicDomain?.NotifyPoolSpawned();
@@ -292,10 +356,15 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            // Destruction is also a terminal control-lifecycle boundary (including non-pool
+            // destruction). Release is owner-checked and therefore idempotent with pool return.
+            ESGameManager.LocalControl?.Release(this);
             Internal_UnregisterShotHitColliders();
             _shotHitCollidersPrepared = false;
             equipmentDomain?.NotifyPoolDespawned();
             kcc?.ResetMotionInfluences();
+            kcc?.ClearMovementResolvedSubscribers();
+            gameplayInteractionHub?.Clear();
             ESGameManager.Camera?.ReleaseOwnedBy(this);
             ReleaseDefaultCameraRequest();
             UnsubscribeFromTagCatalog();
@@ -2856,12 +2925,50 @@ namespace ES
         [NonSerialized] private StateSupportFlags _currentSupportFlags;
         [NonSerialized] private bool _motionSchedulersReady;
         [NonSerialized] private ESMotionInfluenceAccumulator _motionInfluences;
+        [NonSerialized] private Action<ESEntityMovementResult> _movementResolved;
+        [NonSerialized] private Delegate[] _movementResolvedSnapshot = Array.Empty<Delegate>();
 
         [NonSerialized] public int workSelf;
         [NonSerialized] public int workWorld;
         [NonSerialized] public int workOther;
 
         public StateSupportFlags CurrentSupportFlags => _currentSupportFlags;
+
+        /// <summary>
+        /// 发布 KCC 完成位置修正后的唯一运动结果；不替代 KCC 或状态机，只提供领域绑定观察点。
+        /// </summary>
+        public event Action<ESEntityMovementResult> MovementResolved
+        {
+            add
+            {
+                if (value == null)
+                    return;
+                _movementResolved += value;
+                _movementResolvedSnapshot = _movementResolved.GetInvocationList();
+            }
+            remove
+            {
+                if (value == null || _movementResolved == null)
+                    return;
+
+                Action<ESEntityMovementResult> before = _movementResolved;
+                Action<ESEntityMovementResult> after =
+                    (Action<ESEntityMovementResult>)Delegate.Remove(before, value);
+                if (ReferenceEquals(before, after))
+                    return;
+
+                _movementResolved = after;
+                _movementResolvedSnapshot = after != null
+                    ? after.GetInvocationList()
+                    : Array.Empty<Delegate>();
+            }
+        }
+
+        internal void ClearMovementResolvedSubscribers()
+        {
+            _movementResolved = null;
+            _movementResolvedSnapshot = Array.Empty<Delegate>();
+        }
 
         [ShowInInspector, ReadOnly, LabelText("注册的运动前置任务")]
         public int RegisteredBeforeMotionCount => _beforeScheduler != null ? _beforeScheduler.Count : 0;
@@ -2963,6 +3070,7 @@ namespace ES
                 Debug.Assert(false, "EntityKCCData.Initialize 失败：owner 为空。");
                 return;
             }
+            EnsureMotionInfluences().Warmup();
             if (motor == null)
             {
                 motor = owner.GetComponent<KinematicCharacterMotor>();
@@ -3508,6 +3616,35 @@ namespace ES
                 }
             }
             monitor.UpdateFromMotor(motor, _lastVelocity);
+            PublishMovementResolved(owner);
+        }
+
+        [ESHotPath]
+        private void PublishMovementResolved(Entity owner)
+        {
+            if (owner == null || motor == null)
+                return;
+
+            ESEntityMovementResult result = new ESEntityMovementResult(
+                owner,
+                _lastTransientPosition,
+                motor.TransientPosition,
+                _lastVelocity,
+                motor.GroundingStatus.IsStableOnGround,
+                Time.frameCount);
+            owner.GameplayInteractionHub.Publish(new ESEffectTriggerEvent(owner, result));
+            Delegate[] invocationList = _movementResolvedSnapshot;
+            for (int index = 0; index < invocationList.Length; index++)
+            {
+                try
+                {
+                    ((Action<ESEntityMovementResult>)invocationList[index]).Invoke(result);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, owner);
+                }
+            }
         }
 
         private void LogMotionFeatureException(string phase, Exception exception)

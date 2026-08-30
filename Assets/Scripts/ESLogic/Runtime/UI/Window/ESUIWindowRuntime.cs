@@ -12,13 +12,15 @@ namespace ES
             ESUIWindowDefinition definition,
             ESUIWindowLease lease,
             object userData,
-            long operationId)
+            long operationId,
+            ESUICanonicalId canonicalId)
         {
             Root = root;
             Definition = definition;
             Lease = lease;
             UserData = userData;
             OperationId = operationId;
+            CanonicalId = canonicalId;
         }
 
         public ESUIRootCoordinator Root { get; private set; }
@@ -26,6 +28,7 @@ namespace ES
         public ESUIWindowLease Lease { get; private set; }
         public object UserData { get; private set; }
         public long OperationId { get; private set; }
+        public ESUICanonicalId CanonicalId { get; private set; }
 
         internal void Clear()
         {
@@ -34,6 +37,7 @@ namespace ES
             Lease = null;
             UserData = null;
             OperationId = 0;
+            CanonicalId = default;
         }
     }
 

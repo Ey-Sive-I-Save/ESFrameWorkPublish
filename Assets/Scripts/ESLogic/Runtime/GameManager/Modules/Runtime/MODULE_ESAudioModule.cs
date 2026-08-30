@@ -555,6 +555,26 @@ namespace ES
                     EndVoice(voice, ESAudioVoiceEndReason.OwnerDestroyed, null);
                     continue;
                 }
+                if (!voice.usesBoundEmitter && voice.emitterPool != null
+                    && (!voice.emitterPool.IsSpawned || voice.emitterPool.Version != voice.emitterPoolVersion))
+                {
+                    EndVoice(voice, ESAudioVoiceEndReason.BackendFailure, "Audio emitter generation changed before Voice ended.");
+                    continue;
+                }
+                if (voice.owner != null && !voice.owner.gameObject.activeInHierarchy
+                    && (voice.hasLifecycleOwner || voice.followOwner))
+                {
+                    ESAudioVoiceEndReason reason = voice.ownerPool != null && !voice.ownerPool.IsSpawned
+                        ? ESAudioVoiceEndReason.OwnerDespawned
+                        : ESAudioVoiceEndReason.OwnerDisabled;
+                    EndVoice(voice, reason, null);
+                    continue;
+                }
+                if (voice.ownerPool != null && voice.ownerPool.Version != voice.ownerPoolVersion)
+                {
+                    EndVoice(voice, ESAudioVoiceEndReason.OwnerDespawned, null);
+                    continue;
+                }
                 else if (voice.followOwner)
                 {
                     voice.position = voice.owner.position;
@@ -1512,6 +1532,10 @@ namespace ES
             voice.preemptionPolicy = cueData.source.preemptionPolicy;
             voice.loop = forceLoop ?? cueData.source.loop;
             voice.owner = request.owner;
+            voice.ownerPool = request.owner != null
+                ? request.owner.GetComponentInParent<ESPooledGameObject>()
+                : null;
+            voice.ownerPoolVersion = voice.ownerPool != null ? voice.ownerPool.Version : 0;
             voice.hasLifecycleOwner = request.owner != null;
             voice.followOwner = request.followOwner;
             voice.position = request.hasPosition ? request.position : request.owner != null ? request.owner.position : Vector3.zero;
@@ -1553,6 +1577,11 @@ namespace ES
             }
 
             voice.source = source;
+            if (!voice.usesBoundEmitter)
+            {
+                voice.emitterPool = source.GetComponent<ESPooledGameObject>();
+                voice.emitterPoolVersion = voice.emitterPool != null ? voice.emitterPool.Version : 0;
+            }
             bool sourceConfigured;
             string configureError;
             try
@@ -1632,6 +1661,10 @@ namespace ES
             voice.preemptionPolicy = preemptionPolicy;
             voice.loop = loop;
             voice.owner = request.owner;
+            voice.ownerPool = request.owner != null
+                ? request.owner.GetComponentInParent<ESPooledGameObject>()
+                : null;
+            voice.ownerPoolVersion = voice.ownerPool != null ? voice.ownerPool.Version : 0;
             voice.hasLifecycleOwner = request.owner != null;
             voice.followOwner = request.followOwner;
             voice.position = request.hasPosition ? request.position : request.owner != null ? request.owner.position : Vector3.zero;
@@ -1670,6 +1703,11 @@ namespace ES
             }
 
             voice.source = source;
+            if (!voice.usesBoundEmitter)
+            {
+                voice.emitterPool = source.GetComponent<ESPooledGameObject>();
+                voice.emitterPoolVersion = voice.emitterPool != null ? voice.emitterPool.Version : 0;
+            }
             bool sourceConfigured;
             string configureError;
             try
@@ -1939,6 +1977,7 @@ namespace ES
         {
             VoiceAdmissionTransaction admission = admissionPool.GetInPool();
             admission.Initialize(voice, isCue, allowPreemption, ignoredVoice);
+            pendingAdmissions.Add(admission);
             return admission;
         }
 
@@ -1971,8 +2010,7 @@ namespace ES
             if (admission == null || !admission.active)
                 return;
 
-            if (admission.isCue)
-                pendingAdmissions.Remove(admission);
+            pendingAdmissions.Remove(admission);
             admission.active = false;
             admissionPool.PushToPool(admission);
         }
@@ -2015,8 +2053,7 @@ namespace ES
 
             Voice voice = admission.voice;
             ESAudioVoiceHandle handle = CreateVoiceHandle(voice);
-            if (admission.isCue)
-                pendingAdmissions.Remove(admission);
+            pendingAdmissions.Remove(admission);
             admission.active = false;
             if (handle.Equals(pendingMusicHandle))
                 pendingMusicHandle = default;
@@ -2367,10 +2404,17 @@ namespace ES
             return null;
         }
 
-        private void ReturnEmitter(AudioSource source)
+        private void ReturnEmitter(AudioSource source, ESPooledGameObject expectedPool, int expectedVersion)
         {
             if (source == null)
                 return;
+
+            if (expectedPool != null
+                && (!expectedPool.IsSpawned || expectedPool.Version != expectedVersion))
+            {
+                Debug.LogWarning($"[ESAudio] Emitter 回池被拒绝：预期Version={expectedVersion}，当前Version={expectedPool.Version}");
+                return;
+            }
 
             source.Stop();
             source.clip = null;
@@ -2454,13 +2498,15 @@ namespace ES
             }
             else
             {
-                ReturnEmitter(source);
+                ReturnEmitter(source, voice.emitterPool, voice.emitterPoolVersion);
             }
 
             voice.source = null;
             voice.usesBoundEmitter = false;
             voice.boundEmitter = null;
             voice.boundEmitterSnapshot = default;
+            voice.emitterPool = null;
+            voice.emitterPoolVersion = 0;
         }
 
         private void EnsureEmitterPool()
@@ -3157,6 +3203,8 @@ namespace ES
             public ESAudioCuePreemptionPolicy preemptionPolicy;
             public bool loop;
             public Transform owner;
+            public ESPooledGameObject ownerPool;
+            public int ownerPoolVersion;
             public bool hasLifecycleOwner;
             public bool followOwner;
             public Vector3 position;
@@ -3182,6 +3230,8 @@ namespace ES
             public bool loading;
             public bool active;
             public AudioSource source;
+            public ESPooledGameObject emitterPool;
+            public int emitterPoolVersion;
             public bool usesBoundEmitter;
             public ESVfxAudioEmitter boundEmitter;
             public AudioSourceSnapshot boundEmitterSnapshot;
@@ -3197,6 +3247,8 @@ namespace ES
                 preemptionPolicy = default;
                 loop = false;
                 owner = null;
+                ownerPool = null;
+                ownerPoolVersion = 0;
                 hasLifecycleOwner = false;
                 followOwner = false;
                 position = default;
@@ -3222,6 +3274,8 @@ namespace ES
                 loading = false;
                 active = false;
                 source = null;
+                emitterPool = null;
+                emitterPoolVersion = 0;
                 usesBoundEmitter = false;
                 boundEmitter = null;
                 boundEmitterSnapshot = default;

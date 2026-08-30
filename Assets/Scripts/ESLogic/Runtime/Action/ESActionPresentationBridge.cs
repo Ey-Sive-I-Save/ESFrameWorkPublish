@@ -6,7 +6,7 @@ namespace ES
 {
     public sealed class ESActionPresentationBridge : IDisposable
     {
-        private readonly ESActionEventHub hub;
+        private readonly ESActionEventChannel channel;
         private ESActionConfigKeyTable actionTable;
         private Entity owner;
         private ESWeaponConfigKey weaponKey;
@@ -16,26 +16,26 @@ namespace ES
         private readonly HashSet<string> reportedPresentationErrors = new HashSet<string>();
         private bool disposed;
 
-        public ESActionPresentationBridge(ESActionEventHub hub)
-            : this(hub, null, null, null)
+        public ESActionPresentationBridge(ESActionEventChannel channel)
+            : this(channel, null, null, null)
         {
         }
 
         public ESActionPresentationBridge(
-            ESActionEventHub hub,
+            ESActionEventChannel channel,
             ESActionConfigKeyTable actionTable,
             Entity owner = null,
             ESWeaponConfigKey weaponKey = null,
             Func<Transform> weaponMountResolver = null,
             Func<ESWeaponConfigKey> weaponKeyResolver = null)
         {
-            this.hub = hub ?? throw new ArgumentNullException(nameof(hub));
+            this.channel = channel ?? throw new ArgumentNullException(nameof(channel));
             this.actionTable = actionTable;
             this.owner = owner;
             this.weaponKey = weaponKey;
             this.weaponMountResolver = weaponMountResolver;
             this.weaponKeyResolver = weaponKeyResolver;
-            this.hub.Published += HandlePublished;
+            this.channel.Published += HandlePublished;
         }
 
         public ESActionHitstopRuntime HitstopRuntime => hitstopRuntime;
@@ -50,7 +50,7 @@ namespace ES
                 return;
 
             disposed = true;
-            hub.Published -= HandlePublished;
+            channel.Published -= HandlePublished;
             actionTable = null;
             owner = null;
             weaponKey = null;

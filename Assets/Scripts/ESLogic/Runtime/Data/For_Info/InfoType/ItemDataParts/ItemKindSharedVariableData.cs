@@ -376,6 +376,10 @@ namespace ES
         [LabelText("冲击强度"), MinValue(0f)]
         public float impactStrength = 1f;
 
+        [LabelText("攻击扩展信息")]
+        [Tooltip("固定大小值类型元数据；未启用时不参与运行时分配。由武器定义携带并沿攻击/命中链路透传。")]
+        public ESAttackSpecialInfo specialInfo;
+
         [Title("发射图案")]
         [LabelText("弹丸/射线数量"), MinValue(1), MaxValue(64)]
         public int pelletCount = 1;
@@ -479,6 +483,7 @@ namespace ES
                 heatDissipationPerSecond = heatDissipationPerSecond,
                 damage = damage,
                 impactStrength = impactStrength,
+                specialInfo = specialInfo,
                 pelletCount = pelletCount,
                 spreadAngle = spreadAngle
             };

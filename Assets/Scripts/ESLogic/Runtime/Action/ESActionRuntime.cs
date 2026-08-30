@@ -139,7 +139,8 @@ namespace ES
         }
     }
 
-    public sealed class ESActionEventHub
+    /// <summary>Action 层瞬时传输通道；不承担全局编排或 Entity 结果广播。</summary>
+    public sealed class ESActionEventChannel
     {
         public event Action<ESActionEvent> Published;
 
@@ -159,7 +160,7 @@ namespace ES
         private static int nextCatalogVersion;
 
         private readonly ESActionConfigKeyTable table;
-        private readonly ESActionEventHub events;
+        private readonly ESActionEventChannel events;
         private readonly Entity owner;
         private readonly int catalogVersion = ++nextCatalogVersion;
 
@@ -178,7 +179,7 @@ namespace ES
 
         public ESActionRuntime(
             ESActionConfigKeyTable table,
-            ESActionEventHub events,
+            ESActionEventChannel events,
             Entity owner = null)
         {
             this.table = table ?? throw new ArgumentNullException(nameof(table));

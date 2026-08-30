@@ -72,7 +72,11 @@ namespace ES
         {
             if (!TryGetSlot(lease, out ViewState view, out RequestSlot slot)
                 || !request.IsStructurallyValid
-                || request.viewId != lease.viewId)
+                || request.viewId != lease.viewId
+                // A Lease is bound to its original owner for its entire generation.  Allowing
+                // Update() to replace the owner would let a caller transfer a slot it does not
+                // own and would invalidate the loser/winner authorization boundary.
+                || !ReferenceEquals(slot.request.owner, request.owner))
             {
                 return false;
             }
@@ -125,12 +129,55 @@ namespace ES
             return owner != null;
         }
 
+        /// <summary>读取当前 View 的仲裁快照；只读、无资源查询、无额外分配。</summary>
+        public bool TryGetDiagnosticSnapshot(ESCameraViewId viewId, out ESCameraDiagnosticSnapshot snapshot)
+        {
+            snapshot = default;
+            if (!views.TryGetValue(viewId, out ViewState view) || !view.adapter.IsReady)
+                return false;
+
+            if (view.dirty)
+            {
+                RecomputeWinner(view);
+                ComposeModifiers(view);
+            }
+
+            int activeCount = 0;
+            for (int i = 0; i < view.slots.Count; i++)
+            {
+                if (view.slots[i].active)
+                    activeCount++;
+            }
+
+            if (!view.hasWinner)
+            {
+                snapshot = new ESCameraDiagnosticSnapshot(
+                    view.viewId, view.sceneEpoch, activeCount, false,
+                    default, default, null);
+                return true;
+            }
+
+            snapshot = new ESCameraDiagnosticSnapshot(
+                view.viewId,
+                view.sceneEpoch,
+                activeCount,
+                true,
+                view.winner.request.kind,
+                view.winner.request.definition,
+                view.winner.request.owner);
+            return true;
+        }
+
         /// <summary>
         /// 用 Lease 提交 Look，不需要业务复传 Owner。只有该 Lease 的 Owner 与当前赢家
         /// Owner 一致时才接受，因此过期、失效或被其它 Owner 抢占的 Lease 无法驱动镜头。
         /// </summary>
         public bool TrySetLook(ESCameraLease lease, Vector2 lookInput)
         {
+            if (float.IsNaN(lookInput.x) || float.IsInfinity(lookInput.x)
+                || float.IsNaN(lookInput.y) || float.IsInfinity(lookInput.y))
+                return false;
+
             if (!TryGetSlot(lease, out ViewState view, out RequestSlot slot))
                 return false;
 
@@ -143,10 +190,20 @@ namespace ES
                 view.dirty = true;
             }
 
-            if (!view.hasWinner || !ReferenceEquals(slot.request.owner, view.winner.request.owner))
+            // Owner equality alone is not sufficient: one Entity may own a Base and a
+            // higher-priority Shot at the same time.  Only the exact winning slot/generation
+            // may submit frame input; otherwise a losing lease could steer the active rig.
+            if (slot.request.kind == ESCameraRequestKind.Modifier
+                || !view.hasWinner
+                || view.winnerSlot < 0
+                || lease.slot != view.winnerSlot
+                || slot.generation != view.winner.generation
+                || !ReferenceEquals(slot.request.owner, view.winner.request.owner))
                 return false;
 
             view.pendingLookOwner = slot.request.owner;
+            view.pendingLookSlot = lease.slot;
+            view.pendingLookGeneration = lease.generation;
             view.pendingLookInput = lookInput;
             view.hasPendingLook = true;
             return true;
@@ -272,6 +329,8 @@ namespace ES
 
             bool hasLookInput = view.hasPendingLook
                                 && view.hasWinner
+                                && view.pendingLookSlot == view.winnerSlot
+                                && view.pendingLookGeneration == view.winner.generation
                                 && ReferenceEquals(view.pendingLookOwner, view.winner.request.owner);
 
             if (view.hasWinner)
@@ -303,6 +362,8 @@ namespace ES
 
             view.hasPendingLook = false;
             view.pendingLookOwner = null;
+            view.pendingLookSlot = -1;
+            view.pendingLookGeneration = 0;
             view.pendingLookInput = Vector2.zero;
         }
 
@@ -312,7 +373,22 @@ namespace ES
             {
                 RequestSlot slot = view.slots[i];
                 if (!slot.active || IsRequestAlive(slot.request))
+                {
+                    if (slot.active
+                        && slot.request.kind != ESCameraRequestKind.Modifier
+                        && slot.request.lookAt != null
+                        && !IsActiveInHierarchy(slot.request.lookAt))
+                    {
+                        // LookAt is optional: preserve the follow request while removing a stale
+                        // secondary target from the resolved view.
+                        ESCameraRequest request = slot.request;
+                        request.lookAt = null;
+                        slot.request = request;
+                        view.slots[i] = slot;
+                        view.dirty = true;
+                    }
                     continue;
+                }
 
                 slot.active = false;
                 slot.request = default;
@@ -341,21 +417,33 @@ namespace ES
 
                 if (request.follow == null)
                     return false;
+
+                // Follow targets have an independent lifecycle from the request owner. A pooled
+                // or disabled target must not remain the winner and keep driving a stale Rig.
+                if (!IsActiveInHierarchy(request.follow))
+                    return false;
             }
 
-            if (request.owner is Component component && !component.gameObject.activeInHierarchy)
-                return false;
-
-            if (request.owner is GameObject gameObject && !gameObject.activeInHierarchy)
+            if (!IsActiveInHierarchy(request.owner))
                 return false;
 
             return true;
+        }
+
+        private static bool IsActiveInHierarchy(UnityEngine.Object value)
+        {
+            if (value is Component component)
+                return component != null && component.gameObject.activeInHierarchy;
+            if (value is GameObject gameObject)
+                return gameObject != null && gameObject.activeInHierarchy;
+            return value != null;
         }
 
         private static void RecomputeWinner(ViewState view)
         {
             view.hasWinner = false;
             view.winner = default;
+            view.winnerSlot = -1;
             for (int i = 0; i < view.slots.Count; i++)
             {
                 RequestSlot candidate = view.slots[i];
@@ -366,6 +454,7 @@ namespace ES
                 {
                     view.hasWinner = true;
                     view.winner = candidate;
+                    view.winnerSlot = i;
                 }
             }
 
@@ -576,9 +665,12 @@ namespace ES
             public bool hasWinner;
             public bool hasApplied;
             public RequestSlot winner;
+            public int winnerSlot = -1;
             public ESCameraResolvedModifiers modifiers;
             public bool hasPendingLook;
             public UnityEngine.Object pendingLookOwner;
+            public int pendingLookSlot = -1;
+            public int pendingLookGeneration;
             public Vector2 pendingLookInput;
 
             public ViewState(ESCameraViewId viewId, int sceneEpoch, IESCameraViewAdapter adapter, int requestCapacity)
@@ -608,9 +700,12 @@ namespace ES
                 hasWinner = false;
                 hasApplied = false;
                 winner = default;
+                winnerSlot = -1;
                 modifiers = ESCameraResolvedModifiers.Identity;
                 hasPendingLook = false;
                 pendingLookOwner = null;
+                pendingLookSlot = -1;
+                pendingLookGeneration = 0;
                 pendingLookInput = Vector2.zero;
             }
         }

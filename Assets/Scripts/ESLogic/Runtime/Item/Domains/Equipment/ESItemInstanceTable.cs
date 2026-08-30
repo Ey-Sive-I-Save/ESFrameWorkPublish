@@ -234,7 +234,7 @@ namespace ES
             return TrySet(handle, record);
         }
 
-        public bool Internal_TrySetWeaponState(
+        internal bool Internal_TrySetWeaponState(
             ESInstanceHandle handle,
             in ItemWeaponVariableData state)
         {

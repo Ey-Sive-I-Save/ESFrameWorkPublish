@@ -328,7 +328,12 @@ namespace ES
 
             Transform origin = rayOrigin != null ? rayOrigin : MyCore.transform;
             Vector3 dir = origin.forward;
-            if (Physics.Raycast(origin.position, dir, out RaycastHit hit, mountDistance, mountLayerMask, mountQuery))
+            RaycastHit hit;
+            ESSpaceProbe spaceProbe = ESGameManager.SpaceProbe;
+            bool hasHit = spaceProbe != null
+                ? spaceProbe.Raycast(origin.position, dir, mountDistance, mountLayerMask, out hit, mountQuery)
+                : Physics.Raycast(origin.position, dir, out hit, mountDistance, mountLayerMask, mountQuery);
+            if (hasHit)
             {
                 EntityMountable mountable = ResolveMountableFromHit(hit.collider);
 #if UNITY_EDITOR

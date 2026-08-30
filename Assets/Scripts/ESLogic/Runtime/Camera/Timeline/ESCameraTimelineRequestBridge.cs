@@ -58,6 +58,46 @@ namespace ES
     /// </summary>
     public static class ESCameraTimelineRequestBridge
     {
+        /// <summary>
+        /// 受信 Timeline 执行器取得短生命周期 Scope 的入口。普通数据对象不能自行构造
+        /// Timeline 权限；模块会校验当前本地 Owner 与 Cutscene RuntimeMode。
+        /// </summary>
+        internal static bool TryOpenScope(
+            Entity owner,
+            out ESCameraControlScope scope,
+            out ESCameraFailure failure)
+        {
+            scope = null;
+            failure = ESCameraFailure.None;
+            ESCameraModule camera = ESGameManager.Camera;
+            return camera != null
+                ? camera.TryOpenTimelineScope(owner, out scope, out failure)
+                : SetFailure(out failure, ESCameraFailureReason.ModuleUnavailable);
+        }
+
+        /// <summary>Playable 的 OnPlay/PrepareFrame 可重复调用；Scope 统一幂等清理。</summary>
+        internal static bool TryPush(
+            ESCameraControlScope scope,
+            in ESCameraTimelineShot shot,
+            out ESCameraLease lease,
+            out ESCameraFailure failure)
+        {
+            lease = ESCameraLease.Invalid;
+            failure = ESCameraFailure.None;
+            if (scope == null || !scope.IsValid)
+                return SetFailure(out failure, ESCameraFailureReason.ScopeInvalid);
+            if (!shot.IsValid || shot.viewId != scope.ViewId || !ReferenceEquals(shot.owner, scope.RequestOwner))
+                return SetFailure(out failure, ESCameraFailureReason.RequestRejected);
+
+            return scope.TryPlayShot(
+                shot.definition,
+                shot.follow,
+                shot.lookAt,
+                shot.priority - 320,
+                out lease,
+                out failure);
+        }
+
         public static ESCameraLease Push(in ESCameraTimelineShot shot)
         {
             if (!shot.IsValid)
@@ -83,6 +123,12 @@ namespace ES
 
             ESCameraModule camera = ESGameManager.Camera;
             return camera != null && camera.Release(lease);
+        }
+
+        private static bool SetFailure(out ESCameraFailure failure, ESCameraFailureReason reason)
+        {
+            failure = new ESCameraFailure(reason);
+            return false;
         }
     }
 }

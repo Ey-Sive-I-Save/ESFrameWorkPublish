@@ -126,6 +126,7 @@ namespace ES
     {
         public override bool NeedsStop => true;
 
+        [InfoBox("兼容旁路：直接操作已有 ParticleSystem，不创建 ESVfxHandle，也不参与 ESVfxModule 预算；新内容请使用“播放 VFX 定义”。", InfoMessageType.Warning)]
         public GameObjectExpressionSource targetObject = new GameObjectExpressionSource();
         public bool withChildren = true;
 
@@ -147,6 +148,17 @@ namespace ES
             for (int i = 0; i < particles.Length; i++)
                 particles[i].Play(true);
 
+            ESPooledGameObject pooled = obj.GetComponent<ESPooledGameObject>();
+            int pooledVersion = pooled != null ? pooled.Version : 0;
+            bool cleanupWithChildren = withChildren;
+            bool cleanupAudio = playConfiguredAudio;
+            support?.AddCleanup(() =>
+            {
+                if (pooled != null && (!pooled.IsSpawned || pooled.Version != pooledVersion))
+                    return;
+                StopObjectPresentation(obj, cleanupWithChildren, cleanupAudio);
+            });
+
             if (playConfiguredAudio)
             {
                 ESVfxAudioEmitterSet emitterSet = obj.GetComponent<ESVfxAudioEmitterSet>();
@@ -164,14 +176,22 @@ namespace ES
             if (obj == null)
                 return;
 
-            ParticleSystem[] particles = withChildren
+            StopObjectPresentation(obj, withChildren, playConfiguredAudio);
+        }
+
+        private static void StopObjectPresentation(GameObject obj, bool stopChildren, bool stopAudio)
+        {
+            if (obj == null)
+                return;
+
+            ParticleSystem[] particles = stopChildren
                 ? obj.GetComponentsInChildren<ParticleSystem>(true)
                 : obj.GetComponents<ParticleSystem>();
 
             for (int i = 0; i < particles.Length; i++)
                 particles[i].Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
-            if (playConfiguredAudio)
+            if (stopAudio)
             {
                 ESVfxAudioEmitterSet emitterSet = obj.GetComponent<ESVfxAudioEmitterSet>();
                 if (emitterSet != null)
@@ -191,33 +211,49 @@ namespace ES
         public Vector3ExpressionSource euler = new Vector3ExpressionSource { directVector3 = Vector3.zero };
         public bool followOwner;
 
-        [NonSerialized] private ESVfxHandle handle;
-
         public override bool NeedsStop => true;
 
         protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            StopOwnedVfx(support);
             if (ESGameManager.Vfx == null)
                 return;
 
-            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
             GameObject owner = ownerObject != null ? ownerObject.Evaluate(target, support) : null;
             Vector3 pos = position != null ? position.Evaluate(target, support) : Vector3.zero;
             Vector3 eulerAngles = euler != null ? euler.Evaluate(target, support) : Vector3.zero;
-            handle = ESGameManager.Vfx.Play(vfxKey, new ESVfxPlayRequest
+            ESVfxPlayRequest request = new ESVfxPlayRequest
             {
-                owner = owner != null ? owner.transform : null,
                 position = pos,
-                rotation = Quaternion.Euler(eulerAngles),
-                followOwner = followOwner
-            });
+                rotation = Quaternion.Euler(eulerAngles)
+            };
+            ESVfxHandle handle;
+            if (followOwner)
+            {
+                // Use the same explicit attached-play contract as Audio; a missing Owner is a
+                // rejected request, never a silently detached VFX instance.
+                handle = owner != null
+                    ? ESGameManager.Vfx.PlayAttached(vfxKey, owner.transform, request)
+                    : ESGameManager.Vfx.PlayAttached(vfxKey, null, request);
+            }
+            else
+            {
+                handle = ESGameManager.Vfx.PlayAtPosition(vfxKey, pos, request);
+            }
+            if (handle.IsValid)
+                support?.AddVfxHandle(this, handle);
         }
 
         protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            if (handle.IsValid)
-                ESGameManager.Vfx?.Stop(handle);
-            handle = default;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            StopOwnedVfx(support);
+        }
+
+        private void StopOwnedVfx(ESOpSupport support)
+        {
+            support?.StopVfxHandles(this);
         }
     }
 }

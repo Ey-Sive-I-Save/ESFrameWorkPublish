@@ -70,11 +70,21 @@ namespace ES
 
         public ESEditorPreviewCameraPose(Vector3 center, float radius, float yaw, float pitch, float zoom)
         {
-            Center = center;
-            Radius = Mathf.Max(0.05f, radius);
-            Yaw = yaw;
-            Pitch = pitch;
-            Zoom = Mathf.Max(0.05f, zoom);
+            Center = IsFinite(center) ? center : Vector3.zero;
+            Radius = IsFinite(radius) ? Mathf.Max(0.05f, radius) : 1f;
+            Yaw = IsFinite(yaw) ? yaw : 0f;
+            Pitch = IsFinite(pitch) ? pitch : 0f;
+            Zoom = IsFinite(zoom) ? Mathf.Max(0.05f, zoom) : 1f;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 
@@ -103,10 +113,10 @@ namespace ES
         public void Reset(Vector3 focusLocal, float radius, float yaw = 35f, float pitch = 18f, float zoom = 1f)
         {
             FocusLocal = IsFinite(focusLocal) ? focusLocal : Vector3.zero;
-            Radius = Mathf.Max(0.05f, radius);
-            Yaw = yaw;
-            Pitch = Mathf.Clamp(pitch, -80f, 80f);
-            Zoom = Mathf.Max(0.05f, zoom);
+            Radius = IsFinite(radius) ? Mathf.Max(0.05f, radius) : 1f;
+            Yaw = IsFinite(yaw) ? yaw : 35f;
+            Pitch = IsFinite(pitch) ? Mathf.Clamp(pitch, -80f, 80f) : 18f;
+            Zoom = IsFinite(zoom) ? Mathf.Max(0.05f, zoom) : 1f;
         }
 
         public void ResetRecommended(Vector3 focusLocal = default, float radius = 1.6f)
@@ -267,6 +277,11 @@ namespace ES
             return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
                 && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
                 && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 
@@ -942,6 +957,8 @@ namespace ES
         private Vector3 scaleReferenceLocalGroundPosition;
         private Material fallbackParticleMaterial;
         private readonly List<ESEditorPreviewModelHandle> modelHandles = new List<ESEditorPreviewModelHandle>(4);
+        private readonly List<GameObject> preparedObjects = new List<GameObject>(8);
+        private readonly HashSet<GameObject> samplingTargetObjects = new HashSet<GameObject>();
         private RenderTexture renderTexture;
         private int renderTextureWidth;
         private int renderTextureHeight;
@@ -950,30 +967,80 @@ namespace ES
         private bool disposed;
         private bool cellReleased;
         private bool CameraSceneBound;
+        private Scene sceneBinding;
+        private Scene fallbackPreviewScene;
 
         public Camera Camera { get; private set; }
         public Scene PreviewScene => previewScene;
         public Vector3 GroupOrigin => groupOrigin;
-        public bool IsScaleReferenceVisible => scaleReferenceObject != null && scaleReferenceObject.activeSelf;
-        public bool IsReady => Camera != null && (sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid());
+        public bool IsScaleReferenceVisible
+        {
+            get
+            {
+                try { return scaleReferenceObject != null && scaleReferenceObject.activeSelf; }
+                catch { return false; }
+            }
+        }
+        public bool IsReady => !disposed && CheckSceneBinding(out _);
         public bool IsDisposed => disposed;
         public ESEditorPreviewSceneMode SceneMode => sceneMode;
         public ESEditorPreviewEnhancerSet EnhancerSet => enhancerSet;
         public bool PreviewSceneIsValid => sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid();
+        public bool IsSceneBindingHealthy => !disposed && CheckSceneBinding(out _);
+        public string SceneBindingStatus
+        {
+            get
+            {
+                CheckSceneBinding(out string status);
+                return status;
+            }
+        }
         public int ActiveModelGroupCount => modelHandles.Count;
-        public int ActiveTemporaryObjectCount => (cameraObject != null ? 1 : 0)
-            + (keyLightObject != null ? 1 : 0)
-            + (fillLightObject != null ? 1 : 0)
-            + (groundPlaneObject != null ? 1 : 0)
-            + (scaleReferenceObject != null ? 1 : 0)
-            + modelHandles.Count;
-        public bool HasRenderTexture => renderTexture != null;
+        public int ActiveTemporaryObjectCount
+        {
+            get
+            {
+                int count = (cameraObject != null ? 1 : 0)
+                    + (keyLightObject != null ? 1 : 0)
+                    + (fillLightObject != null ? 1 : 0)
+                    + (groundPlaneObject != null ? 1 : 0)
+                    + (scaleReferenceObject != null ? 1 : 0)
+                    + modelHandles.Count;
+                for (int i = 0; i < preparedObjects.Count; i++)
+                {
+                    GameObject prepared = preparedObjects[i];
+                    if (prepared == null)
+                        continue;
+
+                    bool countedAsModel = false;
+                    for (int j = 0; j < modelHandles.Count; j++)
+                    {
+                        if (modelHandles[j] != null && modelHandles[j].Instance == prepared)
+                        {
+                            countedAsModel = true;
+                            break;
+                        }
+                    }
+                    if (!countedAsModel)
+                        count++;
+                }
+                return count;
+            }
+        }
+        public bool HasRenderTexture
+        {
+            get
+            {
+                try { return renderTexture != null && renderTexture.IsCreated(); }
+                catch { return false; }
+            }
+        }
         public Vector2Int RenderTextureSize => new Vector2Int(renderTextureWidth, renderTextureHeight);
         public long EstimatedRenderTextureBytes
         {
             get
             {
-                if (renderTexture == null) return 0L;
+                if (!HasRenderTexture) return 0L;
                 int samples = Math.Max(1, renderTexture.antiAliasing);
                 int depthBytes = renderTexture.depth > 0 ? 4 : 0;
                 return (long)renderTextureWidth * renderTextureHeight * (4 + depthBytes) * samples;
@@ -1005,23 +1072,62 @@ namespace ES
         public void Ensure()
         {
             ThrowIfDisposed();
-            if (sceneMode == ESEditorPreviewSceneMode.PreviewScene && Camera != null && !previewScene.IsValid())
+            if (sceneMode == ESEditorPreviewSceneMode.PreviewScene
+                && Camera != null && !previewScene.IsValid())
+            {
+                LastStatus = "PreviewScene 无效。";
                 ResetSceneBoundPreviewObjects();
-            else if (sceneMode == ESEditorPreviewSceneMode.PreviewScene
-                && !previewScene.IsValid()
-                && (cameraObject != null || keyLightObject != null || fillLightObject != null
-                    || groundPlaneObject != null || scaleReferenceObject != null
-                    || fallbackParticleMaterial != null || modelHandles.Count > 0))
+            }
+            else if (HasSceneBoundResources() && !CheckSceneBinding(out string invalidationReason))
+            {
+                LastStatus = invalidationReason;
                 ResetSceneBoundPreviewObjects();
+                LastStatus = "Preview context reset after invalidation: " + invalidationReason;
+            }
             if (IsReady)
                 return;
 
-            EnsurePreviewScene();
-            EnsureCamera();
-            EnsureLights();
-            if (HasEnhancer(ESEditorPreviewEnhancerSet.GroundPlane))
-                EnsureGroundPlane();
-            LastStatus = "Preview render context ready.";
+            try
+            {
+                EnsurePreviewScene();
+                EnsureFallbackPreviewScene();
+                EnsureCamera();
+                EnsureLights();
+                if (HasEnhancer(ESEditorPreviewEnhancerSet.GroundPlane))
+                    EnsureGroundPlane();
+
+                RebindPreparedObjects();
+
+                if (!CheckSceneBinding(out string healthReason))
+                    throw new InvalidOperationException("Preview context scene binding failed: " + healthReason);
+
+                LastStatus = "Preview render context ready.";
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview render context initialization failed: " + exception.GetBaseException().Message;
+                ResetSceneBoundPreviewObjects();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 统一预览入口的非抛出版本。UI/批处理入口应优先使用它，
+        /// 由调用方根据 failureReason 展示可恢复状态，而不是让 IMGUI 事件被异常打断。
+        /// </summary>
+        public bool TryEnsure(out string failureReason)
+        {
+            try
+            {
+                Ensure();
+                failureReason = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failureReason = exception.GetBaseException().Message;
+                return false;
+            }
         }
 
         /// <summary>
@@ -1042,25 +1148,30 @@ namespace ES
                 return false;
             if (EditorUtility.IsPersistent(obj) || !ESEditorPreviewUtility.HasPreviewOwnershipFlags(obj))
             {
-                LastStatus = "Preview object rejected: object is not an owned temporary preview object.";
+                if (!EditorUtility.IsPersistent(obj) && preparedObjects.Contains(obj))
+                    ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, ESEditorPreviewUtility.PreviewHideFlags);
+                else
+                {
+                    LastStatus = "Preview object rejected: object is not an owned temporary preview object.";
+                    return false;
+                }
+            }
+
+            if (!TryEnsure(out string ensureError))
+            {
+                LastStatus = "Preview context ensure failed: " + ensureError;
+                return false;
+            }
+            bool moved = MoveToContextScene(obj);
+            if (!moved)
+            {
+                RecordMoveFailure(obj);
                 return false;
             }
 
-            Ensure();
-            bool moved = MoveToContextScene(obj);
             HideFlags flags = samplingTarget ? ESEditorPreviewUtility.SamplingSafeHideFlags : ESEditorPreviewUtility.PreviewHideFlags;
-            ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, flags);
-            ESEditorPreviewUtility.SetLayerRecursive(obj.transform, previewLayer);
-            bool markerRegistered = ESEditorPreviewUtility.TryMarkPreviewObject(obj, owner, note, out string markerStatus);
-            LastObjectFlowStatus =
-                "Object=" + obj.name
-                + ", HideFlags=" + flags
-                + ", SamplingTarget=" + samplingTarget
-                + ", Scene=" + FormatScene(obj.scene)
-                + ", Move=" + moved
-                + ", Layer=" + previewLayer
-                + ", Marker=" + markerStatus;
-            return moved && markerRegistered;
+            bool markerRegistered = RegisterPreparedObject(obj, note, flags, samplingTarget);
+            return markerRegistered;
         }
 
         /// <summary>PreviewLocal 是仅平移的米制空间：原点对应 GroupOrigin，轴向与 Unity 世界轴一致。</summary>
@@ -1080,16 +1191,27 @@ namespace ES
         /// </summary>
         public void ConfigureGroundPlane(Vector3 localCenter, float size, float localY = 0f)
         {
-            Ensure();
+            if (!TryEnsure(out string ensureError))
+            {
+                LastStatus = "Preview ground plane unavailable: " + ensureError;
+                return;
+            }
             if (groundPlaneObject == null)
                 return;
 
-            float extent = Mathf.Clamp(size, 1f, 100000f);
-            if (!IsFinite(localCenter))
-                localCenter = Vector3.zero;
-            groundPlaneObject.transform.position = PreviewLocalToWorldPoint(
-                new Vector3(localCenter.x, localY - GroundThickness * 0.5f, localCenter.z));
-            groundPlaneObject.transform.localScale = new Vector3(extent, GroundThickness, extent);
+            try
+            {
+                float extent = Mathf.Clamp(size, 1f, 100000f);
+                if (!IsFinite(localCenter))
+                    localCenter = Vector3.zero;
+                groundPlaneObject.transform.position = PreviewLocalToWorldPoint(
+                    new Vector3(localCenter.x, localY - GroundThickness * 0.5f, localCenter.z));
+                groundPlaneObject.transform.localScale = new Vector3(extent, GroundThickness, extent);
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview ground plane unavailable: " + exception.GetBaseException().Message;
+            }
         }
 
         public ESEditorPreviewCameraPose CreateCameraPose(
@@ -1113,24 +1235,42 @@ namespace ES
                 return;
             if (!visible)
             {
-                if (scaleReferenceObject != null)
-                    scaleReferenceObject.SetActive(false);
+                try
+                {
+                    if (scaleReferenceObject != null)
+                        scaleReferenceObject.SetActive(false);
+                }
+                catch (Exception exception)
+                {
+                    LastStatus = "Preview scale reference hide failed: " + exception.GetBaseException().Message;
+                }
                 return;
             }
 
-            Ensure();
-            sizeMeters = Mathf.Clamp(sizeMeters, 0.01f, 100f);
-            EnsureScaleReference();
-            if (scaleReferenceObject == null)
+            if (!TryEnsure(out string ensureError))
+            {
+                LastStatus = "Preview scale reference unavailable: " + ensureError;
                 return;
+            }
+            try
+            {
+                sizeMeters = Mathf.Clamp(sizeMeters, 0.01f, 100f);
+                EnsureScaleReference();
+                if (scaleReferenceObject == null)
+                    return;
 
-            // 预览原点代表地面接触点。1m 参照物严格占据 [0, 1]m，避免半个立方体
-            // 埋入地面后产生“看起来不是 1m”的误判。
-            scaleReferenceObject.transform.position = PreviewLocalToWorldPoint(
-                scaleReferenceLocalGroundPosition + Vector3.up * (sizeMeters * 0.5f));
-            scaleReferenceObject.transform.rotation = Quaternion.identity;
-            scaleReferenceObject.transform.localScale = Vector3.one * sizeMeters;
-            scaleReferenceObject.SetActive(true);
+                // 预览原点代表地面接触点。1m 参照物严格占据 [0, 1]m，避免半个立方体
+                // 埋入地面后产生“看起来不是 1m”的误判。
+                scaleReferenceObject.transform.position = PreviewLocalToWorldPoint(
+                    scaleReferenceLocalGroundPosition + Vector3.up * (sizeMeters * 0.5f));
+                scaleReferenceObject.transform.rotation = Quaternion.identity;
+                scaleReferenceObject.transform.localScale = Vector3.one * sizeMeters;
+                scaleReferenceObject.SetActive(true);
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview scale reference unavailable: " + exception.GetBaseException().Message;
+            }
         }
 
         /// <summary>把 1m 参照物放到内容左侧，既保持真实米制比例，也避免错误 Pivot 拉坏推荐构图。</summary>
@@ -1153,13 +1293,21 @@ namespace ES
         public bool TryGetScaleReferenceBounds(out Bounds bounds)
         {
             bounds = default;
-            if (!IsScaleReferenceVisible)
+            try
+            {
+                if (!IsScaleReferenceVisible)
+                    return false;
+                Renderer renderer = scaleReferenceObject.GetComponent<Renderer>();
+                if (renderer == null)
+                    return false;
+                bounds = renderer.bounds;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview scale reference bounds unavailable: " + exception.GetBaseException().Message;
                 return false;
-            Renderer renderer = scaleReferenceObject.GetComponent<Renderer>();
-            if (renderer == null)
-                return false;
-            bounds = renderer.bounds;
-            return true;
+            }
         }
 
         public ESEditorPreviewModelHandle CreateModelGroup(
@@ -1174,7 +1322,11 @@ namespace ES
             if (source == null)
                 return null;
 
-            Ensure();
+            if (!TryEnsure(out string ensureError))
+            {
+                LastStatus = "Preview context ensure failed: " + ensureError;
+                return null;
+            }
             GameObject instance = null;
             try
             {
@@ -1215,19 +1367,32 @@ namespace ES
             if (source == null || instance == null)
                 return null;
 
-            Ensure();
+            if (!TryEnsure(out string ensureError))
+            {
+                LastStatus = "Preview context ensure failed: " + ensureError;
+                ESEditorPreviewUtility.DestroyObject(instance);
+                return null;
+            }
             ESEditorPreviewModelHandle handle = null;
             try
             {
                 instance.SetActive(false);
                 instance.name = string.IsNullOrWhiteSpace(instanceName) ? source.name + "_ESPreview" : instanceName;
+                // PreparePreviewObject 先验证完整 ownership bits，再根据 samplingTarget
+                // 切换到 SamplingSafeHideFlags；不能在首次接管前就丢掉 HideAndDontSave。
                 ESEditorPreviewUtility.SetHideFlagsRecursive(
                     instance.transform,
-                    samplingTarget
-                        ? ESEditorPreviewUtility.SamplingSafeHideFlags
-                        : ESEditorPreviewUtility.PreviewHideFlags);
+                    ESEditorPreviewUtility.PreviewHideFlags);
                 if (!PreparePreviewObject(instance, "Preview model group.", samplingTarget))
-                    throw new InvalidOperationException("Preview model could not be moved into the Context scene.");
+                {
+                    // 场景绑定失败属于可恢复的预览不可用状态，不应把统一入口升级为
+                    // 未捕获异常。调用方通过空 handle 和 LastStatus 进入降级绘制，实例
+                    // 仍由本入口回收，避免半迁移对象污染活动场景。
+                    LastStatus = "Preview model could not be moved into the Context scene. "
+                        + LastObjectFlowStatus;
+                    ESEditorPreviewUtility.DestroyObject(instance);
+                    return null;
+                }
                 if (moveToGroupOrigin)
                     MoveToGroupOrigin(instance.transform);
 
@@ -1265,14 +1430,17 @@ namespace ES
         {
             for (int i = modelHandles.Count - 1; i >= 0; i--)
             {
+                ESEditorPreviewModelHandle handle = modelHandles[i];
+                GameObject instance = handle != null ? handle.Instance : null;
                 try
                 {
-                    modelHandles[i]?.DisposeFromOwner();
+                    handle?.DisposeFromOwner();
                 }
                 catch (Exception exception)
                 {
                     Debug.LogException(exception);
                 }
+                ForgetPreparedObject(instance);
             }
 
             modelHandles.Clear();
@@ -1281,19 +1449,27 @@ namespace ES
 
         public bool RenderGUI(Rect rect, ESEditorPreviewCameraPose pose, ESEditorPreviewRenderOptions options)
         {
-            Ensure();
+            if (!TryEnsure(out _))
+                return false;
             if (Camera == null)
                 return false;
 
-            ApplyCameraPose(rect.width / Mathf.Max(1f, rect.height), pose, options.Quality);
+            try
+            {
+                ApplyCameraPose(rect.width / Mathf.Max(1f, rect.height), pose, options.Quality);
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview camera pose failed: " + exception.GetBaseException().Message;
+                return false;
+            }
             if (Event.current == null || Event.current.type != EventType.Repaint)
                 return true;
 
             float scale = Mathf.Clamp(EditorGUIUtility.pixelsPerPoint * options.RenderScale, 0.5f, 4f);
             int width = QuantizeRenderDimension(rect.width * scale);
             int height = QuantizeRenderDimension(rect.height * scale);
-            EnsureRenderTexture(width, height, options.Quality);
-            if (renderTexture == null)
+            if (!TryEnsureRenderTexture(width, height, options.Quality))
                 return false;
 
             double now = EditorApplication.timeSinceStartup;
@@ -1303,19 +1479,32 @@ namespace ES
                 return true;
             }
 
-            RenderTexture oldTarget = Camera.targetTexture;
-            RenderTexture oldActive = RenderTexture.active;
+            RenderTexture oldTarget = null;
+            RenderTexture oldActive = null;
             try
             {
+                oldTarget = Camera.targetTexture;
+                oldActive = RenderTexture.active;
                 Camera.targetTexture = renderTexture;
                 Camera.Render();
                 lastRenderTime = now;
                 GUI.DrawTexture(rect, renderTexture, ScaleMode.StretchToFill, false);
             }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview render failed: " + exception.GetBaseException().Message;
+                return false;
+            }
             finally
             {
-                Camera.targetTexture = oldTarget;
-                RenderTexture.active = oldActive;
+                try
+                {
+                    if (Camera != null)
+                        Camera.targetTexture = oldTarget;
+                }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try { RenderTexture.active = oldActive; }
+                catch (Exception exception) { Debug.LogException(exception); }
             }
 
             return true;
@@ -1327,7 +1516,8 @@ namespace ES
         /// </summary>
         public bool RenderCurrentCameraGUI(Rect rect, ESEditorPreviewRenderOptions options)
         {
-            Ensure();
+            if (!TryEnsure(out _))
+                return false;
             if (Camera == null || rect.width < 1f || rect.height < 1f)
                 return false;
 
@@ -1337,8 +1527,7 @@ namespace ES
             float scale = Mathf.Clamp(EditorGUIUtility.pixelsPerPoint * options.RenderScale, 0.5f, 4f);
             int width = QuantizeRenderDimension(rect.width * scale);
             int height = QuantizeRenderDimension(rect.height * scale);
-            EnsureRenderTexture(width, height, options.Quality);
-            if (renderTexture == null)
+            if (!TryEnsureRenderTexture(width, height, options.Quality))
                 return false;
 
             double now = EditorApplication.timeSinceStartup;
@@ -1348,19 +1537,32 @@ namespace ES
                 return true;
             }
 
-            RenderTexture oldTarget = Camera.targetTexture;
-            RenderTexture oldActive = RenderTexture.active;
+            RenderTexture oldTarget = null;
+            RenderTexture oldActive = null;
             try
             {
+                oldTarget = Camera.targetTexture;
+                oldActive = RenderTexture.active;
                 Camera.targetTexture = renderTexture;
                 Camera.Render();
                 lastRenderTime = now;
                 GUI.DrawTexture(rect, renderTexture, ScaleMode.StretchToFill, false);
             }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview render failed: " + exception.GetBaseException().Message;
+                return false;
+            }
             finally
             {
-                Camera.targetTexture = oldTarget;
-                RenderTexture.active = oldActive;
+                try
+                {
+                    if (Camera != null)
+                        Camera.targetTexture = oldTarget;
+                }
+                catch (Exception exception) { Debug.LogException(exception); }
+                try { RenderTexture.active = oldActive; }
+                catch (Exception exception) { Debug.LogException(exception); }
             }
 
             return true;
@@ -1368,15 +1570,29 @@ namespace ES
 
         public Texture2D Snapshot(int width, int height, ESEditorPreviewCameraPose pose, ESEditorPreviewQuality quality, string textureName, bool linear = false)
         {
-            Ensure();
+            if (!TryEnsure(out _))
+                return null;
             if (Camera == null)
                 return null;
 
             width = Mathf.Clamp(width, 64, 2048);
             height = Mathf.Clamp(height, 64, 2048);
-            ApplyCameraPose(width / (float)Mathf.Max(1, height), pose, quality);
-            EnsureRenderTexture(width, height, quality);
-            return ESEditorPreviewUtility.RenderCameraSnapshot(Camera, renderTexture, width, height, textureName, linear);
+            try
+            {
+                ApplyCameraPose(width / (float)Mathf.Max(1, height), pose, quality);
+                if (!TryEnsureRenderTexture(width, height, quality))
+                    return null;
+                // 全局 RT 预算可能将请求尺寸按比例降级；快照读取必须使用实际
+                // 分配尺寸，否则 RenderCameraSnapshot 会因越界保护直接返回 null。
+                width = renderTextureWidth;
+                height = renderTextureHeight;
+                return ESEditorPreviewUtility.RenderCameraSnapshot(Camera, renderTexture, width, height, textureName, linear);
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview snapshot failed: " + exception.GetBaseException().Message;
+                return null;
+            }
         }
 
         public void Dispose()
@@ -1386,6 +1602,7 @@ namespace ES
 
             try { DestroyAllModelGroups(); }
             catch (Exception exception) { Debug.LogException(exception); }
+            DestroyPreparedObjects();
             SafeReleaseRenderTexture();
             SafeDestroyPreviewObject(ref cameraObject);
             SafeDestroyPreviewObject(ref keyLightObject);
@@ -1402,6 +1619,8 @@ namespace ES
             {
                 if (previewScene.IsValid())
                     EditorSceneManager.ClosePreviewScene(previewScene);
+                if (fallbackPreviewScene.IsValid() && fallbackPreviewScene != previewScene)
+                    EditorSceneManager.ClosePreviewScene(fallbackPreviewScene);
             }
             catch (Exception exception)
             {
@@ -1421,6 +1640,7 @@ namespace ES
             }
 
             previewScene = default;
+            fallbackPreviewScene = default;
             if (!cellReleased)
             {
                 ReleaseCell(allocatedCell);
@@ -1457,8 +1677,225 @@ namespace ES
             catch (Exception exception) { Debug.LogException(exception); }
         }
 
+        private bool HasSceneBoundResources()
+        {
+            return Camera != null
+                || cameraObject != null
+                || keyLightObject != null
+                || fillLightObject != null
+                || groundPlaneObject != null
+                || scaleReferenceObject != null
+                || fallbackParticleMaterial != null
+                || modelHandles.Count > 0
+                || preparedObjects.Count > 0
+                || sceneBinding.IsValid();
+        }
+
+        private bool CheckSceneBinding(out string failureReason)
+        {
+            failureReason = string.Empty;
+            try
+            {
+                if (disposed)
+                {
+                    failureReason = "Preview context 已释放。";
+                    return false;
+                }
+
+                Scene targetScene = GetTargetScene();
+                if (!targetScene.IsValid())
+                {
+                    failureReason = sceneMode == ESEditorPreviewSceneMode.PreviewScene
+                        ? "PreviewScene 无效。"
+                        : "当前编辑器场景无效。";
+                    return false;
+                }
+
+                if (!CameraSceneBound || Camera == null || cameraObject == null)
+                {
+                    failureReason = "预览 Camera 尚未绑定到目标场景。";
+                    return false;
+                }
+                if (Camera.gameObject != cameraObject || cameraObject.scene != targetScene)
+                {
+                    failureReason = "预览 Camera 与目标场景不一致。CameraScene="
+                        + FormatScene(cameraObject.scene) + ", TargetScene=" + FormatScene(targetScene) + "。";
+                    return false;
+                }
+                if (keyLightObject == null || fillLightObject == null
+                    || keyLightObject.scene != targetScene || fillLightObject.scene != targetScene)
+                {
+                    failureReason = "预览灯光与目标场景不一致。";
+                    return false;
+                }
+                if (sceneBinding.IsValid() && sceneBinding != targetScene)
+                {
+                    failureReason = "预览资源仍绑定到旧场景：旧=" + FormatScene(sceneBinding)
+                        + ", 新=" + FormatScene(targetScene) + "。";
+                    return false;
+                }
+
+                for (int i = 0; i < modelHandles.Count; i++)
+                {
+                    ESEditorPreviewModelHandle handle = modelHandles[i];
+                    if (handle == null || handle.Instance == null)
+                    {
+                        failureReason = "预览模型句柄已失效。";
+                        return false;
+                    }
+                    if (handle.Instance.scene != targetScene)
+                    {
+                        failureReason = "预览模型未绑定到目标场景：" + handle.Instance.name + "。";
+                        return false;
+                    }
+                }
+
+                for (int i = 0; i < preparedObjects.Count; i++)
+                {
+                    GameObject obj = preparedObjects[i];
+                    if (obj == null)
+                        continue;
+                    if (obj.scene != targetScene)
+                    {
+                        failureReason = "受管预览对象未绑定到目标场景：" + obj.name + "。";
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                // UnityEngine.Object 可能在域重载/预览拆除期间变成 fake-null；
+                // IsReady 只应报告不可用原因，不能再把检查异常抛回 IMGUI。
+                failureReason = "预览场景绑定检查异常：" + exception.GetBaseException().Message;
+                return false;
+            }
+        }
+
+        private void RecordMoveFailure(GameObject obj)
+        {
+            LastObjectFlowStatus = "Object=" + obj.name
+                + ", Scene=" + FormatScene(obj.scene)
+                + ", Move=false, Marker=未登记：对象未进入目标预览场景。";
+            LastStatus = "Preview object could not enter the target preview scene.";
+        }
+
+        private bool RegisterPreparedObject(GameObject obj, string note, HideFlags flags, bool samplingTarget)
+        {
+            try
+            {
+                ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, ESEditorPreviewUtility.PreviewHideFlags);
+                ESEditorPreviewUtility.SetLayerRecursive(obj.transform, previewLayer);
+                bool markerRegistered = ESEditorPreviewUtility.TryMarkPreviewObject(
+                    obj,
+                    owner,
+                    note,
+                    out string markerStatus);
+                if (markerRegistered)
+                    ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, flags);
+                RecordPreparedObject(obj, flags, samplingTarget, markerRegistered, markerStatus);
+                return markerRegistered;
+            }
+            catch (Exception exception)
+            {
+                string objectName = obj != null ? obj.name : "<destroyed>";
+                LastObjectFlowStatus = "Object=" + objectName
+                    + ", Move=true, Marker=登记异常：" + exception.GetBaseException().Message;
+                LastStatus = "Preview object registration failed: " + exception.GetBaseException().Message;
+                return false;
+            }
+        }
+
+        private void RecordPreparedObject(
+            GameObject obj,
+            HideFlags flags,
+            bool samplingTarget,
+            bool markerRegistered,
+            string markerStatus)
+        {
+            LastObjectFlowStatus = "Object=" + obj.name
+                + ", HideFlags=" + flags
+                + ", SamplingTarget=" + samplingTarget
+                + ", Scene=" + FormatScene(obj.scene)
+                + ", Move=true, Layer=" + previewLayer
+                + ", Marker=" + markerStatus;
+            if (!markerRegistered)
+                return;
+
+            if (!preparedObjects.Contains(obj))
+                preparedObjects.Add(obj);
+            if (samplingTarget)
+                samplingTargetObjects.Add(obj);
+            else
+                samplingTargetObjects.Remove(obj);
+        }
+
+        private void RebindPreparedObjects()
+        {
+            for (int i = preparedObjects.Count - 1; i >= 0; i--)
+            {
+                GameObject obj = preparedObjects[i];
+                if (obj == null)
+                {
+                    preparedObjects.RemoveAt(i);
+                    samplingTargetObjects.Remove(obj);
+                    continue;
+                }
+
+                if (!MoveToContextScene(obj))
+                {
+                    LastObjectFlowStatus = "预览对象重新绑定目标场景失败：" + obj.name + "。";
+                    try { ESEditorPreviewUtility.DestroyObject(obj); }
+                    catch (Exception exception) { Debug.LogException(exception); }
+                    preparedObjects.RemoveAt(i);
+                    samplingTargetObjects.Remove(obj);
+                    continue;
+                }
+
+                HideFlags flags = samplingTargetObjects.Contains(obj)
+                    ? ESEditorPreviewUtility.SamplingSafeHideFlags
+                    : ESEditorPreviewUtility.PreviewHideFlags;
+                ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, ESEditorPreviewUtility.PreviewHideFlags);
+                ESEditorPreviewUtility.SetLayerRecursive(obj.transform, previewLayer);
+                bool markerRegistered = ESEditorPreviewUtility.TryMarkPreviewObject(
+                        obj,
+                        owner,
+                        "Preview object scene rebind.",
+                        out string markerStatus);
+                if (markerRegistered)
+                    ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, flags);
+                else
+                {
+                    LastObjectFlowStatus = "预览对象重新登记失败：" + markerStatus;
+                    try { ESEditorPreviewUtility.DestroyObject(obj); }
+                    catch (Exception exception) { Debug.LogException(exception); }
+                    preparedObjects.RemoveAt(i);
+                    samplingTargetObjects.Remove(obj);
+                }
+            }
+        }
+
+        private void DestroyPreparedObjects()
+        {
+            for (int i = preparedObjects.Count - 1; i >= 0; i--)
+            {
+                GameObject obj = preparedObjects[i];
+                preparedObjects.RemoveAt(i);
+                samplingTargetObjects.Remove(obj);
+                if (obj == null)
+                    continue;
+                try { ESEditorPreviewUtility.DestroyObject(obj); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
+        }
+
         private void ResetSceneBoundPreviewObjects()
         {
+            Scene oldPreviewScene = previewScene;
+            Scene oldFallbackPreviewScene = fallbackPreviewScene;
+            bool previewSceneClosed = !oldPreviewScene.IsValid();
+            bool fallbackPreviewSceneClosed = !oldFallbackPreviewScene.IsValid();
             DestroyAllModelGroups();
 
             if (cameraObject != null)
@@ -1485,11 +1922,31 @@ namespace ES
             SafeDestroyPreviewObject(ref scaleReferenceObject);
             SafeDestroyPreviewObject(ref scaleReferenceMaterial);
             SafeDestroyPreviewObject(ref fallbackParticleMaterial);
+            if (sceneMode == ESEditorPreviewSceneMode.PreviewScene && oldPreviewScene.IsValid())
+            {
+                try
+                {
+                    EditorSceneManager.ClosePreviewScene(oldPreviewScene);
+                    previewSceneClosed = true;
+                }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
+            if (oldFallbackPreviewScene.IsValid() && oldFallbackPreviewScene != oldPreviewScene)
+            {
+                try
+                {
+                    EditorSceneManager.ClosePreviewScene(oldFallbackPreviewScene);
+                    fallbackPreviewSceneClosed = true;
+                }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
             Camera = null;
             CameraSceneBound = false;
-            previewScene = default;
-            LastObjectFlowStatus = "PreviewScene 已失效，已清理旧场景绑定资源，等待重建。";
-            LastStatus = "PreviewScene invalidated; scene-bound preview objects reset.";
+            sceneBinding = default;
+            previewScene = previewSceneClosed ? default : oldPreviewScene;
+            fallbackPreviewScene = fallbackPreviewSceneClosed ? default : oldFallbackPreviewScene;
+            LastObjectFlowStatus = "预览目标场景已失效，已清理旧场景绑定资源，等待重建。";
+            LastStatus = "Preview scene invalidated; scene-bound preview objects reset.";
         }
 
         private void EnsurePreviewScene()
@@ -1498,6 +1955,25 @@ namespace ES
                 return;
 
             previewScene = EditorSceneManager.NewPreviewScene();
+        }
+
+        private void EnsureFallbackPreviewScene()
+        {
+            if (sceneMode != ESEditorPreviewSceneMode.HiddenObjectsInActiveScene)
+                return;
+            if (SceneManager.GetActiveScene().IsValid() || fallbackPreviewScene.IsValid())
+                return;
+
+            fallbackPreviewScene = EditorSceneManager.NewPreviewScene();
+        }
+
+        private Scene GetTargetScene()
+        {
+            if (sceneMode == ESEditorPreviewSceneMode.PreviewScene)
+                return previewScene;
+
+            Scene activeScene = SceneManager.GetActiveScene();
+            return activeScene.IsValid() ? activeScene : fallbackPreviewScene;
         }
 
         private void ThrowIfDisposed()
@@ -1511,8 +1987,15 @@ namespace ES
             if (handle != null)
             {
                 modelHandles.Remove(handle);
+                ForgetPreparedObject(handle.Instance);
                 ESEditorPreviewLifecycleHub.NotifyResourceChanged();
             }
+        }
+
+        private void ForgetPreparedObject(GameObject obj)
+        {
+            preparedObjects.Remove(obj);
+            samplingTargetObjects.Remove(obj);
         }
 
         private void EnsureCamera()
@@ -1524,7 +2007,8 @@ namespace ES
             try
             {
                 created = ESEditorPreviewUtility.CreatePreviewGameObject(owner + " Preview Camera", typeof(Camera));
-                MoveToContextScene(created);
+                if (!MoveToContextScene(created))
+                    throw new InvalidOperationException("Preview camera could not be moved into the Context scene.");
                 if (!ESEditorPreviewUtility.TryMarkPreviewObject(
                         created, owner, "Preview camera.", out string cameraMarkerStatus))
                     throw new InvalidOperationException("Preview camera ownership registration failed: " + cameraMarkerStatus);
@@ -1541,11 +2025,12 @@ namespace ES
                 camera.stereoTargetEye = StereoTargetEyeMask.None;
                 camera.useOcclusionCulling = false;
                 camera.depthTextureMode = DepthTextureMode.None;
-                TrySetCameraScene(camera, previewScene);
+                TrySetCameraScene(camera, GetTargetScene());
                 ESEditorPreviewUtility.TryConfigureUniversalCameraData(camera);
                 cameraObject = created;
                 Camera = camera;
                 CameraSceneBound = true;
+                sceneBinding = cameraObject.scene;
             }
             catch
             {
@@ -1569,7 +2054,8 @@ namespace ES
             try
             {
                 created = ESEditorPreviewUtility.CreatePreviewGameObject(name, typeof(Light));
-                MoveToContextScene(created);
+                if (!MoveToContextScene(created))
+                    throw new InvalidOperationException("Preview light could not be moved into the Context scene.");
                 ESEditorPreviewUtility.SetLayerRecursive(created.transform, previewLayer);
                 if (!ESEditorPreviewUtility.TryMarkPreviewObject(
                         created, owner, "Preview light.", out string lightMarkerStatus))
@@ -1633,7 +2119,8 @@ namespace ES
                 groundPlaneObject.transform,
                 ESEditorPreviewUtility.PreviewHideFlags);
             ESEditorPreviewUtility.SetLayerRecursive(groundPlaneObject.transform, previewLayer);
-            MoveToContextScene(groundPlaneObject);
+            if (!MoveToContextScene(groundPlaneObject))
+                throw new InvalidOperationException("Preview ground could not be moved into the Context scene.");
 
             Collider collider = groundPlaneObject.GetComponent<Collider>();
             if (collider != null)
@@ -1773,7 +2260,8 @@ namespace ES
         private void EnsureRenderTexture(int width, int height, ESEditorPreviewQuality quality)
         {
             ApplyGlobalRenderTextureBudget(ref width, ref height, quality);
-            if (renderTexture != null && renderTextureWidth == width && renderTextureHeight == height && renderTextureQuality == quality)
+            if (renderTexture != null && renderTexture.IsCreated()
+                && renderTextureWidth == width && renderTextureHeight == height && renderTextureQuality == quality)
                 return;
 
             RenderTexture previous = renderTexture;
@@ -1789,12 +2277,28 @@ namespace ES
             renderTextureWidth = width;
             renderTextureHeight = height;
             renderTextureQuality = quality;
+            // 新 RT 没有可复用的上一帧内容；禁止限频逻辑把空白缓冲当成有效帧。
+            lastRenderTime = 0d;
             if (previous != null)
             {
                 try { ESEditorPreviewUtility.ReleaseRenderTexture(ref previous); }
                 catch (Exception exception) { Debug.LogException(exception); }
             }
             ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+        }
+
+        private bool TryEnsureRenderTexture(int width, int height, ESEditorPreviewQuality quality)
+        {
+            try
+            {
+                EnsureRenderTexture(width, height, quality);
+                return renderTexture != null;
+            }
+            catch (Exception exception)
+            {
+                LastStatus = "Preview render texture unavailable: " + exception.GetBaseException().Message;
+                return false;
+            }
         }
 
         private void ApplyGlobalRenderTextureBudget(ref int width, ref int height, ESEditorPreviewQuality quality)
@@ -1837,20 +2341,27 @@ namespace ES
                 if (sceneMode == ESEditorPreviewSceneMode.PreviewScene)
                 {
                     EnsurePreviewScene();
-                    SceneManager.MoveGameObjectToScene(obj, previewScene);
+                    if (!previewScene.IsValid())
+                        return false;
+                    if (obj.scene != previewScene)
+                        SceneManager.MoveGameObjectToScene(obj, previewScene);
                     return obj.scene == previewScene;
                 }
 
-                Scene activeScene = SceneManager.GetActiveScene();
-                if (activeScene.IsValid() && obj.scene != activeScene)
-                    SceneManager.MoveGameObjectToScene(obj, activeScene);
-                return obj.scene.IsValid();
+                EnsureFallbackPreviewScene();
+                Scene targetScene = GetTargetScene();
+                if (!targetScene.IsValid())
+                    return false;
+                if (obj.scene != targetScene)
+                    SceneManager.MoveGameObjectToScene(obj, targetScene);
+                return obj.scene == targetScene;
             }
             catch
             {
                 // PreviewScene 模式下，仍在活动场景的对象不能被视为迁移成功；
                 // 上层必须看到 false 并停止继续渲染，避免正式场景污染/假成功。
                 return sceneMode != ESEditorPreviewSceneMode.PreviewScene
+                    && obj.scene == GetTargetScene()
                     && obj.scene.IsValid();
             }
         }
@@ -1970,12 +2481,21 @@ namespace ES
             if (camera == null || !scene.IsValid())
                 return false;
 
-            PropertyInfo sceneProperty = typeof(Camera).GetProperty("scene", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (sceneProperty == null || !sceneProperty.CanWrite || sceneProperty.PropertyType != typeof(Scene))
-                return false;
+            try
+            {
+                PropertyInfo sceneProperty = typeof(Camera).GetProperty("scene", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (sceneProperty == null || !sceneProperty.CanWrite || sceneProperty.PropertyType != typeof(Scene))
+                    return false;
 
-            sceneProperty.SetValue(camera, scene);
-            return true;
+                sceneProperty.SetValue(camera, scene);
+                return true;
+            }
+            catch
+            {
+                // Camera 已先通过 GameObject 场景迁移完成绑定；Unity 版本差异导致的
+                // 反射 setter 不可用不应把整个预览上下文判为初始化失败。
+                return false;
+            }
         }
 
         private static string FormatScene(Scene scene)

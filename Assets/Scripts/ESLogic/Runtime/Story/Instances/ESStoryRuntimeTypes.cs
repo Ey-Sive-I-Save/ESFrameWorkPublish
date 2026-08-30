@@ -48,6 +48,8 @@ namespace ES
         public int SessionGeneration { get; internal set; }
         public long ViewRevision { get; internal set; }
         public ESRuntimeModeLease RuntimeModeLease { get; internal set; }
+        /// <summary>运行期临时相机 Scope；不参与快照/存档，随前台会话重建。</summary>
+        public ESCameraControlScope CameraScope { get; internal set; }
         public ESStoryExecutionTicket CurrentExecution { get; internal set; }
         public ESQuestRecord QuestRecord { get; internal set; }
     }

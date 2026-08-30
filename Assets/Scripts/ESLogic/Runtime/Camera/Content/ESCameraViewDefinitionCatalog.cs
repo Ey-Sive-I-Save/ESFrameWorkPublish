@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cinemachine;
 using UnityEngine;
 
 namespace ES
@@ -79,6 +80,15 @@ namespace ES
         /// 仅验证其内部依赖，业务侧不会看到 RigKey。</summary>
         public bool TryValidateRigDependencies(ESCameraRigCatalog rigCatalog, out string error)
         {
+            return TryValidateRigDependencies(rigCatalog, null, out error);
+        }
+
+        /// <summary>按当前全局策略校验 Rig 依赖；globalPolicy 非空时不再读取 View 的隐藏兼容字段。</summary>
+        public bool TryValidateRigDependencies(
+            ESCameraRigCatalog rigCatalog,
+            ESCameraGlobalPolicy globalPolicy,
+            out string error)
+        {
             EnsureIndex();
             if (!isValid)
             {
@@ -98,6 +108,25 @@ namespace ES
                 {
                     error = "[ESCamera] Definition '" + definition.Definition + "' 引用了不存在的 RigKey：" + definition.rigKey;
                     return false;
+                }
+
+                bool obstructionEnabled = globalPolicy != null ? globalPolicy.enableObstruction : definition.enableObstruction;
+                if (obstructionEnabled)
+                {
+                    rigCatalog.TryGetPrefab(definition.rigKey, out GameObject rigPrefab);
+                    CinemachineCollider[] colliders = rigPrefab.GetComponentsInChildren<CinemachineCollider>(true);
+                    if (colliders.Length == 0)
+                    {
+                        error = "[ESCamera] Definition '" + definition.Definition
+                            + "' 启用了避障，但 Rig Prefab 缺少 CinemachineCollider：" + definition.rigKey;
+                        return false;
+                    }
+                    if (colliders.Length != 1)
+                    {
+                        error = "[ESCamera] Definition '" + definition.Definition
+                            + "' 的 Rig Prefab 必须且只能包含一个 CinemachineCollider：" + definition.rigKey;
+                        return false;
+                    }
                 }
             }
 
@@ -190,7 +219,9 @@ namespace ES
 
                 if (!definition.IsValid)
                 {
-                    buildError = "[ESCamera] Definition '" + definition.name + "' 缺少稳定引用或 RigKey；旧字符串不会作为运行时 fallback。";
+                    buildError = !definition.definition.IsConfigured || string.IsNullOrWhiteSpace(definition.rigKey)
+                        ? "[ESCamera] Definition '" + definition.name + "' 缺少稳定引用或 RigKey；旧字符串不会作为运行时 fallback。"
+                        : "[ESCamera] Definition '" + definition.name + "' 包含非法镜头参数（FOV、距离、灵敏度或避障预算）。";
                     return;
                 }
 

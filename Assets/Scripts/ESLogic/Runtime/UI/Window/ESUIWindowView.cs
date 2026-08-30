@@ -15,6 +15,7 @@ namespace ES
         [SerializeField] private CanvasGroup presentationCanvasGroup;
 
         private ESUIWindowContext context;
+        private IESUIWindowTemplateAdapter templateAdapter;
         private bool baselineCaptured;
         private float baselineAlpha;
         private bool baselineInteractable;
@@ -23,6 +24,29 @@ namespace ES
         public ESUIWindowContext Context => context;
         public bool IsBound => context != null;
         public CanvasGroup PresentationCanvasGroup => presentationCanvasGroup;
+
+        internal UniTask PrepareTemplateAsync(CancellationToken cancellationToken)
+        {
+            if (templateAdapter == null)
+                templateAdapter = GetComponent<IESUIWindowTemplateAdapter>();
+            if (templateAdapter is IESUIWindowAsyncTemplateAdapter asyncAdapter && context != null)
+                return asyncAdapter.PrepareAsync(context, cancellationToken);
+            return UniTask.CompletedTask;
+        }
+
+        internal UniTask CommitTemplateAsync(CancellationToken cancellationToken)
+        {
+            if (templateAdapter is IESUIWindowAsyncTemplateAdapter asyncAdapter && context != null)
+                return asyncAdapter.CommitAsync(context, cancellationToken);
+            return UniTask.CompletedTask;
+        }
+
+        internal UniTask RollbackTemplateAsync(CancellationToken cancellationToken)
+        {
+            if (templateAdapter is IESUIWindowAsyncTemplateAdapter asyncAdapter && context != null)
+                return asyncAdapter.RollbackAsync(context, cancellationToken);
+            return UniTask.CompletedTask;
+        }
 
         internal void Bind(ESUIWindowContext value)
         {
@@ -34,6 +58,8 @@ namespace ES
             CapturePresentationBaseline();
             RestorePresentationBaseline();
             context = value;
+            templateAdapter = GetComponent<IESUIWindowTemplateAdapter>();
+            templateAdapter?.Bind(value);
             OnBound(value);
         }
 
@@ -44,9 +70,23 @@ namespace ES
                 return;
 
             context = null;
-            OnUnbound(previous);
-            previous.Clear();
-            RestorePresentationBaseline();
+            try
+            {
+                OnUnbound(previous);
+            }
+            finally
+            {
+                try
+                {
+                    templateAdapter?.Unbind(previous);
+                }
+                finally
+                {
+                    templateAdapter = null;
+                    previous.Clear();
+                    RestorePresentationBaseline();
+                }
+            }
         }
 
         public virtual UniTask EnterAsync(ESUIWindowContext value, CancellationToken cancellationToken)

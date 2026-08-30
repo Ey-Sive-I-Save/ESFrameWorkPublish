@@ -449,7 +449,7 @@ namespace ES
         public bool logWeaponMountSuccess;
 
         [NonSerialized]
-        public ESActionEventHub actionEventHub = new ESActionEventHub();
+        public ESActionEventChannel actionEventChannel = new ESActionEventChannel();
 
         [NonSerialized]
         private ESActionRuntime actionRuntime;
@@ -462,6 +462,12 @@ namespace ES
 
         [NonSerialized]
         private Action<ESShotLifecycleEvent> _shotLifecycleObserver;
+
+        [NonSerialized]
+        private Action<ESShotLifecycleEvent> _shotSpawned;
+
+        [NonSerialized]
+        private Delegate[] _shotSpawnedSnapshot = Array.Empty<Delegate>();
 
         [NonSerialized]
         private Delegate[] _primaryAttackEventSnapshot = Array.Empty<Delegate>();
@@ -493,8 +499,40 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 统一真实生成通知。Launched 仅在对象池实例成功初始化并接受 Launch 后发布，
+        /// 复用完整 Shot 生命周期上下文，不创建旁路生成系统。
+        /// </summary>
+        public event Action<ESShotLifecycleEvent> ShotSpawned
+        {
+            add
+            {
+                if (value == null)
+                    return;
+                _shotSpawned += value;
+                _shotSpawnedSnapshot = _shotSpawned.GetInvocationList();
+            }
+            remove
+            {
+                if (value == null || _shotSpawned == null)
+                    return;
+
+                Action<ESShotLifecycleEvent> before = _shotSpawned;
+                Action<ESShotLifecycleEvent> after =
+                    (Action<ESShotLifecycleEvent>)Delegate.Remove(before, value);
+                if (ReferenceEquals(before, after))
+                    return;
+
+                _shotSpawned = after;
+                _shotSpawnedSnapshot = after != null
+                    ? after.GetInvocationList()
+                    : Array.Empty<Delegate>();
+            }
+        }
+
         [NonSerialized]
         private Dictionary<int, PendingPrimaryAttack> _pendingPrimaryAttacks;
+        [NonSerialized] private List<PendingPrimaryAttack> _pendingPrimaryAttackScratch;
 
         [NonSerialized]
         private int _nextPrimaryAttackId;
@@ -536,6 +574,8 @@ namespace ES
             actionRuntime = null;
             _primaryAttackEvent = null;
             _primaryAttackEventSnapshot = Array.Empty<Delegate>();
+            _shotSpawned = null;
+            _shotSpawnedSnapshot = Array.Empty<Delegate>();
         }
 
         [LabelText("Refresh Parent Snapshot Every Frame")]
@@ -723,6 +763,7 @@ namespace ES
         [NonSerialized] private int _activeBeamAttackId;
         [NonSerialized] private ESWeaponConfigKey _activeBeamWeaponKey;
         [NonSerialized] private EntityPrimaryAttackSelection _activeBeamSelection;
+        [NonSerialized] private ESAttackSpecialInfo _activeBeamSpecialInfo;
         [NonSerialized] private bool _chargeReleaseReady;
         [NonSerialized] private float _chargeStartedAt = -1f;
         [NonSerialized] private int _pendingBurstShots;
@@ -775,6 +816,7 @@ namespace ES
             public readonly ItemWeaponVariableData previousWeaponState;
             public readonly bool hasWeaponConsumption;
             public readonly bool started;
+            public readonly ESAttackSpecialInfo specialInfo;
 
             public PendingPrimaryAttack(
                 int attackId,
@@ -785,7 +827,8 @@ namespace ES
                 ESInstanceHandle consumedItemHandle = default,
                 ItemWeaponVariableData previousWeaponState = default,
                 bool hasWeaponConsumption = false,
-                bool started = false)
+                bool started = false,
+                ESAttackSpecialInfo specialInfo = default)
             {
                 this.attackId = attackId;
                 this.selection = selection;
@@ -796,6 +839,7 @@ namespace ES
                 this.previousWeaponState = previousWeaponState;
                 this.hasWeaponConsumption = hasWeaponConsumption;
                 this.started = started;
+                this.specialInfo = specialInfo;
             }
 
             public PendingPrimaryAttack MarkStarted()
@@ -808,7 +852,8 @@ namespace ES
                     consumedItemHandle,
                     previousWeaponState,
                     hasWeaponConsumption,
-                    true);
+                    true,
+                    specialInfo);
         }
 
         [ShowInInspector, ReadOnly, LabelText("最近应用后坐力")]
@@ -838,6 +883,7 @@ namespace ES
             public int remainingMembers;
             public EntityPrimaryAttackSelection selection;
             public ESWeaponConfigKey weaponKey;
+            public ESAttackSpecialInfo specialInfo;
         }
 
         public void TriggerAttack()
@@ -886,7 +932,7 @@ namespace ES
             finally { _chargeReleaseReady = false; }
         }
 
-        public void Internal_CancelPrimaryAttack()
+        internal void Internal_CancelPrimaryAttack()
         {
             FinishBeamSession();
             _weaponTriggerHeld = false;
@@ -1016,6 +1062,7 @@ namespace ES
                             _activeBeamAttackId = attackId;
                             _activeBeamWeaponKey = currentWeaponKey;
                             _activeBeamSelection = selection;
+                            _activeBeamSpecialInfo = definition.fire.specialInfo;
                         }
                         lastPrimaryAttackId = attackId;
                         ScheduleWeaponPolicy(definition, policyTick);
@@ -1068,7 +1115,8 @@ namespace ES
                 secondaryWeaponKey,
                 consumedItemHandle,
                 previousWeaponState,
-                hasWeaponConsumption);
+                hasWeaponConsumption,
+                specialInfo: ResolveWeaponSpecialInfo(primaryWeaponKey));
 
             bool submitted;
             int replacedBufferedPulseId;
@@ -1411,7 +1459,7 @@ namespace ES
                 "Holster");
         }
 
-        public bool Internal_TryFireWeapon()
+        internal bool Internal_TryFireWeapon()
         {
             if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot)
                 || slot.weaponKey == null
@@ -1468,6 +1516,8 @@ namespace ES
             WeaponFireDefinitionData fireDefinition = weaponDefinition.fire;
             if (!fireDefinition.enabled)
                 return false;
+
+            ESAttackSpecialInfo specialInfo = fireDefinition.specialInfo;
 
             if (fireDefinition.requiresAiming && !isAiming)
             {
@@ -1545,7 +1595,8 @@ namespace ES
                         attackId,
                         pelletCount,
                         selection,
-                        primaryWeaponKey))
+                        primaryWeaponKey,
+                        specialInfo))
                 {
                     ESRuntimeDataModule.ItemInstanceTable.Internal_TrySetWeaponState(itemHandle, previousState);
                     lastPrimaryAttackFailureReason = "Shot 图案容量不足，已拒绝发射。";
@@ -1561,7 +1612,8 @@ namespace ES
                     shotTarget,
                     null,
                     _shotLifecycleObserver,
-                    false);
+                    false,
+                    specialInfo);
                 int spawnedCount = 0;
                 for (int pelletIndex = 0; pelletIndex < pelletCount; pelletIndex++)
                 {
@@ -1663,7 +1715,8 @@ namespace ES
                     selection,
                     null,
                     primaryWeaponKey,
-                    null));
+                    null,
+                    specialInfo: specialInfo));
             }
 
             for (int hitIndex = 0; !persistentShot && hitIndex < patternHitCount; hitIndex++)
@@ -1678,7 +1731,8 @@ namespace ES
                     null,
                     patternHit.collider,
                     patternHit.point,
-                    true));
+                    true,
+                    specialInfo: specialInfo));
                 _weaponPatternHits[hitIndex] = default;
             }
 
@@ -1690,7 +1744,8 @@ namespace ES
                     selection,
                     null,
                     primaryWeaponKey,
-                    null));
+                    null,
+                    specialInfo: specialInfo));
             }
 
             return true;
@@ -1727,16 +1782,19 @@ namespace ES
             int attackId = _activeBeamAttackId;
             EntityPrimaryAttackSelection selection = _activeBeamSelection;
             ESWeaponConfigKey weaponKey = _activeBeamWeaponKey;
+            ESAttackSpecialInfo specialInfo = _activeBeamSpecialInfo;
             _activeBeamAttackId = 0;
             _activeBeamWeaponKey = null;
             _activeBeamSelection = default;
+            _activeBeamSpecialInfo = default;
             PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
                 EntityPrimaryAttackEventKind.Finished,
                 attackId,
                 selection,
                 null,
                 weaponKey,
-                null));
+                null,
+                specialInfo: specialInfo));
             return true;
         }
 
@@ -1826,6 +1884,9 @@ namespace ES
             if (evt.context.owner != MyCore)
                 return;
 
+            if (evt.kind == ESShotLifecycleKind.Launched)
+                PublishShotSpawned(evt);
+
             if (evt.kind == ESShotLifecycleKind.Hit
                 && evt.hitDecision != ESShotHitDecision.Ignore)
             {
@@ -1838,7 +1899,8 @@ namespace ES
                     null,
                     evt.hit.collider,
                     evt.hit.point,
-                    true));
+                    true,
+                    specialInfo: evt.context.specialInfo));
                 return;
             }
 
@@ -1861,7 +1923,26 @@ namespace ES
                     evt.context.attackSelection,
                     null,
                     evt.context.sourceWeaponKey,
-                    null));
+                    null,
+                    specialInfo: evt.context.specialInfo));
+            }
+        }
+
+        [ESHotPath]
+        private void PublishShotSpawned(in ESShotLifecycleEvent evt)
+        {
+            MyCore?.GameplayInteractionHub.Publish(new ESEffectTriggerEvent(MyCore, evt));
+            Delegate[] invocationList = _shotSpawnedSnapshot;
+            for (int index = 0; index < invocationList.Length; index++)
+            {
+                try
+                {
+                    ((Action<ESShotLifecycleEvent>)invocationList[index]).Invoke(evt);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, MyCore);
+                }
             }
         }
 
@@ -2066,14 +2147,14 @@ namespace ES
             if (actionRuntime != null || MyCore == null)
                 return;
 
-            actionEventHub ??= new ESActionEventHub();
-            actionEventHub.Published -= HandlePrimaryAttackActionEvent;
-            actionEventHub.Published += HandlePrimaryAttackActionEvent;
-            actionRuntime = new ESActionRuntime(ESActionGameCoreTable.Table, actionEventHub, MyCore);
+            actionEventChannel ??= new ESActionEventChannel();
+            actionEventChannel.Published -= HandlePrimaryAttackActionEvent;
+            actionEventChannel.Published += HandlePrimaryAttackActionEvent;
+            actionRuntime = new ESActionRuntime(ESActionGameCoreTable.Table, actionEventChannel, MyCore);
             if (actionPresentationBridge == null)
             {
                 actionPresentationBridge = new ESActionPresentationBridge(
-                    actionEventHub,
+                    actionEventChannel,
                      ESActionGameCoreTable.Table,
                      MyCore,
                      null,
@@ -2118,7 +2199,8 @@ namespace ES
                         pending.selection,
                         pending.actionKey,
                         pending.primaryWeaponKey,
-                        pending.secondaryWeaponKey));
+                        pending.secondaryWeaponKey,
+                        specialInfo: pending.specialInfo));
                     break;
 
                 case ESActionEventKind.HitResolved:
@@ -2130,7 +2212,8 @@ namespace ES
                         pending.primaryWeaponKey,
                         pending.secondaryWeaponKey,
                         evt.hitResult.target,
-                        actionHitResult: evt.hitResult));
+                        actionHitResult: evt.hitResult,
+                        specialInfo: pending.specialInfo));
                     break;
 
                 case ESActionEventKind.ActionCancelled:
@@ -2142,7 +2225,8 @@ namespace ES
                         pending.selection,
                         pending.actionKey,
                         pending.primaryWeaponKey,
-                        pending.secondaryWeaponKey));
+                        pending.secondaryWeaponKey,
+                        specialInfo: pending.specialInfo));
                     RemovePendingPrimaryAttack(evt.sourcePulseId);
                     break;
             }
@@ -2184,11 +2268,14 @@ namespace ES
             if (_pendingPrimaryAttacks == null || _pendingPrimaryAttacks.Count == 0)
                 return;
 
-            var pendingAttacks = new List<PendingPrimaryAttack>(_pendingPrimaryAttacks.Values);
+            _pendingPrimaryAttackScratch ??= new List<PendingPrimaryAttack>(8);
+            _pendingPrimaryAttackScratch.Clear();
+            foreach (PendingPrimaryAttack pending in _pendingPrimaryAttacks.Values)
+                _pendingPrimaryAttackScratch.Add(pending);
             _pendingPrimaryAttacks.Clear();
-            for (int i = 0; i < pendingAttacks.Count; i++)
+            for (int i = 0; i < _pendingPrimaryAttackScratch.Count; i++)
             {
-                PendingPrimaryAttack pending = pendingAttacks[i];
+                PendingPrimaryAttack pending = _pendingPrimaryAttackScratch[i];
                 if (!pending.started)
                 {
                     if (pending.hasWeaponConsumption)
@@ -2206,7 +2293,8 @@ namespace ES
                     pending.selection,
                     pending.actionKey,
                     pending.primaryWeaponKey,
-                    pending.secondaryWeaponKey));
+                    pending.secondaryWeaponKey,
+                    specialInfo: pending.specialInfo));
             }
         }
 
@@ -2215,6 +2303,8 @@ namespace ES
         {
             if (evt.kind == EntityPrimaryAttackEventKind.HitResolved)
                 Internal_ConsumePrimaryAttackHit(evt);
+
+            MyCore?.GameplayInteractionHub.Publish(new ESEffectTriggerEvent(MyCore, evt));
 
             Delegate[] invocationList = _primaryAttackEventSnapshot;
             for (int i = 0; i < invocationList.Length; i++)
@@ -2276,9 +2366,23 @@ namespace ES
                     hitCollider,
                     point,
                     direction,
-                    evt.attackId);
+                    evt.attackId,
+                    evt.specialInfo);
                 health.TryApplyDamage(request, out _);
             }
+        }
+
+        [ESHotPath]
+        private static ESAttackSpecialInfo ResolveWeaponSpecialInfo(ESWeaponConfigKey weaponKey)
+        {
+            if (weaponKey == null || !weaponKey.IsConfigured)
+                return default;
+            if (!ESRuntimeDataGameCore.Weapons.TryGet(weaponKey, out ESWeaponRuntimeData weaponData)
+                || weaponData == null
+                || !weaponData.Ready
+                || weaponData.PreparedSharedData?.fire == null)
+                return default;
+            return weaponData.PreparedSharedData.fire.specialInfo;
         }
 
         private static bool TryResolveDamageTarget(
@@ -2492,7 +2596,8 @@ namespace ES
             int attackId,
             int memberCount,
             in EntityPrimaryAttackSelection selection,
-            ESWeaponConfigKey weaponKey)
+            ESWeaponConfigKey weaponKey,
+            ESAttackSpecialInfo specialInfo)
         {
             if (attackId <= 0 || memberCount <= 0)
                 return false;
@@ -2510,7 +2615,8 @@ namespace ES
                     attackId = attackId,
                     remainingMembers = memberCount,
                     selection = selection,
-                    weaponKey = weaponKey
+                    weaponKey = weaponKey,
+                    specialInfo = specialInfo
                 };
                 _activeShotPatternCount++;
                 if (_activeShotPatternCount > _shotPatternHighWatermark)
@@ -2575,7 +2681,8 @@ namespace ES
                     pattern.selection,
                     null,
                     pattern.weaponKey,
-                    null));
+                    null,
+                    specialInfo: pattern.specialInfo));
             }
             _activeShotPatternCount = 0;
         }

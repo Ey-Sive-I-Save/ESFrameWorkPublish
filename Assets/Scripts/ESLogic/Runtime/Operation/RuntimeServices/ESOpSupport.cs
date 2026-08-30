@@ -37,7 +37,8 @@ namespace ES
         [NonSerialized] private List<ESOpSupport> children;
         [NonSerialized] private List<OwnedTargetPack> targetPacks;
         [NonSerialized] private List<Action> cleanupCallbacks;
-        [NonSerialized] private Dictionary<ESOutputOp, ESAudioVoiceHandle> audioVoiceHandles;
+        [NonSerialized] private Dictionary<ESOutputOp, List<ESAudioVoiceHandle>> audioVoiceHandles;
+        [NonSerialized] private Dictionary<ESOutputOp, List<ESVfxHandle>> vfxHandles;
 
         [NonSerialized, HideInInspector]
         public ContextPool contextPool;
@@ -310,8 +311,29 @@ namespace ES
                 return;
             }
 
-            audioVoiceHandles ??= new Dictionary<ESOutputOp, ESAudioVoiceHandle>(2);
-            audioVoiceHandles[operation] = handle;
+            audioVoiceHandles ??= new Dictionary<ESOutputOp, List<ESAudioVoiceHandle>>(2);
+            if (!audioVoiceHandles.TryGetValue(operation, out List<ESAudioVoiceHandle> handles))
+            {
+                handles = new List<ESAudioVoiceHandle>(2);
+                audioVoiceHandles.Add(operation, handles);
+            }
+            handles.Clear();
+            handles.Add(handle);
+        }
+
+        /// <summary>Adds a Voice without overwriting another execution of the same Op.</summary>
+        public void AddAudioVoiceHandle(ESOutputOp operation, ESAudioVoiceHandle handle)
+        {
+            if (operation == null || !handle.IsValid)
+                return;
+
+            audioVoiceHandles ??= new Dictionary<ESOutputOp, List<ESAudioVoiceHandle>>(2);
+            if (!audioVoiceHandles.TryGetValue(operation, out List<ESAudioVoiceHandle> handles))
+            {
+                handles = new List<ESAudioVoiceHandle>(2);
+                audioVoiceHandles.Add(operation, handles);
+            }
+            handles.Add(handle);
         }
 
         /// <summary>Retrieves and removes the Voice owned by one concrete Op execution.</summary>
@@ -319,11 +341,105 @@ namespace ES
         {
             handle = default;
             if (operation == null || audioVoiceHandles == null
-                || !audioVoiceHandles.TryGetValue(operation, out handle))
+                || !audioVoiceHandles.TryGetValue(operation, out List<ESAudioVoiceHandle> handles)
+                || handles.Count == 0)
                 return false;
 
-            audioVoiceHandles.Remove(operation);
+            int last = handles.Count - 1;
+            handle = handles[last];
+            handles.RemoveAt(last);
+            if (handles.Count == 0)
+                audioVoiceHandles.Remove(operation);
             return true;
+        }
+
+        /// <summary>Stops and removes every Voice owned by one Op execution group.</summary>
+        public int StopAudioVoices(ESOutputOp operation)
+        {
+            if (operation == null || audioVoiceHandles == null
+                || !audioVoiceHandles.TryGetValue(operation, out List<ESAudioVoiceHandle> handles))
+                return 0;
+
+            int stopped = 0;
+            ESAudioModule audio = ESGameManager.Audio;
+            if (audio != null)
+            {
+                for (int i = 0; i < handles.Count; i++)
+                    if (audio.Stop(handles[i]))
+                        stopped++;
+            }
+            audioVoiceHandles.Remove(operation);
+            return stopped;
+        }
+
+        /// <summary>Stores the VFX handle owned by one concrete Op execution.</summary>
+        public void SetVfxHandle(ESOutputOp operation, ESVfxHandle handle)
+        {
+            if (operation == null)
+                return;
+            if (!handle.IsValid)
+            {
+                vfxHandles?.Remove(operation);
+                return;
+            }
+            vfxHandles ??= new Dictionary<ESOutputOp, List<ESVfxHandle>>(2);
+            if (!vfxHandles.TryGetValue(operation, out List<ESVfxHandle> handles))
+            {
+                handles = new List<ESVfxHandle>(2);
+                vfxHandles.Add(operation, handles);
+            }
+            handles.Clear();
+            handles.Add(handle);
+        }
+
+        /// <summary>Adds a VFX handle without overwriting another execution in the same support scope.</summary>
+        public void AddVfxHandle(ESOutputOp operation, ESVfxHandle handle)
+        {
+            if (operation == null || !handle.IsValid)
+                return;
+
+            vfxHandles ??= new Dictionary<ESOutputOp, List<ESVfxHandle>>(2);
+            if (!vfxHandles.TryGetValue(operation, out List<ESVfxHandle> handles))
+            {
+                handles = new List<ESVfxHandle>(2);
+                vfxHandles.Add(operation, handles);
+            }
+            handles.Add(handle);
+        }
+
+        /// <summary>Retrieves and removes the VFX handle owned by one Op execution.</summary>
+        public bool TryTakeVfxHandle(ESOutputOp operation, out ESVfxHandle handle)
+        {
+            handle = default;
+            if (operation == null || vfxHandles == null
+                || !vfxHandles.TryGetValue(operation, out List<ESVfxHandle> handles)
+                || handles.Count == 0)
+                return false;
+            int last = handles.Count - 1;
+            handle = handles[last];
+            handles.RemoveAt(last);
+            if (handles.Count == 0)
+                vfxHandles.Remove(operation);
+            return true;
+        }
+
+        /// <summary>Stops and removes every VFX owned by one Op execution group.</summary>
+        public int StopVfxHandles(ESOutputOp operation)
+        {
+            if (operation == null || vfxHandles == null
+                || !vfxHandles.TryGetValue(operation, out List<ESVfxHandle> handles))
+                return 0;
+
+            int stopped = 0;
+            ESVfxModule vfx = ESGameManager.Vfx;
+            if (vfx != null)
+            {
+                for (int i = 0; i < handles.Count; i++)
+                    if (vfx.Stop(handles[i]))
+                        stopped++;
+            }
+            vfxHandles.Remove(operation);
+            return stopped;
         }
 
         public void ClearRuntime()
@@ -341,6 +457,7 @@ namespace ES
         {
             DisposeChildren();
             ReleaseAudioVoices();
+            ReleaseVfxHandles();
             RunCleanupCallbacks();
             ReleaseTargetPacks();
             contextPool?.ClearRuntimeValues();
@@ -439,11 +556,28 @@ namespace ES
             ESAudioModule audio = ESGameManager.Audio;
             if (audio != null)
             {
-                foreach (ESAudioVoiceHandle handle in audioVoiceHandles.Values)
-                    audio.Stop(handle);
+                foreach (List<ESAudioVoiceHandle> handles in audioVoiceHandles.Values)
+                    for (int i = 0; i < handles.Count; i++)
+                        audio.Stop(handles[i]);
             }
 
             audioVoiceHandles.Clear();
+        }
+
+        private void ReleaseVfxHandles()
+        {
+            if (vfxHandles == null || vfxHandles.Count == 0)
+                return;
+
+            ESVfxModule vfx = ESGameManager.Vfx;
+            if (vfx != null)
+            {
+                foreach (List<ESVfxHandle> handles in vfxHandles.Values)
+                    for (int i = 0; i < handles.Count; i++)
+                        vfx.Stop(handles[i]);
+            }
+
+            vfxHandles.Clear();
         }
 
         private void ReleaseTargetPacks()

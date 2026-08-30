@@ -3,6 +3,36 @@ using System;
 namespace ES
 {
     /// <summary>
+    /// Canonical runtime identity for a UI definition. Aliases such as BuiltInId are resolved
+    /// by the catalog and must not be used as a second runtime key.
+    /// </summary>
+    public readonly struct ESUICanonicalId : IEquatable<ESUICanonicalId>
+    {
+        public ESUICanonicalId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("UI CanonicalId 不能为空。", nameof(value));
+
+            Value = value;
+        }
+
+        public string Value { get; }
+
+        public bool Equals(ESUICanonicalId other) =>
+            string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+        public override bool Equals(object obj) => obj is ESUICanonicalId other && Equals(other);
+
+        public override int GetHashCode() =>
+            Value == null ? 0 : StringComparer.Ordinal.GetHashCode(Value);
+
+        public override string ToString() => Value ?? string.Empty;
+
+        public static bool operator ==(ESUICanonicalId left, ESUICanonicalId right) => left.Equals(right);
+        public static bool operator !=(ESUICanonicalId left, ESUICanonicalId right) => !left.Equals(right);
+    }
+
+    /// <summary>
     /// Built-in window identities. Hot-update and DLC windows use the stable string key on
     /// <see cref="ESUIWindowDefinition"/> instead of extending this enum.
     /// </summary>

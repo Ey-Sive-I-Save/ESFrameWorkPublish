@@ -836,11 +836,29 @@ namespace ES
 
         public bool PushToPool(GameObject instance)
         {
+            return PushToPoolInternal(instance, null);
+        }
+
+        /// <summary>
+        /// Returns an instance only when it is still the same spawned generation observed by
+        /// the caller. This prevents stale async callbacks from returning a later borrower.
+        /// </summary>
+        public bool PushToPool(GameObject instance, int expectedVersion)
+        {
+            return PushToPoolInternal(instance, expectedVersion);
+        }
+
+        private bool PushToPoolInternal(GameObject instance, int? expectedVersion)
+        {
             if (instance == null)
                 return false;
 
             ESPooledGameObject pooled = instance.GetComponent<ESPooledGameObject>();
             if (pooled == null || string.IsNullOrEmpty(pooled.PoolKey))
+                return false;
+
+            if (expectedVersion.HasValue
+                && (!pooled.IsSpawned || pooled.Version != expectedVersion.Value))
                 return false;
 
             if (pooled.TryDeferReturnDuringPoolSpawn())

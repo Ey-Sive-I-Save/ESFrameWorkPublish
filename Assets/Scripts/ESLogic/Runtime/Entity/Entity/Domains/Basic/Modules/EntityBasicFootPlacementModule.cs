@@ -699,15 +699,14 @@ namespace ES
             float maxDist = castUp + castDown;
 
             RaycastHit hit;
-            bool hasHit;
-            if (sphereRadius > 0.0001f)
-            {
-                hasHit = Physics.SphereCast(origin, sphereRadius, Vector3.down, out hit, maxDist, groundLayers, QueryTriggerInteraction.Ignore);
-            }
-            else
-            {
-                hasHit = Physics.Raycast(origin, Vector3.down, out hit, maxDist, groundLayers, QueryTriggerInteraction.Ignore);
-            }
+            ESSpaceProbe spaceProbe = ESGameManager.SpaceProbe;
+            bool hasHit = spaceProbe != null
+                ? (sphereRadius > 0.0001f
+                    ? spaceProbe.SphereCast(origin, sphereRadius, Vector3.down, maxDist, groundLayers, out hit, QueryTriggerInteraction.Ignore)
+                    : spaceProbe.Raycast(origin, Vector3.down, maxDist, groundLayers, out hit, QueryTriggerInteraction.Ignore))
+                : sphereRadius > 0.0001f
+                    ? Physics.SphereCast(origin, sphereRadius, Vector3.down, out hit, maxDist, groundLayers, QueryTriggerInteraction.Ignore)
+                    : Physics.Raycast(origin, Vector3.down, out hit, maxDist, groundLayers, QueryTriggerInteraction.Ignore);
 
             if (!hasHit)
             {

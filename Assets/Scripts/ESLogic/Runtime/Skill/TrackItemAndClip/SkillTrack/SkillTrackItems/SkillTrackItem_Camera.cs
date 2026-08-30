@@ -164,30 +164,35 @@ namespace ES
             if (camera == null || target == null || cameraOwner == null)
                 return;
 
-            EntityTransformMapping mapping = target.TransformMapping;
-            Transform follow = mapping != null ? mapping.Resolve("CameraTarget") : null;
-            if (follow == null && mapping != null)
-                follow = mapping.Resolve(DefaultTransformKey.Camera);
-            if (follow == null)
+            if (!ESCameraTargetResolver.TryResolve(target, out Transform follow, out Transform lookAt))
                 return;
 
             CameraClipRuntimeState runtimeState = CameraClipRuntimeState.Pool.GetInPool();
             try
             {
-                ESCameraRequest request = ESCameraRequest.CreateShot(
-                    new ESCameraViewId(clip.viewKey),
-                    clip.definition,
-                    clip.priority,
-                    cameraOwner,
-                    follow,
-                    mapping != null ? mapping.Resolve("CameraAimTarget") : null);
-
-                runtimeState.lease = camera.Push(request);
-                if (!runtimeState.lease.IsValid)
+                if (!camera.TryOpenSkillScope(cameraOwner, out ESCameraControlScope scope, out ESCameraFailure openFailure))
                 {
                     runtimeState.TryAutoPushedToPool();
                     return;
                 }
+                runtimeState.scope = scope;
+
+                // Existing serialized priority remains compatible as a relative offset from
+                // the Skill source band; viewKey is retained only for migration/preview data.
+                int priorityOffset = clip.priority - 120;
+                if (!scope.TryPlayShot(clip.definition, follow, lookAt, priorityOffset,
+                    out runtimeState.lease, out ESCameraFailure playFailure))
+                {
+                    scope.Dispose();
+                    runtimeState.scope = null;
+                    runtimeState.TryAutoPushedToPool();
+                    return;
+                }
+
+                runtimeState.supportMode = state != null && state.SkillDefinition != null
+                    ? state.SkillDefinition.cameraSupport
+                    : SkillCameraSupportMode.None;
+                runtimeState.enterFrame = Time.frameCount;
 
                 clipState.UserData = runtimeState;
             }
@@ -200,6 +205,28 @@ namespace ES
 
         public void Tick(EntityState_Skill state, ref SkillRuntimeClipState clipState, float time, float deltaTime)
         {
+            if (!(clipState.UserData is CameraClipRuntimeState runtimeState)
+                || runtimeState.scope == null || !runtimeState.scope.IsValid)
+                return;
+
+            if (runtimeState.supportMode == SkillCameraSupportMode.InstantFeedback
+                && Time.frameCount > runtimeState.enterFrame)
+            {
+                runtimeState.TryAutoPushedToPool();
+                clipState.UserData = null;
+                return;
+            }
+
+            if (runtimeState.supportMode != SkillCameraSupportMode.ContinuousControl
+                && runtimeState.supportMode != SkillCameraSupportMode.TrackCallback)
+                return;
+
+            Entity target = ResolveTarget(state);
+            if (target == null
+                || !ESCameraTargetResolver.TryResolve(target, out Transform follow, out Transform lookAt))
+                return;
+
+            runtimeState.scope.TryUpdateTarget(runtimeState.lease, follow, lookAt);
         }
 
         public void OnClipExit(EntityState_Skill state, ref SkillRuntimeClipState clipState)
@@ -241,6 +268,9 @@ namespace ES
 
         public bool IsRecycled { get; set; }
         public ESCameraLease lease;
+        public ESCameraControlScope scope;
+        public SkillCameraSupportMode supportMode;
+        public int enterFrame;
 
         public void OnResetAsPoolable()
         {
@@ -248,6 +278,10 @@ namespace ES
                 ESGameManager.Camera?.Release(lease);
 
             lease = ESCameraLease.Invalid;
+            scope?.Dispose();
+            scope = null;
+            supportMode = SkillCameraSupportMode.None;
+            enterFrame = 0;
         }
 
         public void TryAutoPushedToPool()

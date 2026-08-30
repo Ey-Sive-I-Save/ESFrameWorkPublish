@@ -20,6 +20,7 @@ namespace ES
         [FormerlySerializedAs("profileCatalog")]
         [SerializeField] private ESCameraViewDefinitionCatalog definitionCatalog;
         [SerializeField] private ESCameraRigCatalog rigCatalog;
+        [SerializeField] private ESCameraGlobalPolicy globalPolicy;
         [SerializeField] private CinemachineBlenderSettings blenderSettings;
         [SerializeField] private CinemachineBlendDefinition defaultBlend = new CinemachineBlendDefinition(
             CinemachineBlendDefinition.Style.EaseInOut,
@@ -50,7 +51,8 @@ namespace ES
             ESCameraViewDefinitionCatalog newDefinitionCatalog,
             ESCameraRigCatalog newRigCatalog,
             CinemachineBlenderSettings newBlenderSettings,
-            Transform newRigRoot)
+            Transform newRigRoot,
+            ESCameraGlobalPolicy newGlobalPolicy = null)
         {
             viewKey = newViewKey;
             outputCamera = newOutputCamera;
@@ -59,6 +61,7 @@ namespace ES
             rigCatalog = newRigCatalog;
             blenderSettings = newBlenderSettings;
             rigRoot = newRigRoot;
+            globalPolicy = newGlobalPolicy;
         }
 #endif
 
@@ -110,7 +113,7 @@ namespace ES
             brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.SmartUpdate;
             brain.m_BlendUpdateMethod = CinemachineBrain.BrainUpdateMethod.LateUpdate;
             sceneEpoch = NextSceneEpoch();
-            adapter = new ESCameraCinemachine2ViewAdapter(outputCamera, brain, definitionCatalog, rigCatalog, rigRoot);
+            adapter = new ESCameraCinemachine2ViewAdapter(outputCamera, brain, definitionCatalog, rigCatalog, rigRoot, globalPolicy);
             if (!adapter.IsReady)
             {
                 adapter.Dispose();
@@ -155,7 +158,13 @@ namespace ES
                 return false;
             }
 
-            if (!definitionCatalog.TryValidateRigDependencies(rigCatalog, out string catalogError))
+            if (globalPolicy != null && !globalPolicy.TryValidate(out string globalPolicyError))
+            {
+                ReportConfigurationError("全局相机策略无效：" + globalPolicyError);
+                return false;
+            }
+
+            if (!definitionCatalog.TryValidateRigDependencies(rigCatalog, globalPolicy, out string catalogError))
             {
                 ReportConfigurationError(catalogError);
                 return false;

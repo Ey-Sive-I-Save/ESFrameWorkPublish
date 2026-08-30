@@ -71,6 +71,53 @@ namespace ES
             RefreshForegroundLocalization();
         }
 
+        /// <summary>只读前台判定，供受信 Story Camera Bridge 建立临时 Scope。</summary>
+        public bool IsForeground(ESStoryInstance instance)
+        {
+            return instance != null
+                   && ReferenceEquals(foreground, instance)
+                   && instances.ContainsKey(instance.InstanceId);
+        }
+
+        /// <summary>
+        /// 剧情表现层的低暴露相机入口。Definition/目标由节点表现适配器提供，视图、优先级
+        /// 和生命周期由前台 Story Scope 统一管理；没有相机时剧情仍可继续并记录降级原因。
+        /// </summary>
+        public bool TryPlayCameraShot(
+            ESStoryInstance instance,
+            ESCameraDefinitionReference definition,
+            Transform subject,
+            out ESCameraLease lease,
+            Transform lookAt = null)
+        {
+            lease = ESCameraLease.Invalid;
+            if (!IsForeground(instance))
+                return false;
+
+            if (instance.CameraScope == null || !instance.CameraScope.IsValid)
+            {
+                EnsureForegroundCameraScope(instance);
+                if (instance.CameraScope == null || !instance.CameraScope.IsValid)
+                    return false;
+            }
+
+            return instance.CameraScope.TryPlayShot(definition, subject, lookAt, out lease);
+        }
+
+        public bool TryPlayCameraShot(
+            string instanceId,
+            ESCameraDefinitionReference definition,
+            Transform subject,
+            out ESCameraLease lease,
+            Transform lookAt = null)
+        {
+            lease = ESCameraLease.Invalid;
+            if (string.IsNullOrWhiteSpace(instanceId) || !instances.TryGetValue(instanceId, out ESStoryInstance instance))
+                return false;
+
+            return TryPlayCameraShot(instance, definition, subject, out lease, lookAt);
+        }
+
         public bool TryStartFromInteraction(ESStoryConfigKey definitionKey, Entity actor, ESInteractionBinding binding, out string instanceId, out string error)
         {
             instanceId = null;
@@ -188,6 +235,8 @@ namespace ES
                 catch (Exception exception) { Debug.LogException(exception); }
                 instance.RuntimeModeLease?.Dispose();
                 instance.RuntimeModeLease = null;
+                instance.CameraScope?.Dispose();
+                instance.CameraScope = null;
                 if (endInteraction)
                     TryEndInteraction(instance, false, ESInteractionEndReason.SceneTransition);
             }
@@ -298,6 +347,8 @@ namespace ES
                 if (instance.RuntimeModeLease == null || !instance.RuntimeModeLease.IsValid)
                     return ESGameSaveApplyResult.Fail("Story.Rollback.RuntimeMode", "Story Rollback 无法恢复 RuntimeMode Lease：" + instanceId);
             }
+            if (foreground != null)
+                EnsureForegroundCameraScope(foreground);
             if (foreground != null && foreground.RunState == ESStoryRunState.WaitingForUI)
             {
                 if (!foreground.Definition.TryGetNode(foreground.CurrentNodeId, out ESStoryNodeSnapshot node))
@@ -396,8 +447,27 @@ namespace ES
                 Finish(instance, ESStoryRunState.Failed, ESInteractionEndReason.StoryFailed, false);
                 return;
             }
+            EnsureForegroundCameraScope(instance);
             instance.RunState = ESStoryRunState.Running;
             Advance(instance);
+        }
+
+        private void EnsureForegroundCameraScope(ESStoryInstance instance)
+        {
+            if (instance == null || !IsForeground(instance) || instance.CameraScope != null)
+                return;
+
+            ESCameraModule camera = ESGameManager.Camera;
+            if (camera == null)
+                return;
+
+            if (!camera.TryOpenStoryScope(instance, out ESCameraControlScope scope, out ESCameraFailure failure))
+            {
+                RecordDiagnostic("Story 相机 Scope 降级 [" + failure.Code + "] " + failure.Message);
+                return;
+            }
+
+            instance.CameraScope = scope;
         }
 
         private void Advance(ESStoryInstance instance)
@@ -591,6 +661,8 @@ namespace ES
             catch (Exception exception) { Debug.LogException(exception); }
             instance.RuntimeModeLease?.Dispose();
             instance.RuntimeModeLease = null;
+            instance.CameraScope?.Dispose();
+            instance.CameraScope = null;
             instances.Remove(instance.InstanceId);
             if (foreground == instance) foreground = null;
             if (!isDestroying) MarkCheckpointDirty();

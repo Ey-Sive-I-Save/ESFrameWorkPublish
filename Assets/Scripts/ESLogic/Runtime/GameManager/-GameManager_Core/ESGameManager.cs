@@ -27,6 +27,10 @@ namespace ES
         [LabelText("自动创建RuntimeData模块")]
         public bool autoCreateRuntimeDataModule = true;
 
+        [TabGroup("设置")]
+        [LabelText("自动创建 ES 渲染模块")]
+        public bool autoCreateRenderModule = true;
+
         [TabGroup("配置")]
         [LabelText("自动创建对象池模块")]
         public bool autoCreateGameObjectPoolModule = true;
@@ -106,6 +110,9 @@ namespace ES
 
             if (autoCreateRuntimeDataModule)
                 GetMoudle<ESRuntimeDataModule>();
+
+            if (autoCreateRenderModule)
+                GetMoudle<ESRenderModule>();
 
             if (autoCreateGameObjectPoolModule)
                 GetMoudle<ESGameObjectPoolModule>();

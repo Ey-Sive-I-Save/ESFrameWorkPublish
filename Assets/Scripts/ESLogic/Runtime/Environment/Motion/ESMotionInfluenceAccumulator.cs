@@ -160,13 +160,11 @@ namespace ES
             public bool TryAcquire(in ESMotionFieldRequest request, out int slotIndex, out int generation)
             {
                 slotIndex = FindFreeSlot();
-                if (slotIndex < 0 && !TryGrow())
+                if (slotIndex < 0)
                 {
                     generation = 0;
                     return false;
                 }
-                if (slotIndex < 0)
-                    slotIndex = FindFreeSlot();
 
                 ref Slot slot = ref slots[slotIndex];
                 slot.generation = NextGeneration(slot.generation);
@@ -236,19 +234,8 @@ namespace ES
                 return -1;
             }
 
-            private bool TryGrow()
-            {
-                if (slots.Length >= MaxFieldCapacity)
-                    return false;
-
-                int nextCapacity = Mathf.Min(MaxFieldCapacity, slots.Length * 2);
-                Array.Resize(ref slots, nextCapacity);
-                Array.Resize(ref activeIndices, nextCapacity);
-                return true;
-            }
         }
 
-        private readonly int initialFieldCapacity;
         private Vector3 pendingVelocityDelta;
         private FieldStore fieldStore;
         private bool hasPendingVelocityDelta;
@@ -256,9 +243,15 @@ namespace ES
         private int rejectedFieldCount;
         private int invalidSolveCount;
 
+        /// <summary>
+        /// Creates an accumulator with a bounded store. <paramref name="capacity"/> is kept
+        /// for source compatibility; the store always reserves <see cref="MaxFieldCapacity"/>
+        /// so field acquisition cannot resize arrays during gameplay.
+        /// </summary>
         public ESMotionInfluenceAccumulator(int capacity = DefaultFieldCapacity)
         {
-            initialFieldCapacity = Mathf.Clamp(capacity, 1, MaxFieldCapacity);
+            // Capacity is retained for source compatibility; the runtime store is always
+            // bounded at MaxFieldCapacity so later field acquisition cannot resize arrays.
         }
 
         public int ActiveFieldCount => fieldStore?.activeCount ?? 0;
@@ -268,6 +261,12 @@ namespace ES
         public int OwnerGeneration => ownerGeneration;
         public bool HasPendingVelocityDelta => hasPendingVelocityDelta;
         public bool HasInfluences => ActiveFieldCount > 0 || HasPendingVelocityDelta;
+
+        /// <summary>Allocate the bounded field store during lifecycle setup, never during motion.</summary>
+        public void Warmup()
+        {
+            fieldStore ??= new FieldStore(MaxFieldCapacity);
+        }
 
         public void AddVelocity(
             Vector3 velocity,
@@ -300,7 +299,7 @@ namespace ES
                 return false;
             }
 
-            fieldStore ??= new FieldStore(initialFieldCapacity);
+            fieldStore ??= new FieldStore(MaxFieldCapacity);
             if (!fieldStore.TryAcquire(request, out int slotIndex, out int slotGeneration))
             {
                 rejectedFieldCount++;

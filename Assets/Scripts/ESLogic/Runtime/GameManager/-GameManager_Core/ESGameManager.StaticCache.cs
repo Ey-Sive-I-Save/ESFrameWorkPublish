@@ -27,6 +27,8 @@ namespace ES
         public static event Action<ESAudioModule> AudioModuleAvailabilityChanged;
         public static ESResourcePlanRuntimeService ResourcePlans { get; private set; }
         public static ESPhysicsQueryModule PhysicsQueryModule { get; private set; }
+        /// <summary>统一的 ES 3D 游戏空间探查入口；仅编排查询与候选归一化。</summary>
+        public static ESSpaceProbe SpaceProbe { get; private set; }
         public static ESLODModule LODModule { get; private set; }
         public static ESDynamicAtlasModule DynamicAtlas { get; private set; }
         /// <summary>
@@ -160,6 +162,9 @@ namespace ES
                 PhysicsQueryModule = physicsQueryModule as ESPhysicsQueryModule;
             else
                 PhysicsQueryModule = null;
+            SpaceProbe = PhysicsQueryModule != null
+                ? new ESSpaceProbe(PhysicsQueryModule, PhysicsQueryModule.sharedColliderCapacity)
+                : null;
 
             if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESLODModule), out IModule lodModule))
                 LODModule = lodModule as ESLODModule;
@@ -202,6 +207,7 @@ namespace ES
             SetAudioModule(null);
             Vfx = null;
             PhysicsQueryModule = null;
+            SpaceProbe = null;
             LODModule = null;
             DynamicAtlas = null;
             Camera = null;

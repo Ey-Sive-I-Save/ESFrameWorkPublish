@@ -78,9 +78,17 @@ namespace ES
         public ESCameraModifierOperation operation;
         public float value;
 
-        public bool IsValid => operation == ESCameraModifierOperation.Override
-                               || operation == ESCameraModifierOperation.Add
-                               || operation == ESCameraModifierOperation.Multiply;
+        public bool IsConfigured => operation != ESCameraModifierOperation.None;
+
+        public bool IsValid => IsFinite(value)
+                               && (operation == ESCameraModifierOperation.Override
+                                   || operation == ESCameraModifierOperation.Add
+                                   || operation == ESCameraModifierOperation.Multiply);
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
     }
 
     [Serializable]
@@ -89,8 +97,21 @@ namespace ES
         public ESCameraModifierOperation operation;
         public Vector3 value;
 
-        public bool IsValid => operation == ESCameraModifierOperation.Override
-                               || operation == ESCameraModifierOperation.Add;
+        public bool IsConfigured => operation != ESCameraModifierOperation.None;
+
+        public bool IsValid => IsFinite(value)
+                               && (operation == ESCameraModifierOperation.Override
+                                   || operation == ESCameraModifierOperation.Add);
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
     }
 
     /// <summary>
@@ -105,10 +126,26 @@ namespace ES
         public ESCameraVectorModifier shoulderOffset;
         public ESCameraScalarModifier shakeAmplitude;
 
-        public bool IsValid => fieldOfView.IsValid
-                               || distanceScale.IsValid
-                               || shoulderOffset.IsValid
-                               || shakeAmplitude.IsValid;
+        public bool IsValid
+        {
+            get
+            {
+                bool hasConfiguredField = fieldOfView.IsConfigured
+                                           || distanceScale.IsConfigured
+                                           || shoulderOffset.IsConfigured
+                                           || shakeAmplitude.IsConfigured;
+                if (!hasConfiguredField)
+                    return false;
+
+                // None means an intentionally unused sparse field. Every declared field still
+                // has to be valid; one good field must never mask a NaN or unknown operation in
+                // another field and poison the resolved camera pose.
+                return (!fieldOfView.IsConfigured || fieldOfView.IsValid)
+                       && (!distanceScale.IsConfigured || distanceScale.IsValid)
+                       && (!shoulderOffset.IsConfigured || shoulderOffset.IsValid)
+                       && (!shakeAmplitude.IsConfigured || shakeAmplitude.IsValid);
+            }
+        }
     }
 
     /// <summary>
@@ -313,6 +350,102 @@ namespace ES
             this.lookInput = lookInput;
             this.hasLookInput = hasLookInput;
             this.modifiers = modifiers;
+        }
+    }
+
+    /// <summary>
+    /// 相机运行时的只读诊断快照。仅暴露仲裁结果和生命周期身份，不暴露 VCam、Rig 或
+    /// 内部槽位引用；调用方可将其写入外部证据回执而不改变相机状态。
+    /// </summary>
+    public readonly struct ESCameraDiagnosticSnapshot
+    {
+        public readonly ESCameraViewId viewId;
+        public readonly int sceneEpoch;
+        public readonly int activeRequestCount;
+        public readonly bool hasWinner;
+        public readonly ESCameraRequestKind winnerKind;
+        public readonly ESCameraDefinitionReference winnerDefinition;
+        public readonly UnityEngine.Object winnerOwner;
+
+        internal ESCameraDiagnosticSnapshot(
+            ESCameraViewId viewId,
+            int sceneEpoch,
+            int activeRequestCount,
+            bool hasWinner,
+            ESCameraRequestKind winnerKind,
+            ESCameraDefinitionReference winnerDefinition,
+            UnityEngine.Object winnerOwner)
+        {
+            this.viewId = viewId;
+            this.sceneEpoch = sceneEpoch;
+            this.activeRequestCount = activeRequestCount;
+            this.hasWinner = hasWinner;
+            this.winnerKind = winnerKind;
+            this.winnerDefinition = winnerDefinition;
+            this.winnerOwner = winnerOwner;
+        }
+
+        public string WinnerDefinitionKey => winnerDefinition.stringKey ?? string.Empty;
+
+        public override string ToString()
+        {
+            return string.Format(
+                "View={0};Epoch={1};Active={2};Winner={3};Kind={4};Definition={5};Owner={6}",
+                viewId,
+                sceneEpoch,
+                activeRequestCount,
+                hasWinner,
+                winnerKind,
+                WinnerDefinitionKey,
+                winnerOwner != null ? winnerOwner.name : "<none>");
+        }
+    }
+
+    /// <summary>
+    /// 可序列化的相机诊断回执投影。它只包含稳定标量/字符串和赢家身份，适合写入
+    /// PlayMode 或 Profiler 证据；运行时对象引用不会进入回执。
+    /// </summary>
+    [Serializable]
+    public struct ESCameraDiagnosticReceipt
+    {
+        public int frame;
+        public string viewKey;
+        public int sceneEpoch;
+        public int activeRequestCount;
+        public bool hasWinner;
+        public ESCameraRequestKind winnerKind;
+        public string winnerDefinitionKey;
+        public string winnerOwnerName;
+        public string scenePath;
+        public string platform;
+        public string buildId;
+
+        public static ESCameraDiagnosticReceipt FromSnapshot(in ESCameraDiagnosticSnapshot snapshot, int frame)
+        {
+            return FromSnapshot(snapshot, frame, string.Empty, string.Empty, string.Empty);
+        }
+
+        public static ESCameraDiagnosticReceipt FromSnapshot(
+            in ESCameraDiagnosticSnapshot snapshot,
+            int frame,
+            string scenePath,
+            string platform,
+            string buildId)
+        {
+            return new ESCameraDiagnosticReceipt
+            {
+                frame = frame,
+                viewKey = snapshot.viewId.Key ?? string.Empty,
+                sceneEpoch = snapshot.sceneEpoch,
+                activeRequestCount = snapshot.activeRequestCount,
+                hasWinner = snapshot.hasWinner,
+                winnerKind = snapshot.winnerKind,
+                winnerDefinitionKey = snapshot.WinnerDefinitionKey,
+                winnerOwnerName = snapshot.winnerOwner != null ? snapshot.winnerOwner.name : string.Empty,
+                scenePath = scenePath ?? string.Empty,
+                platform = platform ?? string.Empty,
+                buildId = buildId ?? string.Empty,
+            };
         }
     }
 

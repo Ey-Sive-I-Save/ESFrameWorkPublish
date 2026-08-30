@@ -236,9 +236,12 @@ namespace ES
             var motor = MyCore.kcc?.motor;
             Vector3 origin = motor != null ? motor.TransientPosition : MyCore.transform.position;
 
+            ESSpaceProbe spaceProbe = ESGameManager.SpaceProbe;
             ESPhysicsQueryModule physicsQuery = ESGameManager.PhysicsQueryModule;
-            int count = physicsQuery != null
-                ? physicsQuery.OverlapSphere(origin, detectRadius, interactableLayers, _overlapBuffer, QueryTriggerInteraction.Collide)
+            int count = spaceProbe != null
+                ? spaceProbe.OverlapSphere(origin, detectRadius, interactableLayers, _overlapBuffer, QueryTriggerInteraction.Collide)
+                : physicsQuery != null
+                    ? physicsQuery.OverlapSphere(origin, detectRadius, interactableLayers, _overlapBuffer, QueryTriggerInteraction.Collide)
                 : Physics.OverlapSphereNonAlloc(origin, detectRadius, _overlapBuffer, interactableLayers, QueryTriggerInteraction.Collide);
             ESInteractable best = null;
             int bestPriority = int.MinValue;

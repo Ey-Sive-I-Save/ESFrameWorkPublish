@@ -46,6 +46,8 @@ namespace ES
             }
         }
 
+        public ESUIWindowContext Context => IsValid ? instance?.context : null;
+
         public UniTask CloseAsync()
         {
             return RequestCloseAsync(ESUIWindowCloseEffect.Default);

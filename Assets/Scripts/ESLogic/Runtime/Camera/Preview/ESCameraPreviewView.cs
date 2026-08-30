@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System;
 using Cinemachine;
 using UnityEngine;
@@ -25,12 +26,15 @@ namespace ES
             CinemachineBrain brain,
             ESCameraViewDefinitionCatalog definitionCatalog,
             ESCameraRigCatalog rigCatalog,
-            Transform rigRoot)
+            Transform rigRoot,
+            ESCameraGlobalPolicy globalPolicy = null)
         {
             this.viewId = viewId;
             this.sceneEpoch = sceneEpoch;
             this.brain = brain;
             if (!viewId.IsValid || sceneEpoch <= 0 || outputCamera == null || brain == null)
+                return;
+            if (globalPolicy != null && !globalPolicy.TryValidate(out _))
                 return;
 
             ESCameraCinemachine2ViewAdapter candidate = null;
@@ -42,7 +46,8 @@ namespace ES
                     brain,
                     definitionCatalog,
                     rigCatalog,
-                    rigRoot);
+                    rigRoot,
+                    globalPolicy);
                 if (candidate.IsReady && director.RegisterView(viewId, sceneEpoch, candidate))
                 {
                     registered = true;
@@ -143,3 +148,4 @@ namespace ES
         }
     }
 }
+#endif

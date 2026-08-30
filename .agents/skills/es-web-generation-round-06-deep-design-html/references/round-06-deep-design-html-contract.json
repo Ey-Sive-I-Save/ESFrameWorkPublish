@@ -3,12 +3,13 @@
   "roundId": "web-generation-round-06",
   "stageId": "deep-design-and-html",
   "authority": "accepted TaskContext + KnowledgeRoute + DesignSystemProfile + current user requirement",
-  "requiredInput": {"recordType": "DesignSystemProfileReceipt", "status": "accepted", "roundId": "web-generation-round-05"},
+  "requiredInput": {"recordType": "PageDesignInstantiation", "status": "accepted", "roundId": "web-generation-round-05.5", "modelResponsePhase": "page-design-instantiation", "aiSolutionRequired": true},
   "requiredDesign": ["objectiveBrief", "informationArchitecture", "componentInventory", "contentModel", "interactionStateGraph", "responsiveMatrix", "motionTimeline", "a11yChecks", "traceability", "acceptanceAssertions", "resourceBudget", "resourceUsage", "listSchemas", "dataContracts", "interactionContracts", "dynamicDataModel", "apiAdapterConfig", "performanceBudget"],
-  "resourceBudget": {"profileId": "web-deep-design-ultra-v2", "maxRounds": 32, "maxBranches": 512, "maxModelCalls": 256, "maxEvaluations": 1024, "stageUsageRequired": true},
-  "requiredArtifact": ["semanticHtml", "styles", "interactionScript", "loadingState", "emptyState", "errorState", "successState", "reducedMotionFallback"],
-  "acceptanceSignals": ["design accepted before write", "real requirement-specific content", "no template-only output", "capability-to-DOM traceability", "max budget profile bound", "per-stage usage recorded", "static artifact hash", "UTF-8 valid", "static checks pass", "every round has artifact increment", "every round passes interaction gate", "every round passes layout gate"],
-  "failureCodes": ["blocked.round-06.missing-upstream", "blocked.round-06.design-not-accepted", "blocked.round-06.template-only", "blocked.round-06.state-coverage", "blocked.round-06.traceability-gap", "blocked.round-06.artifact-integrity"],
+  "resourceBudget": {"profileId": "task-scoped-five-round-v1", "totalWallClockSecondsMax": 1800, "rounds": 5, "round1MinimumActiveSeconds": 300, "roundMinimumActiveSeconds": 60, "stageUsageRequired": true},
+  "requiredAgentContract": ["AiWebDesignTask", "AiWebDesignRevisionReceipt", "meaningful designDecision/implementationSummary/changedRegions/nextHypotheses/failureCauses"],
+  "requiredArtifact": ["HTML/CSS/JS file manifest", "loadingState", "emptyState", "errorState", "successState", "reducedMotionFallback"],
+  "acceptanceSignals": ["design accepted before write", "real requirement-specific content", "AI-authored candidate provenance", "capability-to-DOM traceability", "task-scoped time budget bound", "per-round byte ledger", "static artifact hash", "UTF-8 valid", "static checks pass", "real page navigation", "real menu actions", "localStorage CRUD", "real pagination", "animation and reduced-motion", "locale zh-CN", "dark-style cohesion", "every round has structural or behavioral diff"],
+  "failureCodes": ["blocked.round-06.missing-upstream", "blocked.round-06.ai-solution-required", "blocked.round-06.model-response-required", "blocked.round-06.design-not-accepted", "blocked.round-06.ai-agent-contract-required", "blocked.round-06.ai-agent-not-admitted", "blocked.round-06.ai-candidate-missing", "blocked.round-06.state-coverage", "blocked.round-06.traceability-gap", "blocked.round-06.artifact-integrity"],
   "forbiddenTransitions": ["upstream-stale-to-write", "design-unaccepted-to-html", "html-to-runtime-claim", "html-to-release"],
   "nextRound": "web-generation-round-07-static-quality-closeout"
 }

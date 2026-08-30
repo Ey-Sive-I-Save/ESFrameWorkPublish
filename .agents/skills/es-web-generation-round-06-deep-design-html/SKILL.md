@@ -1,23 +1,23 @@
 ---
 name: es-web-generation-round-06-deep-design-html
-description: Consume an accepted Round 05 design-system profile and a real user requirement to create a requirement-specific deep WebPageStudio design, then materialize high-detail semantic HTML/CSS/JS with traceable interactions, responsive states, motion usage, accessibility, and deterministic static evidence.
+description: Orchestrate an AI agent that consumes an accepted Round 05 capability profile plus a real AI-instantiated page solution (Round 05.5) and user requirement, produces competing page designs, writes real HTML/CSS/JS or React, and iterates from executable evidence; scripts only execute checks and validate receipts.
 ---
 
 # ES Web Generation Round 06 — Deep Design & HTML
 
 ## Purpose
 
-Round 06 is the first page-specific implementation stage. It consumes the accepted TaskContext, KnowledgeRoute, and Round 05 DesignSystemProfile, then designs and materializes the requested page. It must preserve the user's objective, use templates as primitives rather than as a substitute for analysis, and produce a detailed static artifact.
+Round 06 is the AI Design-and-Code Orchestrator. It consumes the accepted TaskContext, KnowledgeRoute, Round 05 DesignSystemProfile, and the AI-owned Round 05.5 page solution, dispatches AI design branches, and lets the AI agent write and repair the page. Templates and scripts are evidence/primitive tools only; they cannot invent page structure, copy, or claim an AI turn.
 
 ## SmallTool controls
 
-- Read only accepted upstream receipts, the current user requirement, and the referenced template/motion/style resources.
+- Read only accepted upstream receipts, the current user requirement, and the referenced motion/style resources. Templates are optional primitives and never a page solution.
 - Require AI analysis before writing: objective, audience, primary action, content model, information architecture, state graph, responsive matrix, motion mapping, a11y and acceptance assertions.
 - Write only the declared WebPageStudio artifact path and deterministic receipt; never overwrite outside the approved output or claim runtime/browser proof.
 
 ## Required reads
 
-Read project `AGENTS.md`, `ES/AISpace/README.md`, Round 03 TaskContext, Round 04 KnowledgeRoute, accepted Round 05 DesignSystemProfile, [`references/round-06-deep-design-html-contract.json`](references/round-06-deep-design-html-contract.json), and the existing WebPageStudio static-generation contracts. Read the selected template, motion/effect and style profile entries before materialization.
+Read project `AGENTS.md`, `ES/AISpace/README.md`, Round 03 TaskContext, Round 04 KnowledgeRoute, accepted Round 05 DesignSystemProfile, [`references/round-06-deep-design-html-contract.json`](references/round-06-deep-design-html-contract.json), and the existing WebPageStudio static-generation contracts. A real `AiWebDesignModelResponse` for `page-design-instantiation` is required before producing a page-level design; without it the adapter writes `review` and blocks. Read any selected motion/effect and style profile entries only as evidence for the AI decision.
 
 ## Workflow
 
@@ -25,9 +25,11 @@ Read project `AGENTS.md`, `ES/AISpace/README.md`, Round 03 TaskContext, Round 04
 2. Interpret the actual user requirement; write an objective brief and do not infer a GitHub/dashboard page from a generic title.
 3. Instantiate Round 05 primitives into concrete page regions, content examples, component inventory, interaction state graph, responsive matrix, motion timeline, a11y checks and traceability links.
 4. Run a design review gate. The design packet must be explicitly accepted before HTML materialization; otherwise return `design-review` with no page write.
-5. Materialize semantic HTML/CSS/JS with real content, loading/empty/error/success states, keyboard paths, reduced-motion fallback, responsive behavior and the selected high-density effects.
-6. Run 5+ bounded self-review rounds. Every round must make an auditable artifact/design increment, pass the interaction gate (search, detail, comments, status/conflict and keyboard path) and pass the layout gate (grid/flex structure, responsive breakpoints, minmax constraints and focus geometry). A round that only waits or recomputes a hash without an increment fails.
-7. Run static checks for required DOM markers, contract-to-DOM traceability, UTF-8, deterministic artifact hash, and no placeholder/template-only output. Emit a receipt separating `static-generated`, `static-validated`, and `release-not-run`.
+5. Admit a real `AiWebDesignTask` and one or more `AiWebDesignRevisionReceipt` records using `Test-ESRound06AiDesignAgentReceipt.ps1`. Each receipt must prove reads, writes, changed files/regions, concrete design decisions, hashes, and requested checks.
+6. Feed real tool failures back to the AI agent. A revision without a failure report, concrete decision, and changed-file manifest is not a revision.
+5. Let the AI/ABCD-selected candidate own the page design. Materialize only a complete AI-authored HTML/CSS/JS candidate; do not synthesize a fallback layout from fixed strings. The candidate must cover real content, loading/empty/error/success states, keyboard paths, reduced-motion fallback, responsive behavior and selected effects.
+6. Run the five-round orchestration defined in [`references/round-06-five-round-orchestration.json`](references/round-06-five-round-orchestration.json): Round 1 uses an isolated subagent with the complete accepted design packet and at least five minutes of active generation, aiming to finish the whole page. Rounds 2–5 are high-authority handoff repair rounds: each may radically restructure HTML/CSS/JS to complete anything Round 1 missed, while using the DesignPacket as the quality oracle; their named focus is a gate, not a limit on repair scope. Each round must consume a distinct AI-authored revision artifact, record the before/after hash and a semantic DOM/interaction diff, then pass the interaction and layout gates. Waiting, hash-only mutation, metadata-only mutation, or non-AI content is an immediate failure.
+7. Run static checks for required DOM markers, contract-to-DOM traceability, UTF-8, deterministic artifact hash, and AI-authored candidate provenance. Emit a receipt separating `static-generated`, `static-validated`, and `release-not-run`.
 8. Stop. Browser, Unity, network, visual, performance and release claims require separate authorization and evidence.
 
 ## Maximum bounded resource profile
@@ -37,7 +39,10 @@ Use the legal project maximums for the design/ABCD portion: `maxRounds=24`, `max
 ## Hard controls
 
 - No HTML write before design acceptance.
-- A template cannot supply the objective, content, state logic or visual decision by itself.
+- A template cannot supply the objective, content, state logic or visual decision by itself; templates are optional primitives only.
+- `Invoke-ESWebPageStudioDeepDesign.ps1` must not synthesize capabilities, regions, data contracts, or visual tokens from the objective. It only maps fields supplied by the AI response and records the response hash.
+- The orchestrator must fail with `blocked.round-06.ai-agent-contract-required` or `blocked.round-06.ai-agent-not-admitted` when the task/receipts are absent or invalid. It must never claim AI analysis from counters, timers, hashes, templates, or generated prose.
+- A receipt with only `modelCalls`, byte changes, or a hash change is invalid. Writes must remain inside `allowedWriteRoots`, and `sourceHashAfter` must match the real artifact.
 - Every primary capability maps to a region, component, interaction, effect and assertion.
 - Every generation round must demonstrably advance detail and must re-check interaction behavior and layout geometry; interaction/layout are mandatory gates, not optional post-checks.
 - Preserve all required states and accessibility semantics; dense effects must degrade under reduced-motion or constrained profiles.
@@ -51,7 +56,7 @@ Use the legal project maximums for the design/ABCD portion: `maxRounds=24`, `max
 
 ## Return contract
 
-Return `recordType=DeepDesignHtmlReceipt`, `roundId`, `stageId`, `status`, `taskId`, upstream hashes, `designPacket`, `artifactPath`, `artifactHash`, `domTraceability`, `staticChecks`, `aiAnalysis`, `execution`, `decision`, `returnReceipt`, and `nonClaims`.
+Return `recordType=DeepDesignHtmlReceipt`, `roundId`, `stageId`, `status`, `taskId`, upstream hashes, `designPacket`, `artifactPath`, `artifactHash`, `domTraceability`, `staticChecks`, `aiAnalysis`, `execution`, `decision`, `returnReceipt`, and `nonClaims`. The receipt must also bind `aiMaterialization.agentTaskPath` and the admitted `revisionReceiptPaths`; without those bindings the result is not a real AI coding round.
 
 ## Skill 使用披露
 

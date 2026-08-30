@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://web-generation/round-05-5/page-design-instantiation/v1",
+  "title": "AI Page Design Instantiation",
+  "type": "object",
+  "required": ["objectiveBrief", "securityContract", "semanticHtml", "informationArchitecture", "visualDirection", "interactionModel", "implementationPlan", "filesToCreate", "filesToModify", "riskAssessment", "rejectedAlternatives", "provenance", "aiAnalysis", "execution", "returnReceipt", "evidence"],
+  "properties": {
+    "semanticHtml": {"type": "string", "minLength": 1},
+    "filesToCreate": {"type": "array", "minItems": 1},
+    "filesToModify": {"type": "array"},
+    "provenance": {"type": "object", "required": ["actor"]},
+    "aiAnalysis": {"type": "string", "minLength": 40},
+    "execution": {"type": "string", "minLength": 20},
+    "returnReceipt": {"type": "object", "minProperties": 1},
+    "evidence": {"type": "object", "minProperties": 1}
+  },
+  "additionalProperties": true
+}

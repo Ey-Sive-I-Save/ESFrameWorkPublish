@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "profileId": "ai-web-materialization-five-rounds-v1",
+  "totalBudgetMinutes": 30,
+  "rounds": [
+    {"round":1,"owner":"isolated-subagent","contextIsolation":"isolated","spawnRequired":true,"focus":"full-design-materialization","minimumActiveMinutes":5,"mustConsume":["acceptedDesignPacket"],"requiredEvidence":["objectiveAnalysis","completeHtmlCssJs","reads","writes","changedRegions","sourceHashBefore","sourceHashAfter","artifactBytesBefore","artifactBytesAfter","requestedChecks","contextFingerprint","activeSeconds"]},
+    {"round":2,"owner":"primary-ai","handoff":"round-1-artifact-only","authority":"high-refactor","focus":"complete-missing-functionality","minimumActiveMinutes":1,"requiredChecks":["real-view-navigation","real-menu-actions","real-local-storage","real-pagination"],"onFailure":"large-structural-refactor","mustRepair":"any gap left by round 1 or required by DesignPacket"},
+    {"round":3,"owner":"primary-ai","handoff":"round-2-artifact-only","authority":"high-refactor","focus":"complete-and-verify-interaction-motion","minimumActiveMinutes":1,"requiredChecks":["state-transitions","animation-timeline","reduced-motion","keyboard-path"],"onFailure":"large-structural-refactor","mustRepair":"missing or shallow interaction and motion"},
+    {"round":4,"owner":"primary-ai","handoff":"round-3-artifact-only","authority":"high-refactor","focus":"complete-and-verify-content-states","minimumActiveMinutes":1,"requiredChecks":["chinese-default","rich-fixture-content","loading-empty-error-success","simulated-real-interaction"],"onFailure":"large-structural-refactor","mustRepair":"missing content, state or information-architecture coverage"},
+    {"round":5,"owner":"primary-ai","handoff":"round-4-artifact-only","authority":"high-refactor","focus":"complete-and-unify-final-style","minimumActiveMinutes":1,"requiredChecks":["dark-theme-consistency","token-consistency","responsive-regression","final-dom-traceability"],"onFailure":"large-structural-refactor","mustRepair":"any remaining design-package gap or style inconsistency"}
+  ],
+  "globalGates":["each round has non-empty AI analysis","each round changes structure or behavior","no metadata-only revision","no template substitution","no old-artifact reuse","all writes inside allowed roots","round transitions carry only accepted artifact and current task context","stopReason is mandatory"]
+}

@@ -13,6 +13,7 @@ Round 05 defines reusable primitives before a specific page is designed: interac
 
 - Read only the accepted Round 04 receipt, selected Knowledge entries, ABCC/ABCD contracts, and the design contract.
 - Require AI analysis of reusable web patterns, at least three independent template systems, explicit selection reasons, and rejected alternatives.
+- Reject shallow candidate shells: every candidate must carry a stable id, a meaningful description, an interaction model, a visual rationale, and explicit tradeoffs; titles or placeholder discard text alone are never design evidence.
 - Start a bounded subagent plan (interaction, component, motion, visual/a11y roles) only after the route is accepted; merge through the InnovationRun, never by untracked prose.
 - Write only the design packet/receipt path. Do not silently mark `designStatus=accepted`; acceptance requires a user decision recorded in the receipt.
 
@@ -44,6 +45,7 @@ Read project `AGENTS.md`, `ES/AISpace/README.md`, the Round 04 KnowledgeRoute re
 - Use a task-scoped InnovationRun or an equivalent contract-bound candidate trace; every branch carries parent, change, interaction delta, keep/discard, and reason.
 - Preserve Knowledge SourceRefs and route hashes; any drift invalidates the packet.
 - Keep design and materialization separate; HTML generation begins only from an accepted packet.
+- When an ABCD candidate must feed Round 05.5, use `scripts/Convert-ESAbcCandidateToWebModelResponse.ps1` only as a lossless evidence adapter. It must reject candidates without a complete `webDesign` payload and stage evidence; it may not invent fields or select an unmarked candidate.
 - Repeat validation is deterministic and does not overwrite prior packets.
 
 ## Return contract

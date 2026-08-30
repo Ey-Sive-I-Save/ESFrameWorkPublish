@@ -1,0 +1,52 @@
+﻿[
+    {
+        "archive":  "has-symbols-1.1.0.tgz",
+        "bytes":  8059,
+        "sha256":  "4460C7532F28B8DF2DDC9A1EC17816D43C24D4B9591DC6C5936B82F7F86AE7C5"
+    },
+    {
+        "archive":  "is-arguments-1.2.0.tgz",
+        "bytes":  11027,
+        "sha256":  "476C29799EC4F51B694D576FC70A27631C8FFE00E4269B7608027E12C7B0E51C"
+    },
+    {
+        "archive":  "is-arrayish-0.3.2.tgz",
+        "bytes":  16639,
+        "sha256":  "01D66E497E5919652A1DA343220E894E4915B80AD3EFBA60324EB422FF97EA32"
+    },
+    {
+        "archive":  "is-callable-1.2.7.tgz",
+        "bytes":  9896,
+        "sha256":  "1B5C6E4E8AB142A6857FCA2FB79D880BA64F2C4AD87907B583934D04B503C3A1"
+    },
+    {
+        "archive":  "is-core-module-2.16.1.tgz",
+        "bytes":  10079,
+        "sha256":  "E3DDB1D0D54AC68DB74DD0AE30F5FF51387C30A01BF6A8D55FFB65A42E3A3BE3"
+    },
+    {
+        "archive":  "is-even-1.0.0.tgz",
+        "bytes":  2163,
+        "sha256":  "D77C6AEABDFB84FEED20106B7533975FE68D17D1FA7969672DDF8EFB2C37B60C"
+    },
+    {
+        "archive":  "is-number-7.0.0.tgz",
+        "bytes":  3730,
+        "sha256":  "7B75C1057198CF97696909A9BEE176C9C5E9BCB5B03BF3ECEF2F484DEFADD51E"
+    },
+    {
+        "archive":  "is-odd-3.0.1.tgz",
+        "bytes":  2774,
+        "sha256":  "13C23B3F1F3A5C146B8906E23C8E674F8E4A6FF44B77720E1D4BDDB7B2CAF312"
+    },
+    {
+        "archive":  "is-regex-1.2.1.tgz",
+        "bytes":  12196,
+        "sha256":  "A73E499153621AF82D1F0F1BA77F21A01F95612B09D50D57253FC9E123A98B0D"
+    },
+    {
+        "archive":  "is-string-1.0.7.tgz",
+        "bytes":  7090,
+        "sha256":  "CDFA3603DCA66033B15C75FB807605D1FBA9ECA08BDCFFE7ED47DE1958D7CEF4"
+    }
+]

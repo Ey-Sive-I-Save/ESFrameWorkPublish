@@ -1,0 +1,30 @@
+{
+  "site": "Poly Haven",
+  "capturedUtc": "2026-08-30T20:20:00+08:00",
+  "budgetBytes": 10485760,
+  "totalBytes": 5480708,
+  "fileCount": 10,
+  "status": "deferred-by-budget",
+  "siteStatus": "unavailable",
+  "totalVisibleFiles": 30,
+  "totalVisibleBytes": 11264993,
+  "typeCounts": {"纹理": 10, "模型": 10, "HDRI": 10},
+  "typeBytes": {"纹理": 5480708, "模型": 5221432, "HDRI": 562853},
+  "deferredByBudget": true,
+  "license": "CC0（以站点及具体资产页为准）",
+  "urpAdaptation": "URP Lit Base Color 初始纹理；完整材质仍需补齐 Normal/Roughness 并在 Unity 验证",
+  "searchTerms": ["Poly Haven texture aerial 1k diffuse"],
+  "partialDownload": true,
+  "files": [
+    {"path":"纹理/aerial_asphalt_01_diff_1k.jpg","bytes":635143,"sha256":"28bfd71288b364f825e0feb750e487410422d80bf3c31d32da01cae3bf085b58"},
+    {"path":"纹理/aerial_beach_01_diff_1k.jpg","bytes":115382,"sha256":"5b849983d08fda1c6d28b95b55851c2227697598721b25ff2b85e57cf8b04fc4"},
+    {"path":"纹理/aerial_beach_02_diff_1k.jpg","bytes":309954,"sha256":"51a1a52942598a31156d671dc931d8c700d8a1fdfb462ee186699e8ee4ed0c15"},
+    {"path":"纹理/aerial_beach_03_diff_1k.jpg","bytes":227361,"sha256":"7d4ba66269add434f4cb77623ff2a55e13f894f560e95f3d2c9c8bd15b39645e"},
+    {"path":"纹理/aerial_grass_rock_diff_1k.jpg","bytes":666655,"sha256":"57b8041bfe0d0f01430e4dbaad45e7ddddf0a9fc97317f90dbc51f7b0d9e1b5d"},
+    {"path":"纹理/aerial_ground_rock_diff_1k.jpg","bytes":599629,"sha256":"c14761998b32630dd193b0fbfd31c8c6f5a144a701b84f87f9d7c33596cc554f"},
+    {"path":"纹理/aerial_mud_1_diff_1k.jpg","bytes":486547,"sha256":"7eb832bde081b6729d36920e99a94316d2323b7d155447b4c3ae1192940612b4"},
+    {"path":"纹理/aerial_rocks_01_diff_1k.jpg","bytes":812635,"sha256":"0f184f4a1da57342d240086b5abfb804bb129bc649024c9546b054bb918264b7"},
+    {"path":"纹理/aerial_rocks_02_diff_1k.jpg","bytes":785923,"sha256":"708373b2af7fd07ac8de1500556006aaf904c41a99985a849cacc78874f38eac"},
+    {"path":"纹理/aerial_rocks_04_diff_1k.jpg","bytes":841479,"sha256":"5ac472016a6740bd3c62b1d719bf128e0659022fb35853f4e847737522337ffa"}
+  ]
+}

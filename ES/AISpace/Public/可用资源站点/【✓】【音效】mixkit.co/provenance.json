@@ -1,0 +1,21 @@
+﻿{
+    "site":  "mixkit.co",
+    "license":  "Mixkit Sound Effects Free License",
+    "sourcePage":  "https://mixkit.co/free-sound-effects/",
+    "downloadMethod":  "official public preview MP3; bounded rerun wrote files directly to canonical folder (no archive); prior batch staged/extracted/cleaned; source page rechecked HTTP 200 on 2026-08-30",
+    "fileCount":  20,
+    "visibleBytes":  6299872,
+    "hashVerified":  20,
+    "archivesRetained":  false,
+    "zipFiles":  0,
+    "archiveCount":  0,
+    "extractedFilesVisible":  true,
+    "hashManifest":  "音效/hashes.json",
+    "samplePath":  "音效/",
+    "access":  {
+                   "requiresLogin":  false,
+                   "sourcePageHttpStatus":  200,
+                   "checkedUtc":  "2026-08-30T00:00:00Z"
+               },
+    "unityUrp":  "AudioClip import expected; Unity runtime not run"
+}

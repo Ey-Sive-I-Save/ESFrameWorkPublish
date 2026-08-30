@@ -1,0 +1,200 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEditor;
+using UnityEngine;
+using Coffee.UIEffectInternal;
+using UnityEditorInternal;
+
+namespace Coffee.UIEffects.Editors
+{
+    [CustomEditor(typeof(UIEffectProjectSettings))]
+    internal class UIEffectProjectSettingsEditor : PreloadedProjectSettingsEditor
+    {
+        private ReorderableList _reorderableList;
+        private SerializedProperty _runtimePresets;
+        private SerializedProperty _runtimePresetsV2;
+        private SerializedProperty _useHDRColorPicker;
+        private ShaderVariantRegistryEditor _shaderVariantRegistryEditor;
+        private UIEffect[] _legacyPresets;
+        private bool _expandRuntimePresets;
+        private bool _expandLegacyPrefabs;
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _legacyPresets = UIEffectProjectSettings.LoadEditorPresets();
+            _useHDRColorPicker = serializedObject.FindProperty("m_UseHDRColorPicker");
+            _runtimePresets = serializedObject.FindProperty("m_RuntimePresets");
+            _runtimePresetsV2 = serializedObject.FindProperty("m_RuntimePresetsV2");
+
+            _reorderableList = new ReorderableList(serializedObject, _runtimePresetsV2, true, true, true, true);
+            _reorderableList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Runtime Presets");
+            _reorderableList.drawElementCallback = (rect, index, isActive, isFocused) =>
+            {
+                var element = _reorderableList.serializedProperty.GetArrayElementAtIndex(index);
+                var effect = element.objectReferenceValue as UIEffectPreset;
+                rect.y += 2;
+                rect.height = EditorGUIUtility.singleLineHeight;
+
+                EditorGUI.BeginDisabledGroup(effect != null && effect.hideFlags == HideFlags.NotEditable);
+                EditorGUI.PropertyField(rect, element, GUIContent.none);
+                EditorGUI.EndDisabledGroup();
+            };
+            _reorderableList.onAddDropdownCallback = (rect, list) =>
+            {
+                UIEffectEditor.DropDownPreset(rect,
+                    x => !UIEffectProjectSettings.instance.m_RuntimePresetsV2.Contains(x.preset),
+                    UIEffectProjectSettings.RegisterRuntimePreset);
+            };
+
+            _shaderVariantRegistryEditor = ShaderVariantRegistryEditor.Create(serializedObject, "(UIEffect)",
+                () =>
+                {
+                    UIEffectProjectSettings.shaderRegistry
+                        .RegisterOptionalShaders(UIEffectProjectSettings.instance);
+                });
+        }
+
+        public override void OnInspectorGUI()
+        {
+            EditorGUIUtility.labelWidth = 180;
+            base.OnInspectorGUI();
+
+            // Settings
+            // Runtime Presets
+            _reorderableList.DoLayoutList();
+
+            // Legacy Presets
+            DrawLegacyPresets();
+
+            // Editor
+            // Use HDR color pickers.
+            EditorGUILayout.PropertyField(_useHDRColorPicker);
+
+            // Shader
+            // Shader registry
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Shader", EditorStyles.boldLabel);
+            _shaderVariantRegistryEditor.Draw();
+
+            DrawPreLoadSettingsInBuild("UIEffect");
+            serializedObject.ApplyModifiedProperties();
+            GUILayout.FlexibleSpace();
+        }
+
+        private void DrawLegacyPresets()
+        {
+            for (var i = _runtimePresets.arraySize - 1; 0 <= i; i--)
+            {
+                if (_runtimePresets.GetArrayElementAtIndex(i).objectReferenceValue == null)
+                {
+                    _runtimePresets.DeleteArrayElementAtIndex(i);
+                }
+            }
+
+            if (_legacyPresets.Length == 0 && _runtimePresets.arraySize == 0) return;
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            var title = EditorGUIUtility.TrTextContent("Legacy Presets (Obsolete)", "", "warning");
+            EditorGUILayout.LabelField(title,
+                EditorStyles.boldLabel);
+
+            _expandRuntimePresets = EditorGUILayout.Foldout(_expandRuntimePresets,
+                $"Legacy Runtime Presets ({_runtimePresets.arraySize})");
+            if (_expandRuntimePresets)
+            {
+                EditorGUI.BeginDisabledGroup(true);
+                EditorGUI.indentLevel++;
+
+                for (var i = 0; i < _runtimePresets.arraySize; i++)
+                {
+                    EditorGUILayout.PropertyField(_runtimePresets.GetArrayElementAtIndex(i), GUIContent.none);
+                }
+
+                EditorGUI.indentLevel--;
+                EditorGUI.EndDisabledGroup();
+            }
+
+            _expandLegacyPrefabs = EditorGUILayout.Foldout(_expandLegacyPrefabs,
+                $"Legacy Preset Prefabs ({_legacyPresets.Length})");
+            if (_expandLegacyPrefabs)
+            {
+                EditorGUI.BeginDisabledGroup(true);
+                EditorGUI.indentLevel++;
+
+                foreach (var legacyPreset in _legacyPresets)
+                {
+                    EditorGUILayout.ObjectField(legacyPreset, typeof(UIEffect), false);
+                }
+
+                EditorGUI.indentLevel--;
+                EditorGUI.EndDisabledGroup();
+            }
+
+            EditorGUILayout.TextArea(
+                "The prefab based presets system is obsolete.\n" +
+                "In the new preset system, UIEffectPreset assets are used.\n" +
+                "Click the button below to convert your legacy preset prefabs into UIEffectPreset assets.\n" +
+                "The UIEffectPreset asset will be saved in the same directory as the prefab, using the same name.\n" +
+                "You can load the new preset via the UIEffect.LoadPreset method.",
+                EditorStyles.miniLabel);
+            if (GUILayout.Button(EditorGUIUtility.TrTempContent("Convert All Legacy Presets in the Project")))
+            {
+                ConvertAllLegacyPresets();
+                _runtimePresets.ClearArray();
+            }
+
+            if (GUILayout.Button(EditorGUIUtility.TrTempContent("Delete All Legacy Presets in the Project")))
+            {
+                foreach (var legacyPreset in _legacyPresets)
+                {
+                    AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(legacyPreset));
+                }
+
+                _runtimePresets.ClearArray();
+                _legacyPresets = Array.Empty<UIEffect>();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private void ConvertAllLegacyPresets()
+        {
+            var length = _legacyPresets.Length;
+            var converted = new HashSet<string>(UIEffectProjectSettings.LoadEditorPresetsV2()
+                .Select(x => Path.ChangeExtension(AssetDatabase.GetAssetPath(x), ".prefab")));
+            for (var i = 0; i < length; i++)
+            {
+                var preset = _legacyPresets[i];
+                var path = AssetDatabase.GetAssetPath(preset);
+                if (converted.Contains(path)) continue;
+
+                EditorUtility.DisplayProgressBar("Convert To UIEffectPreset", path, (float)i / length);
+                var newPath = Path.ChangeExtension(path, ".asset");
+                newPath = AssetDatabase.GenerateUniqueAssetPath(newPath);
+                var newPreset = CreateInstance<UIEffectPreset>();
+                preset.SavePreset(newPreset, false);
+                newPreset.hideFlags = preset.hideFlags;
+                AssetDatabase.CreateAsset(newPreset, newPath);
+
+                var importer = AssetImporter.GetAtPath(path);
+                var newImporter = AssetImporter.GetAtPath(newPath);
+                newImporter.userData = importer.userData;
+                newImporter.SetAssetBundleNameAndVariant(importer.assetBundleName, importer.assetBundleVariant);
+                newImporter.SaveAndReimport();
+
+                // Remove the legacy preset from the project settings and add the new preset.
+                if (UIEffectProjectSettings.instance.m_RuntimePresets.Contains(preset))
+                {
+                    var count = _runtimePresetsV2.arraySize;
+                    _runtimePresetsV2.InsertArrayElementAtIndex(count);
+                    _runtimePresetsV2.GetArrayElementAtIndex(count).objectReferenceValue = newPreset;
+                }
+            }
+
+            EditorUtility.ClearProgressBar();
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+  "site": "itch.io",
+  "sourcePages": ["https://itch.io/game-assets/free/tag-3d", "https://itch.io/game-assets/free/tag-cc0"],
+  "license": "per-project",
+  "licenseStatus": "unverified",
+  "licenseEvidence": "Each itch.io project declares its own license; catalog tags are not license proof",
+  "downloadMethod": "public project files where available; archives removed after extraction",
+  "supportedTypes": {"模型": {"visibleFileCount": 42}},
+  "visibleFileCount": 42,
+  "visibleBytes": 8509810,
+  "archiveCount": 0,
+  "hashVerifiedCount": 42,
+  "accessProbe": {"url": "https://itch.io/game-assets/free/tag-3d", "httpStatus": 200, "authRequired": "project-dependent", "captcha": "project-dependent"},
+  "unityUrp": "not-run",
+  "unverified": ["Individual project licenses, dependencies, and dynamic download permissions", "Unity/URP import and runtime behavior"],
+  "observedUtc": "2026-08-30T00:00:00Z"
+}

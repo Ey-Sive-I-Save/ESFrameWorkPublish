@@ -1,6 +1,10 @@
 schemaVersion: 1
 spaceId: es.aisspace.public.webpagestudio.v1
-status: designed
+status: archived
+archive:
+  archivedAt: 2026-08-30T15:00:00+08:00
+  reason: "WebPageStudio 当前设计/生成链路未形成可验证的高质量静态交互产物；冻结能力索引，保留源码与历史工件供后续重启审查。"
+  deletion: prohibited
 authority: ES/AISpace/Public/WebPageStudio
 contract: ES/Automation/Contracts/es-web-page-generation-v1.schema.json
 knowledge: Documentation/AIKnowledge/entries/web-page-generation-contracts.md

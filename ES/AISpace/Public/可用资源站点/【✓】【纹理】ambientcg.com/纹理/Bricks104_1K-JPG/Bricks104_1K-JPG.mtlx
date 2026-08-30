@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<materialx version="1.39" fileprefix="./">
+  <open_pbr_surface ypos="-1.879310" type="surfaceshader" xpos="6.159420" name="Bricks104_1K_JPG_OpenPbrSurface">
+    <input type="color3" name="base_color" nodename="Bricks104_1K_JPG_Color" />
+    <input type="vector3" name="geometry_normal" nodename="NormalMap" />
+    <input type="float" name="specular_roughness" nodename="Bricks104_1K_JPG_Roughness" />
+  </open_pbr_surface>
+  <surfacematerial ypos="0.000000" type="material" xpos="8.695652" name="Bricks104_1K_JPG">
+    <input type="surfaceshader" name="surfaceshader" nodename="Bricks104_1K_JPG_OpenPbrSurface" />
+    <input type="displacementshader" name="displacementshader" nodename="displacement" />
+  </surfacematerial>
+  <tiledimage ypos="-3.103448" type="color3" xpos="3.623188" name="Bricks104_1K_JPG_Color">
+    <input type="filename" value="Bricks104_1K-JPG_Color.jpg" name="file" colorspace="srgb_texture" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+  <tiledimage ypos="5.163793" type="float" xpos="3.623188" name="Bricks104_1K_JPG_Displacement">
+    <input type="filename" value="Bricks104_1K-JPG_Displacement.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+  <displacement ypos="1.879310" type="displacementshader" xpos="6.159420" name="displacement">
+    <input type="float" name="displacement" nodename="Bricks104_1K_JPG_Displacement" />
+    <input type="float" value="1.0" name="scale" />
+  </displacement>
+  <tiledimage ypos="0.879310" type="vector3" xpos="1.086957" name="Bricks104_1K_JPG_NormalGL">
+    <input type="filename" value="Bricks104_1K-JPG_NormalGL.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+  <normalmap ypos="3.586207" type="vector3" xpos="3.623188" name="NormalMap">
+    <input type="vector3" name="in" nodename="Bricks104_1K_JPG_NormalGL" />
+    <input type="float" value="1.0" name="scale" />
+  </normalmap>
+  <tiledimage ypos="-0.413793" type="float" xpos="3.623188" name="Bricks104_1K_JPG_Roughness">
+    <input type="filename" value="Bricks104_1K-JPG_Roughness.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+</materialx>

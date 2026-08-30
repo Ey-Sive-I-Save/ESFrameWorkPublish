@@ -39,6 +39,22 @@
     "ES/AISpace/AISPACE_CONTENT_CLASSIFICATION.json",
     "ES/AISpace/Public/LOCAL_TEMP_POLICY.json"
   ],
+  "temporaryTaskPolicy": {
+    "pathTemplate": "ES/AISpace/Local/CodexSessionTasks/<YYYYMMDD>/<responsibility>/",
+    "requiredLabel": "temporary-task",
+    "isFormalHandoff": false,
+    "isHistoryAuthority": false,
+    "forbiddenAlternatives": [
+      "ES/AISpace/Local/game-rendering-tasks/",
+      "ES/AISpace/<domain>-handoff/",
+      "ES/AISpace/<domain>-history/"
+    ],
+    "formalHandoffAuthority": "ES/AI协作历程（Codex）/",
+    "acceptanceEvidence": ["acceptedByRecordId", "contextAccepted"],
+    "queuedOnlyIsAccepted": false,
+    "snapshotPathField": "handoffFiles.absolutePath",
+    "sourceAbsolutePathMayBeConsumed": false
+  },
   "nonCompetingRoots": [
     {
       "path": "Assets/ES/AISpace/Public",

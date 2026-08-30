@@ -1,0 +1,57 @@
+﻿[
+    {
+        "archive":  "com.3d-group.unity-simple-localization.tgz",
+        "bytes":  65517,
+        "sha256":  "B8DB53DB37CEAFF3CB8D674EA31A3501088C9C1246426D7FD484B1A4E78734C8"
+    },
+    {
+        "archive":  "com.3d-group.unity-simple-notifications.tgz",
+        "bytes":  5643907,
+        "sha256":  "A664E261F6C2098FE517A96DEE05CE8A47DF8AC568E0F906976BC012F81072A1"
+    },
+    {
+        "archive":  "com.cmdexecutor.dotnet-generic-host.tgz",
+        "bytes":  1017127,
+        "sha256":  "780784F676A1F81B2370073AF48ED8D32B9686B2F3A06237AECD94ADFF8BAD42"
+    },
+    {
+        "archive":  "com.coffee.ui-effect.tgz",
+        "bytes":  2697717,
+        "sha256":  "720214DA2FE87C32F8D19975686A6E2CD9633BB359B1969A2B043C44CED212EA"
+    },
+    {
+        "archive":  "com.cysharp.unitask.tgz",
+        "bytes":  180175,
+        "sha256":  "F502C3D1E56AFEE722C2707BA7370562446A6F3D4684A27AFB74FD5817AB0A5B"
+    },
+    {
+        "archive":  "com.github-glitchenzo.nugetforunity.tgz",
+        "bytes":  357508,
+        "sha256":  "F4632FF85BFBBA6D097804F929DFAB2774036F0D87F78A0BB735A53DE878DDE2"
+    },
+    {
+        "archive":  "com.kagekirin.upmconfigprovider.tgz",
+        "bytes":  8977,
+        "sha256":  "AE86E5B4654A3EE1D643978DE71CDA1609883DD23A7007FE7E72E6E4F636C93B"
+    },
+    {
+        "archive":  "com.kitbashery.3d-pixel-graphics-toolkit.tgz",
+        "bytes":  410995,
+        "sha256":  "9541370C404A79556EC3A3CF50A96411D9576FBFD85AE64E360932C40FBA66CE"
+    },
+    {
+        "archive":  "com.phantombit.command.tgz",
+        "bytes":  51528,
+        "sha256":  "7796EB64FBE190B00ED274827ABFB2328E2B8AAE76CE69CA78EB842A067E18C2"
+    },
+    {
+        "archive":  "com.yasirkula.screenshotcapture.tgz",
+        "bytes":  549711,
+        "sha256":  "30BFA8B1E1077E3F6692449CD834BDA32D5E4418DDB3AF800D64121EB4EC280C"
+    },
+    {
+        "archive":  "com.dbrizov.naughtyattributes.tgz",
+        "bytes":  751780,
+        "sha256":  "B6282A626CF0C647AF1B21DA7A5DDDDEBCB0D7DF42AD3494E3E7E7CF45E05408"
+    }
+]

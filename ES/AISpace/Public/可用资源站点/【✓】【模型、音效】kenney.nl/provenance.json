@@ -1,0 +1,16 @@
+{
+  "site": "kenney.nl",
+  "sourcePages": ["https://kenney.nl/assets"],
+  "license": "CC0",
+  "licenseEvidence": "Official Kenney asset catalogue states CC0",
+  "downloadMethod": "public official asset downloads; extracted; staging archives removed",
+  "supportedTypes": {"模型": {"visibleFileCount": 10}, "音效": {"visibleFileCount": 52}},
+  "visibleFileCount": 62,
+  "visibleBytes": 1099135,
+  "archiveCount": 0,
+  "hashVerifiedCount": 62,
+  "accessProbe": {"url": "https://kenney.nl/assets", "httpStatus": 200, "authRequired": false, "captcha": false},
+  "unityUrp": "not-run",
+  "unverified": ["Unity/URP import and runtime behavior"],
+  "observedUtc": "2026-08-30T00:00:00Z"
+}

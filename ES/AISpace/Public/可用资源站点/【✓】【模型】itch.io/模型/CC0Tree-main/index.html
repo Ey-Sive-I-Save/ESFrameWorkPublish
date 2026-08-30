@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC0Tree — Free Low-Poly Game Assets</title>
+<meta name="description" content="CC0Tree is a free, ever-growing library of CC0-licensed low-poly game assets for indie devs. New assets every week. No attribution required.">
+<link rel="canonical" href="https://skywolfgamestudios.github.io/CC0Tree/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌳</text></svg>">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://skywolfgamestudios.github.io/CC0Tree/">
+<meta property="og:title" content="CC0Tree — Free Low-Poly Game Assets">
+<meta property="og:description" content="A free, ever-growing library of CC0-licensed low-poly game assets for indie devs. New assets every week — no attribution, no restrictions.">
+<meta property="og:image" content="https://skywolfgamestudios.github.io/CC0Tree/Logo/SGS%20ItchIO%20CC0Tree%20Logo.png">
+<meta property="og:image:width" content="630">
+<meta property="og:image:height" content="500">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CC0Tree — Free Low-Poly Game Assets">
+<meta name="twitter:description" content="A free, ever-growing library of CC0-licensed low-poly game assets for indie devs. New assets every week — no attribution, no restrictions.">
+<meta name="twitter:image" content="https://skywolfgamestudios.github.io/CC0Tree/Logo/SGS%20ItchIO%20CC0Tree%20Logo.png">
+<style>
+  :root{
+    --bg:#0e1512;
+    --bg-alt:#131c17;
+    --card:#182420;
+    --card-hover:#1d2b25;
+    --border:#28382f;
+    --text:#e9f2ec;
+    --text-dim:#9fb5a8;
+    --text-faint:#6d8577;
+    --accent:#57c785;
+    --accent-bright:#7fe3a8;
+    --gold:#f2b544;
+    --gold-bright:#ffcc66;
+    --info:#5b9dd9;
+    --info-bright:#7ec4f2;
+    --radius:14px;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(87,199,133,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 400px at 90% 10%, rgba(242,181,68,0.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  html, body{overflow-x:hidden; max-width:100%;}
+  a{color:inherit;}
+  img{max-width:100%;}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px;}
+  section{overflow-x:hidden;}
+
+  /* NAV */
+  header.nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(14,21,18,0.82);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .nav-inner{
+    max-width:var(--maxw); margin:0 auto; padding:14px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:1.15rem; text-decoration:none; white-space:nowrap;}
+  .brand .logo{font-size:1.4rem;}
+  .nav-right{display:flex; align-items:center; gap:16px;}
+  .nav-links{display:flex; align-items:center; gap:22px; font-size:0.92rem;}
+  .nav-links a{text-decoration:none; color:var(--text-dim); transition:color .15s;}
+  .nav-links a:hover{color:var(--accent-bright);}
+  .nav-cta{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--gold); color:#241b06; font-weight:700; font-size:0.85rem;
+    padding:8px 14px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s;
+    white-space:nowrap;
+  }
+  .nav-cta:hover{background:var(--gold-bright); transform:translateY(-1px);}
+  .nav-toggle{
+    display:none; flex-direction:column; justify-content:center; align-items:center; gap:4px;
+    width:36px; height:36px; flex:0 0 auto;
+    background:transparent; border:1px solid var(--border); border-radius:8px; cursor:pointer; padding:0;
+  }
+  .nav-toggle span{display:block; width:16px; height:2px; background:var(--text); border-radius:2px;}
+
+  @media (max-width: 780px){
+    .nav-toggle{display:flex; order:1;}
+    .nav-cta{order:2;}
+    .nav-links{
+      display:none; order:3;
+      position:absolute; top:100%; left:0; right:0;
+      background:var(--bg-alt); border-bottom:1px solid var(--border);
+      flex-direction:column; align-items:stretch; gap:0; padding:4px 24px 12px;
+    }
+    .nav-links.open{display:flex;}
+    .nav-links a{padding:13px 2px; border-bottom:1px solid var(--border);}
+  }
+
+  /* HERO */
+  .hero{padding:76px 0 56px; text-align:center;}
+  .hero .kicker{
+    display:inline-block; font-size:0.78rem; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--accent-bright); background:rgba(87,199,133,0.1); border:1px solid rgba(87,199,133,0.28);
+    padding:6px 14px; border-radius:999px; margin-bottom:22px; font-weight:700;
+  }
+  .hero h1{
+    font-size:clamp(2.1rem, 5vw, 3.4rem); line-height:1.12; margin:0 0 18px; font-weight:800; letter-spacing:-0.02em;
+  }
+  .hero h1 .accent{color:var(--accent-bright);}
+  .hero p.sub{
+    max-width:640px; margin:0 auto 34px; color:var(--text-dim); font-size:1.08rem;
+  }
+  .hero-actions{display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-bottom:52px;}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:13px 24px; border-radius:10px; font-weight:700; font-size:0.96rem;
+    text-decoration:none; border:1px solid transparent; cursor:pointer; transition:all .15s;
+  }
+  .btn-primary{background:var(--accent); color:#062012;}
+  .btn-primary:hover{background:var(--accent-bright); transform:translateY(-2px);}
+  .btn-gold{background:var(--gold); color:#241b06;}
+  .btn-gold:hover{background:var(--gold-bright); transform:translateY(-2px);}
+  .btn-ghost{background:transparent; color:var(--text); border-color:var(--border);}
+  .btn-ghost:hover{border-color:var(--accent); color:var(--accent-bright); transform:translateY(-2px);}
+  .btn-sponsors{background:#ea4aaa; color:#fff0f8;}
+  .btn-sponsors:hover{background:#f56cbe; transform:translateY(-2px);}
+  .btn-kofi{background:#29abe0; color:#062338;}
+  .btn-kofi:hover{background:#4dc0f2; transform:translateY(-2px);}
+  .btn-itch{background:#fa5c5c; color:#3a0a0a;}
+  .btn-itch:hover{background:#ff7a7a; transform:translateY(-2px);}
+  .btn-gumroad{background:#ff90e8; color:#3a0a2e;}
+  .btn-gumroad:hover{background:#ffaef0; transform:translateY(-2px);}
+
+  .stats{display:flex; flex-wrap:wrap; gap:0; justify-content:center; border-top:1px solid var(--border); border-bottom:1px solid var(--border); max-width:760px; margin:0 auto;}
+  .stat{flex:1 1 180px; padding:22px 16px; text-align:center; border-left:1px solid var(--border);}
+  .stat:first-child{border-left:none;}
+  .stat .num{font-size:1.7rem; font-weight:800; color:var(--accent-bright); display:block;}
+  .stat .label{font-size:0.82rem; color:var(--text-dim);}
+
+  /* SECTION HEADINGS */
+  .section-head{text-align:center; max-width:640px; margin:0 auto 40px;}
+  .section-head h2{font-size:clamp(1.6rem,3vw,2.2rem); margin:0 0 12px; font-weight:800; letter-spacing:-0.01em;}
+  .section-head p{color:var(--text-dim); margin:0; font-size:1rem;}
+  section.pad{padding:80px 0;}
+  section.alt{background:var(--bg-alt); border-top:1px solid var(--border); border-bottom:1px solid var(--border);}
+
+  /* FILTERS */
+  .filters{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:36px;}
+  .filter-btn{
+    background:var(--card); border:1px solid var(--border); color:var(--text-dim);
+    padding:8px 16px; border-radius:999px; font-size:0.86rem; font-weight:600; cursor:pointer; transition:all .15s;
+  }
+  .filter-btn:hover{border-color:var(--accent); color:var(--text);}
+  .filter-btn.active{background:var(--accent); border-color:var(--accent); color:#062012;}
+  .filter-btn.new-btn{border-color:rgba(242,181,68,0.4); color:var(--gold-bright);}
+  .filter-btn.new-btn:hover{border-color:var(--gold);}
+  .filter-btn.new-btn.active{background:var(--gold); border-color:var(--gold); color:#241b06;}
+  .filter-btn.updated-btn{border-color:rgba(91,157,217,0.4); color:var(--info-bright);}
+  .filter-btn.updated-btn:hover{border-color:var(--info);}
+  .filter-btn.updated-btn.active{background:var(--info); border-color:var(--info); color:#0a1c2b;}
+
+  /* GRID */
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:18px;
+  }
+  .card{
+    position:relative;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:22px; display:flex; flex-direction:column; gap:12px; transition:all .18s;
+  }
+  .card:hover{background:var(--card-hover); border-color:var(--accent); transform:translateY(-3px);}
+  .card.is-new{border-color:rgba(242,181,68,0.4);}
+  .card.is-updated{border-color:rgba(91,157,217,0.4);}
+  .new-badge{
+    position:absolute; top:-10px; right:16px; background:var(--gold); color:#241b06;
+    font-size:0.72rem; font-weight:800; letter-spacing:0.02em; padding:4px 10px; border-radius:999px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.35);
+  }
+  .updated-badge{
+    position:absolute; top:-10px; left:16px; background:var(--info); color:#0a1c2b;
+    font-size:0.72rem; font-weight:800; letter-spacing:0.02em; padding:4px 10px; border-radius:999px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.35);
+  }
+  .card .icon{
+    font-size:2.4rem; width:72px; height:72px; display:flex; align-items:center; justify-content:center;
+    background:rgba(87,199,133,0.08); border-radius:12px; overflow:hidden;
+  }
+  .card .icon img{width:100%; height:100%; object-fit:contain; border-radius:10px;}
+  .card .icon img.zoomable{cursor:zoom-in; transition:transform .15s;}
+  .card .icon img.zoomable:hover{transform:scale(1.06);}
+
+  /* ICON LIGHTBOX */
+  .img-lightbox{
+    position:fixed; inset:0; z-index:200; background:rgba(6,10,8,0.92);
+    display:none; align-items:center; justify-content:center; flex-direction:column; gap:16px;
+    padding:24px; cursor:zoom-out;
+  }
+  .img-lightbox.open{display:flex;}
+  .img-lightbox img{
+    max-width:min(560px, 90vw); max-height:70vh; object-fit:contain;
+    background:#000; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  }
+  .img-lightbox .lb-caption{color:var(--text); font-weight:700; font-size:1.05rem;}
+  .img-lightbox .lb-close{
+    position:absolute; top:20px; right:24px; background:var(--card); border:1px solid var(--border);
+    color:var(--text); width:40px; height:40px; border-radius:50%; font-size:1.3rem; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card h3{margin:0; font-size:1.05rem; font-weight:700;}
+  .card .meta{display:flex; flex-wrap:wrap; gap:6px; font-size:0.72rem;}
+  .tag{
+    background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text-dim);
+    padding:3px 9px; border-radius:999px; font-weight:600; letter-spacing:0.01em;
+  }
+  .tag.fmt{color:var(--accent-bright); border-color:rgba(87,199,133,0.3);}
+  .card .spacer{flex:1;}
+  .card-actions{display:flex; gap:8px; margin-top:4px;}
+  .card-actions a{
+    flex:1; text-align:center; font-size:0.82rem; font-weight:700; padding:9px 10px; border-radius:8px;
+    text-decoration:none; transition:all .15s;
+  }
+  .dl{background:var(--accent); color:#062012;}
+  .dl:hover{background:var(--accent-bright);}
+  .src{background:transparent; border:1px solid var(--border); color:var(--text-dim); flex:0 0 auto; padding:9px 12px;}
+  .src:hover{color:var(--text); border-color:var(--text-dim);}
+
+  .grid-note{text-align:center; color:var(--text-faint); font-size:0.86rem; margin-top:36px;}
+  .grid-note a{color:var(--accent-bright); text-decoration:none;}
+  .grid-note a:hover{text-decoration:underline;}
+
+  .why-strip{
+    display:flex; gap:16px; align-items:flex-start; max-width:760px; margin:36px auto 0;
+    background:rgba(242,181,68,0.06); border:1px solid rgba(242,181,68,0.25); border-radius:var(--radius);
+    padding:20px 24px; font-size:0.92rem; color:var(--text-dim);
+  }
+  .why-strip strong{color:var(--text); display:block; margin-bottom:4px;}
+  .why-strip a{color:var(--gold-bright); text-decoration:none; font-weight:600;}
+  .why-strip a:hover{text-decoration:underline;}
+  .why-icon{font-size:1.6rem; flex:0 0 auto;}
+
+  /* TOAST */
+  .support-toast{
+    position:fixed; left:20px; right:20px; bottom:20px; z-index:100;
+    max-width:420px; margin:0 auto;
+    background:var(--card); border:1px solid var(--gold); border-radius:var(--radius);
+    padding:18px 20px; box-shadow:0 12px 32px rgba(0,0,0,0.45);
+    display:flex; gap:12px; align-items:flex-start;
+    transform:translateY(140%); opacity:0; transition:transform .35s ease, opacity .35s ease;
+  }
+  .support-toast.show{transform:translateY(0); opacity:1;}
+  .support-toast .t-icon{font-size:1.6rem; flex:0 0 auto;}
+  .support-toast .t-body{flex:1; font-size:0.88rem; color:var(--text-dim);}
+  .support-toast .t-body strong{color:var(--text); display:block; margin-bottom:3px; font-size:0.95rem;}
+  .support-toast .t-actions{display:flex; gap:8px; margin-top:10px;}
+  .support-toast .t-actions a, .support-toast .t-actions button{
+    font-size:0.8rem; font-weight:700; padding:7px 12px; border-radius:7px; border:none; cursor:pointer; text-decoration:none;
+  }
+  .support-toast .t-yes{background:var(--gold); color:#241b06;}
+  .support-toast .t-yes:hover{background:var(--gold-bright);}
+  .support-toast .t-no{background:transparent; color:var(--text-faint); border:1px solid var(--border) !important;}
+  .support-toast .t-no:hover{color:var(--text-dim);}
+  .support-toast .t-close{
+    background:none; border:none; color:var(--text-faint); font-size:1.1rem; cursor:pointer; line-height:1; padding:2px;
+  }
+  @media (max-width:480px){.support-toast{left:12px; right:12px; bottom:12px;}}
+
+  .load-state{text-align:center; color:var(--text-dim); padding:40px 0; font-size:0.95rem;}
+
+  /* SCHEDULE */
+  .schedule-cols{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:8px;}
+  @media (max-width:720px){.schedule-cols{grid-template-columns:1fr;}}
+  .sched-card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:28px;}
+  .sched-card h3{margin:0 0 12px; font-size:1.1rem; display:flex; align-items:center; gap:8px;}
+  .sched-card p{color:var(--text-dim); margin:0 0 14px; font-size:0.94rem;}
+  .sched-card ul{margin:0; padding-left:20px; color:var(--text-dim); font-size:0.92rem;}
+  .sched-card li{margin-bottom:6px;}
+  .sched-card.free{border-color:rgba(87,199,133,0.35);}
+  .sched-card.perk{border-color:rgba(242,181,68,0.35);}
+  .sched-card.free h3{color:var(--accent-bright);}
+  .sched-card.perk h3{color:var(--gold-bright);}
+  .cadence-banner{
+    display:flex; align-items:center; gap:14px; background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:20px 26px; margin-bottom:28px; flex-wrap:wrap;
+  }
+  .cadence-banner .big{font-size:2rem;}
+  .cadence-banner strong{color:var(--accent-bright);}
+
+  /* SUPPORT */
+  .support-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px;}
+  @media (max-width:860px){.support-grid{grid-template-columns:1fr;}}
+  .support-card{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:22px 18px; text-align:center; display:flex; flex-direction:column; gap:12px;
+  }
+  .support-card .icon{font-size:1.9rem;}
+  .support-card h3{margin:0; font-size:1.05rem;}
+  .support-card p{color:var(--text-dim); font-size:0.86rem; margin:0; flex:1;}
+  .support-card .btn{justify-content:center; margin-top:4px; min-height:44px; white-space:nowrap; padding-left:14px; padding-right:14px;}
+
+  /* LICENSE */
+  .license-box{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:32px; display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;
+  }
+  .license-box .icon{font-size:2.4rem;}
+  .license-box h3{margin:0 0 10px;}
+  .license-box p{color:var(--text-dim); margin:0 0 14px; font-size:0.95rem;}
+  .license-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:0.9rem; color:var(--text-dim);}
+  @media (max-width:560px){.license-grid{grid-template-columns:1fr;}}
+  .license-grid li{list-style:none; padding-left:22px; position:relative;}
+  .license-grid li::before{content:"✓"; color:var(--accent-bright); position:absolute; left:0; font-weight:800;}
+  .license-grid{padding:0; margin:0;}
+
+  /* FOOTER */
+  footer{padding:48px 0 40px; text-align:center;}
+  footer .foot-links{display:flex; gap:22px; justify-content:center; flex-wrap:wrap; margin-bottom:18px; font-size:0.9rem;}
+  footer .foot-links a{text-decoration:none; color:var(--text-dim); transition:color .15s;}
+  footer .foot-links a:hover{color:var(--accent-bright);}
+  footer .copyright{color:var(--text-faint); font-size:0.82rem;}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand"><span class="logo">🌳</span> CC0Tree</a>
+    <div class="nav-right">
+      <nav class="nav-links" id="nav-links">
+        <a href="#library">Library</a>
+        <a href="#schedule">Updates</a>
+        <a href="#support">Support</a>
+        <a href="#license">License</a>
+        <a href="https://github.com/SkywolfGameStudios/CC0Tree">GitHub</a>
+        <a href="https://skywolfgamestudios.github.io" target="_blank" rel="noopener">Studio</a>
+      </nav>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="nav-cta" href="https://github.com/sponsors/SkywolfGameStudios" target="_blank" rel="noopener">💛 Sponsor</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <span class="kicker">100% CC0 · Public Domain · No Attribution Required</span>
+      <h1>A free, ever-growing<br><span class="accent">forest of low-poly assets</span></h1>
+      <p class="sub">CC0Tree is a public-domain library of low-poly, game-ready 3D assets built for indie devs, students, and hobbyists. New assets every week — no attribution, no license fees, no strings attached.</p>
+      <div class="hero-actions">
+        <a href="#library" class="btn btn-primary">🌲 Browse the Library</a>
+        <a href="https://patreon.com/skywolfgamestudios" class="btn btn-gold" target="_blank" rel="noopener">☕ Support on Patreon</a>
+        <a href="https://github.com/SkywolfGameStudios/CC0Tree" class="btn btn-ghost" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="num" id="stat-count">—</span><span class="label">Free assets</span></div>
+        <div class="stat"><span class="num">Weekly</span><span class="label">Update schedule</span></div>
+        <div class="stat"><span class="num">CC0</span><span class="label">Public domain license</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pad" id="library">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>The Library</h2>
+        <p>Every asset below is free to download right now, straight from this repo. FBX format, low-poly, game-ready.</p>
+      </div>
+      <div class="filters" id="filters"></div>
+      <div id="grid-container">
+        <div class="load-state" id="load-state">Loading the forest… 🌱</div>
+        <div class="grid" id="grid" style="display:none;"></div>
+      </div>
+      <p class="grid-note">Want the original Blender source (.blend) files instead of just FBX? They're a <a href="https://patreon.com/skywolfgamestudios" target="_blank" rel="noopener">Patreon supporter perk</a>. Or grab everything at once by <a href="https://github.com/SkywolfGameStudios/CC0Tree/archive/refs/heads/main.zip">downloading the full repo</a>.</p>
+      <div class="why-strip">
+        <span class="why-icon">🙋</span>
+        <div>
+          <strong>CC0Tree is made by one person, in the hours between other projects.</strong>
+          Every model shares the same hand-tuned gradient-shaded low-poly style — modeled, UV'd, and exported one at a time, not mass-produced. That consistency is what makes it a library instead of a pile of random files, and free is a choice, not a given. If an asset saved you time, <a href="https://patreon.com/skywolfgamestudios" target="_blank" rel="noopener">a few dollars on Patreon</a> or a <a href="https://github.com/sponsors/SkywolfGameStudios" target="_blank" rel="noopener">GitHub sponsorship</a> is what keeps new ones coming every week.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pad alt" id="schedule">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>📅 Update Schedule</h2>
+        <p>CC0Tree grows a little more every week — steady, reliable growth rather than big irregular drops.</p>
+      </div>
+      <div class="cadence-banner">
+        <span class="big">🌱</span>
+        <div><strong>At least one new asset every week</strong>, sometimes two or more depending on workload and inspiration. The goal is a forest that keeps expanding, week after week.</div>
+      </div>
+      <div class="schedule-cols">
+        <div class="sched-card free">
+          <h3>🌳 Free forever</h3>
+          <p>Available here in this repo the moment it's released — no catch.</p>
+          <ul>
+            <li>Game-ready FBX files</li>
+            <li>CC0 licensed — public domain</li>
+            <li>No attribution required</li>
+            <li>Commercial &amp; personal use welcome</li>
+          </ul>
+        </div>
+        <div class="sched-card perk">
+          <h3>💛 Patreon supporter perk</h3>
+          <p>Supporting the project unlocks the original source files and helps fund weekly releases.</p>
+          <ul>
+            <li>Blender (.blend) source files</li>
+            <li>Directly funds new weekly assets</li>
+            <li>Keeps the CC0 files free for everyone</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pad" id="support">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Support the Project</h2>
+        <p>CC0Tree stays 100% free because supporters help keep it growing. Every bit helps.</p>
+      </div>
+      <div class="support-grid">
+        <div class="support-card">
+          <div class="icon">☕</div>
+          <h3>Patreon</h3>
+          <p>Fuel weekly releases and unlock Blender source files, early access, and supporter perks.</p>
+          <a class="btn btn-gold" href="https://patreon.com/skywolfgamestudios" target="_blank" rel="noopener">Support on Patreon</a>
+        </div>
+        <div class="support-card">
+          <div class="icon">💛</div>
+          <h3>GitHub Sponsors</h3>
+          <p>Prefer GitHub? Sponsor CC0Tree directly — it shows up right on the repo you're already using.</p>
+          <a class="btn btn-sponsors" href="https://github.com/sponsors/SkywolfGameStudios" target="_blank" rel="noopener">Sponsor on GitHub</a>
+        </div>
+        <div class="support-card">
+          <div class="icon">🧡</div>
+          <h3>Ko-fi</h3>
+          <p>Prefer a quick one-time tip over a subscription? Buy a coffee, no account required.</p>
+          <a class="btn btn-kofi" href="https://ko-fi.com/skywolfgamestudios" target="_blank" rel="noopener">Tip on Ko-fi</a>
+        </div>
+        <div class="support-card">
+          <div class="icon">🎮</div>
+          <h3>itch.io</h3>
+          <p>Browse and grab assets individually, rate the project, and help it reach more developers.</p>
+          <a class="btn btn-itch" href="https://skywolfgamestudios.itch.io/cc0tree" target="_blank" rel="noopener">Browse on itch.io</a>
+        </div>
+        <div class="support-card">
+          <div class="icon">🛒</div>
+          <h3>Gumroad</h3>
+          <p>Grab the pack as a pay-what-you-want download — free is an option, but tips are always welcome.</p>
+          <a class="btn btn-gumroad" href="https://skywolfgamestudios.gumroad.com/l/cc0tree" target="_blank" rel="noopener">Buy on Gumroad</a>
+        </div>
+      </div>
+      <p class="grid-note" style="margin-top:32px;">CC0Tree is a side project from <a href="https://skywolfgamestudios.github.io" target="_blank" rel="noopener">Skywolf Game Studios</a> — check out the games it helps fund.</p>
+    </div>
+  </section>
+
+  <section class="pad alt" id="license">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>License</h2>
+        <p>Every asset in this repository is released under Creative Commons Zero (CC0).</p>
+      </div>
+      <div class="license-box">
+        <div class="icon">📜</div>
+        <div>
+          <h3>CC0 — Public Domain</h3>
+          <p>No limitations, no attribution required, no royalties. Use it however your project needs.</p>
+          <ul class="license-grid">
+            <li>Use in commercial or personal projects</li>
+            <li>Modify, remix, or redistribute</li>
+            <li>Include in your own asset packs</li>
+            <li>Use without credit (though it's appreciated!)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-links">
+      <a href="https://github.com/SkywolfGameStudios/CC0Tree" target="_blank" rel="noopener">GitHub Repo</a>
+      <a href="https://patreon.com/skywolfgamestudios" target="_blank" rel="noopener">Patreon</a>
+      <a href="https://github.com/sponsors/SkywolfGameStudios" target="_blank" rel="noopener">GitHub Sponsors</a>
+      <a href="https://ko-fi.com/skywolfgamestudios" target="_blank" rel="noopener">Ko-fi</a>
+      <a href="https://skywolfgamestudios.itch.io/cc0tree" target="_blank" rel="noopener">itch.io</a>
+      <a href="https://skywolfgamestudios.gumroad.com/l/cc0tree" target="_blank" rel="noopener">Gumroad</a>
+      <a href="https://x.com/skywolfgamestds" target="_blank" rel="noopener">X / Twitter</a>
+      <a href="https://bsky.app/profile/skywolfgamestudios.bsky.social" target="_blank" rel="noopener">Bluesky</a>
+      <a href="https://skywolfgamestudios.github.io" target="_blank" rel="noopener">Skywolf Game Studios</a>
+    </div>
+    <div class="copyright">CC0Tree is a project by <a href="https://skywolfgamestudios.github.io" target="_blank" rel="noopener" style="color:var(--accent-bright); text-decoration:none;">Skywolf Game Studios</a> · All assets released under CC0 (public domain)</div>
+    <div class="copyright" style="margin-top:6px;"><a href="https://skywolfgamestudios.github.io/legal.html" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">Legal &amp; Policies</a></div>
+  </div>
+</footer>
+
+<div class="img-lightbox" id="img-lightbox">
+  <button class="lb-close" id="lb-close" aria-label="Close">✕</button>
+  <img id="lb-img" src="" alt="">
+  <div class="lb-caption" id="lb-caption"></div>
+</div>
+
+<div class="support-toast" id="support-toast" role="status" aria-live="polite">
+  <span class="t-icon">🌱</span>
+  <div class="t-body">
+    <strong>Thanks for grabbing that!</strong>
+    Your download is on its way. CC0Tree stays free because a few people chip in — got a second to help keep it growing?
+    <div class="t-actions">
+      <a class="t-yes" href="https://patreon.com/skywolfgamestudios" target="_blank" rel="noopener" id="toast-patreon">Support on Patreon</a>
+      <button class="t-no" id="toast-dismiss">Maybe later</button>
+    </div>
+  </div>
+  <button class="t-close" id="toast-close" aria-label="Close">✕</button>
+</div>
+
+<script>
+(function(){
+  const REPO = "SkywolfGameStudios/CC0Tree";
+  const BRANCH = "main";
+  // One recursive tree fetch covers Assets/, Icons/, New/, Updated/, and Categories/*
+  // instead of a separate API call per folder — keeps this to 1 request instead of 4+,
+  // which matters since unauthenticated GitHub API calls are capped at 60/hour per visitor.
+  const TREE_API_URL = `https://api.github.com/repos/${REPO}/git/trees/${BRANCH}?recursive=1`;
+
+  function rawUrl(path){
+    return `https://raw.githubusercontent.com/${REPO}/${BRANCH}/` + path.split("/").map(encodeURIComponent).join("/");
+  }
+  function blobUrl(path){
+    return `https://github.com/${REPO}/blob/${BRANCH}/` + path.split("/").map(encodeURIComponent).join("/");
+  }
+
+  // Files directly inside a top-level folder (no subfolders) — used for Assets/, Icons/, New/, Updated/.
+  function filesIn(entries, folder){
+    const prefix = folder + "/";
+    return entries
+      .filter(e => e.path.startsWith(prefix) && !e.path.slice(prefix.length).includes("/"))
+      .map(e => ({ name: e.path.slice(prefix.length), path: e.path, size: e.size }));
+  }
+
+  // Categories/<CategoryName>/<file> — each subfolder name becomes a category label.
+  function categoryFoldersIn(entries){
+    const map = {};
+    for (const e of entries){
+      const m = e.path.match(/^Categories\/([^/]+)\/([^/]+)$/);
+      if (!m) continue;
+      const [, cat, filename] = m;
+      (map[cat] = map[cat] || []).push({ name: filename, path: e.path, size: e.size });
+    }
+    return map;
+  }
+
+  // Fallback data in case the GitHub API is unreachable or rate-limited.
+  const FALLBACK_FILES = [
+    "SM_Airplane.fbx","SM_BaseballBat.fbx","SM_Bowling_Ball.fbx","SM_Bowling_Pin.fbx",
+    "SM_ComputerTower.fbx","SM_CrowBar.fbx","SM_FireAxe.fbx","SM_HammerClaw.fbx",
+    "SM_Screwdriver.fbx","SM_Sword_1_Shortsword.fbx","SM_Sword_2_Katana.fbx",
+    "SM_Tree_1.fbx","SM_WateringCan.fbx","SM_Wrench.fbx"
+  ].map(name => ({ name, path: `Assets/${name}`, size: null }));
+
+  const CATEGORY_RULES = [
+    { test: /tree|plant|bush|rock|forest/i, cat: "Nature", icon: "🌳" },
+    { test: /sword|katana|dagger/i, cat: "Weapons", icon: "⚔️" },
+    { test: /axe/i, cat: "Weapons", icon: "🪓" },
+    { test: /bat\b/i, cat: "Sports", icon: "🏏" },
+    { test: /bowling/i, cat: "Sports", icon: "🎳" },
+    { test: /computer|tower|monitor|keyboard|electronic/i, cat: "Electronics", icon: "🖥️" },
+    { test: /wateringcan|watering_can/i, cat: "Garden", icon: "🪣" },
+    { test: /airplane|plane|car|vehicle|boat/i, cat: "Vehicles", icon: "✈️" },
+    { test: /crowbar|hammer|wrench|screwdriver|tool/i, cat: "Tools", icon: "🔧" },
+  ];
+  const DEFAULT_CAT = { cat: "Misc", icon: "📦" };
+
+  function categorize(filename){
+    for (const rule of CATEGORY_RULES){
+      if (rule.test.test(filename)) return { cat: rule.cat, icon: rule.icon };
+    }
+    return DEFAULT_CAT;
+  }
+
+  function prettyName(filename){
+    let n = filename.replace(/\.[^/.]+$/, ""); // strip extension
+    n = n.replace(/^SM_/i, ""); // strip static-mesh prefix
+    n = n.replace(/_/g, " ").trim();
+    n = n.replace(/([a-z0-9])([A-Z])/g, "$1 $2"); // split camelCase words
+    return n.replace(/\s+/g, " ").trim();
+  }
+
+  const NOISE_TOKENS = new Set(["sm", "render", "icon", "thumb", "thumbnail", "final", "v1", "v2"]);
+
+  function tokenize(filename){
+    return filename
+      .replace(/\.[^/.]+$/, "")
+      .split(/[_\s-]+/)
+      .map(t => t.toLowerCase())
+      .filter(t => t && !NOISE_TOKENS.has(t));
+  }
+
+  // Matches an Icons/ file to its Assets/ file by shared name tokens, since filenames
+  // aren't always exact matches (missing prefixes, inconsistent _Render suffixes, etc).
+  function matchIcons(assetItems, iconFiles){
+    const icons = iconFiles.map(f => ({ tokens: tokenize(f.name), url: rawUrl(f.path) }));
+    for (const item of assetItems){
+      const assetTokens = tokenize(item.filename);
+      let best = null, bestScore = 0;
+      for (const icon of icons){
+        const score = icon.tokens.filter(t => assetTokens.includes(t)).length;
+        if (score > bestScore){ bestScore = score; best = icon; }
+      }
+      if (best && bestScore > 0) item.thumb = best.url;
+    }
+  }
+
+  // Flags an item as "New" if a file with a shared name token exists in the New/ folder —
+  // drop the exact same file in there (or anything sharing a word) to feature it, remove
+  // it to un-feature it. Same matching approach as Icons/, purely manual/opt-in.
+  function matchNew(assetItems, newFiles){
+    const markers = newFiles.map(f => tokenize(f.name));
+    for (const item of assetItems){
+      const assetTokens = tokenize(item.filename);
+      item.isNew = markers.some(tokens => tokens.some(t => assetTokens.includes(t)));
+    }
+  }
+
+  // Same idea as matchNew, but for existing assets that were updated/re-exported/migrated
+  // in rather than brand-new work — keeps the two tags from meaning the same thing.
+  function matchUpdated(assetItems, updatedFiles){
+    const markers = updatedFiles.map(f => tokenize(f.name));
+    for (const item of assetItems){
+      const assetTokens = tokenize(item.filename);
+      item.isUpdated = markers.some(tokens => tokens.some(t => assetTokens.includes(t)));
+    }
+  }
+
+  // Drag-and-drop categorization: drop a copy of an asset into Categories/<Name>/ to tag
+  // it with that category, overriding the keyword-guessed default. Anything not manually
+  // sorted keeps falling back to categorize()'s keyword guess, so nothing goes untagged.
+  function matchCategories(assetItems, categoryMap){
+    for (const [catName, files] of Object.entries(categoryMap)){
+      const markers = files.map(f => tokenize(f.name));
+      for (const item of assetItems){
+        const assetTokens = tokenize(item.filename);
+        if (markers.some(tokens => tokens.some(t => assetTokens.includes(t)))) item.cat = catName;
+      }
+    }
+  }
+
+  function formatBytes(bytes){
+    if (!bytes && bytes !== 0) return "";
+    if (bytes < 1024) return bytes + " B";
+    const kb = bytes / 1024;
+    if (kb < 1024) return kb.toFixed(0) + " KB";
+    return (kb / 1024).toFixed(1) + " MB";
+  }
+
+  function render(files, iconFiles, newFiles, updatedFiles, categoryMap){
+    const grid = document.getElementById("grid");
+    const loadState = document.getElementById("load-state");
+    const filtersEl = document.getElementById("filters");
+    const statCount = document.getElementById("stat-count");
+
+    const items = files
+      .filter(f => /\.(fbx|glb|gltf|obj)$/i.test(f.name))
+      .map(f => {
+        const meta = categorize(f.name);
+        return {
+          filename: f.name,
+          name: prettyName(f.name),
+          ext: f.name.split(".").pop().toUpperCase(),
+          size: formatBytes(f.size),
+          cat: meta.cat,
+          icon: meta.icon,
+          thumb: null,
+          isNew: false,
+          isUpdated: false,
+          download: rawUrl(f.path),
+          view: blobUrl(f.path)
+        };
+      })
+      .sort((a,b) => a.name.localeCompare(b.name));
+
+    if (iconFiles && iconFiles.length) matchIcons(items, iconFiles);
+    if (newFiles && newFiles.length) matchNew(items, newFiles);
+    if (updatedFiles && updatedFiles.length) matchUpdated(items, updatedFiles);
+    if (categoryMap && Object.keys(categoryMap).length) matchCategories(items, categoryMap);
+
+    if (items.length === 0){
+      loadState.textContent = "No assets found yet — check back soon 🌱";
+      return;
+    }
+
+    statCount.textContent = items.length + (items.length === FALLBACK_FILES.length ? "+" : "");
+
+    const hasNew = items.some(i => i.isNew);
+    const hasUpdated = items.some(i => i.isUpdated);
+    const cats = ["All", ...Array.from(new Set(items.map(i => i.cat))).sort()];
+    filtersEl.innerHTML =
+      (hasNew ? `<button class="filter-btn new-btn" data-cat="✨ New">✨ New</button>` : "") +
+      (hasUpdated ? `<button class="filter-btn updated-btn" data-cat="🔄 Updated">🔄 Updated</button>` : "") +
+      cats.map((c,i) =>
+        `<button class="filter-btn${i===0?' active':''}" data-cat="${c}">${c}</button>`
+      ).join("");
+
+    function draw(filter){
+      grid.innerHTML = items
+        .filter(i => filter === "All" || i.cat === filter
+          || (filter === "✨ New" && i.isNew)
+          || (filter === "🔄 Updated" && i.isUpdated))
+        .map(i => `
+          <div class="card${i.isNew ? ' is-new' : ''}${i.isUpdated ? ' is-updated' : ''}">
+            ${i.isNew ? '<span class="new-badge">✨ NEW</span>' : ''}
+            ${i.isUpdated ? '<span class="updated-badge">🔄 UPDATED</span>' : ''}
+            <div class="icon">${i.thumb
+              ? `<img src="${i.thumb}" alt="" class="zoomable" data-name="${i.name.replace(/"/g,'&quot;')}" onerror="this.parentElement.textContent='${i.icon}';">`
+              : i.icon}</div>
+            <h3>${i.name}</h3>
+            <div class="meta">
+              <span class="tag fmt">${i.ext}</span>
+              <span class="tag">${i.cat}</span>
+              ${i.size ? `<span class="tag">${i.size}</span>` : ""}
+            </div>
+            <div class="spacer"></div>
+            <div class="card-actions">
+              <a class="dl" href="${i.download}" download>⬇ Download</a>
+              <a class="src" href="${i.view}" target="_blank" rel="noopener" title="View on GitHub">↗</a>
+            </div>
+          </div>
+        `).join("");
+    }
+
+    filtersEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".filter-btn");
+      if (!btn) return;
+      filtersEl.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      draw(btn.dataset.cat);
+    });
+
+    draw("All");
+    loadState.style.display = "none";
+    grid.style.display = "grid";
+  }
+
+  const ghHeaders = { headers: { "Accept": "application/vnd.github+json" } };
+
+  function fetchJson(url){
+    return fetch(url, ghHeaders).then(res => {
+      if (!res.ok) throw new Error("API error " + res.status);
+      return res.json();
+    });
+  }
+
+  fetchJson(TREE_API_URL)
+    .then(data => {
+      const entries = (data.tree || []).filter(e => e.type === "blob");
+      const assetFiles = filesIn(entries, "Assets");
+      const iconFiles = filesIn(entries, "Icons");
+      const newFiles = filesIn(entries, "New");
+      const updatedFiles = filesIn(entries, "Updated");
+      const categoryMap = categoryFoldersIn(entries);
+      render(assetFiles, iconFiles, newFiles, updatedFiles, categoryMap);
+    })
+    .catch(() => render(FALLBACK_FILES, [], [], [], {}));
+})();
+
+// Icon lightbox — click a card's render to see it larger
+(function(){
+  const lb = document.getElementById("img-lightbox");
+  const lbImg = document.getElementById("lb-img");
+  const lbCaption = document.getElementById("lb-caption");
+
+  function open(src, name){
+    lbImg.src = src;
+    lbCaption.textContent = name || "";
+    lb.classList.add("open");
+  }
+  function close(){
+    lb.classList.remove("open");
+    lbImg.src = "";
+  }
+
+  document.body.addEventListener("click", (e) => {
+    const img = e.target.closest(".icon img.zoomable");
+    if (img){ open(img.src, img.dataset.name); return; }
+    if (e.target.closest("#lb-close") || e.target === lb){ close(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+  });
+})();
+
+// Mobile nav toggle
+(function(){
+  const toggle = document.getElementById("nav-toggle");
+  const links = document.getElementById("nav-links");
+  toggle.addEventListener("click", () => {
+    const isOpen = links.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", isOpen);
+  });
+  links.addEventListener("click", (e) => {
+    if (e.target.closest("a")){
+      links.classList.remove("open");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+})();
+
+// Post-download support nudge — fires once per session, on the first asset download click.
+(function(){
+  const toast = document.getElementById("support-toast");
+  const KEY = "cc0tree_toast_shown";
+  let shownThisVisit = false;
+
+  function alreadyShown(){
+    try { return !!sessionStorage.getItem(KEY); } catch (e) { return shownThisVisit; }
+  }
+  function markShown(){
+    shownThisVisit = true;
+    try { sessionStorage.setItem(KEY, "1"); } catch (e) { /* storage unavailable — in-memory flag still applies */ }
+  }
+  function showToast(){
+    if (alreadyShown()) return;
+    markShown();
+    setTimeout(() => toast.classList.add("show"), 600);
+  }
+  function hideToast(){
+    toast.classList.remove("show");
+  }
+
+  document.body.addEventListener("click", (e) => {
+    if (e.target.closest(".dl")) showToast();
+  });
+  document.getElementById("toast-close").addEventListener("click", hideToast);
+  document.getElementById("toast-dismiss").addEventListener("click", hideToast);
+  document.getElementById("toast-patreon").addEventListener("click", hideToast);
+})();
+</script>
+
+</body>
+</html>

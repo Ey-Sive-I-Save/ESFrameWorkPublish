@@ -1,0 +1,19 @@
+{
+  "site": "opengameart.org",
+  "sourcePages": ["https://opengameart.org"],
+  "license": "per-item",
+  "licenseEvidence": "Community pages expose license per item; site-wide CC0 not assumed",
+  "downloadMethod": "public item downloads; extracted; staging archives removed",
+  "supportedTypes": {"模型": {"visibleFileCount": 39}, "音效": {"visibleFileCount": 75}},
+  "visibleFileCount": 114,
+  "visibleBytes": 13642767,
+  "status": "unavailable",
+  "deferredReason": "deferred-by-budget",
+  "budgetBytes": 10485760,
+  "archiveCount": 0,
+  "hashVerifiedCount": 114,
+  "accessProbe": {"url": "https://opengameart.org", "httpStatus": 200, "authRequired": false, "captcha": "item-dependent"},
+  "unityUrp": "not-run",
+  "unverified": ["Some item-level licenses and model dependencies", "Unity/URP import and runtime behavior"],
+  "observedUtc": "2026-08-30T00:00:00Z"
+}

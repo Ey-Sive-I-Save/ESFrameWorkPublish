@@ -1,0 +1,35 @@
+{
+  "name": "com.kagekirin.upmconfigprovider",
+  "version": "0.0.4",
+  "displayName": ".upmconfig.toml Provider",
+  "description": "Unity Editor extension to configure .upmconfig.toml",
+  "unity": "2021.1",
+  "files": [
+    "Scripts/Editor/**",
+    "Scripts/Editor.meta",
+    "Assemblies/**",
+    "Assemblies/*.meta",
+    "Documentation~/**",
+    "**.meta",
+    "*.md"
+  ],
+  "dependencies": {},
+  "keywords": [
+    "editor",
+    "UPM",
+    "NPM"
+  ],
+  "author": {
+    "name": "KageKirin",
+    "email": "kagekirin@gmail.com",
+    "url": "https://github.com/kagekirin"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KageKirin/UPMConfigProvider.git",
+    "directory": "com.kagekirin.upmconfigprovider"
+  },
+  "publishConfig": {
+    "registry": "https://package.openupm.com"
+  }
+}

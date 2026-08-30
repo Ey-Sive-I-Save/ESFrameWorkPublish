@@ -1,0 +1,58 @@
+﻿{
+    "source":  "https://gobkit.com/api/free",
+    "license":  "CC0 1.0 (per official Gobkit API metadata)",
+    "modelCount":  10,
+    "totalBytes":  1492976,
+    "files":  [
+                  {
+                      "file":  "Anglerfish.glb",
+                      "bytes":  57640,
+                      "sha256":  "8D07BD212527EC2E0BA2D42367DCF65AE91EB35538FB3B57A2BFD8E1D8AC60FA"
+                  },
+                  {
+                      "file":  "Bat.glb",
+                      "bytes":  63308,
+                      "sha256":  "1A4317609094C64D3F751ADB9150DF628AAF7902F7440174AFCB642C30E0E072"
+                  },
+                  {
+                      "file":  "minion-a01.glb",
+                      "bytes":  170752,
+                      "sha256":  "AC3BEEF42A63A73A763B0A6EA1B21F0257FD3B1AEE222581305E8571EC99E4D8"
+                  },
+                  {
+                      "file":  "minion-a02.glb",
+                      "bytes":  170764,
+                      "sha256":  "98CAB2B36C0A64EA7F2D9A485D2226C17FA1EB29C1A46AD754B51DF075EBA5BB"
+                  },
+                  {
+                      "file":  "minion-b01.glb",
+                      "bytes":  174432,
+                      "sha256":  "08EAE482AD0B25BFE240E947568BC159A784F154F83CE19DA9F069BD444AE476"
+                  },
+                  {
+                      "file":  "minion-b02.glb",
+                      "bytes":  174432,
+                      "sha256":  "91B2EC46958774408348199E871C494F604FA15A9925A8493883752F079964CE"
+                  },
+                  {
+                      "file":  "minion-c01.glb",
+                      "bytes":  151100,
+                      "sha256":  "F0C29B4BBB1F76F2822C5028D65EB420141043FCB7A9A905975938AFCEB9B516"
+                  },
+                  {
+                      "file":  "minion-c02.glb",
+                      "bytes":  151108,
+                      "sha256":  "4A426B16DD6B94763F9DC2BF306A85AB60BE52B4B9398EC5FAB49C9FE10C6B74"
+                  },
+                  {
+                      "file":  "minion-d01.glb",
+                      "bytes":  189716,
+                      "sha256":  "C6C02AC868FB970DA6C743AB569FB9479D6F858F6F2A1C4FDE786B4FEFCE743E"
+                  },
+                  {
+                      "file":  "minion-d02.glb",
+                      "bytes":  189724,
+                      "sha256":  "E48334AB5A4E684C3944EF1DDEA5C4A309BD8B9E10F5588BE3E2207C7B1B7360"
+                  }
+              ]
+}

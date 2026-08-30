@@ -1,0 +1,13 @@
+{
+  "site": "3dtextures.me",
+  "license": "CC0 (site declaration)",
+  "downloadMethod": "public CDN PNG, resize=256; locally staged then extracted",
+  "fileCount": 10,
+  "visibleBytes": 3116453,
+  "archivesRetained": false,
+  "zipFiles": 0,
+  "archiveCount": 0,
+  "hashManifest": "纹理/hashes.json",
+  "extractedFilesVisible": true,
+  "unityUrp": "PBR maps require material-channel assignment; Unity import not run"
+}

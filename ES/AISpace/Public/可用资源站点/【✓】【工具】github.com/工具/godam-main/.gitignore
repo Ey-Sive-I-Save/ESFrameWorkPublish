@@ -1,0 +1,5 @@
+/target
+.cargo
+project.godot
+.godot
+addons

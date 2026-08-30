@@ -21,6 +21,22 @@ AICommands、Automation 合同/回执和正式证据仍由各自项目权威目�
 - AISpace 没有运行时租约或常驻竞争态。修改根入口或身份描述前必须重读当前内容；发现
   哈希/身份冲突时拒绝覆盖并回到本入口复核，不使用 last-write-wins。
 
+## 固化规则：临时任务与正式交接分离
+
+以下规则是 AISpace 的长期不变量，后续 Skill、窗口和任务文档不得回退或另建同义分类：
+
+- 临时职责说明、窗口准备材料和短期任务文档统一使用
+  `ES/AISpace/Local/CodexSessionTasks/<YYYYMMDD>/<responsibility>/`，并标记
+  `temporary-task`。
+- 该目录不是 Handoff、历史归档、会话权威或长期状态源；不得把它命名为或描述为
+  `handoff`、`history`、`archive`，也不得在 AISpace 下新增领域专用交接目录。
+- 正式交接和 Codex 历史只由 `ES/AI协作历程（Codex）/` 及外部不可变会话快照承载，
+  其协议由 `es-codex-session-bootstrap` 唯一管理。
+- 邮箱消息只有出现 `acceptedByRecordId` 与 `contextAccepted` 证据才算接收；仅
+  `queued` 不得声称窗口已接取。
+- `sourceAbsolutePath` 不是迁移或消费依据；涉及快照时只能使用信封中的
+  `handoffFiles.absolutePath`。
+
 ```text
 Local/                         # 私有 AI 内容
   <category>/<YYYYMMDD>/<agent-or-task>/

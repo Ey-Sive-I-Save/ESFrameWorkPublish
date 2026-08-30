@@ -1,0 +1,5 @@
+{
+  "name": "WellFired.Command.Editor",
+  "references": [ "WellFired.Command" ],
+  "includePlatforms": [ "Editor" ]
+}

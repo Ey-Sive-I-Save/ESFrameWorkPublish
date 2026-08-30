@@ -8,7 +8,7 @@
     "collaborative": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
     "unityPublic": "Assets/ES/AISpace/Public/<category>/<YYYYMMDD>/<domain>/"
   },
-  "categories": ["Screenshots", "Captures", "Cache", "Scratch", "Exports", "EditorTooling", "UIIntent", "StaticReplay", "TaskReadSnapshots", "AgentCandidates", "WebPageStudio", "Skills", "abc-generation-resource-audit", "UI"],
+  "categories": ["Screenshots", "Captures", "Cache", "Scratch", "Exports", "EditorTooling", "UIIntent", "StaticReplay", "TaskReadSnapshots", "AgentCandidates", "WebPageStudio", "Skills", "abc-generation-resource-audit", "UI", "可用资源站点"],
   "forbiddenAIGenerationRoots": ["Assets/Screenshots", "Assets/Temp", "ES/Output/Screenshots", "ES/Output/Temp", ".agents/skills/**/__pycache__"],
   "externalGeneratedRoots": {
     "ES/Output/WebPageStudio": "WebPageStudio output authority; browser profiles and preview caches remain here and are not AISpace content",

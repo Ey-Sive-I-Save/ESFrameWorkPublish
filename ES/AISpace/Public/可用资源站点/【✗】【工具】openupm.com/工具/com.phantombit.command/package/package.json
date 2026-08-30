@@ -1,0 +1,30 @@
+{
+  "name": "com.phantombit.command",
+  "version": "0.1.1",
+  "displayName": ".Command",
+  "description": "A powerful in-game command console and log viewer for Unity. View logs, inspect objects, execute commands, and debug on any platform.",
+  "unity": "2021.3",
+  "documentationUrl": "https://dotcommand-documentation.readthedocs.io/",
+  "changelogUrl": "https://openupm.com/packages/com.phantombit.command/",
+  "licensesUrl": "https://opensource.org/license/mit/",
+  "keywords": [
+    "command",
+    "console",
+    "debug",
+    "runtime",
+    "logs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ArtOfSettling/UnityInGameConsoleUPM.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Terry Drever",
+    "email": "openupm.marsupial459@passmail.net",
+    "url": "https://github.com/ArtOfSettling"
+  },
+  "publishConfig": {
+    "registry": "https://package.openupm.com"
+  }
+}

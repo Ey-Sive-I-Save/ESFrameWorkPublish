@@ -1,0 +1,4 @@
+<linker>
+       <assembly fullname="WellFired.Command" preserve="all"/>
+       <assembly fullname="WellFired.Command.Unity.Runtime" preserve="all"/>
+</linker>

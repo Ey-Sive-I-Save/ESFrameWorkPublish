@@ -1,0 +1,52 @@
+﻿[
+    {
+        "file":  "font_1.ttf",
+        "bytes":  530944,
+        "sha256":  "9725A847AF6B460FFCA162AE66D20DAD48B01876137947180B42D7DCD7887182"
+    },
+    {
+        "file":  "font_10.ttf",
+        "bytes":  174116,
+        "sha256":  "F4852CA89C29F69D800E14F097ED4D1F0A0CC454E9F77D73BFD6DB1F71C287A0"
+    },
+    {
+        "file":  "font_2.ttf",
+        "bytes":  488584,
+        "sha256":  "D7598E12C5DBEF095FF8272CFC55DA0250BD07FBDECBAC8A530B9B277872A134"
+    },
+    {
+        "file":  "font_3.ttf",
+        "bytes":  583992,
+        "sha256":  "FE269381E992F32E135801740998544D6235061E37C93EC067AD2BE3EDD5B17B"
+    },
+    {
+        "file":  "font_4.ttf",
+        "bytes":  532636,
+        "sha256":  "36643644F318A812AAB2D2ED3BB98F8CF0872527F835FE9398D95FE6B9ADB878"
+    },
+    {
+        "file":  "font_5.ttf",
+        "bytes":  664748,
+        "sha256":  "808C62839C62DBCE7DE689AF7603666FC7F8B81E0DF537D8A5212C87580D4337"
+    },
+    {
+        "file":  "font_6.ttf",
+        "bytes":  698264,
+        "sha256":  "3214F75BF96783A571BD25338C867C669E7C5E7C08A227F18A7B63766D6E6CBE"
+    },
+    {
+        "file":  "font_7.ttf",
+        "bytes":  762376,
+        "sha256":  "51607F316BC020E59F03CBF51543EECFFBEA501C0B31D73E5B82927C5CCA442C"
+    },
+    {
+        "file":  "font_8.ttf",
+        "bytes":  744936,
+        "sha256":  "0F7B311B2F3279E4EEF9B2F968BCDBAB6E28F4DAEB1F049F4F278A902BCD82F7"
+    },
+    {
+        "file":  "font_9.ttf",
+        "bytes":  153440,
+        "sha256":  "D82AAAF98A9283F9A8EDD24E51173337D8EAF09E25CD3D98831F8EC8461748A1"
+    }
+]

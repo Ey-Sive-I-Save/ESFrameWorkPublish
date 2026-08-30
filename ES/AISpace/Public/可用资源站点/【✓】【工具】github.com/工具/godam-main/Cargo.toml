@@ -1,0 +1,27 @@
+[package]
+name = "godam"
+version = "0.1.2"
+edition = "2021"
+license = "MIT"
+description = "godam (Godot Asset Manager) is an unofficial minimal command-line tool to install and manage addons from the Godot Asset Library."
+homepage = "https://nilsiker.github.io/projects/godam/"
+repository = "https://github.com/nilsiker/godam"
+readme = "./README.md"
+keywords = ["cli", "godot", "addon-manager"]
+categories = ["command-line-utilities"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "2.0.12"
+clap = { version = "4.5.41", features = ["derive"] }
+reqwest = { version = "0.12.22", features = ["json", "stream"] }
+semver = { version = "1.0.26", features = ["serde"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.141"
+tokio = { version = "1.47.0", features = ["macros", "rt-multi-thread"] }
+toml = "0.9.3"
+zip = "4.3.0"
+indicatif = "0.18.0"
+console = "0.16.0"
+url = { version = "2.5.4", features = ["serde"] }

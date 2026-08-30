@@ -1,0 +1,29 @@
+{
+  "name": "com.cmdexecutor.dotnet-generic-host",
+  "author": "cmdexecutor (https://docs.microsoft.com/ru-ru/dotnet/core/extensions/dependency-injection-usage)",
+  "displayName": ".NET Generic Host for Unity",
+  "description": ".NET Generic Host (Microsoft.Extensions.Hosting) DI container adapted for Unity, works with IL2CPP.",
+  "unity": "2021.1",
+  "release": "0f1",
+  "version": "3.0.3",
+  "keywords": [
+    "unity",
+    "integration",
+    "workflow",
+    "DI",
+    "hosting"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amelkor/Microsoft.Extensions.Hosting.Unity.git"
+  },
+  "type": "library",
+  "bugs": {
+    "url": "https://github.com/amelkor/Microsoft.Extensions.Hosting.Unity/issues"
+  },
+  "homepage": "https://github.com/amelkor/Microsoft.Extensions.Hosting.Unity#readme",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://package.openupm.com"
+  }
+}

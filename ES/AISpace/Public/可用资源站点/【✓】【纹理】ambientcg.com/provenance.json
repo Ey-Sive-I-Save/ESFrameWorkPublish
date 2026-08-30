@@ -1,0 +1,23 @@
+{
+  "site": "ambientCG",
+  "capturedUtc": "2026-08-30T20:30:00+08:00",
+  "budgetBytes": 10485760,
+  "downloadBytes": 9420032,
+  "archiveCount": 0,
+  "extractedResourceFileCount": 22,
+  "fileCount": 22,
+  "visibleBytes": 9420032,
+  "status": "downloaded-and-extracted",
+  "license": "CC0（以站点和具体资产页为准）",
+  "urpAdaptation": "PBR 贴图可映射到 URP Lit；NormalGL/NormalDX 需按 Unity 通道约定选择",
+  "supportedTypes": ["纹理"],
+  "searchTerms": ["ambientCG Bricks 1K JPG PBR"],
+  "partialDownload": true,
+  "archivesRetained": false,
+  "extractedFilesVisible": true,
+  "cleanupPolicy": "解包校验后立即删除传输压缩包，仅保留可见贴图文件",
+  "archives": [
+    {"path":"纹理/Bricks104_1K-JPG.zip","bytes":4252352,"sha256":"b3f75260eaff89008a1f6c29751e27d1edac3604046f1f99b02f56ca9d9a1a32"},
+    {"path":"纹理/Bricks097_1K-JPG.zip","bytes":5172084,"sha256":"97b5df360161e48bcfed609aef361e8115b680ddc0aea4ad9321d4b00e222ad0"}
+  ]
+}

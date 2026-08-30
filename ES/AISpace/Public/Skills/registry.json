@@ -32,15 +32,15 @@
   ],
   "sourceSnapshot": {
     ".agents/SKILL_DISCOVERY_POLICY.json": "0399e899c6d890b94dfa06245f9a97445d45a0dfda7e550533b22d944385cba0",
-    ".agents/SKILL_RESOURCE_INDEX.yaml": "08ed6c48572851051a659d2aa58e5f59fbdd9ea614aec066f721f7e4ddd3b2cb",
-    ".agents/SKILL_CATALOG.yaml": "e112adf6f29d8707e765d961bd00b6bad157ba5fdf60ec59074d59c1a0f8c801",
-    ".agents/SKILL_REGISTRY.manifest.json": "aa2c11b550f77349fb991195c9d39a549c7f85a48070d9ca2d8fe32ad1d65d73",
+    ".agents/SKILL_RESOURCE_INDEX.yaml": "a815aae36ba45fe7e79c5edd1a4f7d5f7dcba318750bd02917cd7569e766d571",
+    ".agents/SKILL_CATALOG.yaml": "5c6931eaf0ae7f1664372e71131f6661922832677eadce07f8fd984390882f29",
+    ".agents/SKILL_REGISTRY.manifest.json": "169c582af676d1da65c1462184f0cd925f3edfdd19da058f8f57afe68831914c",
     ".agents/SKILL_ROUTE_ALIASES.zh-CN.json": "b39bad112757d3bd5f506ae680d7b6701c4405f80cd87b320306fefaca2423d8",
     ".agents/skills/es-skill-governance/references/command-binding-registry.json": "e10f4188102f91614e99a5396cd6b80723faa0fe6f23cb358c1abf0d7354901a",
-    "Documentation/AIKnowledge/AIBRAIN_ENTRY.md": "f13d9a2a9b7170f7bb37c67c5f8270f47d417b0872bd49907bbb0b7ec5448292",
-    "Documentation/AIKnowledge/KnowledgeIndex.yaml": "d97455be04f3095e9b074cbbbb85109f1c1f5d7540e0f47ae168cb8d6f2d6c97",
+    "Documentation/AIKnowledge/AIBRAIN_ENTRY.md": "4f490eba9b41f2d513a6a2bfde359d73a1182c16208bd0a01d276aefe447dfe1",
+    "Documentation/AIKnowledge/KnowledgeIndex.yaml": "d94d63cc2642f26e06c64686db8779e23d04c9d7bf2f830d3fea3d7fb12fe898",
     "Assets/Plugins/ES/AICommands/AICommandCatalog.json": "c9f6e741ceeb006cf8389c21cac2ba022421a9f095332d226f6a704d24b5f46e",
-    ".agents/SKILL_AISPACE_BINDINGS.json": "cf4e11ea039ee2d93b59674460c45f6960bc631404cf53e538b4abb43cc9c4c8"
+    ".agents/SKILL_AISPACE_BINDINGS.json": "a4be2bf756a0c64a2358d6473c3029707a8e163f874f4115398fb35c922e2742"
   },
   "skills": [
     {
@@ -102,6 +102,13 @@
               "overlappingRouteKeys": [
                 "review",
                 "risk"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.creative-resource-evidence.v1",
+              "file": "entries/creative-resource-evidence.md",
+              "overlappingRouteKeys": [
+                "evidence"
               ]
             }
           ]
@@ -287,7 +294,7 @@
     {
       "skillName": "es-ai-abc-core",
       "skillPath": ".agents/skills/es-ai-abc-core",
-      "skillHash": "f423874bdc267eb787bda51055cfd0c0029a652ebc732408a9f475ed2fb7a239",
+      "skillHash": "9dc83d387ae13bdf29c1493f7a4f9b14bb463b46b804a6ec84a12f24eb7ce8e6",
       "governanceHash": "5ad446b5ed25914982649499657c7614d395b1a801078c3ab6bdc48875d400c3",
       "evidenceContractBindingHash": "d3c5996a9d98a3849a4012c8aff31338ba8cf5c6f5dd71ac5a0a34600e519748",
       "registrationState": "NeedsReview",
@@ -579,7 +586,7 @@
     {
       "skillName": "es-ai-interaction-governance",
       "skillPath": ".agents/skills/es-ai-interaction-governance",
-      "skillHash": "2dc52f6f43671ae075387f809f7c06def1914265ef23a8de1478fb3ec1316504",
+      "skillHash": "56846df7b30584630773cadb9201d6fdd1d25212885ff555d78f18d62eb6f785",
       "governanceHash": "d59fb438cf1eb97b111c860e0dc0ff9447a35d60cde859bd53c28e6434462d21",
       "evidenceContractBindingHash": "5ab7f480e1e6797385c5503b04d3405ed8151252f4dea2f5d1f65f5f5a9f49a0",
       "registrationState": "NeedsReview",
@@ -637,7 +644,7 @@
         "registryManifest": {
           "path": ".agents/SKILL_REGISTRY.manifest.json",
           "recordPresent": true,
-          "hashMatch": false
+          "hashMatch": true
         },
         "aibrain": {
           "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
@@ -727,7 +734,7 @@
           "bidirectional": false
         }
       },
-      "relationStatus": "stale"
+      "relationStatus": "closed"
     },
     {
       "skillName": "es-ai-knowledge-curation",
@@ -944,7 +951,7 @@
         "catalog": {
           "path": ".agents/SKILL_CATALOG.yaml",
           "recordPresent": true,
-          "hashMatch": false
+          "hashMatch": true
         },
         "resourceIndex": {
           "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
@@ -2252,14 +2259,6 @@
           "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
           "refs": [
             {
-              "knowledgeId": "es.codex.app-server.integration.v1",
-              "file": "entries/codex-app-server-integration.md",
-              "overlappingRouteKeys": [
-                "automation",
-                "worker"
-              ]
-            },
-            {
               "knowledgeId": "es.project.automation-aibrain-graph.v1",
               "file": "entries/automation-aibrain-graph.md",
               "overlappingRouteKeys": [
@@ -2419,7 +2418,7 @@
     {
       "skillName": "es-codex-session-bootstrap",
       "skillPath": ".agents/skills/es-codex-session-bootstrap",
-      "skillHash": "280a835617e8216f1a0192f3f46aeecb6c9426cf74dd62fafed62910704a189e",
+      "skillHash": "f05401bf432b887f7a1898c07a5cfc5b5846e20e1fc534eeee55ee798b45f452",
       "governanceHash": "dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd",
       "evidenceContractBindingHash": "47ee09a005cf501bec1d8465c68d64f952254ea85cf67fef5bd79897b238986c",
       "registrationState": "NeedsReview",
@@ -2450,7 +2449,7 @@
         "registryManifest": {
           "path": ".agents/SKILL_REGISTRY.manifest.json",
           "recordPresent": true,
-          "hashMatch": true
+          "hashMatch": false
         },
         "aibrain": {
           "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
@@ -2534,7 +2533,7 @@
           "bidirectional": false
         }
       },
-      "relationStatus": "closed"
+      "relationStatus": "stale"
     },
     {
       "skillName": "es-command-authoring",
@@ -3202,6 +3201,14 @@
               ]
             },
             {
+              "knowledgeId": "es.project.r2-camera-character-presentation.v1",
+              "file": "entries/r2-camera-character-presentation.md",
+              "overlappingRouteKeys": [
+                "entity",
+                "prefab"
+              ]
+            },
+            {
               "knowledgeId": "es.project.runtime-lifecycle-pool-arbitration.v1",
               "file": "ESFramework/project-runtime-lifecycle-pool-arbitration/runtime-lifecycle-pool-arbitration.md",
               "overlappingRouteKeys": [
@@ -3340,6 +3347,14 @@
               "file": "entries/pool-operation-skill-lifecycle.md",
               "overlappingRouteKeys": [
                 "pool"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.r2-camera-character-presentation.v1",
+              "file": "entries/r2-camera-character-presentation.md",
+              "overlappingRouteKeys": [
+                "entity",
+                "prefab"
               ]
             },
             {
@@ -3784,6 +3799,335 @@
         }
       },
       "relationStatus": "closed"
+    },
+    {
+      "skillName": "es-game-core-loop-validation",
+      "skillPath": ".agents/skills/es-game-core-loop-validation",
+      "skillHash": "93d8ef30f39f965ad9e4a162dff1855a3f5deb62d071075e66066b3ee5e3b3d1",
+      "governanceHash": "4db974864461a8dc2c92f157feab3278c195209cb520be0c816c73fdd005468f",
+      "evidenceContractBindingHash": "c592eced3d933ffe6cbf39167935d8b41eccb8913b1827986c003aff937895f7",
+      "registrationState": "NeedsReview",
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "not-proven",
+      "reviewRequired": true,
+      "routeKeys": [
+        "abcd",
+        "acceptance",
+        "ai-abc",
+        "evidence",
+        "game-logic",
+        "performance",
+        "playable-loop",
+        "runtime"
+      ],
+      "relations": {
+        "catalog": {
+          "path": ".agents/SKILL_CATALOG.yaml",
+          "recordPresent": true,
+          "hashMatch": true
+        },
+        "resourceIndex": {
+          "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
+          "recordPresent": false,
+          "overlappingRouteKeys": []
+        },
+        "registryManifest": {
+          "path": ".agents/SKILL_REGISTRY.manifest.json",
+          "recordPresent": false,
+          "hashMatch": false
+        },
+        "aibrain": {
+          "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+          "discoverable": false,
+          "routeAreas": []
+        },
+        "knowledge": {
+          "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+          "refs": [
+            {
+              "knowledgeId": "es.aiwarning.p0.playable-loop-runtime-evidence.v1",
+              "file": "entries/aiwarning-p0-playable-loop-runtime-evidence.md",
+              "overlappingRouteKeys": [
+                "abcd",
+                "ai-abc",
+                "playable-loop"
+              ]
+            }
+          ]
+        },
+        "aiCommand": {
+          "path": ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+          "catalogPath": "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+          "status": "not-required",
+          "bindings": [],
+          "catalogMatch": true,
+          "exemption": null
+        },
+        "evidence": {
+          "bindingPath": ".agents/skills/es-game-core-loop-validation/evidence-contract.binding.json",
+          "bindingHash": "c592eced3d933ffe6cbf39167935d8b41eccb8913b1827986c003aff937895f7",
+          "staticReplayManifest": true,
+          "staticReplayAdapter": true
+        },
+        "authority": {
+          "requiredAuthorityRefs": [],
+          "aiWarningsRefs": []
+        },
+        "chineseAliases": {
+          "path": ".agents/SKILL_ROUTE_ALIASES.zh-CN.json",
+          "aliasCount": 0
+        },
+        "aispace": {
+          "path": ".agents/SKILL_AISPACE_BINDINGS.json",
+          "registryPath": "ES/AISpace/Public/Skills/registry.json",
+          "skillContractPath": ".agents/skills/es-game-core-loop-validation/governance.json",
+          "bindingCount": 1,
+          "bindingIds": [
+            "aispace.es-game-core-loop-validation.private-temp"
+          ],
+          "bindings": [
+            {
+              "bindingId": "aispace.es-game-core-loop-validation.private-temp",
+              "purpose": "核心循环验证矩阵与静态回放任务证据暂存",
+              "storageClass": "private-temp",
+              "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+              "contentAuthority": "game-core-loop-validation",
+              "lifecycle": "disposable",
+              "artifactKinds": [
+                "evidence-matrix",
+                "static-replay-receipt",
+                "innovation-run-receipt"
+              ],
+              "retention": "task-scoped",
+              "writePolicy": "user-directed-only"
+            }
+          ],
+          "status": "bound",
+          "bidirectional": true
+        }
+      },
+      "relationStatus": "stale"
+    },
+    {
+      "skillName": "es-game-logic-content-development",
+      "skillPath": ".agents/skills/es-game-logic-content-development",
+      "skillHash": "b944922b36617804857ce4712732e747a4fc2f1cbcbe7eed0efd1737395ac931",
+      "governanceHash": "53a5591c26e0b42154bda4e0c8dfb285394cb6894de794ff2139c08f44b525be",
+      "evidenceContractBindingHash": "2082c190a159356271ff95fd9b6659ae1f8e8b6bfd067449fb92a4e143197626",
+      "registrationState": "NeedsReview",
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "not-proven",
+      "reviewRequired": true,
+      "routeKeys": [
+        "content-development",
+        "game-logic",
+        "gameplay-content"
+      ],
+      "relations": {
+        "catalog": {
+          "path": ".agents/SKILL_CATALOG.yaml",
+          "recordPresent": true,
+          "hashMatch": true
+        },
+        "resourceIndex": {
+          "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
+          "recordPresent": false,
+          "overlappingRouteKeys": []
+        },
+        "registryManifest": {
+          "path": ".agents/SKILL_REGISTRY.manifest.json",
+          "recordPresent": false,
+          "hashMatch": false
+        },
+        "aibrain": {
+          "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+          "discoverable": false,
+          "routeAreas": []
+        },
+        "knowledge": {
+          "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+          "refs": []
+        },
+        "aiCommand": {
+          "path": ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+          "catalogPath": "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+          "status": "not-required",
+          "bindings": [],
+          "catalogMatch": true,
+          "exemption": null
+        },
+        "evidence": {
+          "bindingPath": ".agents/skills/es-game-logic-content-development/evidence-contract.binding.json",
+          "bindingHash": "2082c190a159356271ff95fd9b6659ae1f8e8b6bfd067449fb92a4e143197626",
+          "staticReplayManifest": true,
+          "staticReplayAdapter": true
+        },
+        "authority": {
+          "requiredAuthorityRefs": [],
+          "aiWarningsRefs": []
+        },
+        "chineseAliases": {
+          "path": ".agents/SKILL_ROUTE_ALIASES.zh-CN.json",
+          "aliasCount": 0
+        },
+        "aispace": {
+          "path": ".agents/SKILL_AISPACE_BINDINGS.json",
+          "registryPath": "ES/AISpace/Public/Skills/registry.json",
+          "skillContractPath": ".agents/skills/es-game-logic-content-development/governance.json",
+          "bindingCount": 2,
+          "bindingIds": [
+            "aispace.es-game-logic-content-development.public-index",
+            "aispace.es-game-logic-content-development.private-temp"
+          ],
+          "bindings": [
+            {
+              "bindingId": "aispace.es-game-logic-content-development.public-index",
+              "purpose": "游戏逻辑内容开发方案与证据索引",
+              "storageClass": "public-index",
+              "pathTemplate": "ES/AISpace/Public/game-logic-content/<YYYYMMDD>/<topic-or-task>/",
+              "contentAuthority": "skill-governance",
+              "lifecycle": "retained-index",
+              "artifactKinds": [
+                "content-plan",
+                "evidence",
+                "receipt"
+              ],
+              "retention": "versioned",
+              "writePolicy": "user-directed-only"
+            },
+            {
+              "bindingId": "aispace.es-game-logic-content-development.private-temp",
+              "purpose": "游戏逻辑内容开发临时回放和诊断",
+              "storageClass": "private-temp",
+              "pathTemplate": "ES/AISpace/Local/game-logic-content/<YYYYMMDD>/<agent-or-task>/",
+              "contentAuthority": "skill-governance",
+              "lifecycle": "disposable",
+              "artifactKinds": [
+                "cache",
+                "replay",
+                "scratch"
+              ],
+              "retention": "task-scoped",
+              "writePolicy": "user-directed-only"
+            }
+          ],
+          "status": "bound",
+          "bidirectional": true
+        }
+      },
+      "relationStatus": "stale"
+    },
+    {
+      "skillName": "es-game-logic-system-development",
+      "skillPath": ".agents/skills/es-game-logic-system-development",
+      "skillHash": "49ceefb3a501fa99b9d156131bae857061179336ca7437fe262716c7e42a53d5",
+      "governanceHash": "6b51b601d5d7f83c3c2559f037b6587b0cb47273dc712c35d6fade4c9c742fbd",
+      "evidenceContractBindingHash": "bc9158ad78a32cd638b3ce74cfc0cb7a884109a0370d75986647cadddf0f7ccc",
+      "registrationState": "NeedsReview",
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "not-proven",
+      "reviewRequired": true,
+      "routeKeys": [
+        "game-logic",
+        "runtime-integration",
+        "system-development"
+      ],
+      "relations": {
+        "catalog": {
+          "path": ".agents/SKILL_CATALOG.yaml",
+          "recordPresent": true,
+          "hashMatch": true
+        },
+        "resourceIndex": {
+          "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
+          "recordPresent": false,
+          "overlappingRouteKeys": []
+        },
+        "registryManifest": {
+          "path": ".agents/SKILL_REGISTRY.manifest.json",
+          "recordPresent": false,
+          "hashMatch": false
+        },
+        "aibrain": {
+          "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+          "discoverable": false,
+          "routeAreas": []
+        },
+        "knowledge": {
+          "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+          "refs": []
+        },
+        "aiCommand": {
+          "path": ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+          "catalogPath": "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+          "status": "not-required",
+          "bindings": [],
+          "catalogMatch": true,
+          "exemption": null
+        },
+        "evidence": {
+          "bindingPath": ".agents/skills/es-game-logic-system-development/evidence-contract.binding.json",
+          "bindingHash": "bc9158ad78a32cd638b3ce74cfc0cb7a884109a0370d75986647cadddf0f7ccc",
+          "staticReplayManifest": true,
+          "staticReplayAdapter": true
+        },
+        "authority": {
+          "requiredAuthorityRefs": [],
+          "aiWarningsRefs": []
+        },
+        "chineseAliases": {
+          "path": ".agents/SKILL_ROUTE_ALIASES.zh-CN.json",
+          "aliasCount": 0
+        },
+        "aispace": {
+          "path": ".agents/SKILL_AISPACE_BINDINGS.json",
+          "registryPath": "ES/AISpace/Public/Skills/registry.json",
+          "skillContractPath": ".agents/skills/es-game-logic-system-development/governance.json",
+          "bindingCount": 2,
+          "bindingIds": [
+            "aispace.es-game-logic-system-development.public-index",
+            "aispace.es-game-logic-system-development.private-temp"
+          ],
+          "bindings": [
+            {
+              "bindingId": "aispace.es-game-logic-system-development.public-index",
+              "purpose": "游戏逻辑系统开发方案与证据索引",
+              "storageClass": "public-index",
+              "pathTemplate": "ES/AISpace/Public/game-logic-system/<YYYYMMDD>/<topic-or-task>/",
+              "contentAuthority": "skill-governance",
+              "lifecycle": "retained-index",
+              "artifactKinds": [
+                "evidence",
+                "plan",
+                "receipt"
+              ],
+              "retention": "versioned",
+              "writePolicy": "user-directed-only"
+            },
+            {
+              "bindingId": "aispace.es-game-logic-system-development.private-temp",
+              "purpose": "游戏逻辑系统开发临时回放和诊断",
+              "storageClass": "private-temp",
+              "pathTemplate": "ES/AISpace/Local/game-logic-system/<YYYYMMDD>/<agent-or-task>/",
+              "contentAuthority": "skill-governance",
+              "lifecycle": "disposable",
+              "artifactKinds": [
+                "cache",
+                "replay",
+                "scratch"
+              ],
+              "retention": "task-scoped",
+              "writePolicy": "user-directed-only"
+            }
+          ],
+          "status": "bound",
+          "bidirectional": true
+        }
+      },
+      "relationStatus": "stale"
     },
     {
       "skillName": "es-gamecore-config-authoring",
@@ -4395,6 +4739,13 @@
               ]
             },
             {
+              "knowledgeId": "es.project.game-ui-hud-readability-contract.v1",
+              "file": "entries/game-ui-hud-readability-contract.md",
+              "overlappingRouteKeys": [
+                "evidence"
+              ]
+            },
+            {
               "knowledgeId": "es.project.web-open-source-calibration.v1",
               "file": "entries/web-open-source-calibration.md",
               "overlappingRouteKeys": [
@@ -4661,6 +5012,20 @@
                 "knowledge",
                 "source-ref",
                 "stale"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.creative-resource-evidence.v1",
+              "file": "entries/creative-resource-evidence.md",
+              "overlappingRouteKeys": [
+                "evidence"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.game-ui-hud-readability-contract.v1",
+              "file": "entries/game-ui-hud-readability-contract.md",
+              "overlappingRouteKeys": [
+                "evidence"
               ]
             },
             {
@@ -4997,6 +5362,13 @@
             {
               "knowledgeId": "es.function-area.release.v1",
               "file": "entries/function-area-routing.md",
+              "overlappingRouteKeys": [
+                "evidence"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.creative-resource-evidence.v1",
+              "file": "entries/creative-resource-evidence.md",
               "overlappingRouteKeys": [
                 "evidence"
               ]
@@ -5367,16 +5739,7 @@
         },
         "knowledge": {
           "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
-          "refs": [
-            {
-              "knowledgeId": "es.project.web-ai-generation-repair.v1",
-              "file": "entries/web-ai-generation-repair.md",
-              "overlappingRouteKeys": [
-                "prompt-engineering",
-                "prompt-evaluation"
-              ]
-            }
-          ]
+          "refs": []
         },
         "aiCommand": {
           "path": ".agents/skills/es-skill-governance/references/command-binding-registry.json",
@@ -5427,7 +5790,7 @@
           "bidirectional": false
         }
       },
-      "relationStatus": "closed"
+      "relationStatus": "partial"
     },
     {
       "skillName": "es-publish-aitest-prompt",
@@ -5867,6 +6230,162 @@
       "relationStatus": "closed"
     },
     {
+      "skillName": "es-resource-collection",
+      "skillPath": ".agents/skills/es-resource-collection",
+      "skillHash": "942bc2c364ac370abc6d3ca2f3fdff4aec6b2313c99e26656137aab5e75b0381",
+      "governanceHash": "326120d6ace0001336720c483b46be82f5f617f9495a5ef41c229bcffa390f0d",
+      "evidenceContractBindingHash": "9d1f3b822febe61dcda8a16eed8bfff47e056d321d8b0cb953ea1cc6edda8ae7",
+      "registrationState": "NeedsReview",
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "not-proven",
+      "reviewRequired": true,
+      "routeKeys": [
+        "asset",
+        "assetpackage",
+        "collection",
+        "provenance",
+        "resource"
+      ],
+      "relations": {
+        "catalog": {
+          "path": ".agents/SKILL_CATALOG.yaml",
+          "recordPresent": true,
+          "hashMatch": true
+        },
+        "resourceIndex": {
+          "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
+          "recordPresent": true,
+          "overlappingRouteKeys": [
+            "asset",
+            "assetpackage",
+            "collection",
+            "provenance",
+            "resource"
+          ]
+        },
+        "registryManifest": {
+          "path": ".agents/SKILL_REGISTRY.manifest.json",
+          "recordPresent": false,
+          "hashMatch": false
+        },
+        "aibrain": {
+          "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+          "discoverable": true,
+          "routeAreas": [
+            "资源读取、投影与发布链"
+          ]
+        },
+        "knowledge": {
+          "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+          "refs": [
+            {
+              "knowledgeId": "es.external.free-resource-sites-calibration.v1",
+              "file": "entries/free-resource-sites-calibration.md",
+              "overlappingRouteKeys": [
+                "asset",
+                "provenance",
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.creative-resource-evidence.v1",
+              "file": "entries/creative-resource-evidence.md",
+              "overlappingRouteKeys": [
+                "provenance",
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.resource-import-configuration.v1",
+              "file": "entries/resource-import-configuration.md",
+              "overlappingRouteKeys": [
+                "asset",
+                "assetpackage",
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.resource-management-architecture.v1",
+              "file": "entries/resource-management-architecture.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.unitypackage-parser.v1",
+              "file": "entries/unitypackage-parser.md",
+              "overlappingRouteKeys": [
+                "assetpackage",
+                "provenance",
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.resource.free-sources.v1",
+              "file": "entries/free-resource-sources.md",
+              "overlappingRouteKeys": [
+                "asset",
+                "provenance",
+                "resource"
+              ]
+            }
+          ]
+        },
+        "aiCommand": {
+          "path": ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+          "catalogPath": "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+          "status": "not-required",
+          "bindings": [],
+          "catalogMatch": true,
+          "exemption": null
+        },
+        "evidence": {
+          "bindingPath": ".agents/skills/es-resource-collection/evidence-contract.binding.json",
+          "bindingHash": "9d1f3b822febe61dcda8a16eed8bfff47e056d321d8b0cb953ea1cc6edda8ae7",
+          "staticReplayManifest": true,
+          "staticReplayAdapter": true
+        },
+        "authority": {
+          "requiredAuthorityRefs": [],
+          "aiWarningsRefs": []
+        },
+        "chineseAliases": {
+          "path": ".agents/SKILL_ROUTE_ALIASES.zh-CN.json",
+          "aliasCount": 0
+        },
+        "aispace": {
+          "path": ".agents/SKILL_AISPACE_BINDINGS.json",
+          "registryPath": "ES/AISpace/Public/Skills/registry.json",
+          "skillContractPath": ".agents/skills/es-resource-collection/governance.json",
+          "bindingCount": 1,
+          "bindingIds": [
+            "aispace.es-resource-collection.public-index"
+          ],
+          "bindings": [
+            {
+              "bindingId": "aispace.es-resource-collection.public-index",
+              "purpose": "资源收集快照与AssetPackage聚合索引",
+              "storageClass": "public-index",
+              "pathTemplate": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+              "contentAuthority": "resource-collection-contract",
+              "lifecycle": "retained-index",
+              "artifactKinds": [
+                "aggregation-index",
+                "collection-snapshot",
+                "provenance"
+              ],
+              "retention": "versioned",
+              "writePolicy": "explicit-project-write"
+            }
+          ],
+          "status": "bound",
+          "bidirectional": true
+        }
+      },
+      "relationStatus": "stale"
+    },
+    {
       "skillName": "es-resource-pipeline",
       "skillPath": ".agents/skills/es-resource-pipeline",
       "skillHash": "ed8e47ede2af35ddc499f6ce8d0141948b67a843d86fb4caaa330a70a83d4765",
@@ -5906,7 +6425,7 @@
           "discoverable": true,
           "routeAreas": [
             "游戏 UI AssetManifest 与素材解析",
-            "资源与发布链"
+            "资源读取、投影与发布链"
           ]
         },
         "knowledge": {
@@ -5928,6 +6447,21 @@
               ]
             },
             {
+              "knowledgeId": "es.project.resource-import-configuration.v1",
+              "file": "entries/resource-import-configuration.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.resource-management-architecture.v1",
+              "file": "entries/resource-management-architecture.md",
+              "overlappingRouteKeys": [
+                "manifest",
+                "resource"
+              ]
+            },
+            {
               "knowledgeId": "es.project.resource-pipeline-runtime.v1",
               "file": "entries/resource-pipeline-runtime.md",
               "overlappingRouteKeys": [
@@ -5940,6 +6474,20 @@
               "file": "ESFramework/project-resource-runtime-lease/resource-runtime-lease-boundaries.md",
               "overlappingRouteKeys": [
                 "manifest",
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.unitypackage-parser.v1",
+              "file": "entries/unitypackage-parser.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.resource.free-sources.v1",
+              "file": "entries/free-resource-sources.md",
+              "overlappingRouteKeys": [
                 "resource"
               ]
             }
@@ -6026,7 +6574,7 @@
           "discoverable": true,
           "routeAreas": [
             "游戏 UI AssetManifest 与素材解析",
-            "资源与发布链"
+            "资源读取、投影与发布链"
           ]
         },
         "knowledge": {
@@ -6037,6 +6585,22 @@
               "file": "entries/function-area-routing.md",
               "overlappingRouteKeys": [
                 "asset",
+                "manifest",
+                "provider",
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.creative-resource-evidence.v1",
+              "file": "entries/creative-resource-evidence.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.resource-management-architecture.v1",
+              "file": "entries/resource-management-architecture.md",
+              "overlappingRouteKeys": [
                 "manifest",
                 "provider",
                 "resource"
@@ -6099,6 +6663,143 @@
         }
       },
       "relationStatus": "closed"
+    },
+    {
+      "skillName": "es-resource-reader",
+      "skillPath": ".agents/skills/es-resource-reader",
+      "skillHash": "a32032367e9d241bd9f7c8ec3972b76249797ac6e116b86fb50fb4de12565b40",
+      "governanceHash": "df81d5b232c211afcfeec025a27f8e3cb7871fa61824398792ea7f3e254e2df9",
+      "evidenceContractBindingHash": "c827f0a602214374835331e6cf93c0f90a7d46e1f3db8503bfb9701c388d91f9",
+      "registrationState": "NeedsReview",
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "not-proven",
+      "reviewRequired": true,
+      "routeKeys": [
+        "bytes",
+        "html",
+        "json",
+        "projection",
+        "reader",
+        "resource",
+        "table"
+      ],
+      "relations": {
+        "catalog": {
+          "path": ".agents/SKILL_CATALOG.yaml",
+          "recordPresent": true,
+          "hashMatch": true
+        },
+        "resourceIndex": {
+          "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
+          "recordPresent": true,
+          "overlappingRouteKeys": [
+            "bytes",
+            "html",
+            "json",
+            "projection",
+            "reader",
+            "resource",
+            "table"
+          ]
+        },
+        "registryManifest": {
+          "path": ".agents/SKILL_REGISTRY.manifest.json",
+          "recordPresent": false,
+          "hashMatch": false
+        },
+        "aibrain": {
+          "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+          "discoverable": true,
+          "routeAreas": [
+            "资源读取、投影与发布链"
+          ]
+        },
+        "knowledge": {
+          "path": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+          "refs": [
+            {
+              "knowledgeId": "es.external.free-resource-sites-calibration.v1",
+              "file": "entries/free-resource-sites-calibration.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.resource-import-configuration.v1",
+              "file": "entries/resource-import-configuration.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.resource-management-architecture.v1",
+              "file": "entries/resource-management-architecture.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            },
+            {
+              "knowledgeId": "es.project.unitypackage-parser.v1",
+              "file": "entries/unitypackage-parser.md",
+              "overlappingRouteKeys": [
+                "resource"
+              ]
+            }
+          ]
+        },
+        "aiCommand": {
+          "path": ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+          "catalogPath": "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+          "status": "not-required",
+          "bindings": [],
+          "catalogMatch": true,
+          "exemption": null
+        },
+        "evidence": {
+          "bindingPath": ".agents/skills/es-resource-reader/evidence-contract.binding.json",
+          "bindingHash": "c827f0a602214374835331e6cf93c0f90a7d46e1f3db8503bfb9701c388d91f9",
+          "staticReplayManifest": true,
+          "staticReplayAdapter": true
+        },
+        "authority": {
+          "requiredAuthorityRefs": [],
+          "aiWarningsRefs": []
+        },
+        "chineseAliases": {
+          "path": ".agents/SKILL_ROUTE_ALIASES.zh-CN.json",
+          "aliasCount": 0
+        },
+        "aispace": {
+          "path": ".agents/SKILL_AISPACE_BINDINGS.json",
+          "registryPath": "ES/AISpace/Public/Skills/registry.json",
+          "skillContractPath": ".agents/skills/es-resource-reader/governance.json",
+          "bindingCount": 1,
+          "bindingIds": [
+            "aispace.es-resource-reader.public-index"
+          ],
+          "bindings": [
+            {
+              "bindingId": "aispace.es-resource-reader.public-index",
+              "purpose": "资源解析器路由与ProjectionPacket索引",
+              "storageClass": "public-index",
+              "pathTemplate": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+              "contentAuthority": "resource-reader-route-manifest",
+              "lifecycle": "retained-index",
+              "artifactKinds": [
+                "parser-route",
+                "projection-index",
+                "reader-evidence"
+              ],
+              "retention": "versioned",
+              "writePolicy": "explicit-project-write"
+            }
+          ],
+          "status": "bound",
+          "bidirectional": true
+        }
+      },
+      "relationStatus": "stale"
     },
     {
       "skillName": "es-security-input-audit",
@@ -6197,7 +6898,7 @@
     {
       "skillName": "es-skill-creator",
       "skillPath": ".agents/skills/es-skill-creator",
-      "skillHash": "cdb87f354449b64c01da45ab77806431d94160e0323fc78b35a9ab635768a1b7",
+      "skillHash": "81f99e118fc22a45ed089fffd56991a8237e81001d2f6f074736815933563aaa",
       "governanceHash": "c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1",
       "evidenceContractBindingHash": "c66abd799bc12a74a38c8e90563ac210709b41eb418106f4ecf7371a7bd21b65",
       "registrationState": "NeedsReview",
@@ -6230,7 +6931,7 @@
         "registryManifest": {
           "path": ".agents/SKILL_REGISTRY.manifest.json",
           "recordPresent": true,
-          "hashMatch": true
+          "hashMatch": false
         },
         "aibrain": {
           "path": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
@@ -6351,7 +7052,7 @@
           "bidirectional": true
         }
       },
-      "relationStatus": "closed"
+      "relationStatus": "stale"
     },
     {
       "skillName": "es-skill-governance",
@@ -7981,6 +8682,13 @@
               ]
             },
             {
+              "knowledgeId": "es.project.game-ui-hud-readability-contract.v1",
+              "file": "entries/game-ui-hud-readability-contract.md",
+              "overlappingRouteKeys": [
+                "visual-qa"
+              ]
+            },
+            {
               "knowledgeId": "es.project.game-ui-normalized-adapter-layer.v1",
               "file": "entries/game-ui-normalized-adapter-layer.md",
               "overlappingRouteKeys": [
@@ -8254,6 +8962,13 @@
               "file": "entries/aibrain-orchestration.md",
               "overlappingRouteKeys": [
                 "evidence"
+              ]
+            },
+            {
+              "knowledgeId": "es.engineering.aaa-rendering-architecture.v1",
+              "file": "Engineering/engineering-aaa-rendering-architecture/aaa-rendering-architecture.md",
+              "overlappingRouteKeys": [
+                "unity"
               ]
             },
             {
@@ -8790,9 +9505,9 @@
     {
       "skillName": "es-web-generation-round-01-intake",
       "skillPath": ".agents/skills/es-web-generation-round-01-intake",
-      "skillHash": "25ce172a06f72768161b5f5ac31560c54d1f83d6de06e53ef7ed30e06cda2242",
+      "skillHash": "5225feda018c1305fb827f4adf00c27964c6a2f81c7e15d10ae402004de9506e",
       "governanceHash": "a53c46e73a12ceefa9d725f1329c66510438216c301535948e0a7f2a4d4d5c43",
-      "evidenceContractBindingHash": "",
+      "evidenceContractBindingHash": "3fc4ae23e7ce0a4cff28744dbc34bf8d5303faad4a9e8c56974532b681ed736b",
       "registrationState": "NeedsReview",
       "discoveryState": "candidate",
       "planEligibility": "advisory-only",
@@ -8837,7 +9552,7 @@
         },
         "evidence": {
           "bindingPath": ".agents/skills/es-web-generation-round-01-intake/evidence-contract.binding.json",
-          "bindingHash": "",
+          "bindingHash": "3fc4ae23e7ce0a4cff28744dbc34bf8d5303faad4a9e8c56974532b681ed736b",
           "staticReplayManifest": false,
           "staticReplayAdapter": false
         },
@@ -9034,7 +9749,7 @@
         "catalog": {
           "path": ".agents/SKILL_CATALOG.yaml",
           "recordPresent": true,
-          "hashMatch": false
+          "hashMatch": true
         },
         "resourceIndex": {
           "path": ".agents/SKILL_RESOURCE_INDEX.yaml",
@@ -9093,7 +9808,7 @@
     {
       "skillName": "es-web-generation-round-05-capability-design",
       "skillPath": ".agents/skills/es-web-generation-round-05-capability-design",
-      "skillHash": "0f47aefb9711bd32feb83c748a1292b93eeda0af0c3b9ffc8bc0b7da5dd43d0c",
+      "skillHash": "52fbc0a45b0ff64d225bde1246ba945997a7402ac5dd98a6a7c125c164b8f977",
       "governanceHash": "6694f1aecdd1f8ad33d61f6b1b2ef0b4771e67a52b66f162876706c1248badcf",
       "evidenceContractBindingHash": "",
       "registrationState": "NeedsReview",
@@ -9171,7 +9886,7 @@
     {
       "skillName": "es-web-generation-round-06-deep-design-html",
       "skillPath": ".agents/skills/es-web-generation-round-06-deep-design-html",
-      "skillHash": "fb793e26ada65dd44f74157c666927374ecac5f92c8c4f65aca68df70dae4feb",
+      "skillHash": "eec33eff053085235985c38fd55a1c292b70013d8d9f7b47ed6a37598767e8b9",
       "governanceHash": "dabb473c1db4a03c693da8b4719610556c404c59bbc13d48efb0ecc4250b2851",
       "evidenceContractBindingHash": "",
       "registrationState": "NeedsReview",
@@ -9248,7 +9963,7 @@
     {
       "skillName": "es-web-ui-generation-orchestration",
       "skillPath": ".agents/skills/es-web-ui-generation-orchestration",
-      "skillHash": "9967add2dbd86181ea150b4f921367775e3b3c11a758b053753b4a8b11005cd9",
+      "skillHash": "f93d600413ad100b1a04cfd9907c75ea4f83647beeb55cd8700b914691be49c4",
       "governanceHash": "639197ee2ff2b88117b1f72a9f68a79ecb20eaed06fef16694ae16be06705611",
       "evidenceContractBindingHash": "9957f607f0c315a9c07e535a47ef8d582007dac19047172afc14925fc68f97f8",
       "registrationState": "Draft",
@@ -9539,11 +10254,11 @@
     }
   ],
   "summary": {
-    "skillCount": 67,
-    "closedCount": 54,
-    "partialCount": 0,
-    "staleCount": 13,
+    "skillCount": 72,
+    "closedCount": 52,
+    "partialCount": 1,
+    "staleCount": 19,
     "blockedCount": 0
   },
-  "registryHash": "6f7b82ad62b9e36dd32492f97887dfae76f51dbb08b9a5a327c2a70d5a5253a5"
+  "registryHash": "98f99bb80c673a7463bc860386b92f6c0e4d6289d0ce5654f8adc0d887f2a56e"
 }

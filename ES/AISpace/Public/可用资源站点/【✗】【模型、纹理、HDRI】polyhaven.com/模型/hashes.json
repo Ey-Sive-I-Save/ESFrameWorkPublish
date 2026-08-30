@@ -1,0 +1,52 @@
+﻿[
+    {
+        "file":  "ArmChair_01_1k.fbx",
+        "bytes":  251612,
+        "sha256":  "055113EB7A583D827B5CE3FD2251CF391EE0B9FB924BC36C55E846F121959E37"
+    },
+    {
+        "file":  "BarberShopChair_01_1k.fbx",
+        "bytes":  253052,
+        "sha256":  "B5930A73800A4CE3599FAF5FD21C6F788B169698CF40F1B998EFF9C11FDCEFFA"
+    },
+    {
+        "file":  "Barrel_01_1k.fbx",
+        "bytes":  97052,
+        "sha256":  "556DDBAD76C46BE47EFE8923F560F65ED6C46C14218D0B0163DDC3CC922DB9D9"
+    },
+    {
+        "file":  "Barrel_02_1k.fbx",
+        "bytes":  98892,
+        "sha256":  "8A10F109812F2205D86FE72F43862C895697C0599D760F2455E20394D77F71B9"
+    },
+    {
+        "file":  "Camera_01_1k.fbx",
+        "bytes":  966796,
+        "sha256":  "84733292EFF701F03A1C51816E2B56C3EEEDB1353653F1549C4C49A889F1CDE8"
+    },
+    {
+        "file":  "CashRegister_01_1k.fbx",
+        "bytes":  393100,
+        "sha256":  "C26A5710D584768173B0492CBF09BA779277C089BD1A37D57A5570DD5EB80492"
+    },
+    {
+        "file":  "Chandelier_01_1k.fbx",
+        "bytes":  1219132,
+        "sha256":  "5E02D650A2B443570D25F6B32A843A7FC628E0EB570C8CDEBBFA2083EE6C8CE2"
+    },
+    {
+        "file":  "Chandelier_02_1k.fbx",
+        "bytes":  636908,
+        "sha256":  "47B40D6AA4370D7000317D7F8CE22F63304422E5D578C8CAE1C558CF0BDB0EDE"
+    },
+    {
+        "file":  "Chandelier_03_1k.fbx",
+        "bytes":  1251756,
+        "sha256":  "99438A2E11C682D7EFB7D64CE2E922BF032B5802B21AC6F606C92A92707E1131"
+    },
+    {
+        "file":  "CheeseBox_01_1k.fbx",
+        "bytes":  53132,
+        "sha256":  "A76B24D8A1B72BB1274C683D02A882B8BBB5AFFB814B6024391C86413CD75B42"
+    }
+]

@@ -1,0 +1,34 @@
+{
+  "name": "com.3d-group.unity-simple-localization",
+  "displayName": "3D Group - Localization",
+  "version": "1.0.0",
+  "unity": "2019.4",
+  "description": "Simple localization for Unity game engine.",
+  "keywords": [
+    "unity",
+    "unity3d",
+    "upm",
+    "3d-group",
+    "utility"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "2.0.0",
+    "com.unity.textmeshpro": "2.0.1"
+  },
+  "homepage": "https://github.com/3d-group/unity-simple-localization.git",
+  "bugs": {
+    "url": "https://github.com/3d-group/unity-simple-localization/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/3d-group/unity-simple-localization.git"
+  },
+  "license": "MIT",
+  "author": "3D Group (https://3d.fi)",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "publishConfig": {
+    "registry": "https://package.openupm.com"
+  }
+}

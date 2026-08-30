@@ -1,0 +1,32 @@
+{
+  "name": "com.kitbashery.3d-pixel-graphics-toolkit",
+  "version": "1.0.0",
+  "displayName": "3D Pixel Graphics Toolkit",
+  "description": "HDRP shader graphs for creating 3D pixel-style graphics.",
+  "unity": "2021.3",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://kitbashery.com/docs/3d-pixel-graphics-toolkit",
+  "changelogUrl": "https://github.com/Kitbashery/3D-Pixel-Graphics-Toolkit/commits/main",
+  "licensesUrl": "https://github.com/Kitbashery/3D-Pixel-Graphics-Toolkit/blob/main/LICENSE",
+  "keywords": [
+    "Pixel",
+    "Graphics",
+    "Shaders"
+  ],
+  "author": {
+    "name": "Kitbashery",
+    "email": "kitbashery@gmail.com",
+    "url": "https://www.kitbashery.com"
+  },
+  "type": "library",
+  "samples": [
+    {
+      "displayName": "Demo Scene(s)",
+      "description": "3D Pixel Graphics Toolkit Demo scene(s).",
+      "path": "Samples~/Demo"
+    }
+  ],
+  "publishConfig": {
+    "registry": "https://package.openupm.com"
+  }
+}

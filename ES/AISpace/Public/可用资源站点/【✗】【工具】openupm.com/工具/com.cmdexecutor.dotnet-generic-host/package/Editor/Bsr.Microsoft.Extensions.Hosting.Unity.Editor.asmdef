@@ -1,0 +1,18 @@
+{
+    "name": "Bsr.Microsoft.Extensions.Hosting.Unity.Editor",
+    "rootNamespace": "Microsoft.Extensions.Hosting.Unity",
+    "references": [
+        "GUID:f02d2e96a369c224ba36e2b6953983a3"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

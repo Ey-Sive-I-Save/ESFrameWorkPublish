@@ -1,0 +1,18 @@
+{
+    "name": "Unity.com.3d-group.unity-simple-localization.Editor",
+    "references": [
+        "Unity.com.3d-group.unity-simple-localization",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

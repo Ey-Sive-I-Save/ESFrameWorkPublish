@@ -1,0 +1,52 @@
+﻿[
+    {
+        "file":  "texture_1.png",
+        "bytes":  270205,
+        "sha256":  "CB5165C9CFB3F5D36E38B33B9DB69CBC1A521ACE27E8890F53FD1D656D8C2731"
+    },
+    {
+        "file":  "texture_10.png",
+        "bytes":  247495,
+        "sha256":  "0C6072A94984DA43DF8C61C31C6B539D030ECBED031D6A48DA84BCBA55733D51"
+    },
+    {
+        "file":  "texture_2.png",
+        "bytes":  294951,
+        "sha256":  "F026E67C04B9ACFC96004825DF7E3B231B4996B2FEC071D34ABE7DAC3A7A742D"
+    },
+    {
+        "file":  "texture_3.png",
+        "bytes":  294879,
+        "sha256":  "6DF447256EAA6D78BE352FC7DA47E5A04737D7547AD1642ABF37F862C2620CDE"
+    },
+    {
+        "file":  "texture_4.png",
+        "bytes":  205019,
+        "sha256":  "9AC91C22CF24B311D7B3322C405D37A15AC0FDA5486D6C3EE074EFA6C632A4A8"
+    },
+    {
+        "file":  "texture_5.png",
+        "bytes":  228728,
+        "sha256":  "4A1419751E85C28AA48DD5B320CFAB39A246E5949E475B924D386A149BAEB16E"
+    },
+    {
+        "file":  "texture_6.png",
+        "bytes":  244013,
+        "sha256":  "E8EAB1A00193E93127F10866097A328245CCB3457D53644F6F296C7AB7BB716F"
+    },
+    {
+        "file":  "texture_7.png",
+        "bytes":  268589,
+        "sha256":  "9F5EA6E0AFE7030FBA7003F8BC7386F5AE15AEA223C88E4EC114D6C18E2C445F"
+    },
+    {
+        "file":  "texture_8.png",
+        "bytes":  846513,
+        "sha256":  "04C99030D39539E3F631B03A8C43B4F9F0489CDBD4E7C829097044680447BF2B"
+    },
+    {
+        "file":  "texture_9.png",
+        "bytes":  216061,
+        "sha256":  "2959A9D4B56C1108C5BDC1BAF69A9F58518A7637F7A12A80EADBA306D8B6FEC4"
+    }
+]

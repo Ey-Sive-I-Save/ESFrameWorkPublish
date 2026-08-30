@@ -1,0 +1,29 @@
+{
+  "site": "quaternius.com",
+  "displayName": "Quaternius",
+  "category": "3D",
+  "license": "CC0 (source pack attribution recorded in worker manifest)",
+  "sourcePage": "https://opengameart.org/content/lowpoly-nature-pack-vol-3",
+  "downloadMethod": "public OpenGameArt mirror; downloaded then extracted",
+  "downloadedBytes": 1220229,
+  "visibleBytes": 278552,
+  "fileCount": 10,
+  "hashVerified": 10,
+  "archivesRetained": false,
+  "zipFiles": 0,
+  "archiveCount": 0,
+  "extractedFilesVisible": true,
+  "samplePath": "模型",
+  "resources": [
+    {"name":"quaternius_01_Bush1.fbx","bytes":25932,"sha256":"15E4173BDBB371421C5B0A9BFC7F77599D8A99286234D967171FCE7CA0BB806B"},
+    {"name":"quaternius_02_Bush2.fbx","bytes":29292,"sha256":"072181D5B16468A00827C5F4D9EFB74197E1C58EF822FCC61E9F3EF025F7773D"},
+    {"name":"quaternius_03_Bush3.fbx","bytes":27212,"sha256":"A0015ED61A228889AEEE3E9CAA55B95AFF122A50D175614E42ED185FBB785223"},
+    {"name":"quaternius_04_Grass1.fbx","bytes":26396,"sha256":"F653A5F4FBEE0E6907A8DB65CDE4C795DB0713D4FC004E12694F331213ABBEE4"},
+    {"name":"quaternius_05_Grass2.fbx","bytes":28572,"sha256":"E9B0D9D58276F8D0FF64ED54F2370055DFFF699FBA404FE77F75BD0537C672CE"},
+    {"name":"quaternius_06_Grass3.fbx","bytes":28700,"sha256":"47F34E0C984EC0DBA6C7416320270CAC85DC82BD8A102E27799090FFAABBB0E4"},
+    {"name":"quaternius_07_Rock1.fbx","bytes":26060,"sha256":"1388B1E41CBC52D86E8D4033473BCDA5317A1FE0B2132B870B002BC36CE97C6C"},
+    {"name":"quaternius_08_Rock2.fbx","bytes":26156,"sha256":"8A4C889BB1043078B39C93175A20CBE15AC3A4CEFD1FD088FA73204C0533DE8F"},
+    {"name":"quaternius_09_Rock3.fbx","bytes":25964,"sha256":"A3C5EBB80EA702D8FB18E5B73E9EC26EF639064C588172B5B0639AD21C541F0B"},
+    {"name":"quaternius_10_Tree1.fbx","bytes":34268,"sha256":"F0C12EB2056E4F0A200C1C68202598B753960E1144DFD4541B49F3DF874831E2"}
+  ]
+}

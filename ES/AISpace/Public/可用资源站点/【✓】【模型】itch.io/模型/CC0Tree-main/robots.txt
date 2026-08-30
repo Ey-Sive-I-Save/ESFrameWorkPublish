@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://skywolfgamestudios.github.io/CC0Tree/sitemap.xml

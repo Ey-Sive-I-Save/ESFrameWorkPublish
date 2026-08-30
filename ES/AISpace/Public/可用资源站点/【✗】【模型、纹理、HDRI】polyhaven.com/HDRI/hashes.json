@@ -1,0 +1,52 @@
+﻿[
+    {
+        "file":  "aarfontein_dirt_road.png",
+        "bytes":  45752,
+        "sha256":  "2311CAECA3CCA163C7875704DF391D33DAA5867B9C889D565CF6841A1F428CC0"
+    },
+    {
+        "file":  "aarfontein_dusk.png",
+        "bytes":  51897,
+        "sha256":  "9A06E148C16B07D97AE7E90F17E193F169E6835BCBE7611129569DAE7A117FBB"
+    },
+    {
+        "file":  "abandoned_bakery.png",
+        "bytes":  67708,
+        "sha256":  "C1C7504BC088C063E239B2A15AD22B8264A9E38621D31BA1B15FA55590B895E3"
+    },
+    {
+        "file":  "abandoned_church.png",
+        "bytes":  60548,
+        "sha256":  "4D1794CE30BDD8EFA01C4B2DA4EA545CD6220EE82EC8C7A24F849C902980F25B"
+    },
+    {
+        "file":  "abandoned_construction.png",
+        "bytes":  62304,
+        "sha256":  "642BF9B198D3DBA8A152F8A9A16FEAE4545D0F6B84744071A440693AD96CD2F8"
+    },
+    {
+        "file":  "abandoned_factory_canteen_01.png",
+        "bytes":  53570,
+        "sha256":  "FB3E7A25517E2BABF7D4C926A1A7B6D658C3F6C413420134FE9DE84C4147E1F2"
+    },
+    {
+        "file":  "abandoned_factory_canteen_02.png",
+        "bytes":  59738,
+        "sha256":  "C148BF727135B2B9570B9AEA3F3B0374D2336960C101AEC9454D6FBA5F975B48"
+    },
+    {
+        "file":  "abandoned_greenhouse.png",
+        "bytes":  66127,
+        "sha256":  "72F64A6C5C95F4B8762ADAF0200FAFA4688EB34EA3D54F5F750D8CE79BF49CE1"
+    },
+    {
+        "file":  "abandoned_parking.png",
+        "bytes":  53229,
+        "sha256":  "86CF72730A1C5FCDD6EE11011AA849D09832AFE1CEFBC9BB06EA26883F783442"
+    },
+    {
+        "file":  "abandoned_slipway.png",
+        "bytes":  41980,
+        "sha256":  "91C514F6BCA0947C513F95F58090A48FA414ED31FBFF092C204602F63DE89E52"
+    }
+]

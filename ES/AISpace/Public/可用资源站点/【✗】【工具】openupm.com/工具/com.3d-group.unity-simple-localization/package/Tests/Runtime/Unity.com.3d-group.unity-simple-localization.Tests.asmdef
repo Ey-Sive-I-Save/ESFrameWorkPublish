@@ -1,0 +1,11 @@
+{
+  "name": "Unity.com.3d-group.unity-simple-localization.Tests",
+  "references": [
+    "Unity.com.3d-group.unity-simple-localization"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": []
+}

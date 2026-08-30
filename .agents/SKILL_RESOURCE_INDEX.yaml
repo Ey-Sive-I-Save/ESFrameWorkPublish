@@ -71,6 +71,8 @@ currentSkills:
   - {name: es-publish-aitest-prompt, family: project-test, routeKeys: [estest, prompt, test], mcp: [unity-editor]}
   - {name: es-release-acceptance, family: project-release, routeKeys: [release, evidence, player, il2cpp], mcp: [unity-editor]}
   - {name: es-resource-pipeline, family: project-resource, routeKeys: [resource, manifest, provider], mcp: [unity-editor]}
+  - {name: es-resource-collection, family: project-resource, routeKeys: [resource, asset, collection, assetpackage, provenance], mcp: [none-required]}
+  - {name: es-resource-reader, family: project-resource, routeKeys: [resource, reader, projection, json, table, html, bytes], mcp: [none-required]}
   - {name: es-skill-creator, family: governance, routeKeys: [skill, creator, governance], mcp: [none-required]}
   - {name: es-static-deep-replay, family: governance, routeKeys: [static-replay, deep-replay, deterministic, hash, cache-invalidation, evidence], mcp: [none-required]}
   - {name: es-skill-governance, family: governance, routeKeys: [skill, governance, evidence, skill-performance, execution-cost, fast-path, deep-path, cache], mcp: [none-required]}

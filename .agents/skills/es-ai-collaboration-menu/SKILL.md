@@ -73,6 +73,13 @@ The `ai-mechanism-atlas` submenu is a read-only guide. It may explain trigger ph
 route to a Skill, or describe evidence and permission boundaries, but it never executes
 the described capability. Its entries are defined in `references/menu-submenus.json`.
 
+When the user selects `create-content` → `create-resource`, expose the dedicated
+`resource-collection` submenu before routing. It is the authoritative user-facing
+feature set for `es-resource-collection`: search/candidate queue, download/extract
+verification, read-only preview, site/type layout, deduplication and fuzzy comparison,
+child-agent coordination, and site registration/removal. These entries are choices
+only; they do not grant network, file-write, process, or deletion permission.
+
 Every visible sequence number uses the full-width bracket form `【n】`. This applies
 to both the main menu and the coordination submenu; numeric replies remain choices,
 never direct execution commands.

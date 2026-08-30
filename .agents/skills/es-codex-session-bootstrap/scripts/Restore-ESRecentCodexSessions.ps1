@@ -206,6 +206,9 @@ if (-not $DryRun) {
             SessionId = $candidate.sessionId
             ResponsibilityKey = $candidate.responsibilityKey
             TerminalMode = 'ProjectWindow'
+            # Recent-session recovery must not be blocked by project hook delivery.
+            # This only affects the launched Codex process; hook configuration remains unchanged.
+            SkipHooks = $true
             TaskPrompt = 'Restore this exact recent ESFramework session. Recheck the immutable launch envelope, current branch, HEAD, worktree, rules, and evidence before continuing. Do not assume old evidence remains valid.'
         }
         if (-not [string]::IsNullOrWhiteSpace($candidate.tabTitle)) { $arguments.TabTitle = $candidate.tabTitle }

@@ -67,6 +67,10 @@ External process boundary: any session transition that launches a helper uses an
 
 Plan files for bounded multi-launch may come only from the project root or the approved system Temp root; all other absolute paths and traversal forms are rejected before reading.
 
+## Temporary task versus formal handoff
+
+Temporary responsibility prompts and their short-lived project task documents are not formal handoffs or history archives. When a project-relative task document is needed for a receiving window, place it under `ES/AISpace/Local/CodexSessionTasks/<YYYYMMDD>/<responsibility>/` and label it `temporary-task`, not `handoff`. Formal handoff history remains under `ES/AI协作历程（Codex）/` and immutable private snapshots remain under the external Codex session state root. Never create a domain-specific AISpace category merely to emulate session transfer, and never claim a queued mailbox message was accepted until `acceptedByRecordId`/`contextAccepted` evidence exists.
+
 ## Static acceptance
 
 Run the Skill-local `scripts/Test-es-codex-session-bootstrap-StaticReplay.ps1`

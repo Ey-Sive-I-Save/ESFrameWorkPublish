@@ -9,7 +9,7 @@
         {"id":"create-editor","label":"Editor / Window","routeKey":"editor","relatedSkills":["es-editor-tooling","es-editor-availability-validator"]},
         {"id":"create-ui","label":"UI / Screen","routeKey":"ui-automation","relatedSkills":["es-ui-intent-authoring","es-ui-prefab-authoring"]},
         {"id":"create-shader","label":"Shader / Material","routeKey":"shader","relatedSkills":["es-editor-tooling","es-unity-compile"]},
-        {"id":"create-resource","label":"Resource / Asset","routeKey":"resource","relatedSkills":["es-resource-pipeline","es-resource-publish-audit"]}
+        {"id":"create-resource","label":"Resource / Asset","routeKey":"resource","relatedSkills":["es-resource-collection","es-resource-pipeline","es-resource-publish-audit"],"submenuRef":"references/menu-submenus.json","submenuKey":"resource-collection"}
       ]
     },
     "iterate-feature": {
@@ -62,6 +62,18 @@
         {"id":"atlas-evidence","label":"证据等级与未证实项","routeKey":"evidence-boundary","relatedSkills":["es-ai-interaction-governance","es-release-acceptance"]},
         {"id":"atlas-mechanisms","label":"公开 Agent 机制适配","routeKey":"agent-mechanism-replication","relatedSkills":["es-agent-mechanism-replication","es-first-principles-analysis"]},
         {"id":"atlas-route-help","label":"按目标选择入口","routeKey":"routing","relatedSkills":["es-aibrain-route-authoring","es-knowledge-validator"]}
+      ]
+    },
+    "resource-collection": {
+      "submenuId":"es-menu-resource-collection.v1",
+      "options":[
+        {"id":"resource-search","label":"搜索与候选队列","routeKey":"resource-search","relatedSkills":["es-resource-collection"]},
+        {"id":"resource-download","label":"下载与解压验收","routeKey":"resource-download","relatedSkills":["es-resource-collection"]},
+        {"id":"resource-preview","label":"预览候选（默认只读）","routeKey":"resource-preview","relatedSkills":["es-resource-collection"]},
+        {"id":"resource-layout","label":"站点目录与类型排布","routeKey":"resource-layout","relatedSkills":["es-resource-collection","es-ai-space-organization"]},
+        {"id":"resource-compare","label":"收集、去重与模糊比对","routeKey":"resource-compare","relatedSkills":["es-resource-collection","es-resource-reader"]},
+        {"id":"resource-child-agents","label":"子 Agent 下载协作","routeKey":"resource-child-agents","relatedSkills":["es-resource-collection","es-automation-worker-authoring"]},
+        {"id":"resource-sites","label":"站点探索、注册与移除","routeKey":"resource-sites","relatedSkills":["es-resource-collection","es-resource-publish-audit"]}
       ]
     }
   }

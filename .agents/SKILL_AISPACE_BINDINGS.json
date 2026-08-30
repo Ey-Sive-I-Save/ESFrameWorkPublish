@@ -34,6 +34,27 @@
   ],
   "skills": [
     {
+      "skillName": "es-ai-abc-core",
+      "skillContractRef": ".agents/skills/es-ai-abc-core/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-ai-abc-core.public-resource-audit-index",
+          "purpose": "ABCD 生成候选、资源预算和权威来源的协作索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/abc-generation-resource-audit/<YYYYMMDD>/",
+          "contentAuthority": "abc-generation-contracts",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "candidate-index",
+            "budget-index",
+            "provenance"
+          ],
+          "retention": "versioned",
+          "writePolicy": "explicit-project-write"
+        }
+      ]
+    },
+    {
       "skillName": "es-ai-space-organization",
       "skillContractRef": ".agents/skills/es-ai-space-organization/governance.json",
       "bindings": [
@@ -110,6 +131,78 @@
       ]
     },
     {
+      "skillName": "es-game-logic-content-development",
+      "skillContractRef": ".agents/skills/es-game-logic-content-development/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-game-logic-content-development.public-index",
+          "purpose": "游戏逻辑内容开发方案与证据索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/game-logic-content/<YYYYMMDD>/<topic-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "content-plan",
+            "evidence",
+            "receipt"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        },
+        {
+          "bindingId": "aispace.es-game-logic-content-development.private-temp",
+          "purpose": "游戏逻辑内容开发临时回放和诊断",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/game-logic-content/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "cache",
+            "replay",
+            "scratch"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-game-logic-system-development",
+      "skillContractRef": ".agents/skills/es-game-logic-system-development/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-game-logic-system-development.public-index",
+          "purpose": "游戏逻辑系统开发方案与证据索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/game-logic-system/<YYYYMMDD>/<topic-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "evidence",
+            "plan",
+            "receipt"
+          ],
+          "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        },
+        {
+          "bindingId": "aispace.es-game-logic-system-development.private-temp",
+          "purpose": "游戏逻辑系统开发临时回放和诊断",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/game-logic-system/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "skill-governance",
+          "lifecycle": "disposable",
+          "artifactKinds": [
+            "cache",
+            "replay",
+            "scratch"
+          ],
+          "retention": "task-scoped",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
       "skillName": "es-generate-agent-artifacts",
       "skillContractRef": ".agents/skills/es-generate-agent-artifacts/governance.json",
       "bindings": [
@@ -162,6 +255,44 @@
           ],
           "retention": "versioned",
           "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-resource-collection",
+      "skillContractRef": ".agents/skills/es-resource-collection/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-resource-collection.public-index",
+          "purpose": "资源收集快照与AssetPackage聚合索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+          "contentAuthority": "resource-collection-contract",
+          "lifecycle": "retained-index",
+          "artifactKinds": [
+            "aggregation-index",
+            "collection-snapshot",
+            "provenance"
+          ],
+          "retention": "versioned",
+          "writePolicy": "explicit-project-write"
+        }
+      ]
+    },
+    {
+      "skillName": "es-resource-reader",
+      "skillContractRef": ".agents/skills/es-resource-reader/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-resource-reader.public-index",
+          "purpose": "资源解析器路由与ProjectionPacket索引",
+          "storageClass": "public-index",
+          "pathTemplate": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+          "contentAuthority": "resource-reader-route-manifest",
+          "lifecycle": "retained-index",
+          "artifactKinds": ["parser-route", "projection-index", "reader-evidence"],
+          "retention": "versioned",
+          "writePolicy": "explicit-project-write"
         }
       ]
     },
@@ -352,23 +483,6 @@
       ]
     },
     {
-      "skillName": "es-ai-abc-core",
-      "skillContractRef": ".agents/skills/es-ai-abc-core/governance.json",
-      "bindings": [
-        {
-          "bindingId": "aispace.es-ai-abc-core.public-resource-audit-index",
-          "purpose": "ABCD 生成候选、资源预算和权威来源的协作索引",
-          "storageClass": "public-index",
-          "pathTemplate": "ES/AISpace/Public/abc-generation-resource-audit/<YYYYMMDD>/",
-          "contentAuthority": "abc-generation-contracts",
-          "lifecycle": "retained-index",
-          "artifactKinds": ["candidate-index", "budget-index", "provenance"],
-          "retention": "versioned",
-          "writePolicy": "explicit-project-write"
-        }
-      ]
-    },
-    {
       "skillName": "es-web-ui-generation-orchestration",
       "skillContractRef": ".agents/skills/es-web-ui-generation-orchestration/governance.json",
       "bindings": [
@@ -387,18 +501,35 @@
             "runtime-receipt",
             "visual-baseline",
             "pixel-comparison",
-              "performance-probe",
-              "performance-baseline",
-              "cache-policy",
-              "dynamic-state-replay",
-              "backend-contract",
-              "local-adapter-receipt",
-              "static-signals-receipt",
-              "artifact-integrity-receipt",
-              "staging-readiness-receipt"
-              ,"design-tokens"
+            "performance-probe",
+            "performance-baseline",
+            "cache-policy",
+            "dynamic-state-replay",
+            "backend-contract",
+            "local-adapter-receipt",
+            "static-signals-receipt",
+            "artifact-integrity-receipt",
+            "staging-readiness-receipt",
+            "design-tokens"
           ],
           "retention": "versioned",
+          "writePolicy": "user-directed-only"
+        }
+      ]
+    },
+    {
+      "skillName": "es-game-core-loop-validation",
+      "skillContractRef": ".agents/skills/es-game-core-loop-validation/governance.json",
+      "bindings": [
+        {
+          "bindingId": "aispace.es-game-core-loop-validation.private-temp",
+          "purpose": "核心循环验证矩阵与静态回放任务证据暂存",
+          "storageClass": "private-temp",
+          "pathTemplate": "ES/AISpace/Local/Cache/<YYYYMMDD>/<agent-or-task>/",
+          "contentAuthority": "game-core-loop-validation",
+          "lifecycle": "disposable",
+          "artifactKinds": ["evidence-matrix", "static-replay-receipt", "innovation-run-receipt"],
+          "retention": "task-scoped",
           "writePolicy": "user-directed-only"
         }
       ]

@@ -10,7 +10,7 @@ registryManifest: .agents/SKILL_REGISTRY.manifest.json
 registrationRule: Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.
 hashRule: skillHash covers SKILL.md and governanceHash covers governance.json; lastModifiedUtc changes only when the generated
   catalog record projection changes. Other Skill resources are outside this hash projection.
-generatedAtUtc: '2026-08-30T00:49:31Z'
+generatedAtUtc: '2026-08-30T14:32:54Z'
 skills:
   es-adversarial-review:
     name: es-adversarial-review
@@ -115,9 +115,9 @@ skills:
     owner: ESFramework AI architecture maintainers
     acceptanceOwner: ESFramework governance owner
     firstRegisteredUtc: '2026-08-27T15:46:15Z'
-    lastModifiedUtc: '2026-08-29T17:57:47Z'
+    lastModifiedUtc: '2026-08-30T07:44:34Z'
     lastReviewedUtc: '2026-08-27T15:46:15Z'
-    skillHash: f423874bdc267eb787bda51055cfd0c0029a652ebc732408a9f475ed2fb7a239
+    skillHash: 9dc83d387ae13bdf29c1493f7a4f9b14bb463b46b804a6ec84a12f24eb7ce8e6
     governanceHash: 5ad446b5ed25914982649499657c7614d395b1a801078c3ab6bdc48875d400c3
     statusNote: Initial catalog registration
   es-ai-collaboration-menu:
@@ -150,9 +150,9 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-24T18:42:24Z'
-    lastModifiedUtc: '2026-08-30T02:37:27Z'
+    lastModifiedUtc: '2026-08-30T14:25:21Z'
     lastReviewedUtc: '2026-08-24T18:42:24Z'
-    skillHash: acdd20bec8221f49f4e216eb02c6113a075edcf1f26b0dd9570815e78116677a
+    skillHash: 0e7c44fbbc90fe707668ef61979b7b05efd8e180e72467fdc005fb2eaf77ff3c
     governanceHash: f9001d6a521844c868c121e259cf0884f0892ae8d6d915a7969a1fc84b10f4b3
     statusNote: Initial catalog registration
   es-ai-interaction-governance:
@@ -261,10 +261,10 @@ skills:
     owner: ESFramework AI governance maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-27T13:36:39Z'
-    lastModifiedUtc: '2026-08-29T17:45:58Z'
+    lastModifiedUtc: '2026-08-30T07:44:34Z'
     lastReviewedUtc: '2026-08-27T13:36:39Z'
-    skillHash: cc54d935acf4af513524460e690350ed3b0462e8f6c9f29ffce6264c2d776604
-    governanceHash: 394df7a24d4dcb5b1c8e54fde82289ee0cbbe11fdd9cb5b2a7186d0d5e9fad5d
+    skillHash: 363ba1ebe42361a53ae4dbd1cea7064e0163162737a1e41fedad59a0f822aed9
+    governanceHash: 954c1d85d59dd09e08b4e5ac6f78aaef2104b02fbcfcdd8c8302e4b8241ad986
     statusNote: Initial catalog registration
   es-aibrain-route-authoring:
     name: es-aibrain-route-authoring
@@ -475,9 +475,9 @@ skills:
     owner: ESFramework es-codex-session-bootstrap maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-29T05:07:22Z'
+    lastModifiedUtc: '2026-08-30T09:20:31Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: 280a835617e8216f1a0192f3f46aeecb6c9426cf74dd62fafed62910704a189e
+    skillHash: f05401bf432b887f7a1898c07a5cfc5b5846e20e1fc534eeee55ee798b45f452
     governanceHash: dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd
     statusNote: Catalog hashes synchronized after session-bootstrap governance update
   es-command-authoring:
@@ -763,6 +763,98 @@ skills:
     lastReviewedUtc: '2026-08-22T01:05:22Z'
     skillHash: e9dc9c6daa8749254908c0cfc08854ae81950fe2652260085d9bd9abe5525114
     governanceHash: 5e7f8e8457edaa4d848552f086f5bedada91ebb99910a9700ce7f1eba1c327b7
+    statusNote: Initial catalog registration
+  es-game-core-loop-validation:
+    name: es-game-core-loop-validation
+    displayName: es-game-core-loop-validation
+    skillPath: .agents/skills/es-game-core-loop-validation
+    family: unclassified
+    routeKeys:
+    - game-logic
+    - playable-loop
+    - acceptance
+    - evidence
+    - runtime
+    - performance
+    - abcd
+    - ai-abc
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S2
+    riskClass: game-core-loop-evidence
+    owner: ESFramework engineering maintainers
+    acceptanceOwner: designated engineering owner
+    firstRegisteredUtc: '2026-08-30T08:58:31Z'
+    lastModifiedUtc: '2026-08-30T14:14:47Z'
+    lastReviewedUtc: '2026-08-30T08:58:31Z'
+    skillHash: 93d8ef30f39f965ad9e4a162dff1855a3f5deb62d071075e66066b3ee5e3b3d1
+    governanceHash: 4db974864461a8dc2c92f157feab3278c195209cb520be0c816c73fdd005468f
+    statusNote: Initial catalog registration
+  es-game-logic-content-development:
+    name: es-game-logic-content-development
+    displayName: es-game-logic-content-development
+    skillPath: .agents/skills/es-game-logic-content-development
+    family: unclassified
+    routeKeys:
+    - game-logic
+    - content-development
+    - gameplay-content
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework gameplay content maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-30T08:51:25Z'
+    lastModifiedUtc: '2026-08-30T09:20:31Z'
+    lastReviewedUtc: '2026-08-30T08:51:25Z'
+    skillHash: b944922b36617804857ce4712732e747a4fc2f1cbcbe7eed0efd1737395ac931
+    governanceHash: 53a5591c26e0b42154bda4e0c8dfb285394cb6894de794ff2139c08f44b525be
+    statusNote: Initial catalog registration
+  es-game-logic-system-development:
+    name: es-game-logic-system-development
+    displayName: es-game-logic-system-development
+    skillPath: .agents/skills/es-game-logic-system-development
+    family: unclassified
+    routeKeys:
+    - game-logic
+    - system-development
+    - runtime-integration
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework game logic maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-30T08:51:25Z'
+    lastModifiedUtc: '2026-08-30T09:20:31Z'
+    lastReviewedUtc: '2026-08-30T08:51:25Z'
+    skillHash: 49ceefb3a501fa99b9d156131bae857061179336ca7437fe262716c7e42a53d5
+    governanceHash: 6b51b601d5d7f83c3c2559f037b6587b0cb47273dc712c35d6fade4c9c742fbd
     statusNote: Initial catalog registration
   es-gamecore-config-authoring:
     name: es-gamecore-config-authoring
@@ -1262,6 +1354,37 @@ skills:
     skillHash: 67f7586f8aeef48a1df4043aedfe62c1d3f088087717205f6a958a6bfa6d13d9
     governanceHash: 0dad5398708caee52902bdcf098889725fad14ed4a1ef81079293adeafbe22f2
     statusNote: Initial catalog registration
+  es-resource-collection:
+    name: es-resource-collection
+    displayName: es-resource-collection
+    skillPath: .agents/skills/es-resource-collection
+    family: project-resource
+    routeKeys:
+    - resource
+    - asset
+    - collection
+    - assetpackage
+    - provenance
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Proposed
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework resource maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-30T07:44:34Z'
+    lastModifiedUtc: '2026-08-30T14:32:54Z'
+    lastReviewedUtc: '2026-08-30T07:44:34Z'
+    skillHash: 8d68d31b686c07f85257a0b253d8f88273f733228dbcde24ca8e6f7eb2ca6cce
+    governanceHash: 326120d6ace0001336720c483b46be82f5f617f9495a5ef41c229bcffa390f0d
+    statusNote: Initial catalog registration
   es-resource-pipeline:
     name: es-resource-pipeline
     displayName: es-resource-pipeline
@@ -1322,6 +1445,39 @@ skills:
     skillHash: 855c63ad73c0441ab2026e2444ded934fb770c679c65bc448d8ef7c9288d24dd
     governanceHash: 516e5f265faca986c94c1e9883116a211d28cfb24cdbe3bc95936b1baa8808f8
     statusNote: Initial catalog registration
+  es-resource-reader:
+    name: es-resource-reader
+    displayName: es-resource-reader
+    skillPath: .agents/skills/es-resource-reader
+    family: project-resource
+    routeKeys:
+    - resource
+    - reader
+    - projection
+    - json
+    - table
+    - html
+    - bytes
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Proposed
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: not-proven
+    reviewRequired: true
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework resource maintainers
+    acceptanceOwner: current task requester
+    firstRegisteredUtc: '2026-08-30T09:20:31Z'
+    lastModifiedUtc: '2026-08-30T14:14:47Z'
+    lastReviewedUtc: '2026-08-30T09:20:31Z'
+    skillHash: a32032367e9d241bd9f7c8ec3972b76249797ac6e116b86fb50fb4de12565b40
+    governanceHash: df81d5b232c211afcfeec025a27f8e3cb7871fa61824398792ea7f3e254e2df9
+    statusNote: Initial catalog registration
   es-security-input-audit:
     name: es-security-input-audit
     displayName: es-security-input-audit
@@ -1379,9 +1535,9 @@ skills:
     owner: ESFramework Skill maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-29T11:22:18Z'
+    lastModifiedUtc: '2026-08-30T07:44:34Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: cdb87f354449b64c01da45ab77806431d94160e0323fc78b35a9ab635768a1b7
+    skillHash: 81f99e118fc22a45ed089fffd56991a8237e81001d2f6f074736815933563aaa
     governanceHash: c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1
     statusNote: Initial catalog registration
   es-skill-governance:
@@ -1954,9 +2110,9 @@ skills:
     owner: ESFramework WebPageStudio maintainers
     acceptanceOwner: WebPageStudio owner
     firstRegisteredUtc: '2026-08-29T17:45:58Z'
-    lastModifiedUtc: '2026-08-29T17:45:58Z'
+    lastModifiedUtc: '2026-08-30T14:14:47Z'
     lastReviewedUtc: '2026-08-29T17:45:58Z'
-    skillHash: 25ce172a06f72768161b5f5ac31560c54d1f83d6de06e53ef7ed30e06cda2242
+    skillHash: 5225feda018c1305fb827f4adf00c27964c6a2f81c7e15d10ae402004de9506e
     governanceHash: a53c46e73a12ceefa9d725f1329c66510438216c301535948e0a7f2a4d4d5c43
     statusNote: Initial catalog registration
   es-web-generation-round-02-focus:
@@ -1983,9 +2139,9 @@ skills:
     owner: ESFramework WebPageStudio maintainers
     acceptanceOwner: WebPageStudio owner
     firstRegisteredUtc: '2026-08-29T17:57:47Z'
-    lastModifiedUtc: '2026-08-29T17:57:47Z'
+    lastModifiedUtc: '2026-08-30T14:25:21Z'
     lastReviewedUtc: '2026-08-29T17:57:47Z'
-    skillHash: fa67282b0c3d89d576c96a22c0399124b0d7980bc211cb07ec83367a9bbdfa10
+    skillHash: bfca8b07d2bfc2b0b2a247d154a58faad7b338a75765045b4388b211666c93b4
     governanceHash: 866258f3c950b32a152570f5b73728e5a96affb5a2921031197ad1c5884c3480
     statusNote: Initial catalog registration
   es-web-generation-round-03-task-context:
@@ -2041,9 +2197,9 @@ skills:
     owner: ESFramework AIKnowledge maintainers
     acceptanceOwner: current task requester
     firstRegisteredUtc: '2026-08-29T18:10:48Z'
-    lastModifiedUtc: '2026-08-29T18:10:48Z'
+    lastModifiedUtc: '2026-08-30T07:44:34Z'
     lastReviewedUtc: '2026-08-29T18:10:48Z'
-    skillHash: 32f3867ead45d62da7ff8a9f8582332ccf4752b273fe87626e5d4b34d8675cfe
+    skillHash: 702c185149922f50fdaa339b61c4b6bcd070ab8b32ff25c9ebdf648eb81ea897
     governanceHash: fd28896e15ee02380a0605eb97293277350f9f640b5fb474075f42286f57a7bc
     statusNote: Initial catalog registration
   es-web-generation-round-05-capability-design:
@@ -2072,9 +2228,9 @@ skills:
     owner: ESFramework WebPageStudio maintainers
     acceptanceOwner: current task requester
     firstRegisteredUtc: '2026-08-29T18:17:41Z'
-    lastModifiedUtc: '2026-08-29T18:34:37Z'
+    lastModifiedUtc: '2026-08-30T14:22:06Z'
     lastReviewedUtc: '2026-08-29T18:17:41Z'
-    skillHash: 0f47aefb9711bd32feb83c748a1292b93eeda0af0c3b9ffc8bc0b7da5dd43d0c
+    skillHash: fc1f56ee7d6dd79cccf5ea639083c5a24a0f3b2168199399754bd7d3c013fed2
     governanceHash: 6694f1aecdd1f8ad33d61f6b1b2ef0b4771e67a52b66f162876706c1248badcf
     statusNote: Initial catalog registration
   es-web-generation-round-06-deep-design-html:
@@ -2102,9 +2258,9 @@ skills:
     owner: ESFramework WebPageStudio maintainers
     acceptanceOwner: current task requester
     firstRegisteredUtc: '2026-08-29T18:36:53Z'
-    lastModifiedUtc: '2026-08-30T00:49:31Z'
+    lastModifiedUtc: '2026-08-30T14:14:47Z'
     lastReviewedUtc: '2026-08-29T18:36:53Z'
-    skillHash: fb793e26ada65dd44f74157c666927374ecac5f92c8c4f65aca68df70dae4feb
+    skillHash: eec33eff053085235985c38fd55a1c292b70013d8d9f7b47ed6a37598767e8b9
     governanceHash: dabb473c1db4a03c693da8b4719610556c404c59bbc13d48efb0ecc4250b2851
     statusNote: Initial catalog registration
   es-web-ui-generation-orchestration:
@@ -2134,9 +2290,9 @@ skills:
     owner: ESFramework WebPageStudio maintainers
     acceptanceOwner: WebPageStudio owner
     firstRegisteredUtc: '2026-08-29T11:14:38Z'
-    lastModifiedUtc: '2026-08-29T17:45:58Z'
+    lastModifiedUtc: '2026-08-30T07:44:34Z'
     lastReviewedUtc: '2026-08-29T11:14:38Z'
-    skillHash: 9967add2dbd86181ea150b4f921367775e3b3c11a758b053753b4a8b11005cd9
+    skillHash: f93d600413ad100b1a04cfd9907c75ea4f83647beeb55cd8700b914691be49c4
     governanceHash: 639197ee2ff2b88117b1f72a9f68a79ecb20eaed06fef16694ae16be06705611
     statusNote: 'Draft registration: governance.json required before execution or acceptance'
   es-worktree-audit:

@@ -45,6 +45,7 @@
     "es-release-acceptance": ["发布验收", "Release验收", "构建发布证据"],
     "es-release-notes-evidence": ["发布说明证据", "版本说明编写", "发布记录核验"],
     "es-repository-discovery": ["仓库发现", "项目结构扫描", "代码库范围确认"],
+    "es-resource-collection": ["资源收集", "资源搜索下载", "资源站点下载", "资源候选队列", "资源预览整理"],
     "es-resource-pipeline": ["资源流水线", "资源加载链设计", "资源Provider接入"],
     "es-resource-publish-audit": ["资源发布审计", "资源发布包检查", "资源清单验收"],
     "es-security-input-audit": ["安全输入审计", "输入边界安全检查", "越权输入审查"],

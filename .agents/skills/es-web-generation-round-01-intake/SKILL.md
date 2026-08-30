@@ -7,7 +7,7 @@ description: Capture and freeze the raw WebPageStudio requirement, authorization
 
 ## Purpose
 
-Round 01 converts the user's current request into an immutable, traceable intake receipt. It does not interpret business design, select Knowledge, create FocusContext/TaskContext, invoke SubAgents, run ABCD, or generate artifacts. Its output is the only valid input to Round 02.
+Round 01 preserves the user's request and requires a real AI interpretation before it can be accepted. The AI must state the objective, goals, non-goals, interaction intent and acceptance signals; scripts only hash and persist that evidence. It does not select Knowledge, create FocusContext/TaskContext, invoke SubAgents, run ABCD, or generate artifacts.
 
 ## SmallTool controls
 
@@ -22,9 +22,9 @@ Read project `AGENTS.md`, `ES/AISpace/README.md`, and [`references/round-01-inta
 ## Workflow
 
 1. Preserve the exact user prompt and compute its strict UTF-8 SHA-256.
-2. Record explicit authorization, forbidden actions, target scope, unknowns, and acceptance signals. Never invent missing business intent.
-3. Write one `RequirementIntakeReceipt` using [`scripts/Invoke-ESWebRequirementIntake.ps1`](scripts/Invoke-ESWebRequirementIntake.ps1).
-4. Return `accepted` only when the raw prompt, input hash, scope and non-claims are present. Missing prompt or scope returns `blocked.round-01.missing-input`.
+2. The current AI must provide an interpretation artifact with objectiveBrief, userGoals, nonGoals, acceptanceSignals and interactionIntent; missing evidence leaves the receipt in `review` and blocks Round 02.
+3. Write one `RequirementIntakeReceipt` using [`scripts/Invoke-ESRound01Intake.ps1`](scripts/Invoke-ESRound01Intake.ps1).
+4. Return `accepted` only when the interpretation is present and complete. Missing interpretation returns `review`/`blocked.round-01.ai-interpretation-required`, never synthetic acceptance.
 5. Stop. Round 02 may begin only after reading this receipt; no automatic chaining is allowed.
 
 ## Return contract

@@ -14,6 +14,7 @@ Round 02 turns the immutable Round 01 intake into a single bounded focus. It res
 - Read only the accepted Round 01 receipt and the explicitly listed TaskFocus contract/module.
 - Write only the explicit Round 02 receipt path; reject missing intake, invalid hash, ambiguous focus, empty scope/signals, and revision conflicts.
 - Require an explicit confirm/reject decision; never auto-chain into TaskContext or downstream generation.
+- Require a separate current-AI evidence artifact (`AiEvidencePath`) containing analysis, execution, focus rationale, and a return receipt; the script's fixed prose is never accepted as AI work.
 
 ## Required reads
 

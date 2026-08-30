@@ -3,11 +3,11 @@
   "roundId": "web-generation-round-02",
   "stageId": "task-focus-lock",
   "authority": "current-user-direct + TaskFocusContext platform contract",
-  "requiredInput": "RequirementIntakeReceipt.status=accepted",
+  "requiredInput": "RequirementIntakeReceipt.status=accepted with aiInterpretation.objectiveBrief and acceptanceSignals",
   "mustPreserve": ["intakeHash", "raw requirement", "explicit authorization boundary"],
   "freezeFields": ["focusContextId", "focusRevision", "proposalHash", "focusScopeHash", "allowedScope", "forbiddenExpansion", "requiredReads", "acceptanceSignals"],
-  "forbiddenTransitions": ["unconfirmed -> TaskContext", "focus -> Knowledge without confirmation", "scope expansion", "silent focus replacement"],
-  "acceptanceSignals": ["confirmed status", "expected revision match", "proposal hash", "scope hash", "required reads and signals present"],
-  "failureCodes": ["blocked.round-02.missing-intake", "blocked.round-02.ambiguous-focus", "blocked.round-02.scope-expansion", "blocked.round-02.revision-conflict"],
+  "forbiddenTransitions": ["unconfirmed -> TaskContext", "focus -> Knowledge without confirmation", "scope expansion", "silent focus replacement", "script-authored AI analysis without AiEvidencePath"],
+  "acceptanceSignals": ["confirmed status", "expected revision match", "proposal hash", "scope hash", "required reads and signals present", "current AI evidence with focus rationale", "AI evidence intakeHash matches", "AI evidence focusStatement matches"],
+  "failureCodes": ["blocked.round-02.missing-intake", "blocked.round-02.ai-interpretation-required", "blocked.round-02.ai-evidence-required", "blocked.round-02.ai-evidence-missing", "blocked.round-02.ai-evidence-incomplete", "blocked.round-02.ai-evidence-intake-hash-mismatch", "blocked.round-02.ai-evidence-focus-mismatch", "blocked.round-02.synthetic-ai-evidence", "blocked.round-02.ambiguous-focus", "blocked.round-02.scope-expansion", "blocked.round-02.revision-conflict"],
   "nextRound": "web-generation-round-03-task-context"
 }

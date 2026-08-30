@@ -21,6 +21,8 @@ Read project `AGENTS.md`, `ES/AISpace/README.md`, the Round 02 FocusContext rece
 
 ## Workflow
 
+进入 TaskContext 创建前必须提供当前 AI 证据文件（`AiEvidencePath`），其中的 `taskId`、`focusProposalHash` 和 `focusScopeHash` 必须与本轮输入一致；脚本固定说明不能作为 AI 分析。
+
 1. Verify Round 02 is `accepted`, `status=accepted`, and contains FocusContext identity plus valid SHA-256 hashes.
 2. Verify GoalRevision and RoutePlan are immutable, project-relative, and match the requested task scope; do not synthesize a route or goal from a template.
 3. Bind the FocusContext identity (`focusContextId`, revision, proposal hash, scope hash) to `New-ESTaskContextTask`.

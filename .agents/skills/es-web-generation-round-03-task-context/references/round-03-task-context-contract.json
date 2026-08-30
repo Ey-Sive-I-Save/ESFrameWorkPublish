@@ -20,6 +20,7 @@
     "requestedSourceScope",
     "idempotencyKey"
   ],
+  "aiEvidence": {"required": true, "mustInclude": ["aiAnalysis", "execution", "taskContextRationale", "returnReceipt", "focusProposalHash", "focusScopeHash", "taskId"]},
   "frozenInvariants": [
     "taskId",
     "goalRevisionHash",
@@ -29,7 +30,8 @@
     "focusRevision",
     "focusProposalHash",
     "focusScopeHash",
-    "sourceScopeHash-after-VerifySources"
+    "sourceScopeHash-after-VerifySources",
+    "taskContextHash"
   ],
   "forbiddenTransitions": [
     "focus.pending-to-task",
@@ -50,7 +52,8 @@
     "blocked.round-03.invalid-focus-identity",
     "blocked.round-03.route-or-goal-mismatch",
     "blocked.round-03.scope-expansion",
-    "blocked.round-03.cas-conflict"
+    "blocked.round-03.cas-conflict",
+    "blocked.round-03.source-scope-hash-missing"
   ],
   "nextRound": "web-generation-round-04-knowledge-route"
 }

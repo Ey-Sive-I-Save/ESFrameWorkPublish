@@ -4,10 +4,10 @@
   "stageId": "knowledge-route",
   "authority": "Documentation/AIKnowledge + es-knowledge-validator",
   "requiredInput": {"recordType": "TaskContextCreationReceipt", "status": "accepted", "roundId": "web-generation-round-03"},
-  "requiredBindings": ["taskId", "taskRevision", "contextVersion", "taskContextHash", "selectedEntries"],
+  "requiredBindings": ["taskId", "taskRevision", "contextVersion", "taskContextHash", "sourceScopeHash", "selectedEntries"],
   "entryRequirements": ["KnowledgeId", "Authority", "RouteKeys", "ContentHash", "SourceRefs", "EvidenceLevel", "StaleWhen", "single-index-binding", "requiredReads-closure"],
-  "acceptanceSignals": ["minimal route", "all selected entries statically passed or partial-usable", "source closure current or explicitly stale", "route hash deterministic", "stale status explicit", "project-relative path and parsed usable content"],
-  "failureCodes": ["blocked.round-04.missing-task", "blocked.round-04.no-index-binding", "partial.round-04.content-hash-mismatch", "partial.round-04.source-drift", "blocked.round-04.unsafe-path", "blocked.round-04.route-overbreadth"],
+  "acceptanceSignals": ["minimum two complementary Knowledge entries", "usable content closure >= 1000 UTF-8 characters", "all selected entries statically passed or partial-usable", "source closure current or explicitly stale", "route hash deterministic", "stale status explicit", "project-relative path and parsed usable content", "current AI evidence with knowledgeRationale", "AI evidence taskContextHash/sourceScopeHash matches", "AI evidence entryPaths matches"],
+  "failureCodes": ["blocked.round-04.missing-task", "blocked.round-04.no-index-binding", "blocked.round-04.task-context-hash-missing", "blocked.round-04.knowledge-content-insufficient", "partial.round-04.content-hash-mismatch", "partial.round-04.source-drift", "blocked.round-04.unsafe-path", "blocked.round-04.route-coverage-insufficient"],
   "forbiddenTransitions": ["knowledge.write", "knowledge.stale-silent-refresh", "route-to-design", "route-to-generation"],
   "nextRound": "web-generation-round-05-capability-design"
 }

@@ -10,7 +10,8 @@ param(
     [Parameter(Mandatory=$true)][string]$IdempotencyKey,
     [string[]]$RequiredClaim = @(),
     [string]$OutputPath = 'ES/Output/WebPageStudio/bootstrap/round-03-task-context.json',
-    [string]$StoreRoot = 'ES/Output/TaskContextRuntime'
+    [string]$StoreRoot = 'ES/Output/TaskContextRuntime',
+    [string]$AiEvidencePath = ''
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).Path
@@ -30,7 +31,21 @@ function Resolve-ProjectRelative([string]$Path, [string]$Name) {
 }
 
 $focus = Read-StrictJson $FocusReceiptPath
+$aiEvidenceFull = if ([IO.Path]::IsPathRooted($AiEvidencePath)) { [IO.Path]::GetFullPath($AiEvidencePath) } elseif ($AiEvidencePath) { [IO.Path]::GetFullPath((Join-Path $projectRoot $AiEvidencePath)) } else { '' }
+if (-not $aiEvidenceFull -or -not $aiEvidenceFull.StartsWith($projectRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $aiEvidenceFull -PathType Leaf)) { throw 'blocked.round-03.ai-evidence-required' }
+$aiEvidence = Read-StrictJson $aiEvidenceFull
+if ([string]$aiEvidence.focusProposalHash -cne [string]$focus.proposalHash -or [string]$aiEvidence.focusScopeHash -cne [string]$focus.focusScopeHash) { throw 'blocked.round-03.ai-evidence-focus-hash-mismatch' }
+if ([string]$aiEvidence.taskId -cne [string]$TaskId) { throw 'blocked.round-03.ai-evidence-task-mismatch' }
+foreach ($field in @('aiAnalysis','execution','taskContextRationale','returnReceipt')) { if ($null -eq $aiEvidence.PSObject.Properties[$field] -or [string]::IsNullOrWhiteSpace([string]$aiEvidence.$field)) { throw "blocked.round-03.ai-evidence-incomplete:$field" } }
+if(([string]$aiEvidence.aiAnalysis).Trim().Length -lt 80 -or ([string]$aiEvidence.execution).Trim().Length -lt 40 -or ([string]$aiEvidence.taskContextRationale).Trim().Length -lt 80){throw 'blocked.round-03.ai-evidence-too-shallow'}
+if ([string]$aiEvidence.aiAnalysis -match '(?i)bind the confirmed FocusContext|preserve identity, scope') { throw 'blocked.round-03.synthetic-ai-evidence' }
 if ([string]$focus.recordType -cne 'FocusContextReceipt' -or [string]$focus.roundId -cne 'web-generation-round-02' -or [string]$focus.status -cne 'accepted') { throw 'blocked.round-03.missing-focus' }
+$intake = Read-StrictJson ([string]$focus.intakePath)
+if ($null -eq $intake.PSObject.Properties['aiInterpretation'] -or $null -eq $intake.aiInterpretation -or
+    [string]::IsNullOrWhiteSpace([string]$intake.aiInterpretation.objectiveBrief) -or
+    [string]::IsNullOrWhiteSpace([string]$intake.aiInterpretation.acceptanceSignals)) {
+    throw 'blocked.round-03.ai-interpretation-required'
+}
 $focusId = [string]$focus.focusContextId
 $focusRevision = [int]$focus.focusRevision
 $focusProposalHash = if ($focus.PSObject.Properties['focusProposalHash']) { [string]$focus.focusProposalHash } else { [string]$focus.proposalHash }
@@ -47,19 +62,23 @@ $state = New-ESTaskContextTask -ProjectRoot $projectRoot -StoreRoot $StoreRoot -
     -AcceptanceProfileId $AcceptanceProfileId -OutcomeEvaluatorId $OutcomeEvaluatorId -RequiredClaim $RequiredClaim `
     -FocusContextId $focusId -FocusRevision $focusRevision -FocusProposalHash $focusProposalHash -FocusScopeHash $focusScopeHash `
     -RequestedSourceScope $RequestedSourceScope -IdempotencyKey $IdempotencyKey
+$state = Confirm-ESTaskSourceScope -ProjectRoot $projectRoot -StoreRoot $StoreRoot -TaskId $state.taskId -ExpectedTaskRevision $state.taskRevision -ExpectedContextVersion $state.contextVersion -IdempotencyKey ($IdempotencyKey + '-source-verify')
 
 $outFull = [IO.Path]::GetFullPath((Join-Path $projectRoot $OutputPath))
+$scopeHash=[string]$state.verifiedSourceScopeHash
+if($scopeHash -notmatch '^[a-f0-9]{64}$'){throw 'blocked.round-03.source-scope-hash-missing'}
+$ctxBytes=[Text.Encoding]::UTF8.GetBytes((@([string]$state.taskId,[int]$state.taskRevision,[int]$state.contextVersion,[string]$state.goalRevisionHash,[string]$state.routePlan.routePlanHash,$scopeHash)|ConvertTo-Json -Compress));$taskContextHash=([BitConverter]::ToString(([Security.Cryptography.SHA256]::Create().ComputeHash($ctxBytes))).Replace('-','').ToLowerInvariant())
 $parent = Split-Path -Parent $outFull
 if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
 $receipt = [ordered]@{
     schemaVersion=1; recordType='TaskContextCreationReceipt'; roundId='web-generation-round-03'; stageId='task-context-create'; status='accepted'
     taskId=[string]$state.taskId; taskRevision=[int]$state.taskRevision; contextVersion=[int]$state.contextVersion
     focusContextId=$focusId; focusRevision=$focusRevision; focusProposalHash=$focusProposalHash; focusScopeHash=$focusScopeHash
-    goalRevisionHash=[string]$state.goalRevisionHash; routePlanHash=[string]$state.routePlan.routePlanHash; requestedSourceScope=@($state.requestedSourceScope); sourceScopeHash=[string]$state.verifiedSourceScopeHash
+    goalRevisionHash=[string]$state.goalRevisionHash; routePlanHash=[string]$state.routePlan.routePlanHash; requestedSourceScope=@($state.requestedSourceScope); sourceScopeHash=$scopeHash; taskContextHash=$taskContextHash
     acceptanceProfileId=$AcceptanceProfileId; outcomeEvaluatorId=$OutcomeEvaluatorId; idempotencyKey=$IdempotencyKey
-    aiAnalysis='Bind the confirmed FocusContext to one platform task; preserve identity, scope, route, goal, and CAS invariants.'
-    execution='Created TaskContextRuntime task through the platform API; no downstream stage was invoked.'
-    decision='accepted-for-knowledge-route'; returnReceipt=[ordered]@{taskId=[string]$state.taskId; taskRevision=[int]$state.taskRevision; contextVersion=[int]$state.contextVersion; nextRound='web-generation-round-04-knowledge-route'}
+    aiAnalysis=[string]$aiEvidence.aiAnalysis
+    execution=[string]$aiEvidence.execution
+    decision='accepted-for-knowledge-route'; returnReceipt=[ordered]@{taskId=[string]$state.taskId; taskRevision=[int]$state.taskRevision; contextVersion=[int]$state.contextVersion; aiReturn=$aiEvidence.returnReceipt; nextRound='web-generation-round-04-knowledge-route'}
     nonClaims=@('not Knowledge routed','not design or generation','not SubAgent or ABCD execution','not Unity/runtime/network/release')
 }
 $json = $receipt | ConvertTo-Json -Depth 30

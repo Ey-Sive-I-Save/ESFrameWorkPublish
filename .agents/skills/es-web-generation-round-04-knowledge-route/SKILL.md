@@ -21,6 +21,8 @@ Read project `AGENTS.md`, `ES/AISpace/README.md`, the Round 03 TaskContext recei
 
 ## Workflow
 
+Knowledge 路由必须消费当前 AI 证据（`AiEvidencePath`），并验证 `taskContextHash`、`sourceScopeHash` 与 `entryPaths`；不能使用其他任务或旧轮次的路由分析替代。
+
 1. Verify the TaskContext receipt is accepted and its task identity/hash fields are present.
 2. Select a bounded list of Knowledge entry paths/IDs from the index based on the frozen task focus; do not load the whole library.
 3. Run `Invoke-ESKnowledgeValidation.ps1 -Mode Entry` for each selected entry and preserve every finding.

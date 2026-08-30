@@ -323,6 +323,36 @@
       "produces": ["correction-cycle", "iteration-decision"],
       "failureConditions": ["round-budget-exhausted", "cas-stale", "verification-receipt-missing"],
       "depthReasonCode": "ROUTE.DEPTH_2.ABCD_ITERATION"
+    },
+    {
+      "stageContractId": "es.route-stage.web-provider-dispatch.v1",
+      "skillName": "es-web-ui-generation-orchestration",
+      "profiles": ["governance"],
+      "routeKeys": ["web-ui", "web-page-generation", "webpage-studio", "provider", "dispatch"],
+      "requires": ["goal-revision", "route-plan", "authorization"],
+      "produces": ["provider-operation-receipt"],
+      "failureConditions": ["provider-dispatch-not-authorized", "provider-operation-missing", "provider-response-missing"],
+      "depthReasonCode": ""
+    },
+    {
+      "stageContractId": "es.route-stage.web-response-normalize.v1",
+      "skillName": "es-web-generation-round-05-capability-design",
+      "profiles": ["governance"],
+      "routeKeys": ["web-ui", "web-page-generation", "webpage-studio", "candidate", "evidence"],
+      "requires": ["provider-operation-receipt", "candidate-set"],
+      "produces": ["web-model-response"],
+      "failureConditions": ["selected-candidate-missing", "web-design-evidence-missing", "response-hash-mismatch"],
+      "depthReasonCode": ""
+    },
+    {
+      "stageContractId": "es.route-stage.web-round06-materialization.v1",
+      "skillName": "es-web-generation-round-06-deep-design-html",
+      "profiles": ["governance"],
+      "routeKeys": ["web-ui", "web-page-generation", "webpage-studio", "round-06", "html"],
+      "requires": ["web-model-response", "abc-task-binding"],
+      "produces": ["ai-web-design-task", "revision-receipts", "static-artifact"],
+      "failureConditions": ["design-instantiation-missing", "ai-revision-missing", "artifact-integrity-failed"],
+      "depthReasonCode": ""
     }
   ]
 }

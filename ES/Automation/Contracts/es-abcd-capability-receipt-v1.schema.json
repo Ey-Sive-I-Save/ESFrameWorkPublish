@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/abcd/capability-receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "receiptId", "planHash", "runId", "capabilityId", "status", "inputHash", "resultHash", "capturedUtc", "runtimeStatus", "nonClaims"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/abcd/capability-receipt/v1" },
+    "receiptId": { "type": "string", "minLength": 1 },
+    "planHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "runId": { "type": "string", "minLength": 1 },
+    "capabilityId": { "type": "string", "minLength": 3 },
+    "status": { "enum": ["executed", "not-applicable", "review", "degraded", "blocked"] },
+    "inputHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "resultHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "capturedUtc": { "type": "string", "format": "date-time" },
+    "runtimeStatus": { "enum": ["runtime-not-run", "runtime-observed"] },
+    "nonClaims": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+  }
+}

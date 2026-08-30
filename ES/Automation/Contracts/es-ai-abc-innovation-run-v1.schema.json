@@ -7,7 +7,7 @@
     "tree-expansion", "global-convergence", "interaction-graph", "adaptive-weighting",
     "player-replay", "counterplay-audit", "complexity-prune", "candidate-tournament", "final-decision"
   ],
-  "requiredStageOutputs": ["stagePlan", "seedSelection", "divergenceTree", "convergenceHistory", "interactionGraph", "branchWeights", "weightHistory", "rejectedBranches", "finalDecision"],
+  "requiredStageOutputs": ["stagePlan", "seedSelection", "divergenceTree", "convergenceHistory", "interactionGraph", "branchWeights", "weightHistory", "rejectedBranches", "capabilityPlan", "capabilityEvidence", "finalDecision"],
   "resourceBudget": { "maxRounds": 24, "maxBranches": 256, "maxModelCalls": 128, "maxEvaluations": 512, "stageResourceBudgetsRequired": true, "stageUsageRequired": true, "weightAllocationRequired": true },
   "stageResourceBudgets": {
     "tree-expansion": { "purpose": "deep model branching and concrete player-scenario evaluation", "minimumModelCalls": 16, "minimumEvaluations": 32 },

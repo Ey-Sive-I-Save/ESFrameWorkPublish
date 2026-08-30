@@ -164,6 +164,24 @@
       "path": "Assets/Plugins/ES/Editor/ESAutomation/ESCodexAppServerAutomation.cs",
       "kind": "candidate-only",
       "requiredMarkers": ["ES 保留用户授权", "候选", "ESAutomationRunStatus.Completed"]
+    },
+    {
+      "id": "render-evidence-report",
+      "path": "Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceReport.cs",
+      "kind": "candidate-only",
+      "requiredMarkers": ["decisionStatus", "TryCreate", "ESRenderEvidenceBatchDecision"]
+    },
+    {
+      "id": "web-deep-design-generator",
+      "path": "ES/Automation/WebPageStudio/Invoke-ESWebPageStudioDeepDesign.ps1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["designStatus='accepted'", "runtimeStatus='runtime-not-run'", "nonClaims"]
+    },
+    {
+      "id": "web-preflight-generator",
+      "path": "ES/Automation/WebPageStudio/Invoke-ESWebPageStudioPreflight.ps1",
+      "kind": "candidate-only",
+      "requiredMarkers": ["P0_DESIGN_NOT_ACCEPTED", "promptPlan", "capabilityProfile"]
     }
   ]
 }

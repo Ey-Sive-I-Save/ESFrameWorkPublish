@@ -1,0 +1,35 @@
+{
+  "$id": "es://automation/contracts/camera/diagnostic-receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "frame",
+    "viewKey",
+    "sceneEpoch",
+    "activeRequestCount",
+    "hasWinner",
+    "winnerKind",
+    "winnerDefinitionKey",
+    "winnerOwnerName",
+    "scenePath",
+    "platform",
+    "buildId"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/camera/diagnostic-receipt/v1" },
+    "frame": { "type": "integer", "minimum": 0 },
+    "viewKey": { "type": "string", "minLength": 1 },
+    "sceneEpoch": { "type": "integer", "minimum": 1 },
+    "activeRequestCount": { "type": "integer", "minimum": 0 },
+    "hasWinner": { "type": "boolean" },
+    "winnerKind": { "enum": ["Base", "Shot", "Modifier"] },
+    "winnerDefinitionKey": { "type": "string" },
+    "winnerOwnerName": { "type": "string" },
+    "scenePath": { "type": "string" },
+    "platform": { "type": "string" },
+    "buildId": { "type": "string" }
+  }
+}

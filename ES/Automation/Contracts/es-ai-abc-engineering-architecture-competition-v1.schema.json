@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ES ABC Engineering Architecture Competition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "requiredAssessments": ["implementationBoundary", "lifecycleAssessment", "performanceAssessment", "networkAssessment", "debuggingAssessment", "editorProductionAssessment", "playerIncrementRegression", "innovationDifferentialAssessment", "counterfactualRegression"],
+  "requiredScores": ["technicalInnovationLevel", "safetyLevel", "baselinePlayerLevel", "playerIncrementDelta", "performanceLevel", "reusabilityLevel", "lifecycleLevel", "networkLevel", "debuggingLevel", "editorProductionLevel", "innovationDifferentialLevel"],
+  "scoreBands": {"0": -20, "1": 0, "2": 20, "3": 40, "4": 70, "5": 90},
+  "minimumGenerations": 3,
+  "minimumDirections": 5,
+  "completionRequiresImplementationEvidence": true,
+  "counterfactualGainRequired": true,
+  "generationParentReferencesRequired": true,
+  "counterfactualRegressionRounds": 3,
+  "counterfactualScoreFields": ["baselineScore", "candidateScore"],
+  "required": ["schemaVersion", "contractId", "minimumGenerations", "minimumDirections", "requiredAssessments", "requiredScores", "scoreBands", "completionRequiresImplementationEvidence"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "contractId": {"const": "es://automation/contracts/ai-abc/engineering-architecture-competition/v1"},
+    "minimumGenerations": {"const": 3},
+    "minimumDirections": {"type": "integer", "minimum": 5},
+    "requiredAssessments": {"type": "array", "minItems": 9, "uniqueItems": true, "items": {"type": "string"}},
+    "requiredScores": {"type": "array", "minItems": 10, "uniqueItems": true, "items": {"type": "string"}},
+    "scoreBands": {"type": "object", "additionalProperties": {"type": "number"}, "required": ["0", "1", "2", "3", "4", "5"]},
+    "completionRequiresImplementationEvidence": {"const": true},
+    "counterfactualGainRequired": {"const": true},
+    "generationParentReferencesRequired": {"const": true}
+  }
+}

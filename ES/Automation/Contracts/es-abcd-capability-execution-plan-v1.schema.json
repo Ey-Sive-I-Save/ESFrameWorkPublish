@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/abcd/capability-execution-plan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "planId", "runId", "mode", "sourceHash", "capabilityRefs", "planHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/abcd/capability-execution-plan/v1" },
+    "planId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "minLength": 1 },
+    "sourceHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "capabilityRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 3 } },
+    "planHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

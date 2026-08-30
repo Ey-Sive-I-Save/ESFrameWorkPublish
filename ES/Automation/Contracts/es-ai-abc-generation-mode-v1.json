@@ -101,6 +101,17 @@
       "minimumFocusSpread": 3,
       "minimumDirections": 5,
       "maximumDirections": 12,
+      "architectureCompetition": {
+        "required": true,
+        "minimumDirections": 5,
+        "minimumGenerations": 3,
+        "generationMustChange": true,
+        "fusionEvidenceRequiredAfterGeneration": 1,
+        "requiredAssessments": ["implementationBoundary", "lifecycleAssessment", "performanceAssessment", "networkAssessment", "debuggingAssessment", "editorProductionAssessment", "playerIncrementRegression"],
+        "paretoShortlistRange": [2, 3],
+        "rejectPredicate": "safetyLevel>=3 && playerIncrementRegression<2",
+        "scoreBands": { "0": -20, "1": 0, "2": 20, "3": 40, "4": 70, "5": 90 }
+      },
       "pruningPolicy": "retain-novelty-while-bounding-state-performance-and-authority-risk",
       "requiredAxes": ["state-machine-integrity", "ownership-lifecycle", "determinism", "performance-peak-budget", "failure-recovery", "reuse-surface", "breakthrough-novelty", "longevity", "counterplay"],
       "acceptanceProfile": "core-high-risk",

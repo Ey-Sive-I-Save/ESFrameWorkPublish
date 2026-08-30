@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/ai-web-model-response/v1",
+  "title": "ES AI Web Model Response Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recordType", "providerRunId", "responses"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "recordType": {"const": "AiWebDesignModelResponse"},
+    "providerRunId": {"type": "string", "minLength": 1},
+    "responses": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["phase", "generationMode", "round", "outputs"],
+        "properties": {
+          "phase": {"type": "string", "minLength": 1},
+          "generationMode": {"enum": ["creative-divergence", "engineering", "stable"]},
+          "round": {"type": "integer", "minimum": 0},
+          "outputs": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": true,
+              "required": ["aiAnalysis", "execution", "returnReceipt", "evidence"],
+              "properties": {
+                "aiAnalysis": {"type": "string", "minLength": 40},
+                "execution": {"type": "string", "minLength": 20},
+                "returnReceipt": {"type": "object", "minProperties": 1},
+                "evidence": {"type": "object", "minProperties": 1}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

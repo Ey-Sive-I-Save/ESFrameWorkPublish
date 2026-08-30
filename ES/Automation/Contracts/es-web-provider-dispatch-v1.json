@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/web-provider-dispatch/v1",
+  "title": "ES Web Provider Dispatch Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "objective", "generationMode", "acceptanceProfile", "context", "correlationId", "timeoutSeconds", "userDirected"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "contractId": {"const": "es://automation/contracts/web-provider-dispatch/v1"},
+    "objective": {"type": "string", "minLength": 1, "maxLength": 16000},
+    "generationMode": {"enum": ["creative-divergence", "engineering", "stable"]},
+    "acceptanceProfile": {"enum": ["shallow-fast", "full-depth", "core-high-risk"]},
+    "context": {"type": "string", "maxLength": 32000},
+    "correlationId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 1800},
+    "userDirected": {"const": true}
+  },
+  "executionBoundary": {
+    "writesProjectFiles": false,
+    "startsOnlyManagedAiWindow": true,
+    "requiresExactOperationReceipt": true,
+    "finalAuthority": "ABCD-and-TaskContext",
+    "nonClaims": ["not design acceptance", "not HTML/CSS/JS completion", "not runtime/network/release acceptance"]
+  },
+  "failureCodes": ["WEB_PROVIDER_USER_AUTH_REQUIRED", "WEB_PROVIDER_DISPATCH_REJECTED", "WEB_PROVIDER_OPERATION_RECEIPT_MISSING", "WEB_PROVIDER_RESPONSE_MISSING"]
+}

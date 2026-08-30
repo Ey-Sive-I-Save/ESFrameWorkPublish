@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ES ABC Engineering Competition Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "contractHash", "status", "completionEligible", "evidenceSummary", "generationCount", "generationHistory", "paretoShortlist", "winnerId", "runtimeStatus"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "contractId": {"const": "es://automation/contracts/ai-abc/engineering-architecture-competition/v1"},
+    "contractHash": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "status": {"enum": ["completed", "review-required", "blocked"]},
+    "completionEligible": {"type": "boolean"},
+    "evidenceSummary": {"type": "object", "required": ["eligibleCount", "implementationEvidenceVerifiedCount", "independentReplayVerifiedCount", "providerScoreComparisonStatus", "counterfactualPositiveCount", "generationImprovedCount", "generationNoIncrementCount", "contractHashBound"], "properties": {"eligibleCount": {"type": "integer", "minimum": 0}, "implementationEvidenceVerifiedCount": {"type": "integer", "minimum": 0}, "independentReplayVerifiedCount": {"type": "integer", "minimum": 0}, "providerScoreComparisonStatus": {"enum": ["stable", "drift-failed", "unverified"]}, "counterfactualPositiveCount": {"type": "integer", "minimum": 0}, "generationImprovedCount": {"type": "integer", "minimum": 0}, "generationNoIncrementCount": {"type": "integer", "minimum": 0}, "contractHashBound": {"const": true}}, "additionalProperties": false},
+    "generationCount": {"const": 3},
+    "generationHistory": {"type": "array", "minItems": 3},
+    "paretoShortlist": {"type": "array", "minItems": 2, "maxItems": 3},
+    "winnerId": {"type": "string", "minLength": 1},
+    "runtimeStatus": {"const": "runtime-not-run"}
+  }
+}

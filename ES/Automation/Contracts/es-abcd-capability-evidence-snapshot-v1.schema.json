@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ES ABCD Capability Evidence Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "format", "evidence", "evidenceHash", "savedUtc"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "es.abcd.capability-evidence.snapshot.v1" },
+    "evidence": { "type": "array", "minItems": 1 },
+    "evidenceHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "savedUtc": { "type": "string", "format": "date-time" }
+  }
+}

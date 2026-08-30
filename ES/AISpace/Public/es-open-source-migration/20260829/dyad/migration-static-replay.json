@@ -1,0 +1,195 @@
+{
+    "schemaVersion":  1,
+    "validator":  "es-static-deep-replay",
+    "evidenceContractId":  "es.skill-evidence-receipt",
+    "evidenceContractHash":  "9fbf168a71ff71c0b16d45ec8fdc18d7891a42b3c3f17638b28d3d3541b1f880",
+    "skillName":  "es-open-source-migration",
+    "case":  "StaticDeepReplay",
+    "status":  "passed",
+    "evidenceLevel":  "S1",
+    "receiptPath":  "ES/AISpace/Public/es-open-source-migration/dyad/migration-static-replay.json",
+    "sourceRefs":  [
+                       ".agents/skills/es-open-source-migration/agents/openai.yaml",
+                       ".agents/skills/es-open-source-migration/governance.json",
+                       ".agents/skills/es-open-source-migration/references/migration-map.schema.json",
+                       ".agents/skills/es-open-source-migration/references/static-replay-adapter.md",
+                       ".agents/skills/es-open-source-migration/scripts/Test-es-open-source-migration-StaticReplay.ps1",
+                       ".agents/skills/es-open-source-migration/SKILL.md",
+                       ".agents/skills/es-open-source-migration/static-replay.manifest.json",
+                       ".agents/skills/es-static-deep-replay/references/specialized-acceptance-registry.json",
+                       "ES/AISpace/Public/es-open-source-migration/dyad/source-inventory.json",
+                       "ES/AISpace/Public/es-open-source-migration/migration-map.json",
+                       "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json"
+                   ],
+    "sourceRefHashes":  {
+                            ".agents/skills/es-open-source-migration/agents/openai.yaml":  "eeaaf539a415dac832e20c7369b1a76e777c681a68b389bbe2951aacd6d20780",
+                            ".agents/skills/es-open-source-migration/governance.json":  "9eef14e1470af123596e1cd40037d22fea5d7947e762e213ec940241e905f7cd",
+                            ".agents/skills/es-open-source-migration/references/migration-map.schema.json":  "e2a2698ca0a51f52136997f29b008631679eae5385136e43908573481ffe1bb0",
+                            ".agents/skills/es-open-source-migration/references/static-replay-adapter.md":  "2af3f0e3e82b40f8c8fbe0e91b71bdf7c05cc3afd90db26d4bf10960c79c89ae",
+                            ".agents/skills/es-open-source-migration/scripts/Test-es-open-source-migration-StaticReplay.ps1":  "3e23138299e986e682dcc2103fa7e6180c619201c951053cb20b5020ff8889d4",
+                            ".agents/skills/es-open-source-migration/SKILL.md":  "f41b7c8a1b40f8a9433f8b5f1adf581ad82bf0eb095df0b08114e4ab55c6ce4c",
+                            ".agents/skills/es-open-source-migration/static-replay.manifest.json":  "f2d500e7de10960ad04a27cb88e085bfd2659cf39993006b4a0dd83ac4998767",
+                            ".agents/skills/es-static-deep-replay/references/specialized-acceptance-registry.json":  "1a37519aa95c8c7559c664522b40726ea175d027f83564d500f7db7cda8a5f52",
+                            "ES/AISpace/Public/es-open-source-migration/dyad/source-inventory.json":  "744ddc19c7b6c1de66760cc6e5baaa286b156f316e9f821ea33a956d660b106d",
+                            "ES/AISpace/Public/es-open-source-migration/migration-map.json":  "32dcab6a6085fc9788b726efa3679091535e3327b922bd89a8151ab53d7940fd",
+                            "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json":  "9fbf168a71ff71c0b16d45ec8fdc18d7891a42b3c3f17638b28d3d3541b1f880"
+                        },
+    "toolId":  "es-static-deep-replay",
+    "unityVersion":  "not-run",
+    "capturedUtc":  "2026-08-29T01:55:26.8001769Z",
+    "authorizationKind":  "read-only",
+    "planHash":  "8769750fe544b0e7010684498062954f9b0db849549f3efd4b106d4ef0243caf",
+    "profile":  "StaticReview",
+    "responsibilityProfile":  "engineering",
+    "responsibilityChecks":  [
+                                 "input-boundary",
+                                 "recovery-cache",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "staticStatus":  "static-passed",
+    "runtimeStatus":  "runtime-not-run",
+    "overallVerdict":  "StaticDeepReplayComplete",
+    "claimsNotProven":  [
+                            "network checkout",
+                            "Unity/editor behavior",
+                            "timing and process behavior",
+                            "Player/IL2CPP/release behavior"
+                        ],
+    "nextAction":  "Do not start Runtime unless the declared escalation is authorized.",
+    "cases":  [
+                  {
+                      "id":  "normal-input",
+                      "status":  "passed",
+                      "assertion":  "required Skill files and persistent map are present"
+                  },
+                  {
+                      "id":  "invalid-input",
+                      "status":  "passed",
+                      "assertion":  "missing or malformed source inputs are rejected"
+                  },
+                  {
+                      "id":  "denied-expansion",
+                      "status":  "passed",
+                      "assertion":  "protected target and external side effects remain denied"
+                  },
+                  {
+                      "id":  "repeat-idempotency",
+                      "status":  "passed",
+                      "assertion":  "same map revision yields stable output"
+                  },
+                  {
+                      "id":  "hash-change-cache-invalidation",
+                      "status":  "passed",
+                      "assertion":  "source or target drift marks mapping stale"
+                  },
+                  {
+                      "id":  "interruption-recovery",
+                      "status":  "passed",
+                      "assertion":  "interrupted batch preserves target and recovery state"
+                  },
+                  {
+                      "id":  "deterministic-output",
+                      "status":  "passed",
+                      "assertion":  "stable sorting and partitioning are declared"
+                  }
+              ],
+    "customCheckResults":  [
+                               {
+                                   "id":  "input-boundary",
+                                   "status":  "passed",
+                                   "detail":  "invalid and denied input boundaries are declared"
+                               },
+                               {
+                                   "id":  "recovery-cache",
+                                   "status":  "passed",
+                                   "detail":  "recovery and cache/hash behavior is declared"
+                               },
+                               {
+                                   "id":  "deterministic-replay",
+                                   "status":  "passed",
+                                   "detail":  "deterministic claim and source hashes exist"
+                               },
+                               {
+                                   "id":  "evidence-contract",
+                                   "status":  "passed",
+                                   "detail":  "Skill declares evidence/receipt/acceptance boundary"
+                               }
+                           ],
+    "specializedAcceptance":  [
+                                  {
+                                      "id":  "path-containment",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "mapping-schema",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "permission-denial",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "partition-determinism",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "recovery-state",
+                                      "status":  "passed"
+                                  }
+                              ],
+    "sourceHashes":  [
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/agents/openai.yaml",
+                             "sha256":  "eeaaf539a415dac832e20c7369b1a76e777c681a68b389bbe2951aacd6d20780"
+                         },
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/governance.json",
+                             "sha256":  "9eef14e1470af123596e1cd40037d22fea5d7947e762e213ec940241e905f7cd"
+                         },
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/references/migration-map.schema.json",
+                             "sha256":  "e2a2698ca0a51f52136997f29b008631679eae5385136e43908573481ffe1bb0"
+                         },
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/references/static-replay-adapter.md",
+                             "sha256":  "2af3f0e3e82b40f8c8fbe0e91b71bdf7c05cc3afd90db26d4bf10960c79c89ae"
+                         },
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/scripts/Test-es-open-source-migration-StaticReplay.ps1",
+                             "sha256":  "3e23138299e986e682dcc2103fa7e6180c619201c951053cb20b5020ff8889d4"
+                         },
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/SKILL.md",
+                             "sha256":  "f41b7c8a1b40f8a9433f8b5f1adf581ad82bf0eb095df0b08114e4ab55c6ce4c"
+                         },
+                         {
+                             "path":  ".agents/skills/es-open-source-migration/static-replay.manifest.json",
+                             "sha256":  "f2d500e7de10960ad04a27cb88e085bfd2659cf39993006b4a0dd83ac4998767"
+                         },
+                         {
+                             "path":  ".agents/skills/es-static-deep-replay/references/specialized-acceptance-registry.json",
+                             "sha256":  "1a37519aa95c8c7559c664522b40726ea175d027f83564d500f7db7cda8a5f52"
+                         },
+                         {
+                             "path":  "ES/AISpace/Public/es-open-source-migration/dyad/source-inventory.json",
+                             "sha256":  "744ddc19c7b6c1de66760cc6e5baaa286b156f316e9f821ea33a956d660b106d"
+                         },
+                         {
+                             "path":  "ES/AISpace/Public/es-open-source-migration/migration-map.json",
+                             "sha256":  "32dcab6a6085fc9788b726efa3679091535e3327b922bd89a8151ab53d7940fd"
+                         },
+                         {
+                             "path":  "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json",
+                             "sha256":  "9fbf168a71ff71c0b16d45ec8fdc18d7891a42b3c3f17638b28d3d3541b1f880"
+                         }
+                     ],
+    "issues":  [
+
+               ],
+    "runtimeEscalation":  {
+                              "required":  false,
+                              "reason":  "External checkout and Unity behavior require separate explicit authorization."
+                          },
+    "generatedUtc":  "2026-08-29T01:55:26.8001769Z"
+}

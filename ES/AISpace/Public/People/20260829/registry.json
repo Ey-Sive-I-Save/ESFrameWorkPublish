@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-public-people-registry",
+  "entryPattern": "People/*/registration.json",
+  "visibility": "public-registration-only",
+  "privateDataPolicy": "gitignored-or-external",
+  "taskContract": "ES/Automation/Contracts/es-userspace-profile-v1.json",
+  "requestSchema": "ES/Automation/UserSpace/es-userspace-request-v1.schema.json",
+  "registrationSchema": "ES/Automation/UserSpace/es-user-registration-v1.schema.json",
+  "ownershipTransferSchema": "ES/Automation/UserSpace/es-ownership-transfer-v1.schema.json",
+  "runRecordSchema": "ES/Automation/UserSpace/es-userspace-run-record-v1.schema.json",
+  "aiCommandId": "userspace.profile.manage",
+  "discoveryCommand": "ES/Automation/UserSpace/Invoke-ESUserSpace.ps1 -Action Discover",
+  "validationCommand": "ES/Automation/UserSpace/Invoke-ESUserSpace.ps1 -Action Validate"
+}

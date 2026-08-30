@@ -1,0 +1,103 @@
+schemaVersion: 1
+spaceId: es.aisspace.public.webpagestudio.v1
+status: designed
+authority: ES/AISpace/Public/WebPageStudio
+contract: ES/Automation/Contracts/es-web-page-generation-v1.schema.json
+knowledge: Documentation/AIKnowledge/entries/web-page-generation-contracts.md
+capabilities:
+  - id: intent
+    label: 页面意图与信息架构
+    owner: Documentation/AIKnowledge
+    state: implemented
+    runtime: false
+  - id: visual-design
+    label: 高端视觉、科技感与 Design Token
+    owner: Documentation/AIKnowledge
+    state: design-rules-available
+    runtime: false
+  - id: static-html-css
+    label: 静态 HTML/CSS 生成
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: false
+    evidence:
+      quality: ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      accessibility: ES/Automation/WebPageStudio/Test-ESWebPageStudioAccessibility.ps1
+      contract: ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1
+  - id: html-css-esm-kernel
+    label: 单一 HTML/CSS/ESM 网页生成内核（静态与动态模式）
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: false
+    entrypoint: ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+    request: ES/Automation/WebPageStudio/New-ESWebPageStudioKernelRequest.ps1
+    contract: ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+    validator: ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1
+  - id: backend-contract
+    label: 后端接口与稳定错误语义
+    owner: ES/Automation/Contracts
+    state: contract-only
+    runtime: false
+  - id: network-adapter
+    label: 联网适配、超时、重试、脱敏与取消
+    owner: ES/Automation
+    state: implemented-authorized-runtime
+    runtime: true
+    entrypoint: ES/Automation/WebPageStudio/Invoke-ESWebPageStudioBackend.ps1
+  - id: preview
+    label: 固定浏览器预览与 Snapshot
+    owner: ES/Automation
+    state: implemented-review
+    runtime: true
+  - id: visual-evidence
+    label: DOM/几何/Token/资产/像素/人工复核
+    owner: ES/Automation
+    state: implemented-review
+    runtime: true
+  - id: revision
+    label: 可回滚、幂等、证据驱动迭代
+    owner: ES/Automation
+    state: implemented-review
+    runtime: false
+  - id: offline-package
+    label: 显式授权的 PWA 离线包与缓存验证
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: true
+    entrypoint: ES/Automation/WebPageStudio/New-ESWebPageStudioOfflinePackage.ps1
+    validator: ES/Automation/WebPageStudio/Test-ESWebPageStudioOfflinePackage.ps1
+  - id: localization
+    label: 多语言页面与 hreflang
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: false
+    entrypoint: ES/Automation/WebPageStudio/New-ESWebPageStudioLocaleBundle.ps1
+    validator: ES/Automation/WebPageStudio/Test-ESWebPageStudioLocaleResolution.ps1
+  - id: site-discovery
+    label: robots、Sitemap 与多语言 Sitemap 注解
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: false
+    validator: ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+  - id: search-structured-data
+    label: schema.org WebPage Microdata 与站点图标元数据
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: false
+    validator: ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+  - id: freshness-evidence
+    label: 工件哈希、新鲜度与迁移证据
+    owner: ES/Automation
+    state: implemented-static-verified
+    runtime: false
+    validator: ES/Automation/WebPageStudio/Test-ESWebPageStudioFreshness.ps1
+defaults:
+  pageKind: marketing
+  output: static-html-css
+  network: disabled
+  backend: mock-contract-only
+  runtimeStatus: runtime-not-run-unless-RunPreview
+nonClaims:
+  - capability listing is not an execution grant
+  - runtime or release acceptance requires separate evidence
+  - network access is never enabled by a page request alone

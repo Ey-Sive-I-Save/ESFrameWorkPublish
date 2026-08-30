@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "authorityId": "es-aispace-root.v1",
+  "concept": "AISpace",
+  "status": "active",
+  "canonicalEntry": "ES/AISpace/README.md",
+  "canonicalBody": "ES/AISpace/README.md",
+  "scope": [
+    "ai-content-placement",
+    "local-public-boundary",
+    "skill-output-discovery",
+    "unity-public-exit-disambiguation",
+    "classification-first-date-archive",
+    "lifecycle-promotion"
+  ],
+  "discoveryEntrypoints": [
+    "AGENTS.md",
+    "MUSTREAD_PROJECT_INSTRUCTIONS/README.md",
+    ".agents/README.md",
+    ".agents/MUSTREAD_PROJECT_INSTRUCTIONS.md",
+    "ES/AISpace/MUSTREAD_PROJECT_INSTRUCTIONS.md",
+    "Documentation/AIKnowledge/AIBRAIN_ENTRY.md"
+  ],
+  "machineIdentity": "ES/AISpace/AISPACE_AUTHORITY.json",
+  "derivedProjections": [
+    "ES/AISpace/Public/Skills/registry.json",
+    ".agents/SKILL_AISPACE_BINDINGS.json"
+  ],
+  "workflowAuthority": {
+    "skillName": "es-ai-space-organization",
+    "skillPath": ".agents/skills/es-ai-space-organization/SKILL.md",
+    "registrationContract": "ES/Automation/Contracts/es-userspace-profile-v1.json",
+    "commandId": "userspace.profile.manage",
+    "operations": ["initialize", "update", "discover", "validate"],
+    "documentationRole": "pointer-only",
+    "authorityRule": "AI follows the Skill workflow; documents may explain or point, but cannot define an alternate execution path."
+  },
+  "machinePolicies": [
+    "ES/AISpace/AISPACE_CONTENT_CLASSIFICATION.json",
+    "ES/AISpace/Public/LOCAL_TEMP_POLICY.json"
+  ],
+  "nonCompetingRoots": [
+    {
+      "path": "Assets/ES/AISpace/Public",
+      "role": "unity-import-exit",
+      "authority": "Unity asset pipeline",
+      "mayDeclareAISpaceRoot": false
+    },
+    {
+      "path": "ES/AISpace/Public/Skills/registry.json",
+      "role": "derived-skill-navigation",
+      "authority": "relation projection",
+      "mayDeclareAISpaceRoot": false
+    }
+  ],
+  "bodyPolicy": {
+    "mode": "single-canonical-body",
+    "canonicalBody": "ES/AISpace/README.md",
+    "pointerOnlyMarkers": [
+      "MUSTREAD_PROJECT_INSTRUCTIONS/README.md",
+      ".agents/MUSTREAD_PROJECT_INSTRUCTIONS.md",
+      "ES/AISpace/MUSTREAD_PROJECT_INSTRUCTIONS.md"
+    ],
+    "pointerOrIndexPaths": [
+      "ES/AISpace/Public/Skills/INDEX.md",
+      "ES/AISpace/Public/Skills/registry.json",
+      "ES/AISpace/Public/TempReadme.md",
+      "Assets/ES/AISpace/Public/README.md"
+    ],
+    "historicalRecordPaths": [
+      "ES/AISpace/Public/MIGRATION_MANIFEST.md",
+      "ES/AISpace/Public/MIGRATION_RECORD_20260827.md"
+    ],
+    "duplicateBodyAction": "reject-and-point-to-canonical-entry"
+  },
+  "competitionPolicy": {
+    "mode": "single-root-no-competing-authority",
+    "runtimeLease": false,
+    "lastWriteWins": false,
+    "staleWriteAction": "reread-canonical-entry-and-reject-overwrite",
+    "conflictState": "none-observed"
+  },
+  "permissionBoundary": "This identity governs discovery and placement only; it grants no write, execution, Unity, Runtime, network, Git, delete, rename, or release permission."
+}

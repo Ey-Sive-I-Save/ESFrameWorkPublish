@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-public-teams-registry",
+  "entryPattern": "Teams/*/team.json",
+  "memberRegistry": "ES/AISpace/Public/People/registry.json",
+  "command": "ES/Automation/UserSpace/Invoke-ESTeamSpace.ps1",
+  "visibility": "public-team-metadata-only",
+  "privateDataPolicy": "member-private-areas"
+}

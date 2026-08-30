@@ -1,0 +1,393 @@
+{
+    "schemaVersion":  1,
+    "mapId":  "es-open-source-migration-map.v1",
+    "status":  "in-progress",
+    "source":  {
+                   "repositoryUrl":  "https://github.com/dyad-sh/dyad.git",
+                   "fixedRevision":  "157ab55cf472b3e3ed493ba521885a01c1bf9cc4",
+                   "branchAtCheckout":  "main",
+                   "versionAtCheckout":  "1.13.0-beta.1",
+                   "license":  "Apache-2.0 outside src/pro; FSL-1.1-ALv2 inside src/pro; package.json MIT metadata conflicts with repository LICENSE",
+                   "isolatedRelativeLocator":  "../Dyad.External",
+                   "trackedFileCount":  3199,
+                   "checkoutClean":  true,
+                   "checkoutCleanAtBaseline":  true,
+                   "currentCheckoutState":  "esified-in-place-dirty",
+                   "currentBranch":  "main",
+                   "currentHead":  "157ab55cf472b3e3ed493ba521885a01c1bf9cc4",
+                   "currentTreeSha256":  "e017ca82dc0028353d2a4933e76877133fe59bc9546f4d9d89bcac23fea9a0f6"
+               },
+    "target":  {
+                   "projectRoot":  "F:/aaProject/ESFrameWorkPublish",
+                   "branch":  "main",
+                   "head":  "6286d6457c0051d61f91dde6bfc8f096cfc568c4",
+                   "baselineChangedCount":  1016,
+                   "writeAllowed":  false,
+                   "protectedPaths":  [
+                                          "Assets",
+                                          "Packages",
+                                          "ProjectSettings",
+                                          ".agents"
+                                      ]
+               },
+    "scope":  {
+                  "mode":  "external-checkout-in-place",
+                  "allowTargetMutation":  false,
+                  "allowNetwork":  false,
+                  "allowGitWrite":  false,
+                  "allowDelete":  true,
+                  "allowRename":  true,
+                  "manualSubstitutionAllowed":  true
+              },
+    "executionContract":  {
+                              "mode":  "external-checkout-in-place",
+                              "wholeRepository":  true,
+                              "renamePathSegments":  true,
+                              "developerName":  "ES工作室",
+                              "identityHardeningVersion":  "v8",
+                              "sourceLocatorPolicy":  "handoff consumes immutable private snapshot absolutePath; migration receipts persist only relative locator/name and source tree hash",
+                              "journalPhases":  [
+                                                    "staging",
+                                                    "commit-started",
+                                                    "complete",
+                                                    "recovered-before-commit",
+                                                    "recovered-from-backup"
+                                                ],
+                              "missingStagingPolicy":  {
+                                                           "staging":  "recover-before-commit",
+                                                           "commit-started":  "fail-closed"
+                                                       },
+                              "planHashInputs":  [
+                                                     "sourceRevision",
+                                                     "sourceTreeSha256",
+                                                     "mappingRules",
+                                                     "renamePathSegments",
+                                                     "wholeRepository",
+                                                     "identityHardeningVersion",
+                                                     "developerName",
+                                                     "developerPattern"
+                                                 ],
+                              "fileClassification":  {
+                                                         "text":  "known text extension or strict UTF-8 without NUL/control run",
+                                                         "binary":  "byte-for-byte copy; never lexical rewrite",
+                                                         "opaque":  "not proven text; preserve and report as unverified"
+                                                     },
+                              "protectedPaths":  [
+                                                     ".git",
+                                                     "LICENSE*",
+                                                     "NOTICE*",
+                                                     "src/pro/**"
+                                                 ],
+                              "evidenceSeparation":  {
+                                                         "static":  "Static source/configuration/hash/deterministic checks only",
+                                                         "runtime":  "Runtime Unity/editor/Player/IL2CPP/process behavior requires separate explicit authorization"
+                                                     }
+                          },
+    "authorizationLedger":  [
+                                {
+                                    "action":  "external-checkout",
+                                    "authorizedBy":  "current-user",
+                                    "authorizationText":  "自己跑一遍 Dyad (https://github.com/dyad-sh/dyad)",
+                                    "networkUsed":  true,
+                                    "externalGitWriteUsed":  true,
+                                    "targetProjectWriteUsed":  false,
+                                    "result":  "checked-out-and-pinned"
+                                }
+                            ],
+    "manualSubstitutions":  [
+
+                            ],
+    "mappings":  [
+                     {
+                         "sourceRelativePath":  "LICENSE",
+                         "sourceRefs":  [
+                                            "LICENSE",
+                                            "src/pro/LICENSE",
+                                            "NOTICE",
+                                            "package.json"
+                                        ],
+                         "targetRelativePath":  "ES/AISpace/Public/es-open-source-migration/dyad/license-and-provenance.md",
+                         "category":  "adapt",
+                         "status":  "approved-for-analysis",
+                         "owner":  "license-architecture-agent",
+                         "sourceGitTreeObject":  "157ab55cf472b3e3ed493ba521885a01c1bf9cc4",
+                         "compatibilityImpact":  "Apache attribution required; src/pro cannot be treated as Apache-2.0 before its future-license date",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "src/ipc",
+                         "sourceRefs":  [
+                                            "src/main.ts",
+                                            "src/main",
+                                            "src/ipc"
+                                        ],
+                         "targetRelativePath":  "ES/Automation/Contracts + Assets/Plugins/ES/Editor/ESAutomation",
+                         "category":  "rewrite",
+                         "status":  "approved-for-analysis",
+                         "owner":  "core-boundary-agent",
+                         "sourceGitTreeObject":  "70bfbf6a1307daa084d7c8edd3a59eecbfb2ce31",
+                         "compatibilityImpact":  "Electron IPC cannot be ported directly; extract request identity, validation, cancellation, error and receipt contracts",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "src/state_machines",
+                         "sourceRefs":  [
+                                            "src/state_machines",
+                                            "src/distributed_machines"
+                                        ],
+                         "targetRelativePath":  "ES/Automation/TaskContextRuntime + ES/Automation/RoutePlan",
+                         "category":  "adapt",
+                         "status":  "implemented-external-only",
+                         "owner":  "core-boundary-agent",
+                         "sourceGitTreeObject":  "b2bd82d17a0ac2f11b35693b4fa675cb3b164fbb",
+                         "compatibilityImpact":  "Map keyed hosts, transitions, receipts and recovery to ES TaskContext contracts without React/Electron dependencies",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "src/ipc + src/state_machines + src/distributed_machines",
+                         "sourceRefs":  [
+                                            "src/ipc",
+                                            "src/state_machines",
+                                            "src/distributed_machines"
+                                        ],
+                         "targetRelativePath":  "../Dyad.ESMigration.Work/esified/runtime/ESDyadCoreRuntime.cs",
+                         "category":  "rewrite",
+                         "status":  "implemented-external-only",
+                         "owner":  "root-agent",
+                         "sourceGitTreeObject":  "70bfbf6a1307daa084d7c8edd3a59eecbfb2ce31",
+                         "targetSha256":  "AE387DA46EF6D86829DC5A30271E4C7E331AD548255B419BA20DF5EBA68229DF",
+                         "compatibilityImpact":  "Pure C# ES contract runtime: bounded validation, idempotent dispatch receipts, admission fence lifecycle and deterministic fence hashing; no Unity/Electron dependency",
+                         "rollback":  "discard external esified/runtime batch"
+                     },
+                     {
+                         "sourceRelativePath":  "src/components",
+                         "sourceRefs":  [
+                                            "src/components",
+                                            "src/hooks",
+                                            "src/routes",
+                                            "src/pages"
+                                        ],
+                         "targetRelativePath":  "Assets/Plugins/ES/Editor/EditorTools/ESDeveloperCockpit",
+                         "category":  "rewrite",
+                         "status":  "approved-for-analysis",
+                         "owner":  "editor-ui-agent",
+                         "sourceGitTreeObject":  "2158589cfe273c1332f7f28ac85e75c31af8b7e9",
+                         "compatibilityImpact":  "React/TanStack UI patterns are reference-only; Unity Editor UI requires independent lifecycle, serialization and domain-reload design",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "src/prompts",
+                         "sourceRefs":  [
+                                            "src/prompts",
+                                            "rules",
+                                            "docs"
+                                        ],
+                         "targetRelativePath":  "Documentation/AIKnowledge + .agents/skills/*/references",
+                         "category":  "adapt",
+                         "status":  "approved-for-analysis",
+                         "owner":  "knowledge-test-agent",
+                         "sourceGitTreeObject":  "772310ed018429864ff331ea630a3644948c48f4",
+                         "compatibilityImpact":  "Prompt text is untrusted external content and must become bounded evidence or patterns, never ES authority",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "packages",
+                         "sourceRefs":  [
+                                            "packages",
+                                            "drizzle"
+                                        ],
+                         "targetRelativePath":  "ES/Automation/Contracts/Candidates",
+                         "category":  "defer",
+                         "status":  "approved-for-analysis",
+                         "owner":  "knowledge-test-agent",
+                         "sourceGitTreeObject":  "518bb3140881787cc9f2040a1bdabf10998d022f",
+                         "compatibilityImpact":  "PostgreSQL schema tooling is not a direct Unity dependency; retain only contract-diff and classification mechanisms if independently useful",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "workers",
+                         "sourceRefs":  [
+                                            "workers",
+                                            "worker",
+                                            "native/keychain-reader"
+                                        ],
+                         "targetRelativePath":  "ES/Automation/Workers/Candidates",
+                         "category":  "defer",
+                         "status":  "approved-for-analysis",
+                         "owner":  "core-boundary-agent",
+                         "sourceGitTreeObject":  "96a1d9fce6e53f6aa588c4413e736eb59aad7112",
+                         "compatibilityImpact":  "External process, native credential and worker-thread behavior requires separate security and Runtime authorization",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "scaffold",
+                         "sourceRefs":  [
+                                            "scaffold"
+                                        ],
+                         "targetRelativePath":  "ES/AISpace/Public/es-open-source-migration/dyad/candidates/scaffold",
+                         "category":  "adapt",
+                         "status":  "approved-for-analysis",
+                         "owner":  "editor-ui-agent",
+                         "sourceGitTreeObject":  "5f1b199d6b0f17ba6460ccd4169a202ba8338acd",
+                         "compatibilityImpact":  "Web app scaffolding is reference material only; no direct Unity asset generation",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "e2e-tests",
+                         "sourceRefs":  [
+                                            "e2e-tests",
+                                            "src/__tests__",
+                                            "testing"
+                                        ],
+                         "targetRelativePath":  "Assets/Plugins/ES/1_Design/Tests + ES/AISpace/Public/es-open-source-migration/dyad/test-patterns",
+                         "category":  "adapt",
+                         "status":  "approved-for-analysis",
+                         "owner":  "knowledge-test-agent",
+                         "sourceGitTreeObject":  "f346fcdfba2d72461845e51177d09639030d0b2e",
+                         "compatibilityImpact":  "Translate deterministic negative/recovery cases; Playwright/Electron fixtures cannot prove Unity behavior",
+                         "rollback":  "discard isolated analysis output"
+                     },
+                     {
+                         "sourceRelativePath":  "src/pro",
+                         "sourceRefs":  [
+                                            "src/pro",
+                                            "src/pro/LICENSE"
+                                        ],
+                         "targetRelativePath":  null,
+                         "category":  "exclude",
+                         "status":  "license-blocked",
+                         "owner":  "license-architecture-agent",
+                         "sourceGitTreeObject":  "0b2d96370f185c8d11d46edb8ac4dbd85092433a",
+                         "compatibilityImpact":  "FSL-1.1-ALv2 competing-use restriction; analysis may identify public interfaces but no code adoption into ES",
+                         "rollback":  "retain exclusion and discard any copied content"
+                     }
+                 ],
+    "parallelism":  {
+                        "agentStartGate":  "mapping-approved",
+                        "maxAgents":  0,
+                        "partitionKey":  "assembly-or-domain",
+                        "outputRoot":  null,
+                        "sharedWriteTargets":  [
+
+                                               ],
+                        "mergeOwner":  "root-agent"
+                    },
+    "verification":  {
+                         "mode":  "dry-run",
+                         "requiredChecks":  [
+                                                "source-target-hash",
+                                                "namespace-uniqueness",
+                                                "assembly-direction",
+                                                "license-boundary",
+                                                "strict-utf8",
+                                                "diff-check"
+                                            ],
+                         "runtimeStatus":  "not-run"
+                     },
+    "rollback":  {
+                     "strategy":  "restore from in-place journal backup on interrupted commit; accepted commit has no final external copy",
+                     "compatibilityWindow":  "static whole-repository identity remap only; no Unity/Runtime compatibility claim"
+                 },
+    "owner":  "root-agent",
+    "evidenceRef":  "ES/AISpace/Public/es-open-source-migration/dyad/source-inventory.json",
+    "parallelRuns":  [
+                         {
+                             "batchId":  "dyad-static-domain-scan-20260829",
+                             "status":  "completed",
+                             "agentCount":  3,
+                             "agentStartGate":  "mapping-approved",
+                             "outputRoot":  "../Dyad.ESMigration.Work",
+                             "outputs":  [
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/core-boundary.md",
+                                                 "sha256":  "6117d8e75c7048ce8f505f002393db0e86b4a18cbec0004b0193f2a11e190ff6",
+                                                 "status":  "completed"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/editor-ui.md",
+                                                 "sha256":  "39a59fcb657791e8f08b4bb174b949fd67342779626bead7931e3fc08838864f",
+                                                 "status":  "completed"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/knowledge-license.md",
+                                                 "sha256":  "141ee0646888fb3764940b80d49ef7c0745f989ef70436f63bb8be05b84b4411",
+                                                 "status":  "completed"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/batch-receipt.json",
+                                                 "sha256":  "a9011088e3a6a3402facd67026e71c1188b680ec41fe244a8bba4dcebe4c8b9b",
+                                                 "status":  "completed"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/README.md",
+                                                 "sha256":  "0cac8c718f21954cfb57b67f123ff026be28f935f7081e2384a43855175af279",
+                                                 "status":  "candidate-generated"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/symbols/symbol-map.json",
+                                                 "sha256":  "9b730da33504c3833f5ee36442a1c29e3d0a0e729f268f353f38d778c03e2211",
+                                                 "status":  "candidate-generated"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/contracts/ESDyadCoreContracts.cs",
+                                                 "sha256":  "1c408476fd7cb76c507d3725104d547e0b9845e911da53a517609283316c9cc1",
+                                                 "status":  "candidate-generated"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/contracts/contract-matrix.json",
+                                                 "sha256":  "b5a000ee206287d0de5139f51988049dfd5acc9cf7f098821a07056ce79fa180",
+                                                 "status":  "candidate-generated"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/editor/editor-surface-map.json",
+                                                 "sha256":  "b88579c5704eafb9b9ad44a02b9561e1994c2d4158c91949074ad4333c54d306",
+                                                 "status":  "candidate-generated"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/runtime/ESDyadCoreRuntime.cs",
+                                                 "sha256":  "AE387DA46EF6D86829DC5A30271E4C7E331AD548255B419BA20DF5EBA68229DF",
+                                                 "status":  "implemented-external-only"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/runtime/ESDyadCoreRuntime.csproj",
+                                                 "sha256":  "02FD4D6ACB4361A29B219922DB839FF3AFE0DEF2A5D66F368F04380941629E0D",
+                                                 "status":  "compiled-host-only"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/runtime/ESDyadCoreRuntimeSmoke.cs",
+                                                 "sha256":  "E98DE6999F80BC431BB7E856A28EA4DF391941F749825F8D687BFCD986EA837E",
+                                                 "status":  "smoke-passed"
+                                             },
+                                             {
+                                                 "path":  "../Dyad.ESMigration.Work/esified/runtime/ESDyadCoreRuntime.receipt.json",
+                                                 "sha256":  "1936ECDE2361A0FBF59FFA4EDAE2831ABC2E2A7E02B3781F24E637B99DF1D7CD",
+                                                 "status":  "evidence-receipt"
+                                             }
+                                         ],
+                             "targetProjectWriteUsed":  false,
+                             "runtimeStatus":  "not-run"
+                         }
+                     ],
+    "batchExecution":  {
+                           "receiptRoot":  "F:/aaProject/Dyad.External/.es-migration/batches",
+                           "batchCount":  34,
+                           "resourcePolicy":  "max 50 files and 1 MiB per batch; explicit relative paths; strict UTF-8; SHA-256 per file; no protected paths",
+                           "idempotenceCheck":  "passed",
+                           "lastBatchId":  "batch-34-uppercase-duplicate-identity-repair",
+                           "ledgerValidation":  "review",
+                           "legacyViolations":  [
+                                                    "batch-20 exceeded the 20-file limit",
+                                                    "batches 21-24 repeated component paths before idempotence fix",
+                                                    "batches 25-33 are repair batches and must remain auditable as superseding corrections"
+                                                ],
+                           "validator":  ".agents/skills/es-open-source-migration/scripts/Test-ESMigrationBatchLedger.ps1",
+                           "planner":  ".agents/skills/es-open-source-migration/scripts/New-ESMigrationBatchPlan.ps1",
+                           "planPath":  "F:/aaProject/Dyad.External/.es-migration/batch-plan-v8.json",
+                           "plannedFileCount":  0,
+                           "plannedBatchCount":  0,
+                           "executor":  ".agents/skills/es-open-source-migration/scripts/Invoke-ESMigrationPlan.ps1",
+                           "maxFilesPerBatch":  50,
+                           "maxBytesPerBatch":  1048576
+                       },
+    "staleWhen":  "Dyad revision, target HEAD, license files, mapping schema, or protected-path policy changes"
+}

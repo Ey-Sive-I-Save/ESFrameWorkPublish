@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "classificationOrder": ["category", "date", "ownerOrTopic"],
+  "dateFormat": "YYYYMMDD",
+  "lifecycleStates": ["temporary", "stable", "archived"],
+  "roots": {
+    "private": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>/",
+    "collaborative": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>/",
+    "unityPublic": "Assets/ES/AISpace/Public/<category>/<YYYYMMDD>/<domain>/"
+  },
+  "categories": ["Screenshots", "Captures", "Cache", "Scratch", "Exports", "EditorTooling", "UIIntent", "StaticReplay", "TaskReadSnapshots", "AgentCandidates", "WebPageStudio", "Skills", "abc-generation-resource-audit", "UI"],
+  "forbiddenAIGenerationRoots": ["Assets/Screenshots", "Assets/Temp", "ES/Output/Screenshots", "ES/Output/Temp", ".agents/skills/**/__pycache__"],
+  "externalGeneratedRoots": {
+    "ES/Output/WebPageStudio": "WebPageStudio output authority; browser profiles and preview caches remain here and are not AISpace content",
+    "ES/Automation/AI": "Automation request/run/archive authority; receipts and logs remain here",
+    "ES/Bak": "explicit backup authority; do not mix with AISpace unless a separate migration is authorized"
+  },
+  "authorityRule": "AISpace owns AI collaboration content and its indexes; external authoritative artifacts remain in their source authority and are referenced, not duplicated."
+}

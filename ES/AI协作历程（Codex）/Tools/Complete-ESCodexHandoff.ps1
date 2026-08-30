@@ -8,6 +8,8 @@ param(
 
     [string]$ProjectPath = '',
 
+    [string]$ProjectIdentityFingerprint = '',
+
     [string]$TaskKey = '',
 
     [string]$ResponsibilityKey = '',
@@ -71,6 +73,18 @@ function Get-Sha256([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Get-ProjectIdentityFingerprint([string]$Root) {
+    $parts = foreach ($relative in @('AGENTS.md','ProjectSettings/ProjectVersion.txt')) {
+        $full = [IO.Path]::GetFullPath((Join-Path $Root $relative))
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Project identity file is missing: $relative" }
+        $hash = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$relative|$hash"
+    }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes((($parts | Sort-Object) -join "`n")))).Replace('-','').ToLowerInvariant()) }
+    finally { $sha.Dispose() }
+}
+
 function Write-CreateOnlyJson([string]$Path, [object]$Value) {
     $directory = Split-Path -Parent $Path
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
@@ -95,6 +109,9 @@ if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
 }
 $projectRoot = (Resolve-Path -LiteralPath $ProjectPath).Path
 if (-not (Test-PathInside $archiveFullPath $projectRoot)) { throw "ArchivePath 必须位于项目根内：$archiveFullPath" }
+$actualProjectIdentityFingerprint = Get-ProjectIdentityFingerprint $projectRoot
+if ([string]::IsNullOrWhiteSpace($ProjectIdentityFingerprint)) { $ProjectIdentityFingerprint = $actualProjectIdentityFingerprint }
+if ($ProjectIdentityFingerprint -cne $actualProjectIdentityFingerprint) { throw 'Project identity fingerprint does not match the selected ProjectPath.' }
 
 $archiveId = Get-ArchiveId $archiveFullPath
 $sourceSessionId = Get-SessionId $sessionFullPath
@@ -141,7 +158,7 @@ foreach ($path in @($archiveFullPath, $bootstrapSkill, $currentStatus, $ruleInde
 }
 
 if ([string]::IsNullOrWhiteSpace($TaskPrompt)) {
-    $TaskPrompt = "完成窗口交接：先验证并读取 immutable launch envelope 中的私有 handoff snapshot；读取窗口档案 $archiveId、CurrentStatus、RuleIndex 与 Bootstrap Skill；报告 ContextAccepted、当前分支/HEAD 和工作树状态。仅依据最新源码与运行证据继续，不能把旧档案当作新的修改、Git、Unity 或发布授权。"
+    $TaskPrompt = "完成窗口交接：先验证并读取 immutable launch envelope 中的私有 handoff snapshot；读取窗口档案 $archiveId、CurrentStatus、RuleIndex 与 Bootstrap Skill；报告 ContextAccepted、当前分支/HEAD 和工作树状态。额外核对窗口档案中最近至少 10 轮对话的概览（每轮至少包含用户要求、当时答复摘要和剩余工作；若总轮次不足 10 轮则全部核对），不得只依据最近一两轮。仅依据最新源码与运行证据继续，不能把旧档案当作新的修改、Git、Unity 或发布授权。"
 }
 
 $common = @{
@@ -153,6 +170,7 @@ $common = @{
     TerminalMode = $TerminalMode
     HandoffPath = [string[]]$handoffPaths.ToArray()
     HandoffMode = $true
+    ProjectIdentityFingerprint = $ProjectIdentityFingerprint
 }
 $handoffAuthorization = [Guid]::NewGuid().ToString('N')
 $common.HandoffAuthorization = $handoffAuthorization
@@ -175,7 +193,7 @@ if ($TabTitle -ne '') { $common.TabTitle = $TabTitle }
 if ($ForceNew) { $common.ForceNew = $true }
 
 $validationOutput = @(Invoke-HandoffAuthorized {
-    & $launcher -Mode Validate -ProjectPath $projectRoot -TaskPrompt $TaskPrompt -TaskKey $TaskKey -ResponsibilityKey $ResponsibilityKey -TerminalMode $TerminalMode -HandoffPath ([string[]]$handoffPaths.ToArray()) -HandoffMode -HandoffAuthorization $handoffAuthorization -DryRun 2>&1
+    & $launcher -Mode Validate -ProjectPath $projectRoot -TaskPrompt $TaskPrompt -TaskKey $TaskKey -ResponsibilityKey $ResponsibilityKey -TerminalMode $TerminalMode -HandoffPath ([string[]]$handoffPaths.ToArray()) -HandoffMode -HandoffAuthorization $handoffAuthorization -ProjectIdentityFingerprint $ProjectIdentityFingerprint -DryRun 2>&1
 } $handoffAuthorization)
 $validation = @($validationOutput | Where-Object { $_.PSObject.Properties.Name -contains 'requiredPathsValid' } | Select-Object -Last 1)[0]
 if ($null -eq $validation -or -not [bool]$validation.requiredPathsValid) { throw "Session Bootstrap Validate 失败。" }
@@ -187,6 +205,7 @@ if (-not $OpenNew -or $DryRun) {
         sourceSessionId = $sourceSessionId
         taskKey = $TaskKey
         responsibilityKey = $ResponsibilityKey
+        projectIdentityFingerprint = $ProjectIdentityFingerprint
         responsibilityAssessment = [ordered]@{
             status = [string]$responsibilityAssessment.status
             recommendedResponsibilityKey = [string]$responsibilityAssessment.recommendedResponsibilityKey
@@ -251,6 +270,7 @@ $receipt = [ordered]@{
     envelopePath = [string]$launchResult.envelopePath
     contextAccepted = $contextAccepted
     closeSourceRequested = [bool]$CloseSource
+    projectIdentityFingerprint = $ProjectIdentityFingerprint
 }
 Write-CreateOnlyJson $receiptPath $receipt
 

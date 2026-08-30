@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "policyId": "es-aispace-content-placement",
+  "authority": "ES/AISpace/README.md",
+  "authorityIdentity": "ES/AISpace/AISPACE_AUTHORITY.json",
+  "purpose": "为 AISpace 内容提供分类优先、日期其次的私有/公共归档路径，并区分生命周期与外部权威。",
+  "classificationOrder": ["category", "date", "owner"],
+  "dateFormat": "YYYYMMDD",
+  "defaultRoot": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>",
+  "publicRoot": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>",
+  "unityPublicRoot": "Assets/ES/AISpace/Public/<category>/<YYYYMMDD>/<domain>",
+  "lifecycleStates": ["temporary", "stable", "archived"],
+  "allowedCategories": [
+    "Screenshots",
+    "Captures",
+    "Cache",
+    "Scratch",
+    "Exports",
+    "EditorTooling",
+    "UIIntent",
+    "StaticReplay",
+    "TaskReadSnapshots",
+    "AgentCandidates",
+    "WebPageStudio",
+    "Skills",
+    "abc-generation-resource-audit",
+    "UI"
+  ],
+  "requiredMetadata": [
+    "agentOrTask",
+    "purpose",
+    "createdUtc"
+  ],
+  "routing": {
+    "privateDiagnosticScreenshot": "ES/AISpace/Local/Screenshots/<YYYYMMDD>/<agent-or-task>",
+    "privateContent": "ES/AISpace/Local/<category>/<YYYYMMDD>/<agent-or-task>",
+    "stableCollaborativeContent": "ES/AISpace/Public/<category>/<YYYYMMDD>/<topic-or-task>",
+    "sharedReviewEvidence": "ES/UIEvidence or the owning test/evidence directory; Public stores an index only",
+    "unityImportedReference": "Assets/UI/References or another existing Unity-owned asset directory",
+    "unityTestCapture": "Assets/ESTestAssets/**/Screenshots or the owning test fixture output directory"
+  },
+  "forbiddenRoots": [
+    "Assets/ES/AISpace/Local",
+    "Assets/ES/Space/Local",
+    "Assets/Screenshots",
+    "Assets/Temp",
+    "ES/Output/Screenshots",
+    "ES/Output/Temp",
+    ".agents/skills/**/__pycache__",
+    "ES/AISpace/Public (binary or private temporary bodies)",
+    "Assets/Plugins/ES/AIWarnings",
+    "Assets/Plugins/ES/AICommands",
+    "Documentation/AIKnowledge",
+    "ES/AI协作历程（Codex）"
+  ],
+  "assetRule": "Assets/Screenshots is not the default MCP or AI temporary screenshot root; keep an existing Asset path only when Unity import/reference or a test fixture requires it.",
+  "authorityBoundary": "This policy classifies placement only; it does not authorize deletion, renaming, Git, Unity, Runtime, network, release, or publication.",
+  "retention": "Temporary content is disposable; stable/archived content is retained by category/date. Cleanup requires a separate explicit user instruction."
+}

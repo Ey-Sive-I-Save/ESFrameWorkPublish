@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "inventoryId": "dyad-157ab55-static-inventory",
+  "repositoryUrl": "https://github.com/dyad-sh/dyad.git",
+  "isolatedRelativeLocator": "../Dyad.External",
+  "branch": "main",
+  "revision": "157ab55cf472b3e3ed493ba521885a01c1bf9cc4",
+  "revisionTimestamp": "2026-08-28T10:13:59-07:00",
+  "revisionSubject": "Remove obsolete Agent mode activation toast (#4410)",
+  "version": "1.13.0-beta.1",
+  "trackedFileCount": 3199,
+  "checkoutClean": true,
+  "technology": {
+    "application": "Electron desktop application",
+    "renderer": "React 19 + TanStack Router/Query",
+    "language": "TypeScript",
+    "runtime": "Node >=24 <26; Electron 40",
+    "database": "better-sqlite3 + Drizzle",
+    "tests": "Vitest + Playwright"
+  },
+  "languageCounts": {
+    "ts": 1766,
+    "tsx": 587,
+    "md": 262,
+    "json": 166,
+    "yml": 96,
+    "sql": 50,
+    "mjs": 29,
+    "js": 26
+  },
+  "licenseFindings": [
+    "Repository LICENSE declares Apache-2.0 for content outside src/pro.",
+    "src/pro is FSL-1.1-ALv2 with a two-year future Apache-2.0 grant and a competing-use restriction before conversion.",
+    "Root package.json declares MIT, which conflicts with the repository LICENSE and must not override the file-level license boundary.",
+    "NOTICE lists mustardscript and Playwright attribution requirements."
+  ],
+  "domainInventory": [
+    {"path": "src/ipc", "files": 524, "gitObject": "70bfbf6a1307daa084d7c8edd3a59eecbfb2ce31"},
+    {"path": "src/components", "files": 444, "gitObject": "2158589cfe273c1332f7f28ac85e75c31af8b7e9"},
+    {"path": "src/pro", "files": 170, "gitObject": "0b2d96370f185c8d11d46edb8ac4dbd85092433a"},
+    {"path": "src/hooks", "files": 137, "gitObject": "23c720399e08bf0d60223dfbca8103a7c348cc15"},
+    {"path": "src/__tests__", "files": 108, "gitObject": "7834c38ffa979d699b01403260b2710ba42dfcca"},
+    {"path": "src/state_machines", "files": 34, "gitObject": "b2bd82d17a0ac2f11b35693b4fa675cb3b164fbb"},
+    {"path": "src/distributed_machines", "files": 46, "gitObject": "ad01c3dad55a737b9fad61ba8a4f1e423df11d09"},
+    {"path": "src/prompts", "files": 23, "gitObject": "772310ed018429864ff331ea630a3644948c48f4"},
+    {"path": "packages", "files": 53, "gitObject": "518bb3140881787cc9f2040a1bdabf10998d022f"},
+    {"path": "scaffold", "files": 79, "gitObject": "5f1b199d6b0f17ba6460ccd4169a202ba8338acd"},
+    {"path": "e2e-tests", "files": 538, "gitObject": "f346fcdfba2d72461845e51177d09639030d0b2e"}
+  ],
+  "nonClaims": [
+    "No Dyad dependencies were installed.",
+    "Dyad was not executed or packaged.",
+    "No Unity code or assets were generated or modified.",
+    "Static architecture similarity does not prove ES Runtime compatibility."
+  ]
+}

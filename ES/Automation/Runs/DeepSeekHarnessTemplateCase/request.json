@@ -1,0 +1,10 @@
+{
+    "projectRoot":  "F:\\aaProject\\ESFrameWorkPublish",
+    "workerId":  "es.deepseek-harness",
+    "workerVersion":  "0.1.0",
+    "taskId":  "es.deepseek-harness",
+    "runId":  "template-case",
+    "dryRun":  false,
+    "timeoutMs":  60000,
+    "prompt":  "请输出一个最小的 JSON 模板：只包含 title 和 status 两个字段，title 为 ES Harness Smoke，status 为 ok。"
+}

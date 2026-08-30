@@ -1,0 +1,22 @@
+{
+  "protocolVersion": 1,
+  "taskId": "es.deepseek-harness",
+  "taskVersion": 1,
+  "runId": "template-case",
+  "workerType": "Node",
+  "workerId": "es.deepseek-harness",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "d69acd00fa1dcb15c300ceb1d44c12f689c16b238e5c62445d13f0b0324a1523",
+  "status": "Failed",
+  "exitCode": 1,
+  "startedAtUtc": "2026-08-29T08:19:47.494Z",
+  "finishedAtUtc": "2026-08-29T08:19:50.632Z",
+  "inputManifestHash": "fb6ee239c689c5ec452886eac00b49f4519c8cc2bfffa447062f32ccaf22a342",
+  "outputs": [],
+  "outputHashes": [],
+  "findings": [],
+  "errors": [
+    "{\"code\":\"HARNESS_FAILED\",\"message\":\"dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route \\\"deepseek-official\\\"; store DEEPSEEK_API_KEY through the credentials service (the web Models page writes it), or export DEEPSEEK_API_KEY in the launching environment\"}"
+  ],
+  "completionDecision": null
+}

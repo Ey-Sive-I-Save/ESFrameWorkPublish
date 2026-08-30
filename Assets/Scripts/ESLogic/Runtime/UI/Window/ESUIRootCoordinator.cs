@@ -74,6 +74,19 @@ namespace ES
         public ESUIOverlayArbiter OverlayArbiter => overlayArbiter;
         public ESUITransitionCoordinator TransitionCoordinator => transitionCoordinator;
         public ESUIWindowLifecycleEvents LifecycleEvents => lifecycleEvents;
+        public string BootstrapKey => rootKey + "#registration:" + rootGeneration;
+        public bool IsBootstrapInFlight =>
+            bootstrapCoordinator != null && bootstrapCoordinator.IsInFlight(BootstrapKey);
+        public bool TryGetBootstrapAttempt(out long attempt)
+        {
+            if (bootstrapCoordinator == null)
+            {
+                attempt = 0;
+                return false;
+            }
+
+            return bootstrapCoordinator.TryGetAttempt(BootstrapKey, out attempt);
+        }
         public ESUIBootstrapCoordinator BootstrapCoordinator => bootstrapCoordinator;
 
         public bool NotifyFocus(ESUIWindowLease lease) => TryNotifyLifecycle(lease, c => lifecycleEvents?.RaiseFocused(c));
@@ -276,8 +289,7 @@ namespace ES
                 return UniTask.FromResult(ESUIBootstrapResult.Create(
                     rootKey, ESUIBootstrapState.Stopped, null, 0));
 
-            string bootstrapKey = rootKey + "#registration:" + rootGeneration;
-            return bootstrapCoordinator.StartAsync(bootstrapKey, prepare, cancellationToken);
+            return bootstrapCoordinator.StartAsync(BootstrapKey, prepare, cancellationToken);
         }
 
         /// <summary>

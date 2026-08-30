@@ -6,7 +6,7 @@
   "mustPreserve": ["raw prompt bytes", "input hash", "explicit authorization boundary", "unknowns", "non-claims"],
   "forbiddenTransitions": ["intake -> focus without receipt", "intake -> knowledge", "intake -> generation", "synthetic acceptance", "script-authored interpretation"],
   "acceptanceSignals": ["strict UTF-8 hash", "allowedScope and forbiddenScope present", "AI interpretation with objectiveBrief and acceptanceSignals", "unknowns resolved or explicitly carried", "analysis/execution/returnReceipt from current AI", "returnReceipt persisted"],
-  "aiInterpretation": {"required": true, "actor": "current-ai-session-or-provider", "mustInclude": ["objectiveBrief", "userGoals", "nonGoals", "acceptanceSignals", "unknowns", "interactionIntent", "analysis", "execution", "returnReceipt"], "minimumObjectiveBriefChars": 40, "minimumAnalysisChars": 80},
+  "aiInterpretation": {"required": true, "actor": "current-ai-session-or-provider", "mustInclude": ["objectiveBrief", "userGoals", "nonGoals", "acceptanceSignals", "unknowns", "interactionIntent", "analysis", "execution", "returnReceipt", "provenance"], "provenance": {"actorEnum": ["current-ai-session", "provider"]}, "minimumObjectiveBriefChars": 40, "minimumAnalysisChars": 80},
   "failureCodes": ["blocked.round-01.missing-input", "blocked.round-01.scope-ambiguous", "blocked.round-01.hash-missing", "blocked.round-01.ai-interpretation-required", "blocked.round-01.ai-interpretation-incomplete", "blocked.round-01.ai-interpretation-too-shallow", "blocked.round-01.synthetic-ai-interpretation"],
   "nextRound": "web-generation-round-02-focus"
 }

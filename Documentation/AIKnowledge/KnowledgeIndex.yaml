@@ -1560,7 +1560,7 @@ entries:
       - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESShaderVariantCompileLogParser.cs
     authority: Current ES rendering source/configuration + AIWarnings + Unity 2022.3 official calibration snapshot
     evidenceLevel: S1
-    contentHash: 36e06a2169291c1fc6b6bcb3a8220e50f3be05d58c349f719cf576545f1f299e
+    contentHash: bf819947671087cfa7f3dc248182b8dc6b9d24eb8904107ebf261655e5ff39a7
     staleWhen: Unity/URP、Quality/Graphics/Renderer 配置、Composite Shader、AIWarnings、官方校准快照或渲染证据合同变化
   - knowledgeId: es.unity.serialization-prefab-identity.v1
     file: UnitySerializationPrefab/unity-serialization-prefab-identity.md

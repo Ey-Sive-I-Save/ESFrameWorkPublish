@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-typography-layout.v1`
 `Authority`: WebPageStudio Page IR、Quality/Accessibility 合同与官方 Web 标准校准快照
 `RouteKeys`: `web-layout-system`, `web-typography`, `web-type-scale`, `web-editorial-grid`, `web-content-hierarchy`, `web-fluid-type`, `web-design-system`
-`ContentHash`: `3e1d53b96a8093398c56a0870aa08202ad8cb717d23a442690d466a87d5a0fdb`
+`ContentHash`: `637fc259e9c17a339a38399bde9afccaf5dc6aac4fb89475987d9fb8ae7708c3`
 `EvidenceLevel`: `S1`
 `StaleWhen`: Page IR、排版/主题合同、Quality/Accessibility 验证器或 SourceRef 哈希变化。
 
@@ -31,7 +31,7 @@
 ## SourceRefs
 
 - `ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json` (`db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1`)
-- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`21d9ba62d4b55d67a42518b1cb3cbf53b8d2f0340122e1bc0ceac1341c723d40`)
+- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`718a9698d4aa78b833b1bd269609fbd8ec7bda3cfe0f466d5d0a3292f95a9a26`)
 - `ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1` (`72fba7042e5da70008a5b30a9fa49dfcb6263b959d0120d677cb740808b78ad8`)
 - `Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md` (`54db99b92b4ba54f42fd981f3aadf813e9077d2ab788e14ee3932a94a6a8eb49`)
 - https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_containment/Container_queries

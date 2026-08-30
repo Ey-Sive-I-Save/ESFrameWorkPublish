@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-open-source-calibration.v1`
 `Authority`: ES 外部来源迁移边界与当前 WebPageStudio 合同
 `RouteKeys`: `web-open-source`, `web-framework`, `web-standards`, `web-calibration`, `external-authority`
-`ContentHash`: `78e9145374f0b99fe01893cb68194c84ff71e82abcd47a0ce9349ad0ebcfc079`
+`ContentHash`: `b153cf7edb674c7f09004f38ed4397573fc9210fed57716e1e902eb7686cfa27`
 `EvidenceLevel`: `S1`
 `StaleWhen`: 外部来源锁、版本、许可证、项目合同或迁移映射变化。
 
@@ -16,6 +16,6 @@
 ## SourceRefs
 
 - `ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json` (`db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1`)
-- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`21d9ba62d4b55d67a42518b1cb3cbf53b8d2f0340122e1bc0ceac1341c723d40`)
+- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`718a9698d4aa78b833b1bd269609fbd8ec7bda3cfe0f466d5d0a3292f95a9a26`)
 - `ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1` (`7d12b4d1fcc1c312b08b4b653f156e44dfd7a9c8bea5461533978b69b826d52c`)
 - `Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md` (`54db99b92b4ba54f42fd981f3aadf813e9077d2ab788e14ee3932a94a6a8eb49`)

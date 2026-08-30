@@ -2,11 +2,11 @@
 
 `KnowledgeId`: `es.aiwarning.p0.playable-loop-runtime-evidence.v1`  
 `Authority`: `AIWarnings` 原文与当前运行证据/成熟度合同  
-`RouteKeys`: `aiwarnings`, `p0`, `playable-loop`, `runtime-evidence`, `playmode`, `profiler`  
+`RouteKeys`: `aiwarnings`, `p0`, `playable-loop`, `runtime-evidence`, `playmode`, `profiler`, `game-core-loop`, `structure-validation`, `implementation-validation`, `presentation-validation`, `performance-validation`, `abcd`, `ai-abc`  
 `HashSchema`: `v2`  
-`ContentHash`: `5ced6b5736a30803fe3a8c6ff1a1cab97636243e7c9b120e34a27031fc7dfe1e`  
-`SourceSetHash`: `5ced6b5736a30803fe3a8c6ff1a1cab97636243e7c9b120e34a27031fc7dfe1e`  
-`EntryBodyHash`: `5c84072ab8d923770c109ce17982db5bba950ca02b1eeb4cc63e90df6a1a710a`  
+`ContentHash`: `d5a5946085442dcaed922a572fbe074b6a2a0690f9921b8f167b993add2eabdf`  
+`SourceSetHash`: `d5a5946085442dcaed922a572fbe074b6a2a0690f9921b8f167b993add2eabdf`  
+`EntryBodyHash`: `42b53dc2de8d7c1f1ea28ac05022749b802d2881b960e37deabbde5d53ea5816`  
 `EvidenceLevel`: `S1`  
 `RuntimeEvidence`: `runtime-not-run`  
 `StaleWhen`: 运行闭环、测试场景、证据等级、成熟度或任一 SourceRef 哈希变化。
@@ -34,10 +34,10 @@ Warning 保留完整闭环、玩家主链、失败清理、表现/性能和证�
 ## SourceRefs
 
 - `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md` (`92894b62cf1af0cc26e7ee7d2de31bfd88ad88377b64499f759f721f27621d85`)
-- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md` (`0181a3285041d4221e0eb35a682bfc6de39b7f854b99312e157dd1e4c99c5c5b`)
+- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md` (`c1fc2f3dd03713d0bedf4c12c4e95190613033af55cc28eb79b075976501c31b`)
 - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md` (`896e981dfc0aebdee7de5907b59cceb9d233c3f7ba443599fd904a4b72e822b8`)
-- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md` (`89c647f286f3ff648cc7c3fd7dd0646e1f36c5ded4963b9a5a598d7611ba0a59`)
-- `Documentation/AIKnowledge/aiwarnings-migration-ledger.json` (`bafe6469e496a01cd5d226f2eb775414db70652fc55c82ea86b54ebf5f5138b5`)
+- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md` (`2aa56abe81352fd79ad59b1364ffa7381d70b26674a1676b8439173a515d9b6c`)
+- `Documentation/AIKnowledge/aiwarnings-migration-ledger.json` (`67794270442817648d4894f45766bf83d44aabc25e06f944f96717eda2462ddc`)
 
 ## EvidenceRefs
 

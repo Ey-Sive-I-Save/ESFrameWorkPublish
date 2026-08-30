@@ -1,0 +1,26 @@
+{
+  "snapshotId": "es.external.ui-hud-readability-official.v1",
+  "retrievedUtc": "2026-08-30T00:00:00Z",
+  "sources": [
+    {
+      "url": "https://docs.unity3d.com/cn/2022.3/Manual/UICanvas.html",
+      "publisher": "Unity Technologies",
+      "productVersion": "Unity 2022.3",
+      "calibration": "Canvas render modes are Screen Space Overlay, Screen Space Camera, and World Space; Overlay is independent of scene camera and resizes with resolution."
+    },
+    {
+      "url": "https://docs.unity3d.com/cn/2022.3/ScriptReference/Canvas-renderOrder.html",
+      "publisher": "Unity Technologies",
+      "productVersion": "Unity 2022.3",
+      "calibration": "Canvas.renderOrder is read-only; Unity documents ordering caveats for Screen Space Camera and World Space."
+    },
+    {
+      "url": "https://www.w3.org/TR/WCAG22/",
+      "publisher": "W3C",
+      "productVersion": "WCAG 2.2",
+      "calibration": "Use contrast and target-size guidance as design calibration only; CSS pixels do not automatically equal Unity logical pixels."
+    }
+  ],
+  "authority": "External calibration only; project source and runtime evidence remain authoritative",
+  "staleWhen": "Unity 2022.3 UI documentation, WCAG 2.2 guidance, or the project UI contracts change"
+}

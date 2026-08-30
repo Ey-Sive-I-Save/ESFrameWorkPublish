@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "snapshotId": "es.external.ui-runtime-framework-comparison-official.20260830",
+  "retrievedUtc": "2026-08-30T13:00:00Z",
+  "sources": [
+    {"framework":"Unity UI Toolkit 2022.3","url":"https://docs.unity3d.com/2022.3/Documentation/Manual/UIE-Runtime-Event-System.html","claims":["EventSystem dispatches to active panels; panel sort order affects pointer routing; UI Toolkit and uGUI focus are coordinated through EventSystem."]},
+    {"framework":"Unreal CommonUI 5.8","url":"https://dev.epicgames.com/documentation/en-us/unreal-engine/overview-of-advanced-multiplatform-user-interfaces-with-common-ui-for-unreal-engine","claims":["Activatable widgets form routing trees; only active nodes receive input; top painted tree is selected; deactivation enables layered back/focus recovery."]},
+    {"framework":"Flutter","url":"https://docs.flutter.dev/ui/interactivity/focus","claims":["FocusNode/FocusScopeNode form a persistent focus tree; owned nodes must be disposed; focus change notifications are explicit."]}
+  ],
+  "staleWhen": "Official documentation version, input/focus architecture, or project comparison scope changes."
+}

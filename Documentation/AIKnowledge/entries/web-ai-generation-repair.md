@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-ai-generation-repair.v1`
 `Authority`: 当前 WebPageStudio Page IR、Kernel 合同与 Revision 语义
 `RouteKeys`: `web-ai-generation`, `web-prompt`, `web-repair`, `web-revision`, `web-knowledge`, `prompt-engineering`, `prompt-evaluation`
-`ContentHash`: `2599289ef71ff8dde0f94010be9fccb80f02a8a36d33f7c4cb40e3aa2df31ed8`
+`ContentHash`: `6cdc11783208c739b23b86bb21e8875b3f8c39084243c3d2a2c9b68c537b8174`
 `EvidenceLevel`: `S1`
 `StaleWhen`: Page IR、生成请求、编译器、RevisionPatch 或验证合同变化。
 
@@ -14,5 +14,5 @@ AI 输出先约束为 WebPageIntent、DesignSpec 和 Page IR，再生成 HTML/CS
 ## SourceRefs
 
 - `ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json` (`db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1`)
-- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`21d9ba62d4b55d67a42518b1cb3cbf53b8d2f0340122e1bc0ceac1341c723d40`)
+- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`718a9698d4aa78b833b1bd269609fbd8ec7bda3cfe0f466d5d0a3292f95a9a26`)
 - `ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1` (`7d12b4d1fcc1c312b08b4b653f156e44dfd7a9c8bea5461533978b69b826d52c`)

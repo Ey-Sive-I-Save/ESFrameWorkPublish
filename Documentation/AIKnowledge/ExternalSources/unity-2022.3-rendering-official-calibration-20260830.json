@@ -1,0 +1,64 @@
+{
+  "snapshotId": "unity-2022.3-rendering-official-calibration-20260830",
+  "retrievedUtc": "2026-08-30T00:00:00Z",
+  "authority": "Unity Technologies official documentation",
+  "productVersion": "Unity 2022.3; URP 14.x",
+  "sources": [
+    {
+      "url": "https://docs.unity3d.com/2022.3/Documentation/Manual/SRPBatcher.html",
+      "finalUrl": "https://docs.unity3d.com/2022.3/Documentation/Manual/SRPBatcher.html",
+      "claims": [
+        "SRP Batcher reduces CPU render-state setup for materials sharing a shader variant.",
+        "Compatible custom shaders place engine properties in UnityPerDraw and material properties in UnityPerMaterial.",
+        "MaterialPropertyBlock makes a renderer incompatible with SRP Batcher; GPU instancing can be preferable for many identical meshes and must be profiled."
+      ]
+    },
+    {
+      "url": "https://docs.unity3d.com/2022.3/Documentation/Manual/render-pipelines.html",
+      "finalUrl": "https://docs.unity3d.com/kr/2022.3/Manual/render-pipelines.html",
+      "claims": [
+        "Unity 2022.3 provides Built-in, URP, HDRP and custom SRP choices with different feature and performance characteristics."
+      ]
+    },
+    {
+      "url": "https://docs.unity3d.com/2022.3/Documentation/Manual/DynamicResolution.html",
+      "finalUrl": "https://docs.unity3d.com/ja/2022.3/Manual/DynamicResolution.html",
+      "claims": [
+        "Dynamic resolution support and platform constraints are version and backend dependent; it requires target-platform validation."
+      ]
+    },
+    {
+      "url": "https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/Volumes.html",
+      "finalUrl": "https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/Volumes.html",
+      "claims": [
+        "URP uses the Volume framework for global and local camera-dependent overrides, including post-processing settings.",
+        "Volume contributions depend on camera position and active Volume components; style templates must distinguish global defaults from local scene overrides."
+      ]
+    },
+    {
+      "url": "https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/integration-with-post-processing.html",
+      "finalUrl": "https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/integration-with-post-processing.html",
+      "claims": [
+        "URP integrates post-processing through its Volume framework and does not use the Post Processing Stack v2 package.",
+        "Post-processing effects and low-end constraints require explicit target-platform and readability validation."
+      ]
+    },
+    {
+      "url": "https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/urp-renderer-feature-how-to-add.html",
+      "finalUrl": "https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/urp-renderer-feature-how-to-add.html",
+      "claims": [
+        "URP Renderer Features are configured as children of a Renderer asset; they are a bounded composition point for passes such as SSAO, screen-space shadows and render objects.",
+        "Renderer Feature selection belongs to the ES quality/scene budget rather than arbitrary business-script mutation."
+      ]
+    },
+    {
+      "url": "https://docs.unity3d.com/6000.0/Manual/urp/decal-shader.html",
+      "finalUrl": "https://docs.unity3d.com/6000.0/Manual/urp/decal-shader.html",
+      "claims": [
+        "Unity 6 URP provides a built-in Decal Shader Graph path and supports custom decal shaders for project-specific presentation.",
+        "Decal adoption remains a Unity 6 forward-compatibility candidate and requires Renderer Feature and target-scene validation."
+      ]
+    }
+  ],
+  "scope": "Bounded calibration facts only; not Runtime, Frame Debugger, Profiler, Player or release evidence."
+}

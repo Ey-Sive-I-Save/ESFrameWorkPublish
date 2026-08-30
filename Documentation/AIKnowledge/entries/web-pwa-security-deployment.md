@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-pwa-security-deployment.v1`
 `Authority`: 当前 WebPageStudio 输出合同与 Backend/Kernel 边界
 `RouteKeys`: `web-pwa`, `web-offline`, `web-security`, `web-deployment`, `csp`
-`ContentHash`: `3e1d53b96a8093398c56a0870aa08202ad8cb717d23a442690d466a87d5a0fdb`
+`ContentHash`: `637fc259e9c17a339a38399bde9afccaf5dc6aac4fb89475987d9fb8ae7708c3`
 `EvidenceLevel`: `S1`
 `StaleWhen`: Manifest、offline package、CSP、部署合同或验证器变化。
 
@@ -14,6 +14,6 @@ Manifest、离线包和 Service Worker 必须拥有版本化缓存身份、明�
 ## SourceRefs
 
 - `ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json` (`db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1`)
-- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`21d9ba62d4b55d67a42518b1cb3cbf53b8d2f0340122e1bc0ceac1341c723d40`)
+- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`718a9698d4aa78b833b1bd269609fbd8ec7bda3cfe0f466d5d0a3292f95a9a26`)
 - `ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1` (`72fba7042e5da70008a5b30a9fa49dfcb6263b959d0120d677cb740808b78ad8`)
 - `Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md` (`54db99b92b4ba54f42fd981f3aadf813e9077d2ab788e14ee3932a94a6a8eb49`)

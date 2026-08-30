@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "creative-resource-license-official-20260830",
+  "retrievedUtc": "2026-08-30T00:00:00Z",
+  "sources": [
+    {
+      "url": "https://creativecommons.org/share-your-work/cclicenses/",
+      "product": "Creative Commons license overview",
+      "claim": "CC 许可条件必须逐项核对；商业使用、署名、相同方式共享、禁止衍生等条件不能由‘免费’字样推断。"
+    }
+  ],
+  "authorityNote": "许可证快照仅用于候选筛选；最终资源仍需保存作者、原始许可文本、版本、获取时间和内容哈希。"
+}

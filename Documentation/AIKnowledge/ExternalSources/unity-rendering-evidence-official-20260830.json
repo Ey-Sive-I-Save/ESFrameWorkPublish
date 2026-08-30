@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "unity-rendering-evidence-official-20260830",
+  "retrievedUtc": "2026-08-30T00:00:00Z",
+  "sources": [
+    {
+      "url": "https://docs.unity3d.com/cn/2022.3/Manual/FrameDebugger.html",
+      "product": "Unity 2022.3",
+      "claim": "Frame Debugger 可冻结并逐事件查看帧的渲染事件和图形状态；支持 URP。"
+    },
+    {
+      "url": "https://docs.unity3d.com/cn/2022.3/Manual/performance-profiling-tools.html",
+      "product": "Unity 2022.3",
+      "claim": "Profiler、Memory Profiler、Profile Analyzer 和 Frame Debugger 分别用于性能、内存、数据集比较和图形性能分析。"
+    },
+    {
+      "url": "https://docs.unity3d.com/2022.2/Documentation/Manual/profiler-profiling-applications.html",
+      "product": "Unity Profiler 2022.2",
+      "claim": "目标平台 Player 上的 Profiling 比 Editor Play Mode 更接近实际发布性能；Editor 采样不能替代目标设备证据。"
+    }
+  ],
+  "authorityNote": "网页仅作为外部校准快照，不覆盖 ESFramework 源码、AIWarnings 或运行证据权威。"
+}

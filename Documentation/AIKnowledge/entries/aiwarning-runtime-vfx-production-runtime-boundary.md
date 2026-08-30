@@ -6,9 +6,9 @@
 `EvidenceLevel`: `S1`  
 `RuntimeEvidence`: `runtime-not-run`  
 `HashSchema`: `v2`  
-`ContentHash`: `d2bc65da0d38c72f3947697af5344090f953a8e842949942b1d69d37df2100a8`  
-`SourceSetHash`: `d2bc65da0d38c72f3947697af5344090f953a8e842949942b1d69d37df2100a8`  
-`EntryBodyHash`: `84fa5244fb54ca55cb5f6a62970ef47b13f96c2a436c7f0085168f644b280998`
+`ContentHash`: `3c2e2f23c8a1da98a50f4895a03589ae4272c647485a130755c14f13632fcbb5`
+`SourceSetHash`: `3c2e2f23c8a1da98a50f4895a03589ae4272c647485a130755c14f13632fcbb5`
+`EntryBodyHash`: `ebc3997e3559e4e338aa74477ea2063532e3a77651200e68ce20e0d06ab7922b`
 `StaleWhen`: ESVfx contracts, module backend, Unity VFX package, resource/pool lifecycle or acceptance evidence changes.
 
 ## 迁移范围
@@ -33,11 +33,12 @@
 
 ## SourceRefs
 
-- `Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）/VFX运行时与制作边界_AI协作警告.md` (`27f8c8814cf63f836b2e36cd44fe3962a24d35b4e2811519d2e08d11d0615dc2`)
+- `Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）/VFX运行时与制作边界_AI协作警告.md` (`a6531ed0d60c4e137dad6c18db4481ee50d6f771b9649a5932b61fae887a1118`)
 - `Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESVfxInfo.cs` (`ad2a5bf071d8baf7e6c145e753626b18b2ada52f8dcc200b124314c68ac6c792`)
 - `Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ESVfxGroup.cs` (`905c38ab267181de9df38d4fb04ad01b878f963b6bdcc6752a769dfd4fbc442c`)
 - `Assets/Scripts/ESLogic/Data/GameCoreConfigKey/VFX/ESVfxConfigKeyData.cs` (`f58aaf0f55c4f29739c3fcbd234f2245561820b102d4167667005963899c1e17`)
-- `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESVfxModule.cs` (`738dd55a48c2b7ce3e01916d11145ba7a2409ca49e577b7ba4d74da1d3b4babf`)
+- `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESVfxModule.cs` (`b3d0f17f566ae10a5983d3b4844d7aac7105d61cc867c5c4620b7f568c28ee24`)
+- `Assets/Scripts/ESLogic/Runtime/Operation/Operations/09_GameObjectVFX/OpGameObjectVfx.cs` (`e3c9d637c5149a3a6f286ab41cb8a1dcd903e6875c6d5d3f8301989336162569`)
 
 ## EvidenceRefs
 

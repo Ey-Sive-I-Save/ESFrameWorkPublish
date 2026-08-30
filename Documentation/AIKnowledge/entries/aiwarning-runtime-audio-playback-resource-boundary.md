@@ -6,9 +6,9 @@
 `EvidenceLevel`: `S1`  
 `RuntimeEvidence`: `runtime-not-run`  
 `HashSchema`: `v2`  
-`ContentHash`: `20fb1032eee77580d90bc9a83273aa5f6a4587b289df4340438b44d84d7347e0`  
-`SourceSetHash`: `20fb1032eee77580d90bc9a83273aa5f6a4587b289df4340438b44d84d7347e0`  
-`EntryBodyHash`: `dd422a8f232cd6d4feba145081df27d5acfc604897bf42b00d7e00abebf94e52`  
+`ContentHash`: `9bc37e38c2d72d68278e614934cd07db4c3a682bc78d6b8c6e2a2fb067ec6fff`
+`SourceSetHash`: `9bc37e38c2d72d68278e614934cd07db4c3a682bc78d6b8c6e2a2fb067ec6fff`
+`EntryBodyHash`: `fd5048e5de288f0ec57270542d61bac01784a0eccfb1ee7d7fd8c9d66d053649`
 `StaleWhen`: AudioModule、Cue 身份、Voice/Provider 生命周期、资源 Scope 或预算合同变化。
 
 ## 迁移范围
@@ -26,10 +26,10 @@
 ## SourceRefs
 
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/音频（Audio）/音频播放与资源边界_AI协作警告.md` (`9a208ede3cd065ab6d014d79dfaf1950c4cf745e306e9f734f3e7b2259ccb712`)
-- `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESAudioModule.cs` (`16fb72b483fbb07d97d02c7d3bcfd7c814faba393b8f1901e9b3a9fd40621585`)
+- `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESAudioModule.cs` (`fe13e2579021f4e9837e5c3c0e87c664a9fae9064f4670e4d1db49bc56815f30`)
 - `Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Audio/ESAudioCueConfigKeyData.cs` (`4ec7876a695ca685881d2da6c9d2c1861fb4b0f1c82516fdf834e535b1bcc045`)
 - `Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESAudioCueInfo.cs` (`590fbbdd008c14d70e92b0478a6cd5aed655cdd6aada8a1f0c6b8ceeed2e2383`)
-- `Assets/Scripts/ESLogic/Runtime/Operation/Operations/10_Audio/OpAudio.cs` (`bfaf704b6e4d89b79ae63b60cbcdf2b378b57372250c70e3e03f0f6c1d4f5b59`)
+- `Assets/Scripts/ESLogic/Runtime/Operation/Operations/10_Audio/OpAudio.cs` (`8e52ddf47e2c0c08d92a9ab388fb7b9136911f920f31963a1677d56196799083`)
 - `Assets/Scripts/ESLogic/Runtime/Skill/TrackItemAndClip/SkillTrack/SkillTrackItems/SkillTrackItem_Audio.cs` (`399331b01058c23c00db44de07b8322072343543799a638c78d7e29bc492ef0d`)
 - `Assets/Scripts/ESLogic/Runtime/Command/Commands/COMMAND_ESCommandAudio.cs` (`50ad1255f96ec4887da2c244d2d3c3a9ab083cdd7397265c5bf0816fbbc081c9`)
 - `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESVfxAudioEmitter.cs` (`7b949ce87342c8378dc0c64ec3369d40350e94284c3a6d73d7429ce1f41b75b6`)

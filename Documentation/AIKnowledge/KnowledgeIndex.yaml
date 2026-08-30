@@ -40,6 +40,61 @@ qualityGate:
     sharedProjectionDeclaration: exact-per-binding
     duplicateFactAction: route-to-canonical-and-block-copy
 entries:
+  - knowledgeId: es.resource.free-sources.v1
+    file: entries/free-resource-sources.md
+    topic: 全球免费游戏资源来源与下载探针
+    routeKeys: [resource, asset, free-resource, open-source, texture, audio, 3d, 2d, font, tool, provenance, license, download, resource-pipeline]
+    relatedSkills: [es-resource-collection, es-knowledge-creator, es-ai-knowledge-curation, es-resource-pipeline]
+    requiredReads:
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - Documentation/AIKnowledge/KnowledgeIndex.yaml
+      - ES/AISpace/README.md
+      - ES/AISpace/Local/ResourceSources/20260830/resource-source-probe.json
+      - .agents/skills/es-resource-collection/SKILL.md
+      - .agents/skills/es-knowledge-creator/SKILL.md
+      - Documentation/AIKnowledge/entries/free-resource-sources.md
+    authority: external-primary-source-calibrated
+    evidenceLevel: S2
+    hashSchema: v2
+    sourceSetHash: fe55196b431805cb6c8a80235cbe13ade395cbfb96eeb2e659a295bcc6a72d4f
+    entryBodyHash: f1f13d2380ade03226b96fc50af2f24974026e64601459bcd76d91b82d55f405
+    contentHash: fe55196b431805cb6c8a80235cbe13ade395cbfb96eeb2e659a295bcc6a72d4f
+    staleWhen: 外部来源页面、许可证、下载地址、本地快照或资源收集合同变化时必须重新探测
+  - knowledgeId: es.external.aaa-camera-production-practice.v1
+    file: entries/aaa-camera-production-practice.md
+    topic: AAA级实时游戏相机制作方法（外部权威校准）
+    routeKeys: [camera, camera-production, third-person-camera, cinematography, camera-design, collision-avoidance, camera-occlusion, camera-transition, gameplay-camera, production-process]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator, es-game-logic-system-development, es-editor-tooling, es-adversarial-review]
+    requiredReads:
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - Documentation/AIKnowledge/KnowledgeIndex.yaml
+      - Documentation/AIKnowledge/ExternalSources/aaa-camera-production-provenance.v1.json
+      - Documentation/AIKnowledge/entries/aaa-camera-production-practice.md
+      - .agents/skills/es-knowledge-creator/SKILL.md
+      - .agents/skills/es-knowledge-validator/SKILL.md
+    authority: external-primary-source-calibrated
+    evidenceLevel: S2
+    hashSchema: v2
+    sourceSetHash: 72049c1c71fc20ab2b8d8ae5a9f8a5927f5d2f2968bdac33f65be9a411b5e799
+    entryBodyHash: efcaa0bcc188afb56c0643ed49c3dc0819e9d3b480ee2dbca918b6f0c0b09ac8
+    contentHash: 72049c1c71fc20ab2b8d8ae5a9f8a5927f5d2f2968bdac33f65be9a411b5e799
+    staleWhen: 外部来源版本/语义、本地来源快照、相机制作假设或本条目合同变化时必须复核
+  - knowledgeId: es.project.r2-camera-character-presentation.v1
+    file: entries/r2-camera-character-presentation.md
+    topic: R2 相机与角色表现（ES 相机仲裁、角色 Prefab、IK、Playable 与挂点）
+    routeKeys: [camera, camera-production, third-person-camera, camera-occlusion, camera-transition, entity, character, prefab, final-ik, state-machine, playable, socket, mapping]
+    relatedSkills: [es-entity-authoring, es-entity-prefab-validation, es-editor-tooling, es-editor-availability-validator, es-first-principles-analysis, es-adversarial-review, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+      - Documentation/AIKnowledge/KnowledgeIndex.yaml
+      - Documentation/AIKnowledge/entries/r2-camera-character-presentation.md
+      - Documentation/ES_CAMERA_RUNTIME_STANDARD.md
+      - Documentation/CHARACTER_PREFAB_CONTRACT.md
+      - Documentation/AIKnowledge/ExternalSources/unity-cinemachine-210-r2-camera-provenance-20260830.json
+    authority: Current ES camera/character source and contracts with Unity official calibration
+    evidenceLevel: S1
+    contentHash: 82af90fec035d717738e7ae58b75225dcd701ab138c1d1af8b0e2604aba54feb
+    staleWhen: 相机、角色 Prefab、IK、Playable、挂点合同或官方版本校准变化时必须复核
   - knowledgeId: es.skill.governance-creator.v1
     file: entries/skill-governance-creator.md
     topic: Skill 治理与 Creator 聚合
@@ -658,6 +713,28 @@ entries:
     sourceSetHash: 08ad3c814b81543da06277ccbcbbd3553727e18e2dec4deb91e40fc207c8c2d1
     entryBodyHash: 16ed9f38231281342d40c5ad357a06923c6b7ab4eca43bdfe629568151c58e78
     staleWhen: ScreenSpec v3 Token schema、Validator、Adapter、Materializer、字体/素材治理、视觉证据合同、官方来源锁或任一 SourceRef 哈希变化。
+  - knowledgeId: es.project.game-ui-hud-readability-contract.v1
+    file: entries/game-ui-hud-readability-contract.md
+    topic: R4 HUD 可读性、状态观察、遮挡预算、焦点与窗口生命周期契约
+    routeKeys: [hud-ui, ui-visual-design, ui-layout, ui-behavior-spec, ui-focus, visual-qa, evidence]
+    relatedSkills: [es-ui-prefab-authoring, es-editor-tooling, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/game-ui-hud-readability-contract.md
+      - Documentation/AIKnowledge/entries/game-ui-visual-design-system.md
+      - ES/AISpace/Local/CodexSessionTasks/20260830/R4-ui-hud-readability/TASK.md
+      - Documentation/AIKnowledge/ExternalSources/ui-hud-readability-official-snapshot.v1.json
+      - Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIRootCoordinator.cs
+      - Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIWindowLease.cs
+      - Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs
+      - Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs
+      - .agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md
+    authority: Current project UI source + governed UI contracts + bounded official calibration snapshot
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 6084c51335d6893bdd9dc0334907ff8bf684977f9f0085b48d778b79734be38f
+    sourceSetHash: 6084c51335d6893bdd9dc0334907ff8bf684977f9f0085b48d778b79734be38f
+    entryBodyHash: 124c806bc99faff17ea95885b270c4d6f911f060ab188701926b17c5e5488832
+    staleWhen: ESUIRootCoordinator、Window Lease、ScreenSpec/Materializer 合同、UI 视觉证据合同、AIWarnings RuleIndex 或官方校准快照变化。
   - knowledgeId: es.project.game-ui-capability-readiness.v1
     file: entries/game-ui-capability-readiness.md
     topic: 游戏 UI 自动测量、布局求解、素材、Token、Behavior Bridge、视觉评分与修复闭环的能力就绪判定
@@ -894,10 +971,10 @@ entries:
     topic: AudioCue、VFX、资源与预算运行机制
     routeKeys: [audio, audio-cue, voice, vfx, variant, budget, pool, resource, owner]
     relatedSkills: [es-gamecore-config-authoring, es-resource-pipeline, es-performance-budgeting, es-observability-evidence]
-    requiredReads: [Documentation/AIKnowledge/entries/audio-vfx-runtime.md, Assets/Plugins/ES/1_Design/Tests/ESAudioCueRuntimeTests.cs]
+    requiredReads: [Documentation/AIKnowledge/entries/audio-vfx-runtime.md, Assets/Plugins/ES/1_Design/Tests/ESAudioCueRuntimeTests.cs, Assets/Plugins/ES/1_Design/Tests/ESVfxOpSupportLifecycleTests.cs]
     authority: Source + AIWarnings
     evidenceLevel: S1
-    contentHash: 6ee1132fdfd415eb33ee7da2401bc14ccbe3d880362653bd1f03ed7b2b7977c3
+    contentHash: 6c2bb2e4a2186f550bbefa98ca2d232104090331a9fe4279d3524ebbb8623b12
     staleWhen: Cue/VFX 定义、资源解析、预算、Handle 或 Owner 生命周期变化
   - knowledgeId: es.project.runtime-ui-window-current-state.v1
     file: entries/runtime-ui-window-current-state.md
@@ -909,6 +986,32 @@ entries:
     evidenceLevel: S1
     contentHash: 229c18ba7edae4ed146f7ecfe0b137a5b3168aa0d5b4c147ca3489849139e7a2
     staleWhen: RuleIndex 状态、UI Window 源码、AICommand 或运行证据变化
+  - knowledgeId: es.project.runtime-ui-framework-core-current-state.v1
+    file: entries/runtime-ui-framework-core-current-state.md
+    topic: Runtime UI Framework Core 导航、焦点、状态、Overlay、转场与内容呈现合同
+    routeKeys: [runtime-ui-window, ui-root, ui-navigation, ui-focus, ui-state-binding, ui-overlay, ui-transition, ui-lifecycle, ui-content-presenter, lease]
+    relatedSkills: [es-api-contract-review, es-dependency-boundary-audit, es-test-fixture-authoring, es-knowledge-validator]
+    requiredReads: [Documentation/AIKnowledge/entries/runtime-ui-framework-core-current-state.md]
+    authority: Current runtime source + EditMode contract tests + AIWarnings RuleIndex
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: eca6c62781b9e70d362db7bfe16015a42a2a926b582dfcea8a99df7c4f0d2421
+    sourceSetHash: eca6c62781b9e70d362db7bfe16015a42a2a926b582dfcea8a99df7c4f0d2421
+    entryBodyHash: 1ee447dbbd6d54a3470a35f127c7b480cf23801dffcbe84f2e81db2e42f234c2
+    staleWhen: 任一 UI Runtime SourceRef 哈希、生命周期、Overlay、转场或 Unity EventSystem 合同变化
+  - knowledgeId: es.project.runtime-ui-framework-comparative-patterns.v1
+    file: entries/runtime-ui-framework-comparative-patterns.md
+    topic: 完备运行时 UI 框架对比与 ES 可迁移合同
+    routeKeys: [runtime-ui-window, ui-navigation, ui-focus, ui-input-routing, ui-overlay, ui-lifecycle, ui-state-binding, ui-testability]
+    relatedSkills: [es-ai-knowledge-curation, es-knowledge-creator, es-knowledge-validator, es-api-contract-review]
+    requiredReads: [Documentation/AIKnowledge/entries/runtime-ui-framework-comparative-patterns.md, Documentation/AIKnowledge/ExternalSources/ui-runtime-framework-comparison-official-20260830.json]
+    authority: Bounded official framework snapshots + current ES runtime UI source
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 5378e38faf2c59142b6488872e1a9f8f5843284d867ce89749518fa72f10a191
+    sourceSetHash: 5378e38faf2c59142b6488872e1a9f8f5843284d867ce89749518fa72f10a191
+    entryBodyHash: 98be961d8a58d84092aeb871913d7b9e52612a4b45deede0b4897a1bbc1e1b7e
+    staleWhen: 官方框架快照、ES UI 源码、输入系统或生命周期合同变化
   - knowledgeId: es.project.shader-atlas-rendering.v1
     file: entries/shader-atlas-rendering.md
     topic: Shader、SpriteAtlas 与 Dynamic Atlas 歧义路由投影
@@ -1367,6 +1470,98 @@ entries:
     evidenceLevel: S1
     contentHash: ac0708b6af73bdb4bae915c09846d8434c5addbeb612f48d104c1ba32f42c4da
     staleWhen: Unity 通用渲染知识、运行证据 P0、性能/可观察性/发布 Skill、Composite Shader Fixture 合同或任一 SourceRef 哈希变化
+  - knowledgeId: es.engineering.aaa-rendering-architecture.v1
+    file: Engineering/engineering-aaa-rendering-architecture/aaa-rendering-architecture.md
+    topic: ES 3A 个性化 Unity 渲染架构、三档质量与证据方案
+    routeKeys: [unity, rendering, aaa-rendering, rendering-architecture, quality-tier, urp, shader-variant, srp-batcher, gpu-instancing, lighting, shadow, post-processing, material-property-block, rendering-evidence, performance-budget]
+    relatedSkills: [es-first-principles-analysis, es-adversarial-review, es-knowledge-creator, es-knowledge-validator, es-performance-budgeting, es-unity-compile, es-observability-evidence]
+    requiredReads:
+      - Documentation/AIKnowledge/Engineering/engineering-aaa-rendering-architecture/aaa-rendering-architecture.md
+      - Documentation/AIKnowledge/ExternalSources/unity-2022.3-rendering-official-calibration-20260830.json
+      - ProjectSettings/GraphicsSettings.asset
+      - ProjectSettings/QualitySettings.asset
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESCompositeShaderParameters.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderIntent.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderQualityPolicy.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderStylePreset.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderStyleCatalog.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderContentTypeProfile.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderContentTypeManifest.json
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderSceneTemplateManifest.json
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderSceneIntent.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderPlatformProfile.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderFeatureRecipe.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderConfigurationResolver.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderMaterialRecipe.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderLightingRecipe.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEffectsRecipe.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderTemplateBundle.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderTemplateCatalog.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderTemplateResourceMap.cs
+      - ES/Tools/Validation/Test-ESRenderTemplateResourceClosure.ps1
+      - Assets/Plugins/ES/0_Stand/Rendering/ESStyleLit.shader
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NaturalPbr.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-StylizedToon.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NeonSciFi.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-NoirContrast.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-FantasyAtmosphere.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-MobileFlat.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-RetroPixel.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-HorrorGrit.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-CozyPastel.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Materials/ES-TacticalRealism.mat
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NaturalPbr.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-StylizedToon.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NeonSciFi.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-NoirContrast.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-FantasyAtmosphere.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-MobileFlat.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-RetroPixel.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-HorrorGrit.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-CozyPastel.volume.json
+      - Assets/Plugins/ES/0_Stand/Rendering/Volumes/ES-TacticalRealism.volume.json
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderTemplateManifest.json
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderTemplateProfiles.json
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderTemplatePlan.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRenderModule.cs
+      - Assets/Plugins/ES/Editor/ESShader/Tests/ESRenderModuleContractTests.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendSnapshot.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendChangePlan.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendDiff.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendApplyGate.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendReceipt.cs
+      - Assets/Plugins/ES/Editor/ESShader/Tests/ESRenderBackendContractTests.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendApplySession.cs
+      - Assets/Plugins/ES/Editor/ESShader/ESRenderBackendUnityWriter.cs
+      - Assets/Plugins/ES/Editor/ESShader/ESUnityProfilerMetricSource.cs
+      - Assets/Plugins/ES/Editor/ESShader/ESUrpRenderControlWindow.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBackendEvidenceReceipt.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderBudgetEvaluation.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderMetricSnapshot.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderMetricSamplingRequest.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderMetricCaptureSession.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderQualitySamplingQueue.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceReport.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceAggregateReport.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESUrpCompatibilityPolicy.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESUrpFeatureBudgetEvaluation.cs
+      - ES/Tools/Validation/Test-ESUrpQualityMatrix.ps1
+      - Assets/Plugins/ES/Editor/ESShader/ESRenderBackendEvidenceReceiptStore.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceBatch.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceBatchDiff.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceBatchBudgetAudit.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceBatchDecision.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidenceScenarioSummary.cs
+      - Assets/Plugins/ES/Editor/ESShader/ESRenderVolumeResourceSnapshot.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESRenderEvidencePathPolicy.cs
+      - Assets/Plugins/ES/Editor/ESShader/ESRenderBackendResourceSnapshot.cs
+      - Assets/Plugins/ES/Editor/ESShader/ESRenderShaderResourceSnapshot.cs
+      - Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESShaderVariantCompileLogParser.cs
+    authority: Current ES rendering source/configuration + AIWarnings + Unity 2022.3 official calibration snapshot
+    evidenceLevel: S1
+    contentHash: 36e06a2169291c1fc6b6bcb3a8220e50f3be05d58c349f719cf576545f1f299e
+    staleWhen: Unity/URP、Quality/Graphics/Renderer 配置、Composite Shader、AIWarnings、官方校准快照或渲染证据合同变化
   - knowledgeId: es.unity.serialization-prefab-identity.v1
     file: UnitySerializationPrefab/unity-serialization-prefab-identity.md
     topic: Unity 序列化、Prefab 与持久身份
@@ -1956,8 +2151,8 @@ entries:
   - knowledgeId: es.aiwarning.p0.playable-loop-runtime-evidence.v1
     file: entries/aiwarning-p0-playable-loop-runtime-evidence.md
     topic: P0 实际可玩闭环、玩家主链与运行证据边界
-    routeKeys: [aiwarnings, p0, playable-loop, runtime-evidence, playmode, profiler]
-    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit]
+    routeKeys: [aiwarnings, p0, playable-loop, runtime-evidence, playmode, profiler, game-core-loop, structure-validation, implementation-validation, presentation-validation, performance-validation, abcd, ai-abc]
+    relatedSkills: [es-aiwarning-authoring, es-ai-knowledge-curation, es-knowledge-validator, es-worktree-audit, es-game-core-loop-validation]
     requiredReads:
       - Documentation/AIKnowledge/entries/aiwarning-p0-playable-loop-runtime-evidence.md
       - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
@@ -1966,9 +2161,9 @@ entries:
     authority: AIWarnings + current runtime evidence and maturity contracts
     evidenceLevel: S1
     hashSchema: v2
-    contentHash: 5ced6b5736a30803fe3a8c6ff1a1cab97636243e7c9b120e34a27031fc7dfe1e
-    sourceSetHash: 5ced6b5736a30803fe3a8c6ff1a1cab97636243e7c9b120e34a27031fc7dfe1e
-    entryBodyHash: 5c84072ab8d923770c109ce17982db5bba950ca02b1eeb4cc63e90df6a1a710a
+    contentHash: d5a5946085442dcaed922a572fbe074b6a2a0690f9921b8f167b993add2eabdf
+    sourceSetHash: d5a5946085442dcaed922a572fbe074b6a2a0690f9921b8f167b993add2eabdf
+    entryBodyHash: 42b53dc2de8d7c1f1ea28ac05022749b802d2881b960e37deabbde5d53ea5816
     staleWhen: 运行闭环、测试场景、证据等级、成熟度或任一 SourceRef 哈希变化
   - knowledgeId: es.aiwarning.p0.il2cpp-toolchain-detection.v1
     file: entries/aiwarning-p0-il2cpp-toolchain-detection.md
@@ -2469,9 +2664,9 @@ entries:
     authority: AIWarnings + current audio runtime source
     evidenceLevel: S1
     hashSchema: v2
-    contentHash: 20fb1032eee77580d90bc9a83273aa5f6a4587b289df4340438b44d84d7347e0
-    sourceSetHash: 20fb1032eee77580d90bc9a83273aa5f6a4587b289df4340438b44d84d7347e0
-    entryBodyHash: dd422a8f232cd6d4feba145081df27d5acfc604897bf42b00d7e00abebf94e52
+    contentHash: 9bc37e38c2d72d68278e614934cd07db4c3a682bc78d6b8c6e2a2fb067ec6fff
+    sourceSetHash: 9bc37e38c2d72d68278e614934cd07db4c3a682bc78d6b8c6e2a2fb067ec6fff
+    entryBodyHash: fd5048e5de288f0ec57270542d61bac01784a0eccfb1ee7d7fd8c9d66d053649
     staleWhen: AudioModule、Cue 身份、Voice/Provider 生命周期、资源 Scope 或预算合同变化
   - knowledgeId: es.aiwarning.arch.ai-content-identity-gamecorekey-migration.v1
     file: entries/aiwarning-architecture-ai-content-identity-gamecorekey-migration.md
@@ -2526,12 +2721,13 @@ entries:
       - Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ESVfxGroup.cs
       - Assets/Scripts/ESLogic/Data/GameCoreConfigKey/VFX/ESVfxConfigKeyData.cs
       - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESVfxModule.cs
+      - Assets/Scripts/ESLogic/Runtime/Operation/Operations/09_GameObjectVFX/OpGameObjectVfx.cs
     authority: AIWarnings + current VFX runtime/editor source
     evidenceLevel: S1
     hashSchema: v2
-    contentHash: d2bc65da0d38c72f3947697af5344090f953a8e842949942b1d69d37df2100a8
-    sourceSetHash: d2bc65da0d38c72f3947697af5344090f953a8e842949942b1d69d37df2100a8
-    entryBodyHash: 84fa5244fb54ca55cb5f6a62970ef47b13f96c2a436c7f0085168f644b280998
+    contentHash: 3c2e2f23c8a1da98a50f4895a03589ae4272c647485a130755c14f13632fcbb5
+    sourceSetHash: 3c2e2f23c8a1da98a50f4895a03589ae4272c647485a130755c14f13632fcbb5
+    entryBodyHash: ebc3997e3559e4e338aa74477ea2063532e3a77651200e68ce20e0d06ab7922b
     staleWhen: ESVfx contracts、module backend、Unity VFX package、resource/pool lifecycle 或 acceptance evidence changes
   - knowledgeId: es.aiwarning.arch.player-entity-model-rebuild.v1
     file: entries/aiwarning-architecture-player-entity-model-rebuild.md
@@ -3264,7 +3460,7 @@ entries:
       - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
     authority: Current WebPageStudio source, contracts, validators and acceptance matrix
     evidenceLevel: S1
-    contentHash: 9abb149ba5bcd75f2993991f82a71e634a7035685cf37ab41bb0afca3de0c16f
+    contentHash: 98e2def5d87a0a6215dcd69fc2b10b873859036c82425ea27a348b247dc786b9
     staleWhen: WebPageStudio generator, request/generation/backend schema, validator behavior, acceptance matrix, or any SourceRef hash changes
   - knowledgeId: es.project.web-component-layout-route.v1
     file: entries/web-component-layout-route.md
@@ -3278,7 +3474,7 @@ entries:
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
     authority: Current WebPageStudio Kernel and Quality contract
     evidenceLevel: S1
-    contentHash: 0da6afdd9ef1d6768ba21ca7c7a5c11a7656117d6b263c85e7bb9805bfbd04f0
+    contentHash: 2e789ad92eeb8a109b50a0248ee3237447701f396be4bec58bc3b6d4c364a758
     staleWhen: Kernel schema, compiler, Quality validator, or Page IR changes
   - knowledgeId: es.project.web-page-generation-contracts.v1
     file: entries/web-page-generation-contracts.md
@@ -3291,8 +3487,68 @@ entries:
       - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
     authority: Current WebPageStudio static contract compatibility entry
     evidenceLevel: S1
-    contentHash: 0da6afdd9ef1d6768ba21ca7c7a5c11a7656117d6b263c85e7bb9805bfbd04f0
+    contentHash: 2e789ad92eeb8a109b50a0248ee3237447701f396be4bec58bc3b6d4c364a758
     staleWhen: Web contract schema, generator, or validator changes
+  - knowledgeId: es.project.web-creative-visual-design.v1
+    file: entries/web-creative-visual-design.md
+    topic: Web 创意视觉设计、动态表现与 3D 排版
+    routeKeys: [web-creative-design, web-motion, web-scroll-animation, web-view-transition, web-3d, web-typography, web-visual-hierarchy, web-reduced-motion]
+    relatedSkills: [es-web-generation-round-06-deep-design-html, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-creative-visual-design.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+    authority: Current WebPageStudio visual, motion and accessibility contracts
+    evidenceLevel: S1
+    contentHash: c54244a91939e2a3648b6a18136db89d0fc068d70dcbb2e7c425902617004845
+    staleWhen: Page IR, visual/motion contract, browser standard snapshot, or SourceRef hash changes
+  - knowledgeId: es.project.web-typography-layout.v1
+    file: entries/web-typography-layout.md
+    topic: Web 排版系统与视觉层级
+    routeKeys: [web-layout-system, web-typography, web-type-scale, web-editorial-grid, web-content-hierarchy, web-fluid-type, web-design-system]
+    relatedSkills: [es-web-generation-round-06-deep-design-html, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-typography-layout.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+    authority: Current WebPageStudio typography and visual hierarchy contracts
+    evidenceLevel: S1
+    contentHash: c54244a91939e2a3648b6a18136db89d0fc068d70dcbb2e7c425902617004845
+    staleWhen: Page IR, typography/theme contract, or SourceRef hash changes
+  - knowledgeId: es.project.web-motion-showcase.v1
+    file: entries/web-motion-showcase.md
+    topic: Web 动效展示与视觉叙事
+    routeKeys: [web-motion-showcase, web-scroll-animation, web-view-transition, web-hero-animation, web-3d-motion, web-performance-motion, web-motion-fallback]
+    relatedSkills: [es-web-generation-round-06-deep-design-html, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-motion-showcase.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+    authority: Current WebPageStudio motion and fallback contracts
+    evidenceLevel: S1
+    contentHash: c54244a91939e2a3648b6a18136db89d0fc068d70dcbb2e7c425902617004845
+    staleWhen: Motion contract, browser standard snapshot, or SourceRef hash changes
+  - knowledgeId: es.project.web-interaction-experience.v1
+    file: entries/web-interaction-experience.md
+    topic: Web 交互体验与状态反馈
+    routeKeys: [web-interaction, web-microinteraction, web-input-feedback, web-navigation, web-form-ux, web-state-design, web-accessible-interaction, web-cache, cache-invalidation, dynamic-state-replay]
+    relatedSkills: [es-web-generation-round-06-deep-design-html, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-interaction-experience.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+      - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+      - Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+    authority: Current WebPageStudio interaction and state contracts
+    evidenceLevel: S1
+    contentHash: 55414279b099e377187d3bbb4a0a7245737214b17c459f46d20baf9419124029
+    staleWhen: Interaction/Backend contract, accessibility validator, or SourceRef hash changes
   - knowledgeId: es.project.web-theme-design-tokens.v1
     file: entries/web-theme-design-tokens.md
     topic: Web 主题、强制配色与设计 Token
@@ -3304,7 +3560,7 @@ entries:
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
     authority: Current WebPageStudio theme and accessibility validators
     evidenceLevel: S1
-    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    contentHash: c54244a91939e2a3648b6a18136db89d0fc068d70dcbb2e7c425902617004845
     staleWhen: Theme tokens, media rules, Accessibility, or Quality behavior changes
   - knowledgeId: es.project.web-runtime-data-contract.v1
     file: entries/web-runtime-data-contract.md
@@ -3317,7 +3573,7 @@ entries:
       - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
     authority: Current Backend Contract and dynamic kernel boundary
     evidenceLevel: S1
-    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    contentHash: af9b2f49abd503cf1fa70c6950b0d5edc2c1af3ed5afa02ef2a5290162cc4c9d
     staleWhen: Backend schema, dynamic compiler, allowlist, or runtime policy changes
   - knowledgeId: es.project.web-content-seo-discovery.v1
     file: entries/web-content-seo-discovery.md
@@ -3330,7 +3586,7 @@ entries:
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
     authority: Current WebPageStudio SEO output and Quality contract
     evidenceLevel: S1
-    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    contentHash: c54244a91939e2a3648b6a18136db89d0fc068d70dcbb2e7c425902617004845
     staleWhen: SEO output, locale bundles, Sitemap, or discovery validator changes
   - knowledgeId: es.project.web-accessibility-performance-evidence.v1
     file: entries/web-accessibility-performance-evidence.md
@@ -3343,7 +3599,7 @@ entries:
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioAccessibility.ps1
     authority: Current Accessibility and Quality validators
     evidenceLevel: S1
-    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    contentHash: b86298ebeae8af7e272f788f15906f4fae8c4955ffd47da92b2e60138c01d70b
     staleWhen: Accessibility, Quality, performance budget, or acceptance matrix changes
   - knowledgeId: es.project.web-pwa-security-deployment.v1
     file: entries/web-pwa-security-deployment.md
@@ -3356,7 +3612,7 @@ entries:
       - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
     authority: Current WebPageStudio output and security boundary
     evidenceLevel: S1
-    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    contentHash: c54244a91939e2a3648b6a18136db89d0fc068d70dcbb2e7c425902617004845
     staleWhen: Manifest, offline package, CSP, deployment contract, or security validator changes
   - knowledgeId: es.project.web-testing-observability.v1
     file: entries/web-testing-observability.md
@@ -3375,7 +3631,7 @@ entries:
   - knowledgeId: es.project.web-ai-generation-repair.v1
     file: entries/web-ai-generation-repair.md
     topic: Web AI 生成、失败挖掘与修复
-    routeKeys: [web-ai-generation, web-prompt, web-repair, web-revision, web-knowledge]
+    routeKeys: [web-ai-generation, web-prompt, web-repair, web-revision, web-knowledge, prompt-engineering, prompt-evaluation]
     relatedSkills: [es-prompt-engineering, es-knowledge-creator, es-knowledge-validator]
     requiredReads:
       - Documentation/AIKnowledge/entries/web-ai-generation-repair.md
@@ -3384,7 +3640,7 @@ entries:
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1
     authority: Current WebPageStudio Page IR and Kernel contracts
     evidenceLevel: S1
-    contentHash: 6b12ae73746cb1d01158b2836a38366cb162c15aa31c74094eec83676bc4cf38
+    contentHash: 42218a014087798393fb591b1043833e5be7dac3d2c724fab050504d9dc84834
     staleWhen: Page IR, generation request, compiler, RevisionPatch, or validation contracts change
   - knowledgeId: es.project.web-open-source-calibration.v1
     file: entries/web-open-source-calibration.md
@@ -3397,5 +3653,72 @@ entries:
       - Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md
     authority: ES external-source migration boundary and current WebPageStudio contract
     evidenceLevel: S1
-    contentHash: 6b12ae73746cb1d01158b2836a38366cb162c15aa31c74094eec83676bc4cf38
+    contentHash: 620b296176873b31a55fee2e8ebf22896e4d7f354eb2d1d35c26e30df7e8f2fc
     staleWhen: External source lock, version, license, project contract, or migration mapping changes
+  - knowledgeId: es.project.resource-import-configuration.v1
+    file: entries/resource-import-configuration.md
+    topic: 常规资源导入与配置
+    routeKeys: [resource, asset, import, configuration, assetpackage, library]
+    relatedSkills: [es-resource-reader, es-resource-collection, es-resource-pipeline, es-knowledge-creator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/resource-import-configuration.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/0_Stand/_Res/Master/Shared/SoSupport/ESAssetLibrary.cs
+      - Assets/Plugins/ES/0_Stand/_Res/Master/Shared/SoSupport/ESAssetBookAndPage.cs
+    authority: Current ES source + AIWarnings P0
+    evidenceLevel: S1
+    contentHash: 6ea9c2319e419b3244ab227ca923a13268770f4a80411e14b47f373471c81344
+    staleWhen: 导入入口、Library/Book、身份注册或资源 P0 变化。
+  - knowledgeId: es.project.resource-management-architecture.v1
+    file: entries/resource-management-architecture.md
+    topic: 资源加载架构下的资源管理方案
+    routeKeys: [resource, manifest, provider, scope, resource-plan, lease, runtime]
+    relatedSkills: [es-resource-reader, es-resource-collection, es-resource-pipeline, es-resource-publish-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/resource-management-architecture.md
+      - Documentation/AIKnowledge/entries/resource-pipeline-runtime.md
+      - Assets/Plugins/ES/0_Stand/_Res/Runtime/ESAssetScope.cs
+      - Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESResourcePlanRuntimeService.cs
+    authority: Current ES resource source + AIWarnings P0
+    evidenceLevel: S1
+    contentHash: b146bf82f7cc29114cc2396bf24c6baef28cdc5bf33813b0c292fa752034cea1
+    staleWhen: Provider、Manifest、Scope、ResourcePlan 状态机或释放安全点变化。
+  - knowledgeId: es.external.free-resource-sites-calibration.v1
+    file: entries/free-resource-sites-calibration.md
+    topic: 热门免费资源站点校准清单
+    routeKeys: [resource, asset, free-assets, provenance, license, external-source]
+    relatedSkills: [es-resource-reader, es-resource-collection, es-knowledge-creator, es-ai-space-organization]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/free-resource-sites-calibration.md
+      - ES/AISpace/README.md
+    authority: Candidate list only; external-source-not-bound
+    evidenceLevel: S0
+    contentHash: 95c08e64a9203d17343294f0f7077863fe279c2b5d717a0f6b98cb15779bd22f
+    staleWhen: 站点条款、许可证、页面或版本发生变化。
+  - knowledgeId: es.project.unitypackage-parser.v1
+    file: entries/unitypackage-parser.md
+    topic: unitypackage 解析与导入边界
+    routeKeys: [resource, unitypackage, parser, import, provenance, assetpackage]
+    relatedSkills: [es-resource-reader, es-resource-collection, es-resource-pipeline, es-security-input-audit]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/unitypackage-parser.md
+      - .agents/skills/es-resource-collection/references/collection-contract.md
+      - Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs
+    authority: ES resource collection contract + Unity import boundary
+    evidenceLevel: S1
+    contentHash: 66c880a76d16b1509a4ae2bd981e2cf04a446d118416f9ec0f1ad4db6c0e99eb
+    staleWhen: AssetPackage 导入链、归档格式处理或资源安全规则变化。
+  - knowledgeId: es.project.creative-resource-evidence.v1
+    file: entries/creative-resource-evidence.md
+    topic: R5 创意资源与渲染证据最小闭环
+    routeKeys: [creative-resource, resource, provenance, license, rendering-evidence, frame-debugger, profiler, single-variable-test, evidence]
+    relatedSkills: [es-first-principles-analysis, es-adversarial-review, es-resource-collection, es-resource-publish-audit, es-observability-evidence, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/creative-resource-evidence.md
+      - Documentation/AIKnowledge/ExternalSources/unity-rendering-evidence-official-20260830.json
+      - Documentation/AIKnowledge/ExternalSources/creative-resource-license-official-20260830.json
+      - Documentation/AIKnowledge/Engineering/engineering-rendering-batching-evidence/rendering-batching-evidence-contract.md
+    authority: Current ES contracts + AIWarnings + bounded official-source snapshots
+    evidenceLevel: S1
+    contentHash: dea244b1488d40ed474d597ad9b8e86e6feebc54605d827e2d859c1dd8eaebf1
+    staleWhen: 资源发布链、AssetPackage、Composite Shader、相机/UI/VFX 合同、Unity 版本、外部来源快照或任一 SourceRef 哈希变化。

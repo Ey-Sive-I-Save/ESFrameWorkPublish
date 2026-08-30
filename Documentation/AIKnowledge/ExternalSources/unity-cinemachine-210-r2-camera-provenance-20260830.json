@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "unity-cinemachine-210-r2-camera-provenance-20260830",
+  "retrievedUtc": "2026-08-30T10:00:00Z",
+  "product": "Unity Cinemachine",
+  "version": "2.10.x",
+  "sources": [
+    {
+      "url": "https://docs.unity.cn/Packages/com.unity.cinemachine@2.10/manual/CinemachineCollider.html",
+      "title": "Cinemachine Collider",
+      "contract": "Collider post-processes a virtual camera position to preserve line of sight, uses physics raycasts, requires obstacle colliders, and has a measurable performance cost."
+    },
+    {
+      "url": "https://docs.unity3d.com/cn/current/Manual/Playables-Graph.html",
+      "title": "PlayableGraph",
+      "contract": "PlayableGraph owns playable/output lifecycle and must be explicitly destroyed."
+    }
+  ],
+  "staleWhen": "Unity/Cinemachine package version, documented collider/playable lifecycle semantics, or project camera ownership contracts change."
+}

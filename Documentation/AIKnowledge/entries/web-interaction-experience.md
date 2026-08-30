@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-interaction-experience.v1`
 `Authority`: WebPageStudio Page IR、动态 Backend Contract、Quality/Accessibility 合同与官方 Web 标准校准快照
 `RouteKeys`: `web-interaction`, `web-microinteraction`, `web-input-feedback`, `web-navigation`, `web-form-ux`, `web-state-design`, `web-accessible-interaction`, `web-cache`, `cache-invalidation`, `dynamic-state-replay`
-`ContentHash`: `97871553e0f88e6a568ec2b99c63e02bf2e803067e59cabaf23206589a48b035`
+`ContentHash`: `ad19ce2c7b2b01c9a3ab5812e6d0174945ca599c7cd11f6519f6fd0478a6f504`
 `EvidenceLevel`: `S1`
 `StaleWhen`: 交互/Backend Contract、Accessibility/Quality 验证器、路由语义或 SourceRef 哈希变化。
 
@@ -31,7 +31,7 @@ CSS Design Awards 的 UX/Innovation 分类和 Immersive Garden 的 One Year 案�
 ## SourceRefs
 
 - `ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json` (`db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1`)
-- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`21d9ba62d4b55d67a42518b1cb3cbf53b8d2f0340122e1bc0ceac1341c723d40`)
+- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`718a9698d4aa78b833b1bd269609fbd8ec7bda3cfe0f466d5d0a3292f95a9a26`)
 - `ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1` (`72fba7042e5da70008a5b30a9fa49dfcb6263b959d0120d677cb740808b78ad8`)
 - `Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md` (`54db99b92b4ba54f42fd981f3aadf813e9077d2ab788e14ee3932a94a6a8eb49`)
 - `ES/Automation/Contracts/es-web-dynamic-state-replay-v1.schema.json` (`2e94689ef36631d9022e8f58b01de2a7e7cbb595afc9f8e7e7ec90535bd27162`)

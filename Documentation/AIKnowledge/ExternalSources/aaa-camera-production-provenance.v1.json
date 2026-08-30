@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "registryId": "aaa-camera-production-provenance.v1",
+  "authority": "external-primary-source-snapshot",
+  "captureMode": "bounded-not-full-page",
+  "retrievedUtc": "2026-08-30T09:20:02.7252062Z",
+  "purpose": "为非ES框架的AAA级实时游戏相机制作方法提供可复核的外部校准；不证明ES或Unity运行时行为。",
+  "sources": [
+    {"id":"gdc-haigh-hutchinson-2005","title":"Fundamentals of Real-Time Camera Design","publisher":"GDC / Mark Haigh-Hutchinson, Retro Studios","productVersion":"GDC 2005 slides","url":"https://media.gdcvault.com/gdc05/slides/GD_Haigh-Hutchinson_FundamentalsReal-TimeCameraDesign2.pdf","boundedContract":"相机影响玩家满意度，应在设计早期投入专门资源；系统需协调视野、输入映射、环境/角色变化和竞争请求。","evidenceScope":"设计与生产原则"},
+    {"id":"gdc-nesky-50-camera","title":"50 Camera Mistakes","publisher":"GDC / John Nesky, thatgamecompany","productVersion":"GDC session","url":"https://www.gdcvault.com/play/1021262/50-Camera","boundedContract":"从失败案例识别镜头如何破坏方向感、距离判断、视线和舒适性。","evidenceScope":"失败模式与体验风险"},
+    {"id":"gdc-lacoste-tomb-raider","title":"Creating an Emotionally Engaging Camera","publisher":"GDC / Remi Lacoste, Crystal Dynamics","productVersion":"GDC session","url":"https://www.gdcvault.com/play/1018141/creating-an-emotionally-engaging-camera","boundedContract":"以Tomb Raider为例讨论情绪目标、艺术选择与技术实现之间的相机取舍。","evidenceScope":"镜头表现与协作流程"},
+    {"id":"epic-parrot-cameras","title":"Parrot Cameras in Unreal Engine","publisher":"Epic Games","productVersion":"Unreal Engine documentation","url":"https://dev.epicgames.com/documentation/en-us/unreal-engine/parrot-cameras-in-unreal-engine","boundedContract":"示例采用相机子系统、地图级设置、Follow/Fixed/None模式、触发区、阻挡网格和最后已知位置回退。","evidenceScope":"可迁移的相机导演/模式架构"},
+    {"id":"epic-gameplay-camera-system","title":"Gameplay Camera System Overview","publisher":"Epic Games","productVersion":"Unreal Engine experimental system","url":"https://dev.epicgames.com/documentation/en-us/unreal-engine/gameplay-camera-system-overview","boundedContract":"实验性系统将Camera Asset、Rig、Transition、Director和变量集合模块化；仅作架构启发，不视为发布质量保证。","evidenceScope":"模块化资产与过渡"},
+    {"id":"unity-cinemachine-3rd-person","title":"Cinemachine3rdPersonFollow API","publisher":"Unity Technologies","productVersion":"Cinemachine 2.6","url":"https://docs.unity3d.com/ja/Packages/com.unity.cinemachine@2.6/api/Cinemachine.Cinemachine3rdPersonFollow.html","boundedContract":"第三人称跟随器以水平枢轴和肩部垂直枢轴组织跟随目标，适合作为通用跟随几何参考。","evidenceScope":"第三人称跟随几何"},
+    {"id":"eurographics-visibility-camera-2009","title":"Visibility-aware Roadmap for Large-scale Camera Transitions","publisher":"Eurographics / SIGGRAPH","productVersion":"2009 paper","url":"https://diglib.eg.org/bitstreams/92f4df56-ac30-4413-bd38-3694bb354f68/download","boundedContract":"大尺度镜头切换需考虑可见性；局部第三人称模块应避免遮挡视点，平滑自然的运动是关键。","evidenceScope":"遮挡与过渡研究"}
+  ],
+  "staleWhen": "任一来源URL、产品版本、官方文档语义或本地快照内容变化；或需要将外部建议宣称为ES/Unity运行时事实时。"
+}

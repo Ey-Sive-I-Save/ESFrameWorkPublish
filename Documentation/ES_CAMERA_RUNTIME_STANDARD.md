@@ -85,3 +85,82 @@ Core 源码已具备：View/Lease、Base/Shot 仲裁、Modifier 合成、Scene E
 源码存在但尚未由 Unity 生成工程收录/域重载验收：`ESCameraModule`、TrackView 独立 Preview Factory/Session/渲染面板、SkillTrackItem_Camera 与 Timeline Request Bridge。尚未交付：具体 Timeline PlayableBehaviour/Clip Authoring、相机对 Blend、已生成玩家/载具内容资产的场景证据、锁敌策略、遮挡预算、随机乱序 PlayMode、Profiler/Player/IL2CPP 证据。
 
 不得把“源码存在”表述为“相机系统已冻结或已通过 PlayMode”。
+
+## 相机需求支持矩阵（vNext）
+
+本矩阵冻结“全部支持”的需求边界；每项必须能映射到现有
+`ESCameraRequest / ESCameraLease / ESCameraDirector / ESCameraViewDefinition /
+ESCameraCinemachine2ViewAdapter`，不得新增旁路 Camera Controller。
+
+### Blend 支持边界
+
+`ESCameraSceneBinding` 已将 `defaultBlend` 与 `CinemachineBlenderSettings` 注入同一
+`CinemachineBrain`，因此 Blend 配置不会由业务 Request 旁路写入。当前支持边界为：
+
+- 默认 Blend：由 Binding 的 `defaultBlend` 提供；
+- 自定义 Blend：由 Binding 的 `blenderSettings` 提供；
+- 业务切镜：仍只提交 Base/Shot Request，由 Director 选择唯一赢家；
+- 禁止业务直接修改 Brain、VCam Priority 或全局 Blend。
+
+尚未证明的部分：BlenderSettings 中的相机对是否覆盖全部 Definition/Rig 组合、切镜
+时序是否符合目标曲线，以及 PlayMode/Player 下的实际视觉结果。未取得这些证据前，
+Blend 只能标记为“源码已接线、运行时未验收”。
+
+| 需求域 | 必须支持的行为 | 权威入口 | 最小验收证据 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| 玩家跟随 | 目标枢轴、肩部偏移、距离、FOV、阻尼和帧率无关输入 | `ESCameraViewDefinition` + `ESCameraModule` | 不同刷新率与灵敏度回放；记录输入步长和最终轴值 | 源码存在；Runtime 未验收 |
+| 遮挡回缩 | 球/胶囊等价探针；墙角、窄门、坡面回缩；无可见点安全降级 | `ESCameraViewDefinition` + CM2 Adapter Collider | 命中层、半径、最小距离、回缩/恢复耗时与截图/回放 | 配置与写入存在；Unity 未验收 |
+| 目标生命周期 | 销毁、回池、失活、换场景、传送后旧 Lease 失效并转安全锚点 | `ESCameraDirector` SceneEpoch/Generation + Module | 目标失效事件、旧 Lease 拒绝、冻结/转移轨迹 | 静态合同存在；Runtime 未验收 |
+| 请求仲裁 | `priority → Shot > Base → submissionSequence` 唯一赢家；Modifier 仅作用于赢家 | `ESCameraDirector` | 同帧多 Owner 重放，输出唯一且序列稳定 | 有 Director 测试；扩展场景未验收 |
+| 构图适配 | FOV、宽高比、安全框、兴趣点在 16:9/21:9/窄屏下保持可读 | `ESCameraViewDefinition` + Rig 内容 | 分辨率矩阵截图；角色与目标不越安全框 | 字段存在；Player 未验收 |
+| 模式扩展 | Player/Vehicle/Shot/Timeline/Preview 复用同一请求与资源链 | Module/Director/Catalog/Preview Session | 模式切换、释放、预览隔离和资源实例计数 | Player/Vehicle 部分存在；Timeline Authoring 未交付 |
+| 性能预算 | 仅赢家执行避障；稳态不实例化 Rig；LateTick 同帧只提交一次 | Director + Adapter + RigRegistry | Profiler 记录查询次数、分配、实例化峰值和降级原因 | 静态约束存在；Profiler 未运行 |
+
+### 统一失败处理
+
+- 无有效目标：冻结最近安全姿态，随后平滑到默认安全锚点；禁止回退到未验证根节点或骨骼。
+- 无可见点：按“最近可见点 → 替代视点 → 最后安全姿态”降级，并记录稳定失败码。
+- Definition/Rig/Collider 缺失，或启用避障却未配置碰撞层：拒绝应用该请求并报告错误；不得静默创建组件、按路径加载或猜测替代资产。
+- 旧 Lease、失活 Owner 或旧 SceneEpoch：拒绝更新/Look/Release 对新槽位的影响。
+
+### 完成声明边界
+
+满足本矩阵的静态字段、类型和测试，只能证明源码/合同覆盖；不能替代 Unity 域重载、Prefab 序列化、PlayMode、设备舒适度、Profiler、Player、IL2CPP 或发布证据。未取得对应证据的项必须保持 `runtime-not-run` 或 `unproven`。
+
+## 3A体感强化合同（保持ES命名与权威）
+
+本节只吸收外部AAA制作中的可迁移效果与验证方法，不复制外部团队组织、类名、目录或资源加载体系。现有 `ESCameraSceneBinding`、`ESCameraModule`、`ESCameraDirector`、`ESCameraViewDefinition`、`ESCameraViewDefinitionCatalog`、`ESCameraRigCatalog`、`ESCameraSceneRigRegistry`、`ESCameraCinemachine2ViewAdapter` 和 `ESCameraTimelineRequestBridge` 的身份保持不变。
+
+### 权威不变量
+
+- ES 请求、Lease、Director 和 Catalog 是唯一业务权威；Cinemachine 2.10.5 只是经 `ESCameraCinemachine2ViewAdapter` 授权的执行后端。
+- 相机 Rig 只能由 ES 资源链解析：Resource/Manifest/Bundle Index → `ESCameraRigCatalog` → `ESCameraSceneRigRegistry`；业务代码和 Cinemachine 不得自行按路径加载相机资源。
+- 每个正式 View 只能由一个 `ESCameraSceneBinding` 注册；Output Camera、CinemachineBrain、Catalog、BlendSettings 与 RigRoot 必须属于同一 Binding 生命周期。
+- 所有相机输入、切镜和表现修饰均转为 `ESCameraRequest` / `ESCameraLease` / Modifier；禁止直接写 VCam Priority、Follow、LookAt、Axis、Blend。
+- 预览和正式运行时拥有独立 Director、Binding、RigRegistry、SceneEpoch 与 Lease；预览不得修改正式 View。
+
+### 体感目标（不新增类型）
+
+- `ESCameraViewDefinition` 提供跟随距离、肩部偏移、FOV、输入灵敏度、阻尼和遮挡基线。
+- `ESCameraDirector` 只负责请求仲裁与 Modifier 合成，不承载 Cinemachine 具体实现。
+- `ESCameraCinemachine2ViewAdapter` 负责 Follow/Aim、Collider、Lens、Noise、Impulse 和 Blend 的执行写入。
+- Player、Vehicle、Shot、Timeline 等模式通过现有 DefinitionKey、RigKey、Base/Shot/Modifier 和优先级表达，不建立平行模式系统。
+- 墙角、窄门、斜坡、楼梯、目标丢失、快速转向和分辨率变化必须在代表性灰盒中提前验证。
+
+### 性能与扩展预算
+
+- `LateTick` 是唯一正常提交点；同帧重复调用不得重复写入 Adapter。
+- 稳态 Push/Update/Release 不触发 Cinemachine Rig 实例化；实例化与 Modifier 基线建立只发生在 Binding 预热或首次解析阶段。
+- 只有当前获胜 Rig 执行 Collider 和 Modifier 应用；不为非赢家持续执行避障或镜头修饰。
+- 新增镜头模式必须复用现有 Request/Definition/Catalog/Adapter 链，不能增加第二个 Director 或资源入口。
+- 未取得 Profiler、PlayMode 和 Player 证据前，不得声明零GC、商业级帧率、设备舒适度或发布通过。
+
+### 强化验收矩阵
+
+|范围|必须证明|禁止替代的弱证据|
+|---|---|---|
+|权威|业务只能通过 ES Module/Director/Lease 控制镜头|Cinemachine Inspector 可见或场景里存在 VCam|
+|资源|RigKey 经 ES Catalog 和 SceneRigRegistry 解析、预热、释放|Prefab 路径存在或手工拖拽引用|
+|体感|碰撞回缩、遮挡恢复、切镜、目标丢失和输入响应|静态字段配置或单张截图|
+|性能|稳态无新增分配、查询预算和实例化峰值可重放|源码“看起来没有 new”|
+|扩展|Player/Vehicle/Timeline/Preview 不旁路且可独立回收|复制一套 Camera Controller|

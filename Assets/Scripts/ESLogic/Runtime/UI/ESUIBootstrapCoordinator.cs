@@ -110,7 +110,13 @@ namespace ES
         {
             if (disposed) return;
             disposed = true;
-            foreach (Attempt attempt in attempts.Values) attempt.Cancellation.Cancel();
+            foreach (KeyValuePair<string, Attempt> pair in attempts)
+            {
+                Attempt attempt = pair.Value;
+                attempt.Cancellation.Cancel();
+                attempt.Completion.TrySetResult(
+                    ESUIBootstrapResult.Create(pair.Key, ESUIBootstrapState.Stopped, null, attempt.Number));
+            }
             attempts.Clear();
         }
 

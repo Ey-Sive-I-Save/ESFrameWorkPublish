@@ -13,6 +13,12 @@ AIKnowledge 解决“针对一个任务挑选最小相关知识集合”的问�
 三态落地可用性评分规范见：[`tools/ESKnowledgeEffectivenessRubric.md`](tools/ESKnowledgeEffectivenessRubric.md)。
 本轮初步三态观察见：[`reports/knowledge-routing-quality-three-state-preliminary.md`](reports/knowledge-routing-quality-three-state-preliminary.md)；该报告不是正式验收证据。
 
+WebPageStudio 知识覆盖与缺口入口见：[`WebKnowledgeCoverageMatrix.yaml`](WebKnowledgeCoverageMatrix.yaml)。该矩阵只做静态路由、证据层和缺口导航，不把 runtime-not-run 或外部资料 Deferred 升级为通过。
+覆盖矩阵静态审计：`Documentation/AIKnowledge/tools/Test-ESWebKnowledgeCoverage.ps1 -ProjectRoot . -Json`。
+外部官方资料校准请求包：[`WebKnowledgeExternalSourcePlan.yaml`](WebKnowledgeExternalSourcePlan.yaml)；官方静态快照已建立，后续仍需版本/许可证复核与运行时验证。
+计划边界审计：`Documentation/AIKnowledge/tools/Test-ESWebKnowledgeExternalSourcePlan.ps1 -ProjectRoot . -Json`。
+Web 统一静态门禁：`Documentation/AIKnowledge/tools/Test-ESWebKnowledgeStaticGate.ps1 -ProjectRoot . -Json`。
+
 ## 使用理念：以落地决策为中心
 
 Knowledge 的价值不是替 AI 读完全部源码，也不是让 AI 背诵摘要；它应当用最小的、可追溯的路由集合，
@@ -116,6 +122,7 @@ Documentation/AIKnowledge/
 ├── AIWarningsGeneratedInventory.json
 ├── AIKnowledgeFreshness.json
 ├── AIKnowledgeFreshnessContract.md
+├── WebKnowledgeCoverageMatrix.yaml
 └── entries/
     ├── aibrain-orchestration.md
     ├── authority-and-startup.md

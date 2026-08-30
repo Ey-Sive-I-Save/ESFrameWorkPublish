@@ -890,6 +890,9 @@ namespace ES
             {
                 runId = active.Record.runId,
                 executionStatus = result.status,
+                // Task dispatch/mutation is an editor/external-effect authority,
+                // not a lenient collaboration-only observation.
+                authorityDomain = "editor-tooling",
                 freshnessPolicy = CreateAcceptanceCriteria().freshnessPolicy,
                 traceReconciled = true,
                 criterionResults = new List<ESAutomationCriterionResult>
@@ -1002,6 +1005,7 @@ namespace ES
                 {
                     ESAutomationRunRecord record = JsonConvert.DeserializeObject<ESAutomationRunRecord>(
                         File.ReadAllText(recordPath, new UTF8Encoding(false, true)));
+                    if (record != null) record.Validate();
                     if (record == null || !Specs.ContainsKey(record.taskId)
                         || ESAutomationRunStatus.IsTerminal(record.status)) continue;
                     ESAutomationRunStatus.Transition(record, ESAutomationRunStatus.Failed);
@@ -1076,6 +1080,7 @@ namespace ES
                 File.ReadAllText(path, new UTF8Encoding(false, true)));
             if (record == null || record.taskId != taskId || record.taskVersion != TaskVersion)
                 throw new InvalidDataException("飞书任务 RunRecord 身份无效。");
+            record.Validate();
             return record;
         }
 

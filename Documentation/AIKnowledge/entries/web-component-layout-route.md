@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.web-component-layout-route.v1`
 `Authority`: 当前 WebPageStudio Kernel 与 Quality 合同
 `RouteKeys`: `web-component`, `web-layout`, `web-route`, `web-page-generation`, `responsive`
-`ContentHash`: `74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d`
+`ContentHash`: `0da6afdd9ef1d6768ba21ca7c7a5c11a7656117d6b263c85e7bb9805bfbd04f0`
 `EvidenceLevel`: `S1`
 `StaleWhen`: Kernel schema、编译器、Quality 验证器或页面 IR 变化。
 
@@ -12,5 +12,5 @@
 ## SourceRefs
 
 - `ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json` (`db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1`)
-- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`0a958512aa4ead4dfcfb1b70ca19b62f12433862f6830bee0eef089a6475838b`)
+- `ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1` (`2ac243a6670aea28409412228375614720327a158139a351211b985e9ca70650`)
 - `ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1` (`72fba7042e5da70008a5b30a9fa49dfcb6263b959d0120d677cb740808b78ad8`)

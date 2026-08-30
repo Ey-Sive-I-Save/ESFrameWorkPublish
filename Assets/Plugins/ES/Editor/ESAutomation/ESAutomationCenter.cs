@@ -449,6 +449,107 @@ namespace ES
         public ESAutomationTraceReconciliation traceReconciliation;
         // Optional, validated projection for untrusted external collaboration evidence.
         public ESAutomationExternalEvidenceReceipt externalEvidence;
+
+        public void Validate()
+        {
+            if (protocolVersion != 1)
+                throw new InvalidOperationException("不支持的 Automation RunRecord 协议版本。");
+            if (string.IsNullOrWhiteSpace(taskId)
+                || !Regex.IsMatch(taskId, "^es\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"))
+                throw new InvalidOperationException("RunRecord 的 TaskId 无效。");
+            if (taskVersion < 1)
+                throw new InvalidOperationException("RunRecord 的任务版本无效。");
+            if (!Guid.TryParseExact(runId, "N", out _))
+                throw new InvalidOperationException("RunRecord 的 RunId 必须是 N 格式 GUID。");
+
+            new ESAutomationWorkerRegistration
+            {
+                type = workerType,
+                workerId = workerId,
+                version = workerVersion,
+                entrypointHash = entrypointHash,
+            }.Validate();
+
+            if (status != ESAutomationRunStatus.Created
+                && status != ESAutomationRunStatus.Starting
+                && status != ESAutomationRunStatus.Accepted
+                && status != ESAutomationRunStatus.Running
+                && status != ESAutomationRunStatus.Completed
+                && status != ESAutomationRunStatus.Failed
+                && status != ESAutomationRunStatus.Cancelled
+                && status != ESAutomationRunStatus.TimedOut
+                && status != ESAutomationRunStatus.Blocked
+                && status != ESAutomationRunStatus.DryRun)
+                throw new InvalidOperationException("RunRecord 的状态无效：" + status);
+            if (retryCount < 0)
+                throw new InvalidOperationException("RunRecord 的 retryCount 不能为负数。");
+            if (string.IsNullOrWhiteSpace(startedAtUtc)
+                || !DateTimeOffset.TryParse(startedAtUtc, out DateTimeOffset startedAt))
+                throw new InvalidOperationException("RunRecord 必须记录有效的 startedAtUtc。");
+            if (!string.IsNullOrWhiteSpace(lastUpdatedAtUtc)
+                && !DateTimeOffset.TryParse(lastUpdatedAtUtc, out _))
+                throw new InvalidOperationException("RunRecord 的 lastUpdatedAtUtc 格式无效。");
+            if (!string.IsNullOrWhiteSpace(finishedAtUtc))
+            {
+                if (!DateTimeOffset.TryParse(finishedAtUtc, out DateTimeOffset finishedAt))
+                    throw new InvalidOperationException("RunRecord 的 finishedAtUtc 格式无效。");
+                if (finishedAt < startedAt)
+                    throw new InvalidOperationException("RunRecord 的 finishedAtUtc 不能早于 startedAtUtc。");
+            }
+            else if (ESAutomationRunStatus.IsTerminal(status))
+            {
+                throw new InvalidOperationException("RunRecord 的终态必须记录 finishedAtUtc。");
+            }
+            if (!string.IsNullOrWhiteSpace(idempotencyKey)
+                && (idempotencyKey.Length > 160 || !Regex.IsMatch(idempotencyKey, "^[A-Za-z0-9._:-]+$")))
+                throw new InvalidOperationException("RunRecord 的 idempotencyKey 格式无效。");
+            if (!ESAutomationWorkerRegistration.IsSha256(inputManifestHash))
+                throw new InvalidOperationException("RunRecord 必须记录输入 Manifest SHA-256。");
+            if (!string.IsNullOrWhiteSpace(invocationHash)
+                && !ESAutomationWorkerRegistration.IsSha256(invocationHash))
+                throw new InvalidOperationException("RunRecord 的 invocationHash 无效。");
+            if (!string.IsNullOrWhiteSpace(riskAcceptanceHash)
+                && !ESAutomationWorkerRegistration.IsSha256(riskAcceptanceHash))
+                throw new InvalidOperationException("RunRecord 的 riskAcceptanceHash 无效。");
+            if (acceptedRiskCodes == null || outputs == null || outputHashes == null
+                || findings == null || errors == null)
+                throw new InvalidOperationException("RunRecord 的集合字段不得为 null。");
+            if (outputs.Count != outputHashes.Count)
+                throw new InvalidOperationException("RunRecord 的输出路径与输出 Hash 数量不一致。");
+            foreach (string outputHash in outputHashes)
+            {
+                if (!ESAutomationWorkerRegistration.IsSha256(outputHash))
+                    throw new InvalidOperationException("RunRecord 包含无效输出 SHA-256。");
+            }
+            foreach (string output in outputs)
+            {
+                if (string.IsNullOrWhiteSpace(output))
+                    throw new InvalidOperationException("RunRecord 包含空输出路径。");
+                string normalizedOutput = output.Replace('\\', '/').Trim();
+                if (normalizedOutput.Split('/').Any(segment => segment == ".."))
+                    throw new InvalidOperationException("RunRecord 输出路径不得包含 .. 穿越：" + output);
+            }
+            if (executionSnapshot != null)
+                executionSnapshot.Validate();
+            if (completionDecision != null)
+            {
+                completionDecision.Validate();
+                if ((string.Equals(completionDecision.authorityRiskClass, "high", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(completionDecision.authorityRiskClass, "critical", StringComparison.OrdinalIgnoreCase))
+                    && string.IsNullOrWhiteSpace(completionDecision.authorityDomain))
+                    throw new InvalidOperationException("RunRecord 的高风险 CompletionDecision 必须显式声明 authorityDomain。");
+                if (!string.Equals(completionDecision.runId, runId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("RunRecord 的 CompletionDecision 必须绑定同一 RunId。");
+            }
+            if (traceReconciliation != null)
+                traceReconciliation.Validate();
+            if (externalEvidence != null)
+            {
+                externalEvidence.Validate();
+                if (!string.Equals(externalEvidence.runId, runId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("RunRecord 的 externalEvidence 必须绑定同一 RunId。");
+            }
+        }
     }
 
     [Serializable]
@@ -525,6 +626,10 @@ namespace ES
             if (completionDecision != null)
             {
                 completionDecision.Validate();
+                if ((string.Equals(completionDecision.authorityRiskClass, "high", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(completionDecision.authorityRiskClass, "critical", StringComparison.OrdinalIgnoreCase))
+                    && string.IsNullOrWhiteSpace(completionDecision.authorityDomain))
+                    throw new InvalidOperationException("RunResult 的高风险 CompletionDecision 必须显式声明 authorityDomain。");
                 if (!string.Equals(completionDecision.runId, runId, StringComparison.Ordinal))
                     throw new InvalidOperationException("RunResult 的 CompletionDecision 必须绑定同一 RunId。");
             }
@@ -1241,6 +1346,9 @@ namespace ES
         // Public UserSpace registration cards are bounded, non-Unity artifacts. They
         // are intentionally separate from Assets and from private ignored UserSpace data.
         public static string PublicPeopleRoot => Path.Combine(ProjectRoot, "ES", "AISpace", "Public", "People");
+        // Public TeamSpace registration cards share the same bounded non-Unity
+        // governance boundary as People cards and must be explicitly declared.
+        public static string PublicTeamsRoot => Path.Combine(ProjectRoot, "ES", "AISpace", "Public", "Teams");
 
         public static string Normalize(string path)
         {
@@ -1360,8 +1468,8 @@ namespace ES
                     Path.Combine(ProjectRoot, "Assets", "UI"),
                     Path.Combine(ProjectRoot, "ES", "UIEvidence"),
                     Path.Combine(ProjectRoot, "ES", "Output", "TaskContextRuntime"),
-                    PublicPeopleRoot }))
-                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI、ES/UIEvidence、TaskContextRuntime 或 ES/AISpace/Public/People：" + normalized);
+                    PublicPeopleRoot, PublicTeamsRoot }))
+                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI、ES/UIEvidence、TaskContextRuntime、ES/AISpace/Public/People 或 ES/AISpace/Public/Teams：" + normalized);
         }
 
         private static IEnumerable<string> ProtectedWriteRoots
@@ -1745,6 +1853,21 @@ namespace ES
                     })
                 .WithUnityIcon("Clipboard")
                 .WithPriority(30));
+            actions.Add(new ESMenuTreePageAction(
+                    "automation.validate-deepseek",
+                    "检查 DSH 链路",
+                    "检查 DeepSeek Harness 的本地运行时、Profile、依赖锁和凭据存在性。",
+                    context =>
+                    {
+                        ESDeepSeekHarnessAutomation.DeepSeekHarnessStatus status = ESDeepSeekHarnessAutomation.RunLocalCheck(true);
+                        string detail = status.state == "Connected"
+                            ? "DSH 本地运行时已就绪。\n\n作用：高权威开发贡献层；ES 仍保留权限、证据和最终完成权。"
+                            : "未接入：" + status.message + "\n\n恢复：" + status.nextAction;
+                        EditorUtility.DisplayDialog(status.state == "Connected" ? "DSH 已接入" : "DSH 未接入", detail, "关闭");
+                        context.SetStatus(status.state == "Connected" ? "DSH 链路已接入" : "DSH 未接入", status.state == "Connected" ? ESMenuTreePageStatus.Info : ESMenuTreePageStatus.Warning);
+                    })
+                .WithUnityIcon("d_CloudConnect")
+                .WithPriority(110));
         }
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
@@ -1759,6 +1882,12 @@ namespace ES
             EditorGUILayout.LabelField("Worker 写 Assets", "禁止");
             EditorGUILayout.LabelField("发布门禁", "失败或缺少结构化报告时阻止");
             EditorGUILayout.LabelField("受管进程", ESManagedProcessRegistry.ActiveCount + " 个（ReloadDomain 前统一终止）");
+
+            EditorGUILayout.Space(8f);
+            DrawDeepSeekHarnessStatus();
+
+            EditorGUILayout.Space(8f);
+            DrawCodexAppServerStatus();
 
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("已注册原型", EditorStyles.boldLabel);
@@ -1809,6 +1938,70 @@ namespace ES
             finally
             {
                 EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private static void DrawDeepSeekHarnessStatus()
+        {
+            EditorGUILayout.LabelField("DSH 接入状态", EditorStyles.boldLabel);
+            ESDeepSeekHarnessAutomation.DeepSeekHarnessStatus status = ESDeepSeekHarnessAutomation.GetStatus(true);
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            {
+                GUIContent icon = EditorGUIUtility.IconContent("d_CloudConnect");
+                if (icon != null && icon.image != null) GUILayout.Label(icon, GUILayout.Width(24f), GUILayout.Height(24f));
+                EditorGUILayout.BeginVertical();
+                EditorGUILayout.LabelField(
+                    status.state == "Connected" ? "DSH · 已接入" : "DSH · 未接入",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("作用", "高权威开发贡献层（候选分析/实现）；ES 保留最终验收权。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("状态", status.state == "Connected" ? status.message : status.message, EditorStyles.wordWrappedMiniLabel);
+                if (status.state != "Connected")
+                    EditorGUILayout.LabelField("恢复", status.nextAction, EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.EndVertical();
+            }
+            if (GUILayout.Button("检查 DSH 链路", GUILayout.Height(22f)))
+            {
+                ESDeepSeekHarnessAutomation.DeepSeekHarnessStatus current = ESDeepSeekHarnessAutomation.RunLocalCheck(true);
+                EditorUtility.DisplayDialog(
+                    current.state == "Connected" ? "DSH 已接入" : "DSH 未接入",
+                    current.state == "Connected"
+                        ? "本地 DSH 运行时与 Provider 凭据存在性检查通过，可执行 DryRun；真实调用仍需 ES 任务授权。"
+                        : current.message + "\n\n" + current.nextAction,
+                    "关闭");
+            }
+        }
+
+        private static void DrawCodexAppServerStatus()
+        {
+            EditorGUILayout.LabelField("Codex App Server 接入状态", EditorStyles.boldLabel);
+            ESCodexAppServerAutomation.CodexAppServerStatus status =
+                ESCodexAppServerAutomation.GetStatus();
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            {
+                GUIContent icon = EditorGUIUtility.IconContent("d_CloudConnect");
+                if (icon != null && icon.image != null)
+                    GUILayout.Label(icon, GUILayout.Width(24f), GUILayout.Height(24f));
+                EditorGUILayout.BeginVertical();
+                EditorGUILayout.LabelField(
+                    status.registered ? "Codex App Server · 合同已注册" : "Codex App Server · 接入不完整",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    "作用",
+                    "只读外部执行候选层；ES 保留用户授权、证据和最终业务完成权。",
+                    EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("合同状态", status.message, EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("运行态", status.runtimeStatus, EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.EndVertical();
+            }
+            if (GUILayout.Button("检查 Codex 合同（不启动运行时）", GUILayout.Height(22f)))
+            {
+                ESCodexAppServerAutomation.CodexAppServerStatus current =
+                    ESCodexAppServerAutomation.GetStatus();
+                EditorUtility.DisplayDialog(
+                    current.registered ? "Codex 合同已注册" : "Codex 合同未完整注册",
+                    current.message + "\n\n运行态：" + current.runtimeStatus
+                        + "\n\n此检查不会启动 Codex、访问 Provider 或修改项目源文件。",
+                    "关闭");
             }
         }
 
@@ -1954,7 +2147,7 @@ namespace ES
                 fromAi = false,
                 actorId = "editor.user",
             });
-            if (result.status == "Accepted")
+            if (result.status == "Accepted" || result.status == "Completed")
             {
                 Debug.Log("[ESAutomation] 快速任务已接受：" + descriptor.taskId + " / RunId=" + result.runId);
                 SceneView.lastActiveSceneView?.ShowNotification(new GUIContent("已启动：" + descriptor.displayName));
@@ -2269,10 +2462,19 @@ namespace ES
         public int schemaVersion = 1;
         public List<ESAutomationAcceptanceCriterion> criteria = new List<ESAutomationAcceptanceCriterion>();
         public ESAutomationFreshnessPolicy freshnessPolicy;
+        public string authorityDomain = "ai-collaboration";
+        public string authorityRiskClass = "standard";
 
         public void Validate()
         {
             if (schemaVersion != 1) throw new InvalidOperationException("Unsupported AcceptanceCriteria schema version.");
+            if ((!string.IsNullOrWhiteSpace(authorityDomain) && !IsKnownAuthorityDomain(authorityDomain))
+                || (string.IsNullOrWhiteSpace(authorityDomain)
+                    && IsKnownAuthorityRiskClass(authorityRiskClass)
+                    && !IsHighRiskAuthorityRiskClass(authorityRiskClass)))
+                throw new InvalidOperationException("AcceptanceCriteria contains an unknown authorityDomain.");
+            if (!IsKnownAuthorityRiskClass(authorityRiskClass))
+                throw new InvalidOperationException("AcceptanceCriteria contains an unknown authorityRiskClass.");
             if (freshnessPolicy != null) freshnessPolicy.Validate();
             if (criteria == null || criteria.Count == 0)
                 throw new InvalidOperationException("AcceptanceCriteria requires at least one criterion.");
@@ -2287,6 +2489,21 @@ namespace ES
                     throw new InvalidOperationException("Duplicate acceptance criterion: " + criterion.criterionId);
             }
         }
+
+        private static bool IsKnownAuthorityDomain(string value)
+            => string.Equals(value, "ai-collaboration", StringComparison.Ordinal)
+                || string.Equals(value, "game-logic", StringComparison.Ordinal)
+                || string.Equals(value, "editor-tooling", StringComparison.Ordinal)
+                || string.Equals(value, "release", StringComparison.Ordinal);
+
+        private static bool IsKnownAuthorityRiskClass(string value)
+            => string.Equals(value, "standard", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "high", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "critical", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsHighRiskAuthorityRiskClass(string value)
+            => string.Equals(value, "high", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "critical", StringComparison.OrdinalIgnoreCase);
     }
 
     [Serializable]
@@ -2491,6 +2708,12 @@ namespace ES
         public string runtimeStatus = string.Empty;
         public List<string> claimsNotProven = new List<string>();
         public string nextAction = string.Empty;
+        // Project-level authority policy domain.  The default is deliberately
+        // lenient for AI collaboration; high-risk consumers must opt into a
+        // strict domain explicitly (for example, game-logic or release).
+        public string authorityDomain = string.Empty;
+        public string authorityRiskClass = "standard";
+        public string authorityPolicyStatus = string.Empty;
 
         public void Validate()
         {
@@ -2500,6 +2723,13 @@ namespace ES
             if (criterionResults == null) criterionResults = new List<ESAutomationCriterionResult>();
             if (forbiddenConditions == null) forbiddenConditions = new List<string>();
             if (claimsNotProven == null) claimsNotProven = new List<string>();
+            if (string.IsNullOrWhiteSpace(authorityRiskClass)) authorityRiskClass = "standard";
+            if (!IsAuthorityRiskClass(authorityRiskClass))
+                throw new InvalidOperationException("CompletionDecision contains an unknown authorityRiskClass.");
+            if (string.IsNullOrWhiteSpace(authorityDomain) && !IsHighRiskAuthority(authorityRiskClass))
+                authorityDomain = "ai-collaboration";
+            if (!string.IsNullOrWhiteSpace(authorityDomain) && !IsAuthorityDomain(authorityDomain))
+                throw new InvalidOperationException("CompletionDecision contains an unknown authorityDomain.");
             if (freshnessPolicy != null) freshnessPolicy.Validate();
             if (traceReconciliation != null) traceReconciliation.Validate();
             if (!string.IsNullOrWhiteSpace(decisionStatus)
@@ -2627,6 +2857,30 @@ namespace ES
                 || string.Equals(evidenceStatus, "missing-or-stale", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(evidenceStatus, "evidence-pending", StringComparison.OrdinalIgnoreCase);
             bool runtimePending = string.Equals(runtimeStatus, "runtime-not-run", StringComparison.OrdinalIgnoreCase);
+            if (IsHighRiskAuthority(authorityRiskClass) && string.IsNullOrWhiteSpace(authorityDomain))
+            {
+                accepted = false;
+                decisionStatus = "Blocked";
+                blockingLayer = "authority";
+                nextAction = "declare-authority-domain";
+                authorityPolicyStatus = "domain-required-for-high-risk";
+                ESAIBrainFailureTelemetry.Record("ClaimDowngraded", "completion-decision",
+                    decisionStatus + "|authority-domain-missing", runId);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(authorityDomain)) authorityDomain = "ai-collaboration";
+            bool strictAuthorityDomain = IsStrictAuthorityDomain(authorityDomain, out string policyStatus);
+            authorityPolicyStatus = policyStatus;
+            if (strictAuthorityDomain && evidencePending)
+            {
+                accepted = false;
+                decisionStatus = "Blocked";
+                blockingLayer = "evidence";
+                nextAction = "stop-and-report";
+                ESAIBrainFailureTelemetry.Record("ClaimDowngraded", "completion-decision",
+                    decisionStatus + "|authority-domain:" + authorityDomain, runId);
+                return;
+            }
             if (codeBlocked || contractBlocked || boundaryBlocked || unauthorizedToolCalls || sourceDrift || budgetViolation)
             {
                 accepted = false;
@@ -2681,6 +2935,50 @@ namespace ES
                 && actual.requireSourceHash == expected.requireSourceHash
                 && actual.allowRuntimeNotRun == expected.allowRuntimeNotRun
                 && actual.requireExecutionSnapshotBinding == expected.requireExecutionSnapshotBinding;
+        }
+
+        private static bool IsAuthorityDomain(string value)
+        {
+            return string.Equals(value, "ai-collaboration", StringComparison.Ordinal)
+                || string.Equals(value, "game-logic", StringComparison.Ordinal)
+                || string.Equals(value, "editor-tooling", StringComparison.Ordinal)
+                || string.Equals(value, "release", StringComparison.Ordinal);
+        }
+
+        private static bool IsAuthorityRiskClass(string value)
+        {
+            return string.Equals(value, "standard", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "high", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "critical", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsHighRiskAuthority(string value)
+        {
+            return string.Equals(value, "high", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "critical", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsStrictAuthorityDomain(string value, out string policyStatus)
+        {
+            policyStatus = "contract-unavailable";
+            if (!IsAuthorityDomain(value)) return true;
+            try
+            {
+                string root = Directory.GetParent(Application.dataPath).FullName;
+                string path = Path.Combine(root, "ES", "Automation", "Contracts", "es-authority-ai-decision-policy-v1.json");
+                if (!File.Exists(path)) return true;
+                JObject contract = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
+                JObject domain = contract["domains"]?[value] as JObject;
+                if (domain == null) return true;
+                policyStatus = "contract-loaded";
+                return domain.Value<bool?>("strictOnUnresolved") ?? true;
+            }
+            catch
+            {
+                // A missing or malformed authority contract must never weaken
+                // a completion gate.  Fail closed for the host-side decision.
+                return true;
+            }
         }
 
         private static ESAutomationBlockingLayer BlockingLayerToEnum(string value)
@@ -2865,7 +3163,8 @@ namespace ES
             string runId, string executionStatus, IEnumerable<ESAutomationCriterionResult> results,
             IEnumerable<string> forbiddenConditions, bool unauthorizedToolCalls,
             bool sourceDrift, bool traceReconciled, out ESAutomationCompletionDecision decision,
-            out string reason)
+            out string reason, string authorityDomain = null,
+            string authorityRiskClass = null)
         {
             decision = new ESAutomationCompletionDecision
             {
@@ -2874,6 +3173,10 @@ namespace ES
                 unauthorizedToolCalls = unauthorizedToolCalls,
                 sourceDrift = sourceDrift,
                 traceReconciled = traceReconciled,
+                authorityDomain = string.IsNullOrWhiteSpace(authorityDomain)
+                    ? criteria?.authorityDomain : authorityDomain,
+                authorityRiskClass = string.IsNullOrWhiteSpace(authorityRiskClass)
+                    ? criteria?.authorityRiskClass : authorityRiskClass,
                 forbiddenConditions = new List<string>(forbiddenConditions ?? Enumerable.Empty<string>())
             };
             reason = string.Empty;

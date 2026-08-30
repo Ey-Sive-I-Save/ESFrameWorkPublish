@@ -440,6 +440,9 @@ namespace ES
                 return false;
             }
 
+            // Palette admission only: acceptedIds means a menu item was
+            // discovered/registered; it never declares task completion or
+            // grants execution authority.
             var acceptedIds = new HashSet<string>(StringComparer.Ordinal);
             int totalCandidateCount;
             try

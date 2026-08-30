@@ -13,6 +13,7 @@ namespace ES
     /// AITalk 的受管 Codex 多启动入口。AITalk 只能通过 AIBrain planTask/runTask
     /// 到达这里；脚本路径、输出根和参数形状均固定，不能注入任意命令行。
     /// </summary>
+    // Invocation Completed/Accepted is orchestration status only; it never declares task completion; authoritative downstream decision remains separate.
     internal static class ESCodexMultiLaunchAutomation
     {
         internal const string TaskId = "es.codex.multilaunch";
@@ -46,6 +47,20 @@ namespace ES
                     inputSchemaHash = InputSchemaHash, timeoutSeconds = TimeoutSeconds,
                     supportsDryRun = true, supportsRetry = false,
                     outputs = new List<string> { "launch-plan.json", "multilaunch-result.json", "run-record.json" },
+                    acceptanceCriteria = new ESAutomationAcceptanceCriteria
+                    {
+                        authorityDomain = "editor-tooling",
+                        authorityRiskClass = "high",
+                        criteria = new List<ESAutomationAcceptanceCriterion>
+                        {
+                            new ESAutomationAcceptanceCriterion
+                            {
+                                criterionId = "codex-multilaunch.acceptance-receipts",
+                                verifierId = "es.codex.multilaunch.per-launch-acceptance",
+                                description = "每个职责窗口必须有独立 acceptance 回执；编排结果不能替代逐项验收。",
+                            },
+                        },
+                    },
                     performanceBudget = new ESAutomationPerformanceBudget { maxDurationSeconds = TimeoutSeconds, maxOutputBytes = 1024 * 1024, maxRetryCount = 0, maxFindingCount = 128 },
                     capabilityEnvelope = new ESAutomationCapabilityEnvelope { userAuthorization = Capabilities, taskContract = Capabilities, aiCommand = Capabilities, workerCapability = Capabilities, projectBoundary = Capabilities },
                 };

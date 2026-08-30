@@ -949,6 +949,7 @@ namespace ES
         private double lastRenderTime;
         private bool disposed;
         private bool cellReleased;
+        private bool CameraSceneBound;
 
         public Camera Camera { get; private set; }
         public Scene PreviewScene => previewScene;
@@ -1004,6 +1005,14 @@ namespace ES
         public void Ensure()
         {
             ThrowIfDisposed();
+            if (sceneMode == ESEditorPreviewSceneMode.PreviewScene && Camera != null && !previewScene.IsValid())
+                ResetSceneBoundPreviewObjects();
+            else if (sceneMode == ESEditorPreviewSceneMode.PreviewScene
+                && !previewScene.IsValid()
+                && (cameraObject != null || keyLightObject != null || fillLightObject != null
+                    || groundPlaneObject != null || scaleReferenceObject != null
+                    || fallbackParticleMaterial != null || modelHandles.Count > 0))
+                ResetSceneBoundPreviewObjects();
             if (IsReady)
                 return;
 
@@ -1448,6 +1457,41 @@ namespace ES
             catch (Exception exception) { Debug.LogException(exception); }
         }
 
+        private void ResetSceneBoundPreviewObjects()
+        {
+            DestroyAllModelGroups();
+
+            if (cameraObject != null)
+            {
+                try { ESEditorPreviewUtility.DestroyObject(cameraObject); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                cameraObject = null;
+            }
+            if (keyLightObject != null)
+            {
+                try { ESEditorPreviewUtility.DestroyObject(keyLightObject); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                keyLightObject = null;
+            }
+            if (fillLightObject != null)
+            {
+                try { ESEditorPreviewUtility.DestroyObject(fillLightObject); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                fillLightObject = null;
+            }
+
+            SafeDestroyPreviewObject(ref groundPlaneObject);
+            SafeDestroyPreviewObject(ref groundPlaneMaterial);
+            SafeDestroyPreviewObject(ref scaleReferenceObject);
+            SafeDestroyPreviewObject(ref scaleReferenceMaterial);
+            SafeDestroyPreviewObject(ref fallbackParticleMaterial);
+            Camera = null;
+            CameraSceneBound = false;
+            previewScene = default;
+            LastObjectFlowStatus = "PreviewScene 已失效，已清理旧场景绑定资源，等待重建。";
+            LastStatus = "PreviewScene invalidated; scene-bound preview objects reset.";
+        }
+
         private void EnsurePreviewScene()
         {
             if (sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid())
@@ -1501,6 +1545,7 @@ namespace ES
                 ESEditorPreviewUtility.TryConfigureUniversalCameraData(camera);
                 cameraObject = created;
                 Camera = camera;
+                CameraSceneBound = true;
             }
             catch
             {

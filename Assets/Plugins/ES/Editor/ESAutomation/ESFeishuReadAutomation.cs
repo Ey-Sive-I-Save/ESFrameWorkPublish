@@ -590,6 +590,7 @@ namespace ES
             {
                 runId = active.record.runId,
                 executionStatus = result.status,
+                authorityDomain = "ai-collaboration",
                 freshnessPolicy = new ESAutomationFreshnessPolicy { maxAgeHours = 168, requireSourceHash = true, allowRuntimeNotRun = true },
                 traceReconciled = true,
                 criterionResults = new List<ESAutomationCriterionResult>
@@ -878,6 +879,7 @@ namespace ES
                 File.ReadAllText(path, new UTF8Encoding(false, true)));
             if (record == null || record.taskId != TaskId || record.taskVersion != TaskVersion)
                 throw new InvalidDataException("Feishu RunRecord 身份无效。");
+            record.Validate();
             return record;
         }
 

@@ -1,0 +1,45 @@
+schemaVersion: 1
+planId: es-web-knowledge-external-source-plan-v1
+status: calibrated-static-awaiting-runtime-framework-validation
+ownerKnowledgeId: es.project.web-open-source-calibration.v1
+purpose: 受控校准网页标准与开源框架，不替换 ES canonical 合同
+network: disabled-after-bounded-snapshot
+authorizationRequired: true
+sourcePolicy:
+  authority: official-documentation-only
+  snapshotDestination: Documentation/AIKnowledge/external/web/
+  preserveUrlAndRetrievedAt: true
+  preserveLicenseNotice: true
+  noSourceCodeVendoring: true
+targets:
+  - targetId: web-platform
+    domains: [developer.mozilla.org, www.w3.org]
+    topics: [media-queries, forced-colors, accessibility, CSP, service-workers]
+    versionPolicy: current-stable-at-authorization-time
+    maxPages: 12
+  - targetId: performance
+    domains: [web.dev]
+    topics: [responsive-images, loading, core-web-vitals, performance-budget]
+    versionPolicy: current-guidance-at-authorization-time
+    maxPages: 8
+  - targetId: structured-data
+    domains: [developers.google.com]
+    topics: [structured-data, sitemap, hreflang, canonical]
+    versionPolicy: current-search-guidance-at-authorization-time
+    maxPages: 8
+  - targetId: framework-calibration
+    domains: [docs.astro.build, nextjs.org, nuxt.com, vite.dev]
+    topics: [routing, static-output, hydration, asset-pipeline]
+    versionPolicy: explicitly-pinned-release-only
+    maxPages: 12
+budgets:
+  totalMaxPages: 40
+  timeoutMinutes: 15
+  maxRedirectsPerUrl: 3
+  stopOnLicenseAmbiguity: true
+  stopOnDomainMismatch: true
+  stopOnVersionAmbiguity: true
+acceptance:
+  required: [source-url, retrieved-at, source-hash, license-note, topic-mapping, es-canonical-diff]
+  forbiddenClaims: [browser-passed, runtime-passed, production-ready, framework-compatible-without-adapter]
+  nextAction: 仅在用户明确授权网络和项目快照写入后执行

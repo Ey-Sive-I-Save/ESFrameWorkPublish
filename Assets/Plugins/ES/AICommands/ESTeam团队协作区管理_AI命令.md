@@ -30,7 +30,7 @@ recovery: ExpectedRevision/CAS and contentHash; conflict returns NeedsReissue, n
 validation: team owner hash, member personId, path placement, schema and revision checks.
 evidenceRef: commandId, commandBodyHash, planHash, invocationId, revision/contentHash, receipt and source SHA-256.
 allowRoots: ES/AISpace/Public/Teams/<team-id>/team.json only.
-denyPaths: ES/AISpace/Local, Assets/ES/Space/Local, source, Git, release, Runtime and unrelated teams; deny-overrides.
+denyPaths: ES/AISpace/Local, Assets/ES/AISpace/Local, Assets/ES/Space/Local (legacy), source, Git, release, Runtime and unrelated teams; deny-overrides.
 ```
 
 ## 交付格式

@@ -19,6 +19,7 @@ using System.Runtime.CompilerServices;
 
 namespace ES
 {
+    // Invocation Completed/Accepted is orchestration status only; it never declares task completion; downstream decision is owned by TaskContext/ABCD.
     /// <summary>
     /// AI 的受管自动化入口。外部 AI 只能通过固定 JSON 信封调用已注册任务；不能传递脚本、解释器、命令行或任意输出路径。
     /// 收件箱默认关闭，且只适合本机受信 AI。联网/多人环境必须在此桥之上另加鉴权与审批。
@@ -892,7 +893,7 @@ namespace ES
             RequireExactProperties(payload, new[]
                 { "objective", "routeKeys", "commandId", "taskId", "taskVersion", "preset", "input" },
                 new[] { "skillNames", "dryRun", "approvedPlanHash", "invocationId", "idempotencyKey",
-                    "routeProfileId", "goalRevisionPath" }, context + " payload");
+                    "routeProfileId", "goalRevisionPath", "generationMode", "acceptanceProfile" }, context + " payload");
             if (payload["routeKeys"].Type != JTokenType.Array)
                 throw new InvalidOperationException(context + ".routeKeys 必须是数组。");
             if (payload["skillNames"] != null && payload["skillNames"].Type != JTokenType.Array)
@@ -918,6 +919,10 @@ namespace ES
                 taskId = ReadString(payload, "taskId"),
                 taskVersion = ReadInteger(payload, "taskVersion"),
                 preset = ReadString(payload, "preset", allowEmpty: true),
+                generationMode = payload["generationMode"] == null
+                    ? string.Empty : ReadString(payload, "generationMode", allowEmpty: true),
+                acceptanceProfile = payload["acceptanceProfile"] == null
+                    ? "core-high-risk" : ReadString(payload, "acceptanceProfile", allowEmpty: true),
                 input = (JObject)payload["input"],
                 fromAi = true,
                 dryRun = dryRun,
@@ -2380,9 +2385,13 @@ namespace ES
             };
 
         private static ESAutomationRunRecord ReadRunRecord(string path)
-            => JsonConvert.DeserializeObject<ESAutomationRunRecord>(
+        {
+            ESAutomationRunRecord record = JsonConvert.DeserializeObject<ESAutomationRunRecord>(
                 File.ReadAllText(path, new UTF8Encoding(false, true)))
-               ?? throw new InvalidDataException("TaskContext /eval RunRecord 为空。");
+                ?? throw new InvalidDataException("TaskContext /eval RunRecord 为空。");
+            record.Validate();
+            return record;
+        }
 
         private static void WriteRunRecord(string path, ESAutomationRunRecord record)
             => ESAutomationPathPolicy.WriteWorkerTextAtomic(path,
@@ -2548,13 +2557,55 @@ namespace ES
             try
             {
                 ESTaskContextEvaluationAutomation.Register();
-                ESCodexMultiLaunchAutomation.Register();
-                ESUserSpaceAutomation.Register();
-                ESTeamSpaceAutomation.Register();
             }
             catch (Exception exception)
             {
                 Debug.LogError("TASK_CONTEXT_EVAL_REGISTRATION_ISOLATED: TaskContext /eval 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
+                    + exception.GetBaseException().Message);
+            }
+            try
+            {
+                ESCodexMultiLaunchAutomation.Register();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("CODEX_MULTI_LAUNCH_REGISTRATION_ISOLATED: Codex MultiLaunch 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
+                    + exception.GetBaseException().Message);
+            }
+            try
+            {
+                ESUserSpaceAutomation.Register();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("USERSPACE_REGISTRATION_ISOLATED: UserSpace 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
+                    + exception.GetBaseException().Message);
+            }
+            try
+            {
+                ESTeamSpaceAutomation.Register();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("TEAMSPACE_REGISTRATION_ISOLATED: TeamSpace 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
+                    + exception.GetBaseException().Message);
+            }
+            try
+            {
+                ESDeepSeekHarnessAutomation.Register();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("DEEPSEEK_HARNESS_REGISTRATION_ISOLATED: DeepSeek Harness 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
+                    + exception.GetBaseException().Message);
+            }
+            try
+            {
+                ESCodexAppServerAutomation.Register();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("CODEX_APP_SERVER_REGISTRATION_ISOLATED: Codex App Server 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
                     + exception.GetBaseException().Message);
             }
             // ES_Logic.Editor is a separate assembly and is not part of the

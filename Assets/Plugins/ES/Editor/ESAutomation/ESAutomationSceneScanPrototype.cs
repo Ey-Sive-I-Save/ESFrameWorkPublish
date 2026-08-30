@@ -944,6 +944,7 @@ namespace ES
                 {
                     runId = session.runId,
                     executionStatus = finalResult.status,
+                    authorityDomain = "editor-tooling",
                     freshnessPolicy = new ESAutomationFreshnessPolicy { maxAgeHours = 168, requireSourceHash = true, allowRuntimeNotRun = true },
                     traceReconciled = true,
                     criterionResults = new List<ESAutomationCriterionResult>

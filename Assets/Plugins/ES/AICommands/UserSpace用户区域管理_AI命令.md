@@ -1,6 +1,10 @@
 # UserSpace 用户区域管理 AI 命令
 
-## 直接生效协议
+## Skill 受管入口（文档仅作指针）
+
+本文件不定义独立执行流程。外部注册必须先路由到
+`.agents/skills/es-ai-space-organization/SKILL.md`，再由该 Skill 读取本合同并调用 Worker；
+以下命令形式仅用于显示确定的 Worker 入口，不得绕过 Skill、合同或权限门禁。
 
 用户明确要求初始化、更新、发现或验证个人协作区域时，AI 使用：
 
@@ -62,7 +66,7 @@ recovery: reread registration and contentHash, require ExpectedRevision/CAS and 
 validation: PersonId/path grammar, ownership confirmation fields, schema, revision/CAS, duplicate ID, malformed JSON and contentHash checks.
 evidenceRef: commandId, commandBodyHash, planHash, invocationId, personId, revision/contentHash, Test-ESUserSpace receipt and source SHA-256.
 allowRoots: ES/AISpace/Public/People/<person-id>/registration.json for authorized Initialize/Update only; Discover/Validate remain read-only.
-denyPaths: ES/AISpace/Local contents, Assets/ES/Space/Local, other people/teams, source, Git, release, Runtime, credentials and external network; deny-overrides.
+denyPaths: ES/AISpace/Local contents, Assets/ES/AISpace/Local, Assets/ES/Space/Local (legacy), other people/teams, source, Git, release, Runtime, credentials and external network; deny-overrides.
 ```
 
 ## 交付格式

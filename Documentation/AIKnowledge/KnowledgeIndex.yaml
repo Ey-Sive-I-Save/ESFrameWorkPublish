@@ -3253,8 +3253,8 @@ entries:
     relatedSkills: [es-open-source-migration, es-knowledge-creator, es-ai-knowledge-curation, es-knowledge-validator, es-automation-worker-authoring, es-utf8-guard]
     requiredReads:
       - Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md
-      - ES/AISpace/Public/WebPageStudio/README.md
-      - ES/AISpace/Public/WebPageStudio/ACCEPTANCE_MATRIX.md
+      - ES/AISpace/Public/WebPageStudio/20260829/README.md
+      - ES/AISpace/Public/WebPageStudio/20260829/ACCEPTANCE_MATRIX.md
       - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioStatic.ps1
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1
@@ -3264,7 +3264,7 @@ entries:
       - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
     authority: Current WebPageStudio source, contracts, validators and acceptance matrix
     evidenceLevel: S1
-    contentHash: 2a741e734810eb02f302222812a001c215a34fdab86833fd11b0e3d2fe0d0930
+    contentHash: 9abb149ba5bcd75f2993991f82a71e634a7035685cf37ab41bb0afca3de0c16f
     staleWhen: WebPageStudio generator, request/generation/backend schema, validator behavior, acceptance matrix, or any SourceRef hash changes
   - knowledgeId: es.project.web-component-layout-route.v1
     file: entries/web-component-layout-route.md
@@ -3278,8 +3278,21 @@ entries:
       - ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
     authority: Current WebPageStudio Kernel and Quality contract
     evidenceLevel: S1
-    contentHash: 74486c6530399b1b45ebb2ad7b8eecc0ae3cb63ff4f621a6b32a1a8b7538e42d
+    contentHash: 0da6afdd9ef1d6768ba21ca7c7a5c11a7656117d6b263c85e7bb9805bfbd04f0
     staleWhen: Kernel schema, compiler, Quality validator, or Page IR changes
+  - knowledgeId: es.project.web-page-generation-contracts.v1
+    file: entries/web-page-generation-contracts.md
+    topic: Web 网页生成最小静态合同与版本兼容语义
+    routeKeys: [web-page-generation, web-contract, static-html-css]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/web-page-generation-contracts.md
+      - ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+      - ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+    authority: Current WebPageStudio static contract compatibility entry
+    evidenceLevel: S1
+    contentHash: 0da6afdd9ef1d6768ba21ca7c7a5c11a7656117d6b263c85e7bb9805bfbd04f0
+    staleWhen: Web contract schema, generator, or validator changes
   - knowledgeId: es.project.web-theme-design-tokens.v1
     file: entries/web-theme-design-tokens.md
     topic: Web 主题、强制配色与设计 Token

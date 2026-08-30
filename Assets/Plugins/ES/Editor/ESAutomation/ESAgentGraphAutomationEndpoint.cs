@@ -11,6 +11,7 @@ using UnityEngine;
 
 namespace ES.EditorInternal
 {
+    // Invocation Completed/Accepted is orchestration status only; it never declares task completion; downstream decision is owned by TaskContext/ABCD.
     /// <summary>
     /// Stable Graph 的唯一 AI 派发入口。Graph 只提交已经写入候选目录的不可变 Prompt，
     /// AutomationCenter 负责 RunId、输入指纹、受控发送和可恢复证据。
@@ -402,6 +403,7 @@ namespace ES.EditorInternal
                         File.ReadAllText(path, new UTF8Encoding(false, true)));
                     if (record == null) return ESAutomationTaskInvocationResult.Failed("Graph AI RunRecord 为空。", runId);
                     NormalizeRecordCollections(record);
+                    record.Validate();
                     if (ESAutomationRunStatus.IsTerminal(record.status))
                         return GetRun(runId);
                     if (!ESCmdAgentWindow.TryCancelAutomationRun(runId, out string message))
@@ -431,6 +433,7 @@ namespace ES.EditorInternal
                     File.ReadAllText(recordPath, new UTF8Encoding(false, true)));
                 if (record == null) return;
                 NormalizeRecordCollections(record);
+                record.Validate();
                 if (!TryApplyManagedLifecycleIdentity(record, lifecycleEvent, out string identityError))
                 {
                     record.errors.Add(identityError);
@@ -652,6 +655,7 @@ namespace ES.EditorInternal
                     File.ReadAllText(path, new UTF8Encoding(false, true)));
                 if (record == null) return;
                 NormalizeRecordCollections(record);
+                record.Validate();
                 if (ESAutomationRunStatus.TryTransition(record.status, ESAutomationRunStatus.Failed))
                     ESAutomationRunStatus.Transition(record, ESAutomationRunStatus.Failed);
                 record.errors.Add(message ?? "Automation 异常。");
@@ -758,6 +762,7 @@ namespace ES.EditorInternal
                     StringComparison.Ordinal)
                 || !IsSha256(record.inputManifestHash))
                 throw new InvalidDataException("Graph AI RunRecord 身份或输入 Hash 无效。");
+            record.Validate();
             return record;
         }
 

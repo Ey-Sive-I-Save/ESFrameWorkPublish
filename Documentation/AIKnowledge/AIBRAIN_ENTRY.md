@@ -83,6 +83,7 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 | AICommands | `Assets/Plugins/ES/AICommands/README.md` |
 | Project Skills | `.agents/README.md` 与各 Skill 的 `agents/openai.yaml` |
 | AIKnowledge | 本文件与 `KnowledgeIndex.yaml` |
+| AISpace 内容放置与唯一权威 | `ES/AISpace/README.md`；机器身份 `ES/AISpace/AISPACE_AUTHORITY.json` |
 | Automation / MCP | `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` |
 
 ## AIBrain 如何找到功能区
@@ -91,20 +92,25 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 
 | 功能区 | RouteKeys | 首选 Skills |
 |---|---|---|
-| 治理、规划与 Skill 执行成本 | `aibrain, governance, planning, authority, skill-performance, execution-cost, fast-path, deep-path, cache` | `es-skill-governance`, `es-use-ai-command` |
-| 分析、审查、迁移与变更风险 | `analysis, design, root-cause, review, risk, change-budget, rollback, migration, compatibility` | `es-first-principles-analysis`, `es-adversarial-review`, `es-change-risk-register`, `es-migration-planning` |
+| 治理、规划与 Skill 执行成本 | `aibrain, governance, planning, authority, skill-performance, execution-cost, fast-path, deep-path, cache` | `es-skill-governance`, `es-use-ai-command`, `es-repository-discovery` |
+| 分析、审查、迁移与变更风险 | `analysis, design, root-cause, review, risk, change-budget, rollback, migration, compatibility` | `es-first-principles-analysis`, `es-adversarial-review`, `es-change-risk-register`, `es-migration-planning`, `es-dependency-boundary-audit`, `es-security-input-audit` |
+| 开源框架迁移与兼容性 | `migration, open-source, compatibility, analysis, design` | `es-open-source-migration` |
+| 提示词工程与结构化约束 | `prompt-engineering, prompt-expansion, prompt-template, prompt-wrapper, prompt-evaluation, prompt-regression, structured-output, guardrails` | `es-prompt-engineering` |
 | 公开 Agent 机制复刻与 ES 适配 | `agent-mechanism-replication, research-to-contract, es-adaptation, failure-surface, external-authority` | `es-agent-mechanism-replication`, `es-first-principles-analysis`, `es-adversarial-review`, `es-aibrain-route-authoring`, `es-knowledge-creator`, `es-knowledge-validator` |
 | ES AI ABC 语义适配核心（ABCC） | `ai-abc, abc-core, semantic-adapter, evidence, closed-loop, route-stage` | `es-ai-abc-core`, `es-aibrain-route-authoring`, `es-knowledge-creator`, `es-knowledge-validator` |
 | 武器 ABC 部件（ABCP） | `ai-abc, abc-part, weapon, weapon-definition, prefab, input, evidence` | `es-weapon-abc-part`, `es-ai-abc-core`, `es-knowledge-creator`, `es-knowledge-validator` |
 | AIBrain 编排与 Automation 任务路由 | `orchestration, task-routing, automation, task-contract, worker, automation-run-record, agent-execution-graph, aicommand, mcp` | `es-aibrain-route-authoring`, `es-use-ai-command`, `es-automation-worker-authoring`, `es-aicommand-contract-authoring` |
+| DeepSeek Harness 受管开发贡献层 | `automation, worker, external-agent, deepseek, harness, authority, evidence, editor, skill, knowledge` | `es-aicommand-contract-authoring`, `es-use-ai-command`, `es-automation-worker-authoring`, `es-aibrain-route-authoring`, `es-editor-tooling` |
+| Codex App Server Harness 受管开发贡献层 | `automation, worker, external-agent, codex, app-server, harness, authority, evidence, editor, session, thread, turn` | `es-aicommand-contract-authoring`, `es-use-ai-command`, `es-automation-worker-authoring`, `es-aibrain-route-authoring`, `es-api-contract-review`, `es-security-input-audit` |
 | 任务与上下文平台生命周期 | `task-context-runtime, task-lifecycle, context-lifecycle, goal-revision, route-plan, completion-decision, delivery-acceptance, evidence-set, evidence-verifier, source-scope, receipt, cas, reopen` | `es-task-context-runtime`, `es-aibrain-route-authoring`, `es-task-read-snapshot`, `es-observability-evidence` |
 | AI 用户交互与任务收尾治理 | `interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, numeric-selection, next-step-dispatch, goal-drift, handover, closeout, evaluation, dialogue-quality` | `es-ai-interaction-governance`, `es-codex-session-bootstrap`, `es-skill-session-refresh` |
 | ES AI 协作菜单与制作/迭代引导 | `menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination` | `es-ai-collaboration-menu` |
-| AI 生成内容空间与 Local/Public 放置治理 | `governance, ai-space, folder-organization, file-placement, local-public, generated-content, stale` | `es-ai-space-organization` |
-| Skill 验证与质量门禁 | `skill, validation, security, catalog, evidence, evidence-pending, portfolio, static-replay, deep-replay, deterministic, static-boundary, external-side-effect, blocking-layer` | `es-skill-validator`, `es-skill-creator`, `es-static-deep-replay` |
-| 商业一致性与交付证据 | `commercial-coherence, delivery-tracking, evidence-receipt, report-hash, source-freshness, plan-hash, static-review, runtime-not-run` | `es-skill-governance`, `es-knowledge-validator`, `es-release-acceptance` |
+| AI 生成内容空间与 Local/Public 放置治理 | `governance, ai-space, folder-organization, file-placement, local-public, generated-content, temporary-content, screenshot, stale` | `es-ai-space-organization` |
+| AISpace/UserSpace 外部注册与受管更新 | `governance, ai-space, external-registration, userspace, registration, cas, run-record` | `es-ai-space-organization`, `es-use-ai-command` |
+| Skill 验证与质量门禁 | `skill, validation, security, catalog, evidence, evidence-pending, portfolio, static-replay, deep-replay, deterministic, static-boundary, external-side-effect, blocking-layer` | `es-skill-validator`, `es-skill-creator`, `es-static-deep-replay`, `es-security-input-audit` |
+| 商业一致性与交付证据 | `commercial-coherence, delivery-tracking, evidence-receipt, report-hash, source-freshness, plan-hash, static-review, runtime-not-run` | `es-skill-governance`, `es-knowledge-validator`, `es-release-acceptance`, `es-release-notes-evidence` |
 | 工作树与编码 | `worktree, utf8, validation` | `es-worktree-audit`, `es-utf8-guard` |
-| Unity 编译、MonoBehaviour 生命周期与验收 | `unity, compile, monobehaviour, lifecycle, static-state, domain-reload, scene-reload, enter-play-mode, script-execution-order, player, il2cpp, aot, test, release, evidence, unity-build-identity, artifact-provenance, build-fingerprint, build-input-snapshot, build-output-hash, build-receipt, artifact-freshness, player-provenance, hybridclr-input-hash, build-reproducibility` | `es-unity-compile`, `es-release-acceptance`, `es-editor-availability-validator`, `es-observability-evidence`, `es-worktree-audit` |
+| Unity 编译、MonoBehaviour 生命周期与验收 | `unity, compile, monobehaviour, lifecycle, static-state, domain-reload, scene-reload, enter-play-mode, script-execution-order, player, il2cpp, aot, test, release, evidence, unity-build-identity, artifact-provenance, build-fingerprint, build-input-snapshot, build-output-hash, build-receipt, artifact-freshness, player-provenance, hybridclr-input-hash, build-reproducibility` | `es-unity-compile`, `es-release-acceptance`, `es-editor-availability-validator`, `es-observability-evidence`, `es-worktree-audit`, `es-fix-compile-error`, `es-start-estest`, `es-publish-aitest-prompt` |
 | Unity 编辑态执行与 Prefab Stage | `unity, execute-always, execute-in-edit-mode, edit-mode, prefab-stage, prefab-mode, prefab-auto-save, application-is-playing, playing-world` | `es-editor-tooling`, `es-unity-compile` |
 | 游戏 UI 玩家目标与 IntentSpec | `ui-automation, player-intent, player-goal, intent-spec, primary-action, ui-intent-clarification, business-bridge` | `es-ui-intent-authoring`, `es-ui-prefab-authoring` |
 | 游戏 UI 自动化装配 | `ui-automation, screen-spec-v3, ui-prefab, ui-fixture-scene, ui-layout, responsive, visual-qa, asset-fallback` | `es-ui-prefab-authoring`, `es-unity-compile` |
@@ -132,6 +138,7 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 | 跨域协作路由与证据基础设施 | `action, communication, integration, knowledge-search, pipeline, plan, preservation, reload, route, runrecord, screen-family, stable-graph, static-replay, deep-replay` | `es-aibrain-route-authoring`, `es-task-read-snapshot`, `es-observability-evidence`, `es-static-deep-replay`, `es-editor-tooling`, `es-stable-graph-authoring` |
 | 飞书外部协作适配器 | `feishu, lark, external-adapter, dry-run, task-monitor, task-dispatch, task-transition, virtual-team, identity-claim, bot-ownership, onboarding, message-send, notification` | `es-feishu-cli`, `es-use-ai-command`, `es-automation-worker-authoring` |
 | Knowledge 输出、验证、维护事务与条目治理 | `knowledge, knowledge-quality, knowledge-output, validation, source-ref, content-hash, hash, routing, route-probe, misroute, canonical-entry, dedup, maintenance-transaction, refresh-plan, stable-refresh, cas, concurrent-update, atomic-projection, recovery, evidence, evidence-boundary, permission-boundary, bounded-output, stale` | `es-knowledge-creator`, `es-knowledge-validator`, `es-ai-knowledge-curation`, `es-aibrain-route-authoring`, `es-worktree-audit`, `es-task-read-snapshot`, `es-utf8-guard` |
+| WebPageStudio 静态/动态网页生成编排与四层验收 | `web-ui, web-page-generation, webpagestudio, webpage-studio, scheduler, worker, network, preview, visual, release, responsive, theme, accessibility, evidence` | `es-web-ui-generation-orchestration`, `es-open-source-migration`, `es-knowledge-creator`, `es-knowledge-validator`, `es-automation-worker-authoring` |
 | 任务读取一致性与解析投影基础设施 | `task, read, snapshot, consistency, hash, stale` | `es-task-read-snapshot` |
 | 长运行 AI 会话的 Skill 增量发现与能力刷新 | `skill, session, refresh, capability, delta, stale, routing` | `es-skill-session-refresh`, `es-task-read-snapshot` |
 | Skill 理解刷新与增量能力发现 | `understanding-drift, skill-understanding-refresh, capability-refresh, incremental-discovery` | `es-skill-session-refresh`, `es-task-read-snapshot` |

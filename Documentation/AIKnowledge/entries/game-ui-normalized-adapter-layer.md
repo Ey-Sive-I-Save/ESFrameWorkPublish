@@ -126,10 +126,10 @@ evidenceBoundary: static-routing-only
 
 ## SourceRefs
 
-- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`6785f682878cfaba2fb0f525e947eadace8cd8f31e5ba3cc0df62d3a4da5098d`)
+- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`b3010e989e3460643e72f442f339e73e89586f4840ce16ab1baf07ccd3aa4423`)
 - `Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md` (`d29ff698cd8fc3b0a3e014efe1780ef4a141e620b05cd3bf22be9d72ab3548de`)
 - `Documentation/AIKnowledge/UI/unity-ui-ai-failure-prevention.md` (`1f48ec5d7dc61214d6b1dd35bd90d0e656db0f543eb4e04d63d32d67e683ce81`)
-- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`69fd14142f1a859f1c25cffd0bd56d86633c17943396913f6558d3b673c433ff`)
+- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`6d65cb5664ce212b503b6939722939bd91d76798f4d63b1c01129983f9836984`)
 
 ## Evidence boundary
 

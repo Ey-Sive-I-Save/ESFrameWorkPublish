@@ -7,6 +7,8 @@ using Newtonsoft.Json.Linq;
 namespace ES
 {
     /// <summary>受管 UserSpace 注册卡入口。脚本路径、项目根和参数形状均由代码固定。</summary>
+    // Worker Completed is an execution result only; it never declares project
+    // acceptance. TaskContext/ABCD remains the final decision authority.
     internal static class ESUserSpaceAutomation
     {
         internal const string TaskId = "es.userspace.profile";

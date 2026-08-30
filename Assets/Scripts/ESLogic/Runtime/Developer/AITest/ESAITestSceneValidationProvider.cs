@@ -116,6 +116,9 @@ namespace ES
 
         private static ESAITestCapabilityResponseDto Accepted(bool conditionMet, bool retryable, string message, ESAITestValueDto value)
         {
+            // Capability admission only: accepted=true never declares task
+            // completion or runtime acceptance; the external authority gate
+            // must consume conditionMet and its evidence separately.
             return new ESAITestCapabilityResponseDto
             {
                 accepted = true,

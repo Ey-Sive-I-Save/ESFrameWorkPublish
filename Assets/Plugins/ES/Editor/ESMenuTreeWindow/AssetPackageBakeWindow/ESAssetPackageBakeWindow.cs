@@ -105,7 +105,7 @@ namespace ES
 
         protected override void ESWindow_OnHostDisable()
         {
-            EditorApplication.delayCall -= RepaintAssetPackageWindow;
+            EditorApplication.delayCall -= ESAssetPackagePreviewUtility.RepaintAssetPackageWindow;
             ReleaseInstancePreviewResources();
             SaveSelectedBakeGuid(selectedBake);
             base.ESWindow_OnHostDisable();
@@ -3024,7 +3024,7 @@ namespace ES
 
     internal sealed class ESAssetPackageMaterialPreviewPlayer : IDisposable
     {
-        private readonly ESAssetPackagePreviewSession previewContext = new ESAssetPackagePreviewSession(ESEditorPreviewSceneMode.PreviewScene);
+        private ESAssetPackagePreviewSession previewContext = new ESAssetPackagePreviewSession(ESEditorPreviewSceneMode.PreviewScene);
         private Material sourceMaterial;
         private Material previewMaterial;
         private GameObject previewObject;
@@ -3032,6 +3032,9 @@ namespace ES
         private float yaw = 25f;
         private float pitch = 12f;
         private float zoom = 1f;
+        private Material failedMaterial;
+        private PrimitiveType failedPrimitive;
+        private string failureReason;
 
         public void Draw(Material material, Action repaint)
         {
@@ -3041,7 +3044,13 @@ namespace ES
                 return;
             }
 
-            EnsureInstance(material, previewPrimitive);
+            EnsurePreviewContext();
+            if (!TryEnsureInstance(material, previewPrimitive))
+            {
+                DrawFailureState(material, repaint);
+                return;
+            }
+
             using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
             {
                 EditorGUILayout.LabelField("ES 材质预览", ESAssetPackagePresentation.Header);
@@ -3052,11 +3061,29 @@ namespace ES
                 PrimitiveType nextPrimitive = primitiveIndex == 0 ? PrimitiveType.Sphere : primitiveIndex == 1 ? PrimitiveType.Cube : PrimitiveType.Quad;
                 if (nextPrimitive != previewPrimitive)
                 {
-                    EnsureInstance(material, nextPrimitive);
+                    if (!TryEnsureInstance(material, nextPrimitive))
+                    {
+                        DrawFailureContent(material, repaint);
+                        return;
+                    }
                     repaint?.Invoke();
                 }
                 Rect rect = GUILayoutUtility.GetRect(420f, 300f, GUILayout.ExpandWidth(true));
-                previewContext.Render(rect, previewObject != null ? previewObject.transform.position : Vector3.zero, 1.2f, 1.2f, yaw, pitch, zoom, ESAssetPackagePreviewBaselinePlatform.Desktop, 1d / 30d);
+                try
+                {
+                    if (!previewContext.Render(rect, previewObject != null ? previewObject.transform.position : Vector3.zero, 1.2f, 1.2f, yaw, pitch, zoom, ESAssetPackagePreviewBaselinePlatform.Desktop, 1d / 30d))
+                    {
+                        RegisterFailure(material, previewPrimitive, "受管预览上下文未返回成功。" + previewContext.LastStatus);
+                        DrawFailureContent(material, repaint);
+                        return;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    RegisterFailure(material, previewPrimitive, "渲染受管预览失败：" + exception.GetBaseException().Message);
+                    DrawFailureContent(material, repaint);
+                    return;
+                }
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     yaw = EditorGUILayout.Slider("旋转", yaw, -180f, 180f);
@@ -3078,6 +3105,99 @@ namespace ES
                     pitch = 12f;
                     zoom = 1f;
                     repaint?.Invoke();
+                }
+            }
+        }
+
+        private void EnsurePreviewContext()
+        {
+            if (previewContext != null && !previewContext.IsDisposed)
+                return;
+
+            DisposeInstance();
+            previewContext = new ESAssetPackagePreviewSession(ESEditorPreviewSceneMode.PreviewScene);
+            failureReason = null;
+            failedMaterial = null;
+        }
+
+        private bool TryEnsureInstance(Material material, PrimitiveType primitive)
+        {
+            if (failureReason != null && failedMaterial == material && failedPrimitive == primitive)
+                return false;
+
+            try
+            {
+                EnsureInstance(material, primitive);
+                failureReason = null;
+                failedMaterial = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                RegisterFailure(material, primitive, "建立材质预览实例失败：" + exception.GetBaseException().Message);
+                return false;
+            }
+        }
+
+        private void RegisterFailure(Material material, PrimitiveType primitive, string reason)
+        {
+            failedMaterial = material;
+            failedPrimitive = primitive;
+            failureReason = string.IsNullOrWhiteSpace(reason) ? "未知预览错误。" : reason;
+        }
+
+        private void DrawFailureState(Material material, Action repaint)
+        {
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
+            {
+                EditorGUILayout.LabelField("ES 材质预览", ESAssetPackagePresentation.Header);
+                DrawFailureContent(material, repaint);
+            }
+        }
+
+        private void DrawFailureContent(Material material, Action repaint)
+        {
+            EditorGUILayout.HelpBox(
+                "材质预览暂不可用：" + (failureReason ?? "未知错误。")
+                + "\n源材质和正式场景未被修改。可重试以重建受管预览资源。",
+                MessageType.Error);
+            if (previewContext != null)
+            {
+                EditorGUILayout.LabelField("预览状态", previewContext.LastStatus, ESAssetPackagePresentation.Meta);
+                EditorGUILayout.LabelField("对象迁移", previewContext.LastObjectFlowStatus, ESAssetPackagePresentation.Meta);
+            }
+
+            int primitiveIndex = GUILayout.Toolbar(
+                previewPrimitive == PrimitiveType.Sphere ? 0 : previewPrimitive == PrimitiveType.Cube ? 1 : 2,
+                new[] { "材质球", "立方体", "平面" });
+            PrimitiveType nextPrimitive = primitiveIndex == 0 ? PrimitiveType.Sphere : primitiveIndex == 1 ? PrimitiveType.Cube : PrimitiveType.Quad;
+            if (nextPrimitive != previewPrimitive)
+            {
+                previewPrimitive = nextPrimitive;
+                failureReason = null;
+                failedMaterial = null;
+                repaint?.Invoke();
+            }
+
+            if (GUILayout.Button("重试材质预览", ESAssetPackagePresentation.ToolbarButton))
+            {
+                DisposeInstance();
+                try
+                {
+                    previewContext?.Dispose();
+                    if (previewContext != null && !previewContext.IsDisposed)
+                    {
+                        RegisterFailure(material, previewPrimitive, "旧受管预览上下文尚未完成清理，已保留原上下文等待下一次生命周期清理。\n请稍后再次重试。");
+                        return;
+                    }
+                    previewContext = new ESAssetPackagePreviewSession(ESEditorPreviewSceneMode.PreviewScene);
+                    failureReason = null;
+                    failedMaterial = null;
+                    repaint?.Invoke();
+                }
+                catch (Exception exception)
+                {
+                    RegisterFailure(material, previewPrimitive, "重建受管预览上下文失败：" + exception.GetBaseException().Message);
                 }
             }
         }
@@ -3140,7 +3260,8 @@ namespace ES
         public void Dispose()
         {
             DisposeInstance();
-            previewContext.Dispose();
+            previewContext?.Dispose();
+            previewContext = null;
         }
     }
 
@@ -4125,7 +4246,7 @@ namespace ES
             EditorApplication.delayCall += RepaintAssetPackageWindow;
         }
 
-        private static void RepaintAssetPackageWindow()
+        internal static void RepaintAssetPackageWindow()
         {
             ESAssetPackageBakeWindow.UsingWindow?.Repaint();
         }

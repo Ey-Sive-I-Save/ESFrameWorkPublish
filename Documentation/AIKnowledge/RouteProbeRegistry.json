@@ -1255,6 +1255,166 @@
       "zeroHitAllowed": false,
       "repeatCount": 3,
       "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-component-layout-routing",
+      "domain": "web-generation",
+      "objective": "网页组件树、响应式布局和路由如何保持确定性生成？",
+      "explicitRouteKeys": ["web-component", "web-layout", "web-route"],
+      "expectedRouteKeys": ["web-component", "web-layout", "web-route"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-component-layout-route.v1","requiredReads":["Documentation/AIKnowledge/entries/web-component-layout-route.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-theme-forced-colors",
+      "domain": "web-design",
+      "objective": "网页暗色、浅色和 forced-colors 主题应由哪些设计 Token 保证？",
+      "explicitRouteKeys": ["web-theme", "web-design-token", "forced-colors"],
+      "expectedRouteKeys": ["web-theme", "web-design-token", "forced-colors"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-theme-design-tokens.v1","requiredReads":["Documentation/AIKnowledge/entries/web-theme-design-tokens.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.ui-visual-design-system.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-dynamic-backend-boundary",
+      "domain": "web-runtime",
+      "objective": "动态网页的数据请求、allowlist 和 runtime-not-run 边界如何判定？",
+      "explicitRouteKeys": ["web-runtime", "web-data", "dynamic-backend-contract"],
+      "expectedRouteKeys": ["web-runtime", "web-data", "dynamic-backend-contract"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-runtime-data-contract.v1","requiredReads":["Documentation/AIKnowledge/entries/web-runtime-data-contract.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.runtime-lifecycle-pool-arbitration.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-quality-evidence-layers",
+      "domain": "web-validation",
+      "objective": "网页 Quality、Accessibility、视觉回归和浏览器证据如何分层？",
+      "explicitRouteKeys": ["web-testing", "web-observability", "web-evidence"],
+      "expectedRouteKeys": ["web-testing", "web-observability", "web-evidence"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-testing-observability.v1","requiredReads":["Documentation/AIKnowledge/entries/web-testing-observability.md","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioAccessibility.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.shot-performance-evidence.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-open-source-calibration",
+      "domain": "web-calibration",
+      "objective": "如何在不污染 ES canonical 合同的前提下校准开源网页框架？",
+      "explicitRouteKeys": ["web-open-source", "web-framework", "external-authority"],
+      "expectedRouteKeys": ["web-open-source", "web-framework", "external-authority"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-open-source-calibration.v1","requiredReads":["Documentation/AIKnowledge/entries/web-open-source-calibration.md",".agents/skills/es-open-source-migration/SKILL.md","Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md"]}],
+      "forbiddenKnowledgeIds": ["es.research.agent-mechanism-replication.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-seo-localization-discovery",
+      "domain": "web-content",
+      "objective": "网页 SEO、结构化数据、本地化和 Sitemap 如何保持路径真实？",
+      "explicitRouteKeys": ["web-content", "web-seo", "web-sitemap", "web-localization"],
+      "expectedRouteKeys": ["web-content", "web-seo", "web-sitemap", "web-localization"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-content-seo-discovery.v1","requiredReads":["Documentation/AIKnowledge/entries/web-content-seo-discovery.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.web-page-generation-contracts.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-pwa-offline-security",
+      "domain": "web-deployment",
+      "objective": "网页 PWA、离线缓存、CSP 和部署边界如何保持显式？",
+      "explicitRouteKeys": ["web-pwa", "web-offline", "web-security", "web-deployment"],
+      "expectedRouteKeys": ["web-pwa", "web-offline", "web-security", "web-deployment"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-pwa-security-deployment.v1","requiredReads":["Documentation/AIKnowledge/entries/web-pwa-security-deployment.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.web-runtime-data-contract.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-ai-generation-repair",
+      "domain": "web-ai",
+      "objective": "AI 如何从 Page IR 生成网页并对失败 finding 产生可回滚修复？",
+      "explicitRouteKeys": ["web-ai-generation", "web-prompt", "web-repair", "web-revision"],
+      "expectedRouteKeys": ["web-ai-generation", "web-prompt", "web-repair", "web-revision"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-ai-generation-repair.v1","requiredReads":["Documentation/AIKnowledge/entries/web-ai-generation-repair.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1"]}],
+      "forbiddenKnowledgeIds": ["es.project.web-page-generation-contracts.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-generation-capability-overview",
+      "domain": "web-generation",
+      "objective": "网页生成总能力如何选择静态或动态模式并保持证据边界？",
+      "explicitRouteKeys": ["web-page-generation", "webpagestudio", "static-html-css", "dynamic-backend-contract"],
+      "expectedRouteKeys": ["web-page-generation", "webpagestudio", "static-html-css", "dynamic-backend-contract"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-page-generation-advanced-capabilities.v1","requiredReads":["Documentation/AIKnowledge/entries/web-page-generation-advanced-capabilities.md","ES/AISpace/Public/WebPageStudio/20260829/README.md","ES/AISpace/Public/WebPageStudio/20260829/ACCEPTANCE_MATRIX.md","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioStatic.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioContract.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioBackendContract.ps1","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioKernel.ps1","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json"]}],
+      "forbiddenKnowledgeIds": ["es.project.web-page-generation-contracts.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    }
+    ,{
+      "probeId": "web-creative-visual-design",
+      "domain": "web-creative-design",
+      "objective": "如何生成高动态、创意绚丽、3D 化且排版精妙的网页，同时保留可访问性与性能降级？",
+      "explicitRouteKeys": ["web-creative-design", "web-motion", "web-3d", "web-typography"],
+      "expectedRouteKeys": ["web-creative-design", "web-motion", "web-scroll-animation", "web-view-transition", "web-3d", "web-typography", "web-visual-hierarchy", "web-reduced-motion"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-creative-visual-design.v1","requiredReads":["Documentation/AIKnowledge/entries/web-creative-visual-design.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1","Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md"]}],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-typography-layout",
+      "domain": "web-typography",
+      "objective": "如何生成排版精妙、可扫描、响应式且保持中文阅读质量的网页？",
+      "explicitRouteKeys": ["web-layout-system", "web-typography", "web-type-scale"],
+      "expectedRouteKeys": ["web-layout-system", "web-typography", "web-type-scale", "web-editorial-grid", "web-content-hierarchy", "web-fluid-type", "web-design-system"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-typography-layout.v1","requiredReads":["Documentation/AIKnowledge/entries/web-typography-layout.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1","Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md"]}],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"], "zeroHitAllowed": false, "repeatCount": 3, "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-motion-showcase",
+      "domain": "web-motion",
+      "objective": "如何生成高动态、滚动叙事、页面转场和有限 3D 展示，并且可降级？",
+      "explicitRouteKeys": ["web-motion-showcase", "web-scroll-animation", "web-3d-motion"],
+      "expectedRouteKeys": ["web-motion-showcase", "web-scroll-animation", "web-view-transition", "web-hero-animation", "web-3d-motion", "web-performance-motion", "web-motion-fallback"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-motion-showcase.v1","requiredReads":["Documentation/AIKnowledge/entries/web-motion-showcase.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1","Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md"]}],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"], "zeroHitAllowed": false, "repeatCount": 3, "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "web-interaction-experience",
+      "domain": "web-interaction",
+      "objective": "如何生成可预测、可访问、可恢复且支持动态数据的网页交互？",
+      "explicitRouteKeys": ["web-interaction", "web-microinteraction", "web-state-design"],
+      "expectedRouteKeys": ["web-interaction", "web-microinteraction", "web-input-feedback", "web-navigation", "web-form-ux", "web-state-design", "web-accessible-interaction"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.project.web-interaction-experience.v1","requiredReads":["Documentation/AIKnowledge/entries/web-interaction-experience.md","ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json","ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1","ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1","Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md"]}],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"], "zeroHitAllowed": false, "repeatCount": 3, "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "codex-harness-authority-boundary",
+      "domain": "codex-harness",
+      "objective": "Codex App Server Harness 如何接入 ES Automation 并保持 ES 业务权威？",
+      "explicitRouteKeys": ["codex", "app-server", "harness", "authority"],
+      "expectedRouteKeys": ["codex", "app-server", "harness", "authority", "external-agent", "evidence", "thread", "turn"],
+      "expectedKnowledgeTop3": [{"knowledgeId":"es.codex.app-server.integration.v1","requiredReads":["AGENTS.md","ES/AISpace/README.md","Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md","Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md","Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md","Documentation/AIKnowledge/AIBRAIN_ENTRY.md","Documentation/AIKnowledge/KnowledgeIndex.yaml","Documentation/AIKnowledge/entries/codex-app-server-integration.md","ES/Automation/Contracts/es-codex-app-server-integration-declaration-v1.json","ES/Automation/Contracts/es-codex-app-server-v1.schema.json","ES/Automation/Workers/PowerShell/Test-ESCodexAppServerContract.ps1","Assets/Plugins/ES/AICommands/CodexAppServerHarness受管开发_AI命令.md","Assets/Plugins/ES/Editor/ESAutomation/ESCodexAppServerAutomation.cs"]}],
+      "forbiddenKnowledgeIds": ["es.project.automation-aibrain-graph.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only",
+      "notes": "仅验证静态路由与 Knowledge 选择；不授予 Codex Harness 最终业务验收、写资产或发布权限。"
     }
   ]
 }

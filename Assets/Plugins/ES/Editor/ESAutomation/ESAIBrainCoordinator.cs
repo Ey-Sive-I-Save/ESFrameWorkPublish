@@ -30,6 +30,8 @@ namespace ES
         public const string RoutePlanContractId = "es://automation/contracts/route-plan/v1";
         public const string RouteStageRegistryPath = "ES/Automation/Contracts/es-route-stage.registry.json";
         public const string AbcModeRegistryPath = "ES/Automation/Contracts/es-ai-abc-mode.registry.json";
+        public const string AbcCoreContractPath = "ES/Automation/Contracts/es-ai-abc-core-v1.json";
+        public const string AbcGenerationModeContractPath = "ES/Automation/Contracts/es-ai-abc-generation-mode-v1.json";
         public const string ChineseSkillAliasPath = ".agents/SKILL_ROUTE_ALIASES.zh-CN.json";
         private const string AuthorizationStorePath = "ES/Output/Automation/AIBrain/authorizations.json";
         private const int AuthorizationStoreSchemaVersion = 3;
@@ -72,6 +74,8 @@ namespace ES
             "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
             RouteStageRegistryPath,
             AbcModeRegistryPath,
+            AbcCoreContractPath,
+            AbcGenerationModeContractPath,
         };
         private static string capabilityMetadataFingerprint = string.Empty;
         private static string capabilityDriftTrigger = string.Empty;
@@ -264,6 +268,9 @@ namespace ES
                 taskId = request.taskId,
                 taskVersion = request.taskVersion,
                 preset = request.preset ?? string.Empty,
+                generationMode = request.generationMode ?? string.Empty,
+                acceptanceProfile = request.acceptanceProfile ?? string.Empty,
+                generationAuditDeferred = plan.generationAuditDeferred,
                 input = request.input == null ? new JObject() : (JObject)request.input.DeepClone(),
                 fromAi = request.fromAi,
                 dryRun = request.dryRun,
@@ -526,6 +533,8 @@ namespace ES
                     taskId = source.taskId ?? string.Empty,
                     taskVersion = source.taskVersion,
                     preset = source.preset ?? string.Empty,
+                    generationMode = source.generationMode ?? string.Empty,
+                    acceptanceProfile = source.acceptanceProfile ?? string.Empty,
                     input = source.input == null ? new JObject() : (JObject)source.input.DeepClone(),
                     fromAi = source.fromAi,
                     dryRun = source.dryRun,
@@ -1411,6 +1420,7 @@ namespace ES
             surface.blockers.AddRange(probe.blockers);
 
             CollectAbcModes(surface);
+            CollectAbcGenerationModes(surface);
             CollectCommands(surface);
             CollectSkills(surface);
             CollectAutomationAndCli(surface);
@@ -1488,6 +1498,38 @@ namespace ES
                         "es-ai-abc-mode-registry", StringComparison.Ordinal))
                     throw new InvalidDataException("ABC 模式注册表身份或版本无效。");
 
+                if (!TryResolveProjectPath(AbcCoreContractPath, out string corePath, out string corePathError))
+                    throw new InvalidDataException("ABCC 核心合同路径无效：" + corePathError);
+                if (!TryReadTextAndHash(corePath, out string coreText, out _, out string coreReadError))
+                    throw new InvalidDataException("ABCC 核心合同无法严格读取：" + coreReadError);
+                JObject coreContract = JObject.Parse(coreText);
+                if (coreContract.Value<int?>("schemaVersion") != 1
+                    || !string.Equals(coreContract.Value<string>("mode"), "ABCC.Core", StringComparison.Ordinal)
+                    || !string.Equals(coreContract.Value<string>("coreId"), "es.ai-abc.core.v1", StringComparison.Ordinal))
+                    throw new InvalidDataException("ABCC 核心合同身份或版本无效。");
+                JObject coreParityContract = coreContract["parityContract"] as JObject;
+                JArray coreCapabilityArray = coreParityContract?["requiredCapabilities"] as JArray;
+                string[] canonicalCapabilities = coreCapabilityArray?.Values<string>()
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .ToArray() ?? new string[0];
+                if (canonicalCapabilities.Length != 6
+                    || canonicalCapabilities.Distinct(StringComparer.Ordinal).Count() != canonicalCapabilities.Length)
+                    throw new InvalidDataException("ABCC 核心合同必须声明六项唯一能力。");
+                string[] declaredCoreCapabilities = (coreContract["capabilities"] as JArray)?.OfType<JObject>()
+                    .Select(item => item.Value<string>("capabilityId") ?? string.Empty)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .ToArray() ?? new string[0];
+                if (declaredCoreCapabilities.Length != canonicalCapabilities.Length
+                    || declaredCoreCapabilities.Distinct(StringComparer.Ordinal).Count() != declaredCoreCapabilities.Length
+                    || canonicalCapabilities.Any(capability => !declaredCoreCapabilities.Contains(capability, StringComparer.Ordinal)))
+                    throw new InvalidDataException("ABCC 核心合同能力注册表与 parityContract 不一致。");
+                if (coreParityContract == null
+                    || !string.Equals(coreParityContract.Value<string>("missingCapabilityEffect"), "blocked", StringComparison.Ordinal)
+                    || !string.Equals(coreParityContract.Value<string>("semanticMismatchEffect"), "replan", StringComparison.Ordinal)
+                    || !string.Equals(coreParityContract.Value<string>("evidenceMissingEffect"), "claim-cap", StringComparison.Ordinal)
+                    || !string.Equals(coreParityContract.Value<string>("dynamicFallback"), "explicit-only", StringComparison.Ordinal))
+                    throw new InvalidDataException("ABCC 核心合同 parityContract 闸门语义无效。");
+
                 JObject namingAuthority = root["namingAuthority"] as JObject
                     ?? throw new InvalidDataException("ABC 模式命名权威缺失。");
                 string authorityId = namingAuthority.Value<string>("authorityId") ?? string.Empty;
@@ -1520,12 +1562,29 @@ namespace ES
                         ?? throw new InvalidDataException("ABC 模式缺少命名权威：" + modeId);
                     JArray coverage = mode["capabilityCoverage"] as JArray
                         ?? throw new InvalidDataException("ABC 模式缺少能力覆盖声明：" + modeId);
-                    List<string> capabilities = coverage.Values<string>()
+                    List<string> rawCapabilities = coverage.Values<string>()
                         .Where(value => !string.IsNullOrWhiteSpace(value))
-                        .Distinct(StringComparer.Ordinal)
                         .ToList();
+                    if (rawCapabilities.Count != rawCapabilities.Distinct(StringComparer.Ordinal).Count())
+                        throw new InvalidDataException("ABC 模式能力覆盖不得重复：" + modeId);
+                    if (rawCapabilities.Any(value => !canonicalCapabilities.Contains(value, StringComparer.Ordinal)))
+                        throw new InvalidDataException("ABC 模式包含未注册能力：" + modeId);
+                    List<string> capabilities = rawCapabilities;
                     if (capabilities.Count == 0)
                         throw new InvalidDataException("ABC 模式能力覆盖不能为空：" + modeId);
+
+                    bool independent = mode.Value<bool?>("independent") ?? false;
+                    bool dependsOnCore = mode.Value<bool?>("dependsOnCore") ?? false;
+                    string fallback = mode.Value<string>("fallback") ?? string.Empty;
+                    if (string.Equals(modeId, "ABCD.Dynamic", StringComparison.Ordinal)
+                        && (!independent || dependsOnCore || !string.Equals(fallback, "none", StringComparison.Ordinal)))
+                        throw new InvalidDataException("ABCD.Dynamic 的独立性、依赖和回退策略无效。");
+                    if (string.Equals(modeId, "ABCC.Core", StringComparison.Ordinal)
+                        && (!independent || dependsOnCore || !string.Equals(fallback, "explicit-only", StringComparison.Ordinal)))
+                        throw new InvalidDataException("ABCC.Core 的独立性、依赖和回退策略无效。");
+                    if (string.Equals(modeId, "ABCP.Part", StringComparison.Ordinal)
+                        && (independent || !dependsOnCore || !string.Equals(fallback, "explicit-only", StringComparison.Ordinal)))
+                        throw new InvalidDataException("ABCP.Part 的独立性、依赖和回退策略无效。");
 
                     bindings.Add(new ESAIBrainModeBinding
                     {
@@ -1537,10 +1596,10 @@ namespace ES
                         chineseName = names.Value<string>("chinese") ?? string.Empty,
                         shortName = names.Value<string>("shortName") ?? string.Empty,
                         suffix = names.Value<string>("suffix") ?? string.Empty,
-                        independent = mode.Value<bool?>("independent") ?? false,
+                        independent = independent,
                         orchestration = mode.Value<string>("orchestration") ?? string.Empty,
-                        dependsOnCore = mode.Value<bool?>("dependsOnCore") ?? false,
-                        fallback = mode.Value<string>("fallback") ?? string.Empty,
+                        dependsOnCore = dependsOnCore,
+                        fallback = fallback,
                         contractRef = mode.Value<string>("contractRef") ?? string.Empty,
                         registryHash = registryHash,
                         capabilityCoverage = capabilities,
@@ -1551,17 +1610,83 @@ namespace ES
                     string.Equals(item.modeId, "ABCD.Dynamic", StringComparison.Ordinal));
                 ESAIBrainModeBinding coreMode = bindings.Single(item =>
                     string.Equals(item.modeId, "ABCC.Core", StringComparison.Ordinal));
+                if (dynamicMode.capabilityCoverage.Count != canonicalCapabilities.Length
+                    || coreMode.capabilityCoverage.Count != canonicalCapabilities.Length
+                    || canonicalCapabilities.Any(capability =>
+                        !dynamicMode.capabilityCoverage.Contains(capability, StringComparer.Ordinal)
+                        || !coreMode.capabilityCoverage.Contains(capability, StringComparer.Ordinal)))
+                    throw new InvalidDataException("ABCD.Dynamic 与 ABCC.Core 必须闭合六项核心能力。");
                 JObject parityRule = root["parityRule"] as JObject;
-                if (parityRule != null && parityRule.Value<bool?>("coreMustCoverDynamic") == true
-                    && dynamicMode.capabilityCoverage.Any(capability =>
-                        !coreMode.capabilityCoverage.Contains(capability, StringComparer.Ordinal)))
-                    throw new InvalidDataException("ABCC.Core 能力覆盖未闭合 ABCD.Dynamic。");
+                if (parityRule == null
+                    || parityRule.Value<bool?>("coreMustCoverDynamic") != true
+                    || parityRule.Value<string>("missingCapabilityEffect") != "blocked"
+                    || parityRule.Value<bool?>("partMaySelectSubset") != true
+                    || parityRule.Value<bool?>("silentFallback") != false
+                    || parityRule.Value<bool?>("textCopying") != false)
+                    throw new InvalidDataException("ABC 能力一致性闸门规则不完整或不安全。");
 
                 surface.modes.AddRange(bindings);
             }
             catch (Exception exception)
             {
                 surface.blockers.Add("ABC 模式注册表校验失败：" + exception.Message);
+            }
+        }
+
+        private static void CollectAbcGenerationModes(ESAIBrainProductionSurface surface)
+        {
+            if (!TryResolveProjectPath(AbcGenerationModeContractPath, out string path, out string pathError))
+            {
+                surface.blockers.Add("ABC 生成模式合同路径无效：" + pathError);
+                return;
+            }
+            if (!TryReadTextAndHash(path, out string text, out string contractHash, out string readError))
+            {
+                surface.blockers.Add("ABC 生成模式合同无法读取：" + readError);
+                return;
+            }
+
+            try
+            {
+                JObject root = JObject.Parse(text);
+                if (root.Value<int?>("schemaVersion") != 1
+                    || !string.Equals(root.Value<string>("contractId"),
+                        "es://automation/contracts/ai-abc/generation-modes/v1", StringComparison.Ordinal))
+                    throw new InvalidDataException("ABC 生成模式合同身份或版本无效。");
+                JArray modes = root["modes"] as JArray
+                    ?? throw new InvalidDataException("ABC 生成模式列表缺失。");
+                string[] required = { "creative-divergence", "engineering", "stable" };
+                string[] ids = modes.OfType<JObject>().Select(item => item.Value<string>("modeId") ?? string.Empty).ToArray();
+                if (ids.Length != required.Length || required.Any(item => !ids.Contains(item, StringComparer.Ordinal)))
+                    throw new InvalidDataException("ABC 生成模式必须完整声明 creative-divergence、engineering 和 stable。");
+                foreach (JObject mode in modes.OfType<JObject>())
+                {
+                    string modeId = mode.Value<string>("modeId") ?? string.Empty;
+                    int minimum = mode.Value<int?>("minimumDirections") ?? 0;
+                    int maximum = mode.Value<int?>("maximumDirections") ?? 0;
+                    string objective = mode.Value<string>("objective") ?? string.Empty;
+                    string pruning = mode.Value<string>("pruningPolicy") ?? string.Empty;
+                    string acceptance = mode.Value<string>("acceptanceProfile") ?? string.Empty;
+                    JArray axes = mode["requiredAxes"] as JArray;
+                    if (minimum < 5 || maximum < minimum || string.IsNullOrWhiteSpace(objective)
+                        || string.IsNullOrWhiteSpace(pruning) || axes == null || axes.Count < 5
+                        || !new[] { "shallow-fast", "full-depth", "core-high-risk" }.Contains(acceptance, StringComparer.Ordinal))
+                        throw new InvalidDataException("ABC 生成模式约束不完整：" + modeId);
+                    surface.generationModes.Add(new ESAIBrainGenerationModeBinding
+                    {
+                        modeId = modeId,
+                        objective = objective,
+                        minimumDirections = minimum,
+                        maximumDirections = maximum,
+                        pruningPolicy = pruning,
+                        acceptanceProfile = acceptance,
+                        contractHash = contractHash,
+                    });
+                }
+            }
+            catch (Exception exception)
+            {
+                surface.blockers.Add("ABC 生成模式合同校验失败：" + exception.Message);
             }
         }
 
@@ -1577,12 +1702,21 @@ namespace ES
 
             foreach (ESAICommandCatalogEntry entry in entries.OrderBy(item => item.id, StringComparer.Ordinal))
             {
+                string mappedRisk = MapAuthorityRiskClass(entry.riskLevel);
+                if (!string.Equals(mappedRisk, "standard", StringComparison.OrdinalIgnoreCase)
+                    && (string.IsNullOrWhiteSpace(entry.authorityDomain)
+                        || string.IsNullOrWhiteSpace(entry.authorityRiskClass)))
+                {
+                    surface.blockers.Add("高风险 AICommand 缺少显式 authorityDomain/authorityRiskClass：" + entry.id);
+                }
                 surface.commands.Add(new ESAIBrainCommandBinding
                 {
                     id = entry.id,
                     path = entry.path,
                     role = entry.role,
                     riskLevel = entry.riskLevel,
+                    authorityDomain = entry.authorityDomain,
+                    authorityRiskClass = entry.authorityRiskClass,
                     writeMode = entry.writeMode,
                     catalogHash = catalogHash,
                     contractHash = string.Empty,
@@ -1800,6 +1934,9 @@ namespace ES
                     + "@" + item.shortName + "@" + item.suffix + "@" + item.independent
                     + "@" + item.orchestration + "@" + item.dependsOnCore + "@" + item.fallback
                     + "@" + item.contractRef + "@" + string.Join(",", item.capabilityCoverage)),
+                generationModes = surface.generationModes.Select(item => item.modeId + "@" + item.objective
+                    + "@" + item.minimumDirections + "@" + item.maximumDirections
+                    + "@" + item.pruningPolicy + "@" + item.acceptanceProfile + "@" + item.contractHash),
                 warnings = surface.warnings.Select(item => item.projectPath + "@" + item.sha256),
                 knowledge = surface.knowledge.Select(item => item.knowledgeId + "@" + item.contentHash),
                 commands = surface.commands.Select(item => item.id + "@" + item.contractHash),
@@ -1872,6 +2009,7 @@ namespace ES
             }
             ValidateSkills(plan, selectedSkills, request.workflow);
             ValidateTask(plan, request);
+            ValidateGenerationSelection(plan, request);
 
             if (string.IsNullOrWhiteSpace(request.invocationId)
                 || !Guid.TryParseExact(request.invocationId, "N", out _))
@@ -1881,6 +2019,24 @@ namespace ES
             plan.routePlan = BuildReadOnlyRoutePlan(plan, request);
             plan.planHash = ComputePlanHash(plan, request);
             return plan;
+        }
+
+        private static void ValidateGenerationSelection(ESAIBrainPlan plan, ESAIBrainRequest request)
+        {
+            string mode = request.generationMode?.Trim().ToLowerInvariant() ?? string.Empty;
+            // core-high-risk is the default acceptance gate; callers may explicitly opt
+            // into shallow-fast/full-depth, but an omitted profile must not bypass ABCD.
+            string acceptance = request.acceptanceProfile?.Trim().ToLowerInvariant() ?? string.Empty;
+            if (acceptance.Length == 0) acceptance = "core-high-risk";
+            string[] modes = { "creative-divergence", "engineering", "stable" };
+            string[] profiles = { "shallow-fast", "full-depth", "core-high-risk" };
+            if (mode.Length > 0 && !modes.Contains(mode, StringComparer.Ordinal))
+                plan.blockers.Add("ABC generationMode 无效：" + mode);
+            if (acceptance.Length > 0 && !profiles.Contains(acceptance, StringComparer.Ordinal))
+                plan.blockers.Add("ABC acceptanceProfile 无效：" + acceptance);
+            plan.generationMode = mode;
+            plan.acceptanceProfile = acceptance;
+            plan.generationAuditDeferred = mode.Length > 0 && acceptance == "core-high-risk";
         }
 
         private static ESAIBrainRoutePlan BuildReadOnlyRoutePlan(
@@ -2672,18 +2828,54 @@ namespace ES
                 return;
             }
 
+            string authorityRiskClass = string.IsNullOrWhiteSpace(verified.authorityRiskClass)
+                ? MapAuthorityRiskClass(verified.riskLevel) : verified.authorityRiskClass;
+            string authorityDomain = string.IsNullOrWhiteSpace(verified.authorityDomain)
+                ? MapAuthorityDomain(verified.id, verified.path) : verified.authorityDomain;
+            if (string.IsNullOrWhiteSpace(authorityDomain)
+                && !string.Equals(authorityRiskClass, "standard", StringComparison.OrdinalIgnoreCase))
+            {
+                plan.blockers.Add("高风险 AICommand 未声明可验证的 authorityDomain："
+                    + verified.id + " (" + verified.riskLevel + ")。");
+            }
             plan.command = new ESAIBrainCommandBinding
             {
                 id = verified.id,
                 path = verified.path,
                 role = verified.role,
                 riskLevel = verified.riskLevel,
+                authorityRiskClass = authorityRiskClass,
+                authorityDomain = authorityDomain,
                 writeMode = verified.writeMode,
                 catalogHash = catalogHash,
                 contractHash = commandHash,
                 reference = reference,
             };
             plan.authority.command = "AICommand:" + verified.id;
+        }
+
+        private static string MapAuthorityRiskClass(string riskLevel)
+        {
+            switch ((riskLevel ?? string.Empty).Trim().ToUpperInvariant())
+            {
+                case "L3": return "critical";
+                case "L2": return "high";
+                default: return "standard";
+            }
+        }
+
+        private static string MapAuthorityDomain(string commandId, string path)
+        {
+            string value = ((commandId ?? string.Empty) + " " + (path ?? string.Empty)).ToLowerInvariant();
+            if (value.Contains("gamecore") || value.Contains("player") || value.Contains("projectile")
+                || value.Contains("input") || value.Contains("physics") || value.Contains("item")
+                || value.Contains("escommand") || value.Contains("runtime")) return "game-logic";
+            if (value.Contains("release") || value.Contains("export") || value.Contains("publish")) return "release";
+            if (value.Contains("ui") || value.Contains("asset") || value.Contains("editor")
+                || value.Contains("compile") || value.Contains("reload")) return "editor-tooling";
+            // L2/L3 commands must not silently inherit the lenient domain.
+            // L1 callers can explicitly use ai-collaboration at their contract.
+            return string.Empty;
         }
 
         private static void ValidateSkills(ESAIBrainPlan plan, IEnumerable<string> requestedSkills,
@@ -2968,6 +3160,9 @@ namespace ES
                 case "es.task-context.evaluate":
                     expectedCommandId = "task.context-runtime.mutate";
                     break;
+                case "es.codex.app-server":
+                    expectedCommandId = "codex.appserver.execute";
+                    break;
                 default:
                     return;
             }
@@ -2995,6 +3190,13 @@ namespace ES
                     || !string.Equals(plan.command.riskLevel, "L3", StringComparison.Ordinal)))
                 plan.blockers.Add("飞书消息发送 AICommand 必须声明 L3/external-run。"
                     + " 当前为 " + plan.command.riskLevel + "/" + plan.command.writeMode + "。");
+            if (taskId == "es.codex.app-server"
+                && (!string.Equals(plan.command.writeMode, "external-run", StringComparison.Ordinal)
+                    || !string.Equals(plan.command.riskLevel, "L3", StringComparison.Ordinal)
+                    || !string.Equals(plan.command.authorityDomain, "editor-tooling", StringComparison.Ordinal)))
+                plan.blockers.Add("Codex App Server 必须绑定 L3/external-run/editor-tooling AICommand。"
+                    + " 当前为 " + plan.command.riskLevel + "/" + plan.command.writeMode
+                    + "/" + plan.command.authorityDomain + "。");
         }
 
         private static bool TryReadAiwarnings(ESAIBrainPlan plan, string objective,
@@ -4582,6 +4784,8 @@ namespace ES
                 },
                 request.invocationId,
                 request.preset,
+                request.generationMode,
+                request.acceptanceProfile,
                 input = request.input ?? new JObject(),
                 request.fromAi,
                 request.dryRun,
@@ -4620,6 +4824,8 @@ namespace ES
                 request.taskId,
                 request.taskVersion,
                 request.preset,
+                request.generationMode,
+                request.acceptanceProfile,
                 input = request.input ?? new JObject(),
                 request.fromAi,
                 request.dryRun,
@@ -4792,6 +4998,8 @@ namespace ES
     public sealed class ESAIBrainRequest
     {
         public string objective = string.Empty;
+        public string generationMode = string.Empty;
+        public string acceptanceProfile = "core-high-risk";
         public List<string> routeKeys = new List<string>();
         public string commandId = string.Empty;
         public List<string> skillNames = new List<string>();
@@ -4860,6 +5068,9 @@ namespace ES
         public string invocationId = string.Empty;
         public string status = string.Empty;
         public string objective = string.Empty;
+        public string generationMode = string.Empty;
+        public string acceptanceProfile = string.Empty;
+        public bool generationAuditDeferred;
         public string knowledgeIndexHash = string.Empty;
         public readonly List<string> routeKeys = new List<string>();
         public readonly List<string> blockers = new List<string>();
@@ -5062,6 +5273,8 @@ namespace ES
         public string path = string.Empty;
         public string role = string.Empty;
         public string riskLevel = string.Empty;
+        public string authorityDomain = string.Empty;
+        public string authorityRiskClass = string.Empty;
         public string writeMode = string.Empty;
         public string catalogHash = string.Empty;
         public string contractHash = string.Empty;
@@ -5120,6 +5333,18 @@ namespace ES
         public string contractRef = string.Empty;
         public string registryHash = string.Empty;
         public List<string> capabilityCoverage = new List<string>();
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainGenerationModeBinding
+    {
+        public string modeId = string.Empty;
+        public string objective = string.Empty;
+        public int minimumDirections;
+        public int maximumDirections;
+        public string pruningPolicy = string.Empty;
+        public string acceptanceProfile = string.Empty;
+        public string contractHash = string.Empty;
     }
 
     internal sealed class SkillEligibility
@@ -5212,6 +5437,7 @@ namespace ES
         public string inventoryHash = string.Empty;
         public readonly List<string> routeKeys = new List<string>();
         public readonly List<ESAIBrainModeBinding> modes = new List<ESAIBrainModeBinding>();
+        public readonly List<ESAIBrainGenerationModeBinding> generationModes = new List<ESAIBrainGenerationModeBinding>();
         public readonly List<string> blockers = new List<string>();
         public readonly List<ESAIBrainEvidenceBinding> warnings = new List<ESAIBrainEvidenceBinding>();
         public readonly List<ESAIBrainKnowledgeBinding> knowledge = new List<ESAIBrainKnowledgeBinding>();
@@ -5340,6 +5566,9 @@ namespace ES
                     EditorGUILayout.LabelField("生产力面", productionSurface.status, EditorStyles.boldLabel);
                     DrawSelectableValue("InventoryHash", productionSurface.inventoryHash);
                     EditorGUILayout.LabelField("ABC 模式", productionSurface.modes.Count.ToString());
+                    EditorGUILayout.LabelField("ABC 生成模式", productionSurface.generationModes.Count.ToString());
+                    if (productionSurface.generationModes.Count > 0)
+                        EditorGUILayout.LabelField("生成目标", string.Join(", ", productionSurface.generationModes.Select(item => item.modeId)));
                     EditorGUILayout.LabelField("Skills", productionSurface.skills.Count.ToString());
                     EditorGUILayout.LabelField("CLI", productionSurface.cli.Count.ToString());
                     EditorGUILayout.LabelField("MCP", productionSurface.mcp.Count.ToString());

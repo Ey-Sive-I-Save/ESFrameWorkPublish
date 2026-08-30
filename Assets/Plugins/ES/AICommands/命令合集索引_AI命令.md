@@ -64,6 +64,8 @@ Assets/Plugins/ES/AICommands/ES发布验收证据候选_AI命令.md
 Assets/Plugins/ES/AICommands/ES测试夹具候选创建_AI命令.md
 Assets/Plugins/ES/AICommands/UserSpace用户区域管理_AI命令.md
 Assets/Plugins/ES/AICommands/ESTeam团队协作区管理_AI命令.md
+Assets/Plugins/ES/AICommands/DeepSeekHarness受管开发_AI命令.md
+Assets/Plugins/ES/AICommands/CodexAppServerHarness受管开发_AI命令.md
 ```
 
 不要为每个命令机械创建一个 Skill。只有跨任务高频复用、步骤稳定、适合脚本或工具集成的执行能力才进入 `.agents/skills`。

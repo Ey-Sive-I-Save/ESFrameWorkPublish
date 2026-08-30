@@ -153,6 +153,23 @@ namespace ES
                     else
                         ESAutomationPathPolicy.EnsureWorkerWriteAllowed(path, contract.writeRoots);
                 }
+                // Any AI invocation that can mutate Unity assets, launch an
+                // external worker, delete, publish, or otherwise cross the
+                // project boundary must declare an explicit strict authority
+                // profile. Ordinary collaboration/report tasks may continue
+                // with the lenient ai-collaboration policy, but mutation
+                // capabilities must never silently inherit that default.
+                if (invocation.fromAi && RequiresStrictAuthority(requirements.requiredCapabilities))
+                {
+                    ESAutomationAcceptanceCriteria authorityCriteria = contract.acceptanceCriteria;
+                    if (authorityCriteria == null
+                        || (authorityCriteria.authorityDomain != "game-logic"
+                            && authorityCriteria.authorityDomain != "editor-tooling"
+                            && authorityCriteria.authorityDomain != "release")
+                        || string.Equals(authorityCriteria.authorityRiskClass, "standard", StringComparison.OrdinalIgnoreCase))
+                        return ESAutomationTaskInvocationResult.Blocked(
+                            "AI 高危副作用任务必须声明严格 authorityDomain/authorityRiskClass；禁止静默继承 ai-collaboration。" + invocation.taskId);
+                }
             }
             catch (Exception exception)
             {
@@ -172,6 +189,13 @@ namespace ES
                 && string.Equals(left.workerId, right.workerId, StringComparison.Ordinal)
                 && string.Equals(left.version, right.version, StringComparison.Ordinal)
                 && string.Equals(left.entrypointHash, right.entrypointHash, StringComparison.OrdinalIgnoreCase);
+
+        private static bool RequiresStrictAuthority(ESAutomationCapability capabilities)
+            => (capabilities & (ESAutomationCapability.MaterializeUI
+                | ESAutomationCapability.WriteAssets
+                | ESAutomationCapability.Delete
+                | ESAutomationCapability.Publish
+                | ESAutomationCapability.ExternalWrite)) != ESAutomationCapability.None;
 
         public static ESAutomationTaskInvocationResult GetRun(string runId, bool fromAi)
         {
@@ -424,6 +448,9 @@ namespace ES
         public string taskId = string.Empty;
         public int taskVersion;
         public string preset = string.Empty;
+        public string generationMode = string.Empty;
+        public string acceptanceProfile = "core-high-risk";
+        public bool generationAuditDeferred;
         public JObject input = new JObject();
         public bool fromAi;
         public bool dryRun;

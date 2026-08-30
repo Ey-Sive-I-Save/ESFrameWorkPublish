@@ -29,6 +29,7 @@ namespace ES
 
         public Vector3 GroupOrigin => renderContext.GroupOrigin;
         public bool IsReady => !disposed && renderContext.IsReady;
+        public bool IsDisposed => disposed || renderContext.IsDisposed;
         public bool UsePreviewScene => renderContext.SceneMode == ESEditorPreviewSceneMode.PreviewScene;
         public ESEditorPreviewEnhancerSet EnhancerSet => renderContext.EnhancerSet;
         public string LastStatus => disposed ? "AssetPackage preview session disposed." : renderContext.LastStatus;

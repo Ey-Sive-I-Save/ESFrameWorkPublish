@@ -1,0 +1,103 @@
+schemaVersion: 1
+matrixId: es-web-knowledge-coverage-v1
+status: operational-static
+authority: current WebPageStudio source, KnowledgeIndex and RouteProbeRegistry
+knowledgeIndex: Documentation/AIKnowledge/KnowledgeIndex.yaml
+routeProbeRegistry: Documentation/AIKnowledge/RouteProbeRegistry.json
+evidenceBoundary: static-routing-only
+entries:
+  - domain: generation-kernel
+    canonicalKnowledgeId: es.project.web-page-generation-advanced-capabilities.v1
+    routeProbeIds: [web-generation-capability-overview]
+    staticEvidence: [kernel-schema, kernel-compiler, kernel-validator, quality, accessibility, contract]
+    runtimeEvidence: runtime-not-run
+    gaps: [browser-execution, production-deployment]
+  - domain: legacy-static-contract
+    canonicalKnowledgeId: es.project.web-page-generation-contracts.v1
+    routeProbeIds: []
+    staticEvidence: [kernel-schema, kernel-compiler, quality]
+    runtimeEvidence: runtime-not-run
+    gaps: [visual-runtime, browser-execution]
+  - domain: creative-visual-design
+    canonicalKnowledgeId: es.project.web-creative-visual-design.v1
+    routeProbeIds: [web-creative-visual-design]
+    staticEvidence: [design-spec, motion-contract, quality, accessibility, utf8]
+    runtimeEvidence: runtime-not-run
+    gaps: [browser-animation, visual-regression, web-vitals, device-gpu-profile]
+  - domain: typography-layout
+    canonicalKnowledgeId: es.project.web-typography-layout.v1
+    routeProbeIds: [web-typography-layout]
+    staticEvidence: [type-scale, editorial-grid, responsive, quality, utf8]
+    runtimeEvidence: runtime-not-run
+    gaps: [font-rendering, browser-line-breaks, visual-regression]
+  - domain: motion-showcase
+    canonicalKnowledgeId: es.project.web-motion-showcase.v1
+    routeProbeIds: [web-motion-showcase]
+    staticEvidence: [motion-contract, scroll-timeline, view-transition, reduced-motion, quality]
+    runtimeEvidence: runtime-not-run
+    gaps: [browser-animation, gpu-compositing, device-performance]
+  - domain: interaction-experience
+    canonicalKnowledgeId: es.project.web-interaction-experience.v1
+    routeProbeIds: [web-interaction-experience]
+    staticEvidence: [state-machine, accessibility, backend-contract, quality, utf8]
+    runtimeEvidence: runtime-not-run
+    gaps: [keyboard-runtime, assistive-tech, network-error-recovery]
+  - domain: component-layout-route
+    canonicalKnowledgeId: es.project.web-component-layout-route.v1
+    routeProbeIds: [web-component-layout-routing]
+    staticEvidence: [kernel-schema, kernel-compiler, quality]
+    runtimeEvidence: runtime-not-run
+    gaps: [nested-route-browser-navigation]
+  - domain: theme-design-tokens
+    canonicalKnowledgeId: es.project.web-theme-design-tokens.v1
+    routeProbeIds: [web-theme-forced-colors]
+    staticEvidence: [quality, accessibility, forced-colors]
+    runtimeEvidence: runtime-not-run
+    gaps: [browser-color-scheme-switching]
+  - domain: runtime-data-contract
+    canonicalKnowledgeId: es.project.web-runtime-data-contract.v1
+    routeProbeIds: [web-dynamic-backend-boundary]
+    staticEvidence: [backend-contract, kernel-validator]
+    runtimeEvidence: runtime-not-run
+    gaps: [network-execution, auth-session-integration]
+  - domain: content-seo-localization
+    canonicalKnowledgeId: es.project.web-content-seo-discovery.v1
+    routeProbeIds: [web-seo-localization-discovery]
+    staticEvidence: [quality, sitemap, hreflang, microdata]
+    runtimeEvidence: runtime-not-run
+    gaps: [search-engine-reprocessing]
+  - domain: accessibility-performance
+    canonicalKnowledgeId: es.project.web-accessibility-performance-evidence.v1
+    routeProbeIds: [web-quality-evidence-layers]
+    staticEvidence: [quality, accessibility]
+    runtimeEvidence: runtime-not-run
+    gaps: [axe-browser-run, web-vitals, screen-reader]
+  - domain: pwa-security-deployment
+    canonicalKnowledgeId: es.project.web-pwa-security-deployment.v1
+    routeProbeIds: [web-pwa-offline-security]
+    staticEvidence: [manifest, csp, offline-package]
+    runtimeEvidence: runtime-not-run
+    gaps: [service-worker-installability, cache-update, https-deployment]
+  - domain: testing-observability
+    canonicalKnowledgeId: es.project.web-testing-observability.v1
+    routeProbeIds: [web-quality-evidence-layers]
+    staticEvidence: [contract, quality, accessibility, freshness]
+    runtimeEvidence: runtime-not-run
+    gaps: [e2e, visual-regression, lighthouse]
+  - domain: ai-generation-repair
+    canonicalKnowledgeId: es.project.web-ai-generation-repair.v1
+    routeProbeIds: [web-ai-generation-repair]
+    staticEvidence: [page-ir, revision-patch, kernel-validator]
+    runtimeEvidence: runtime-not-run
+    gaps: [automated-failure-mining, repair-planner]
+  - domain: open-source-calibration
+    canonicalKnowledgeId: es.project.web-open-source-calibration.v1
+    routeProbeIds: [web-open-source-calibration]
+    staticEvidence: [migration-boundary, source-ref-policy]
+    runtimeEvidence: runtime-not-run
+    gaps: [license-review, version-pinning, adapter-conformance]
+coverageRules:
+  - every domain has one canonicalKnowledgeId
+  - every routeProbeId must resolve to RouteProbeRegistry.json
+  - staticEvidence cannot promote runtimeEvidence
+  - gaps are non-blocking until the corresponding runtime or external-source scope is authorized

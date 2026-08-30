@@ -17,6 +17,7 @@ namespace ES
     /// The endpoint owns request admission and run records; ESUIGameScreenMaterializer
     /// remains the only implementation that creates Prefabs, Fixture Scenes and evidence.
     /// </summary>
+    // Materialization completion is an execution result only; it never declares task completion.
     internal static class ESUIAutomationMaterializer
     {
         private const string TaskId = "es.ui.materialize-screen";
@@ -65,6 +66,20 @@ namespace ES
                         supportsDryRun = true,
                         supportsRetry = false,
                         outputs = new List<string> { "prefab", "fixture-scene", "evidence", "result.json" },
+                        acceptanceCriteria = new ESAutomationAcceptanceCriteria
+                        {
+                            authorityDomain = "editor-tooling",
+                            authorityRiskClass = "high",
+                            criteria = new List<ESAutomationAcceptanceCriterion>
+                            {
+                                new ESAutomationAcceptanceCriterion
+                                {
+                                    criterionId = "ui-materializer.evidence",
+                                    verifierId = "es.ui.materializer.evidence-receipt",
+                                    description = "Prefab、Fixture Scene 与视觉证据必须绑定同一 ScreenSpec 和 Run。",
+                                },
+                            },
+                        },
                     });
                 }
                 else

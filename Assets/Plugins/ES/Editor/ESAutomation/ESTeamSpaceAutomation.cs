@@ -8,6 +8,8 @@ using Newtonsoft.Json.Linq;
 namespace ES
 {
     /// <summary>受管 TeamSpace 注册卡入口；AI 菜单选择后通过此 Endpoint 执行固定 Worker。</summary>
+    // Worker Completed is an execution result only; it never declares project
+    // acceptance. TaskContext/ABCD remains the final decision authority.
     internal static class ESTeamSpaceAutomation
     {
         internal const string TaskId = "es.teamspace.profile";

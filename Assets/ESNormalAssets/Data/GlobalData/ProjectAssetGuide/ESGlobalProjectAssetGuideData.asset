@@ -134,7 +134,7 @@ MonoBehaviour:
     expandedTransformPaths: []
   - sceneGuid: 56b71f36d8040a44ebdacf759edc04ca
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/02_CompositeShader_UI_Cases.unity
-    savedUtcTicks: 639232651000524882
+    savedUtcTicks: 639236659263711600
     expandedTransformPaths: []
   - sceneGuid: 6b375c60c399eee48bcc8c14f94b7d14
     scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/03_CompositeShader_3D_Lit_Cases.unity
@@ -179,6 +179,26 @@ MonoBehaviour:
   - sceneGuid: 83071ee2bf66a63448904924b04b5bc8
     scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-iteration-nextFixture.unity
     savedUtcTicks: 639232651003083316
+    expandedTransformPaths: []
+  - sceneGuid: 427c7cd0e0c5db24ea553bb4352c086c
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-v21Fixture.unity
+    savedUtcTicks: 639234455262887630
+    expandedTransformPaths: []
+  - sceneGuid: 83592311c40fac0419abc7feb81eb325
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-v22Fixture.unity
+    savedUtcTicks: 639234481181164620
+    expandedTransformPaths: []
+  - sceneGuid: 83769f5257530cd4bb58c2f00bee4326
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-v23-referenceFixture.unity
+    savedUtcTicks: 639234490153685751
+    expandedTransformPaths: []
+  - sceneGuid: adbcdea04fa9abe4da0b34700b72c0f6
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-reference-decomposedFixture.unity
+    savedUtcTicks: 639234510966061240
+    expandedTransformPaths: []
+  - sceneGuid: beba6882aa8aafa43bfcc2594b719d4c
+    scenePath: Assets/UI/Scenes/Generated/arena-moba-lobby-reference-decomposed-finalFixture.unity
+    savedUtcTicks: 639234524870393559
     expandedTransformPaths: []
   displayTitleFontSize: 22
   displayHintFontSize: 14

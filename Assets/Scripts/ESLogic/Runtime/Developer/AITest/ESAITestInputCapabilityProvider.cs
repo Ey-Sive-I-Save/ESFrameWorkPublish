@@ -505,6 +505,9 @@ namespace ES
 
         private static ESAITestCapabilityResponseDto Accepted(bool conditionMet, bool retryable, string message, ESAITestValueDto value)
         {
+            // Capability admission only: accepted=true never declares task
+            // completion or release acceptance; TaskContext/ABCD owns the
+            // final decision.
             return new ESAITestCapabilityResponseDto
             {
                 accepted = true,

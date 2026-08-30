@@ -1,0 +1,109 @@
+schemaVersion: 1
+matrixId: es-web-open-source-capability-comparison-v1
+status: calibrated-static
+authority: Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+sourcePlan: Documentation/AIKnowledge/WebKnowledgeExternalSourcePlan.yaml
+purpose: >-
+  将主流开源网页框架的可复用机制映射到 ES WebPageStudio；仅作能力校准，
+  不复制第三方代码，不替代 ES canonical 合同，也不宣称实时版本或运行时通过。
+snapshot:
+  snapshotDate: '2026-08-29'
+  versionPolicy: explicitly-pinned-release-only
+  network: disabled-after-bounded-snapshot
+  sourceRefs:
+    - id: official-calibration-v2
+      path: Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+      topics: [container-queries, forced-colors, WCAG-2.2, web-vitals, canonical, sitemap, Nuxt-route-rules, Next-cache-components, Vite-build-assets]
+  freshness: snapshot-only
+  unverified: [live-framework-releases, browser-behavior, production-deployments, benchmark-results, license-compatibility]
+
+capabilityAxes:
+  - id: rendering
+    values: [static, incremental-cache, server-rendered, client-hydrated, route-level-policy]
+  - id: visual
+    values: [design-tokens, responsive-container, forced-colors, reduced-motion, css-animation, 3d-gpu]
+  - id: interaction
+    values: [islands, state-machine, progressive-enhancement, forms, streaming, optimistic-update]
+  - id: assurance
+    values: [a11y-static, web-vitals-budget, contract-validation, visual-regression, e2e, observability]
+  - id: delivery
+    values: [asset-hashing, base-path, adapters, edge, pwa, cache-invalidation]
+
+frameworks:
+  - id: nextjs
+    snapshotVersion: '16.x docs signal (unverified exact release)'
+    rendering: [static-export, server-rendered, cached-components, client-hydrated]
+    visual: [design-tokens, responsive-container, reduced-motion, css-animation, 3d-gpu-via-css-or-webgl]
+    interaction: [server-actions, streaming, client-components, progressive-enhancement]
+    assurance: [a11y-static-by-tooling, web-vitals-instrumentation, contract-validation-via-build, e2e-via-ecosystem]
+    delivery: [asset-hashing, base-path, edge-adapters, cache-invalidation]
+    esAdoption: [route-level-renderPolicy, static-shell-dynamic-island, explicit-client-boundary, performanceEvidence]
+    caveats: [static-export-does-not-prove-cache-components, browser-and-production-unverified]
+  - id: astro
+    snapshotVersion: 'current docs signal (exact release unverified)'
+    rendering: [static, server-rendered-via-adapter, island-hydration, route-level-policy]
+    visual: [design-tokens, responsive-container, reduced-motion, css-animation, 3d-gpu-via-islands]
+    interaction: [islands, progressive-enhancement, partial-hydration, forms-via-adapter]
+    assurance: [a11y-static-by-generated-html, web-vitals-budget-via-adapter, contract-validation-via-build, e2e-via-ecosystem]
+    delivery: [asset-hashing, base-path, adapters, pwa-via-integration, cache-invalidation-via-host]
+    esAdoption: [component-hydration-policy, static-first-page-ir, adapter-boundary, accessibilityEvidence]
+    caveats: [island-runtime-needs-browser-validation, adapter-capability-varies]
+  - id: nuxt
+    snapshotVersion: '4.x rendering docs signal (exact release unverified)'
+    rendering: [static, ssr, swr, isr, csr, route-level-policy]
+    visual: [design-tokens, responsive-container, forced-colors, reduced-motion, css-animation, 3d-gpu-via-client]
+    interaction: [islands-or-client-components, forms, progressive-enhancement, streaming-via-runtime]
+    assurance: [a11y-static-by-generated-html, web-vitals-budget-via-module, contract-validation-via-build, e2e-via-ecosystem]
+    delivery: [asset-hashing, base-path, edge-adapters, pwa-via-module, route-cache-invalidation]
+    esAdoption: [renderPolicy-prerender-cached-dynamic-client-only, route-rules-as-policy-data, cacheEvidence]
+    caveats: [route-rules-need-runtime-host, no live benchmark]
+  - id: sveltekit
+    snapshotVersion: 'current docs signal (exact release unverified)'
+    rendering: [static, ssr, csr, prerender-per-route]
+    visual: [design-tokens, responsive-container, reduced-motion, css-animation, 3d-gpu-via-client]
+    interaction: [progressive-enhancement, forms, transitions, streaming-via-adapter]
+    assurance: [a11y-static-by-generated-html, contract-validation-via-build, e2e-via-ecosystem]
+    delivery: [asset-hashing, base-path, adapters, pwa-via-integration, cache-invalidation-via-host]
+    esAdoption: [route-level-prerender, form-state-machine, adapter-contract, reducedMotionToken]
+    caveats: [adapter and browser behavior unverified]
+  - id: remix
+    snapshotVersion: 'current docs signal (exact release unverified)'
+    rendering: [ssr, static-via-adapter, client-hydrated]
+    visual: [design-tokens, responsive-container, reduced-motion, css-animation]
+    interaction: [nested-routes, loader-action-dataflow, progressive-enhancement, optimistic-update]
+    assurance: [a11y-static-by-generated-html, contract-validation-via-loaders-actions, e2e-via-ecosystem]
+    delivery: [asset-hashing, adapters, edge, cache-invalidation-via-http]
+    esAdoption: [route-data-contract, mutation-state-machine, http-cacheEvidence]
+    caveats: [static output depends on adapter, no live release check]
+  - id: qwik
+    snapshotVersion: 'current docs signal (exact release unverified)'
+    rendering: [static, ssr, resumable-client]
+    visual: [design-tokens, responsive-container, reduced-motion, css-animation]
+    interaction: [resumability, progressive-enhancement, lazy-event-listeners, forms]
+    assurance: [a11y-static-by-generated-html, web-vitals-budget, contract-validation-via-build, e2e-via-ecosystem]
+    delivery: [asset-hashing, base-path, adapters, edge]
+    esAdoption: [interaction-resumability-hint, event-boundary, hydration-budget]
+    caveats: [resumability requires runtime validation and framework-specific adapter]
+  - id: eleventy
+    snapshotVersion: 'current docs signal (exact release unverified)'
+    rendering: [static, multi-template, incremental-build-via-plugin]
+    visual: [design-tokens, responsive-container, reduced-motion, css-animation]
+    interaction: [progressive-enhancement, client-js-opt-in, forms-via-static-endpoint]
+    assurance: [a11y-static-by-html-checks, contract-validation-via-build, e2e-via-ecosystem]
+    delivery: [asset-copying, base-path, pwa-via-plugin, cache-invalidation-via-host]
+    esAdoption: [static-first-output, template-contract, explicit-client-island, utf8-and-link-validation]
+    caveats: [dynamic behavior is external; no browser/performance proof]
+
+esCanonicalProjection:
+  rendering: route-level renderPolicy maps to prerender|cached|dynamic|client-only; never imports framework runtime semantics.
+  visual: Page IR uses responsiveBasis=container plus media preferences (forced-colors, prefers-reduced-motion); tokens remain source of truth.
+  interaction: model explicit state/event transitions and hydration/client boundaries; generated JS remains progressive-enhancement-safe.
+  assurance: keep WCAG normative, automated checks, assistive-tech, browser, visual-regression and web-vitals evidence separate.
+  delivery: require basePath/static analyzability, immutable asset hashes, adapter contract and cache invalidation evidence.
+  licensing: no source-code vendoring; provenance and license review required before adopting implementation.
+
+comparisonRules:
+  - staticEvidenceCannotPromoteRuntime
+  - frameworkVersionMustBePinnedBeforeMigration
+  - capabilityLabelsAreDesignSignalsNotCompatibilityClaims
+  - routePolicyAndAdapterBoundaryRequiredForDynamicFeatures

@@ -1461,6 +1461,7 @@ namespace ES
         };
 
         private static readonly List<EditorWindow> OpenedWindows = new List<EditorWindow>(WindowCount);
+        private static readonly List<string> ProtectedExistingWindowTitles = new List<string>(WindowCount);
         private static MethodInfo hasOpenInstancesMethod;
         private static int nextWindowIndex;
         private static double nextOpenAt;
@@ -1485,6 +1486,7 @@ namespace ES
 
             StopOpeningQueue();
             CloseOpenedWindows();
+            ProtectedExistingWindowTitles.Clear();
             nextWindowIndex = 0;
             nextOpenAt = 0d;
             EditorApplication.update -= OpenNextWindow;
@@ -1518,6 +1520,94 @@ namespace ES
         {
             StopOpeningQueue();
             CloseOpenedWindows();
+        }
+
+        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/关闭全部压力测试目标窗口", false, 9175)]
+        private static void CloseAllStressTargetWindowsEntry()
+        {
+            _ = ConfirmAndCloseAllStressTargetWindowsAsync();
+        }
+
+        private static async Task ConfirmAndCloseAllStressTargetWindowsAsync()
+        {
+            bool accepted;
+            try
+            {
+                accepted = await ESDialog.DangerAsync(
+                    "es.window.semisleep.close-all-targets",
+                    "关闭全部压力测试目标窗口",
+                    "将关闭半休眠压力测试目标列表中的所有窗口和性能探针，不会关闭其他 Unity 窗口。",
+                    "关闭全部目标窗口",
+                    "取消",
+                    detail: "影响：目标窗口的未保存编辑状态由各窗口自身负责处理。\n恢复：可从【ES】菜单重新打开需要的窗口。",
+                    host: ESDialogHost.Editor,
+                    owner: null,
+                    allowMainWorkspaceFallback: true);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[ESWindowSemiSleepStressTest] 全部关闭确认失败：\n" + exception);
+                return;
+            }
+
+            if (!accepted)
+                return;
+
+            CloseAllStressTargetWindows();
+        }
+
+        private static void CloseAllStressTargetWindows()
+        {
+            var windowsToClose = new List<EditorWindow>(WindowSpecs.Length + 1);
+            AddOpenWindowsOfType(typeof(ESWindowSleepBenchmarkProbeWindow), windowsToClose);
+            foreach (WindowSpec spec in WindowSpecs)
+            {
+                Type windowType = Type.GetType(spec.TypeName, false);
+                if (windowType == null || !typeof(EditorWindow).IsAssignableFrom(windowType))
+                    continue;
+                AddOpenWindowsOfType(windowType, windowsToClose);
+            }
+
+            StopOpeningQueue();
+            int closedCount = 0;
+            foreach (EditorWindow window in windowsToClose)
+            {
+                if (window == null)
+                {
+                    closedCount++;
+                    continue;
+                }
+                try
+                {
+                    window.Close();
+                    closedCount++;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("[ESWindowSemiSleepStressTest] 关闭目标窗口失败："
+                                   + window.GetType().FullName + "\n" + exception);
+                }
+            }
+
+            OpenedWindows.Clear();
+            ProtectedExistingWindowTitles.Clear();
+            Debug.Log("[ESWindowSemiSleepStressTest] 已关闭全部压力测试目标窗口"
+                      + $" | closed={closedCount}"
+                      + " | scope=WindowSpecs+ESWindowSleepBenchmarkProbeWindow");
+        }
+
+        private static void AddOpenWindowsOfType(Type windowType, List<EditorWindow> destination)
+        {
+            if (windowType == null || destination == null)
+                return;
+
+            UnityEngine.Object[] instances = Resources.FindObjectsOfTypeAll(windowType);
+            foreach (UnityEngine.Object instance in instances)
+            {
+                if (!(instance is EditorWindow window) || window == null || destination.Contains(window))
+                    continue;
+                destination.Add(window);
+            }
         }
 
         private static void BeginPerformanceBenchmark(int windowCount)
@@ -1669,9 +1759,8 @@ namespace ES
             {
                 if (HasOpenWindowInstance(windowType))
                 {
-                    Debug.LogWarning(
-                        "[ESWindowSemiSleepStressTest] 已跳过现有窗口，禁止为测试创建同类型副本："
-                        + spec.Title);
+                    if (!ProtectedExistingWindowTitles.Contains(spec.Title))
+                        ProtectedExistingWindowTitles.Add(spec.Title);
                     nextOpenAt = EditorApplication.timeSinceStartup + 0.08d;
                     return;
                 }
@@ -1696,6 +1785,16 @@ namespace ES
             StopOpeningQueue();
             Rect mainBounds = EditorGUIUtility.GetMainWindowPosition();
             OpenedWindows.RemoveAll(window => window == null);
+            ReportProtectedExistingWindows();
+            if (OpenedWindows.Count == 0)
+            {
+                Debug.Log(
+                    "[ESWindowSemiSleepStressTest] 本轮没有创建可测试窗口；"
+                    + "已保留所有现有窗口不变，半休眠测试结束。"
+                    + $" | protectedExisting={ProtectedExistingWindowTitles.Count}");
+                return;
+            }
+
             int preparedWindowCount = 0;
             for (int i = 0; i < OpenedWindows.Count; i++)
             {
@@ -1714,6 +1813,7 @@ namespace ES
             Debug.Log(
                 "[ESWindowSemiSleepStressTest] 商业实机环境"
                 + $" | productionHosts={preparedWindowCount}/{OpenedWindows.Count}"
+                + $" | protectedExisting={ProtectedExistingWindowTitles.Count}"
                 + $" | mainBounds={mainBounds}"
                 + $" | negativeCoordinates={mainBounds.x < 0f || mainBounds.y < 0f}"
                 + $" | pixelsPerPoint={EditorGUIUtility.pixelsPerPoint:0.###}"
@@ -1722,6 +1822,17 @@ namespace ES
                 + ((OpenedWindows.Count + 3) / 4));
             EditorApplication.delayCall -= RequestAllWindowsSleep;
             EditorApplication.delayCall += RequestAllWindowsSleep;
+        }
+
+        private static void ReportProtectedExistingWindows()
+        {
+            if (ProtectedExistingWindowTitles.Count == 0)
+                return;
+
+            Debug.Log(
+                "[ESWindowSemiSleepStressTest] 已保护现有窗口，未创建同类型副本："
+                + string.Join("、", ProtectedExistingWindowTitles)
+                + $" | count={ProtectedExistingWindowTitles.Count}");
         }
 
         private static bool TryPrepareWindowForSleep(
@@ -1789,6 +1900,7 @@ namespace ES
                 window != null
                 && ES.EditorInternal.ESEditorPresentation.RequestWindowSemiSleep(window));
             Debug.Log($"[ESWindowSemiSleepStressTest] 已打开 {OpenedWindows.Count}/{WindowCount} 个窗口，"
+                      + $"已保护现有窗口 {ProtectedExistingWindowTitles.Count} 个，"
                       + $"已请求半休眠 {sleeping} 个。点击任一 100×100 窗口可验证唤醒与回位。");
         }
 

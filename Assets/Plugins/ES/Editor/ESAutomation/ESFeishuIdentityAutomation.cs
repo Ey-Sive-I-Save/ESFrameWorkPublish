@@ -11,6 +11,7 @@ using UnityEditor;
 
 namespace ES
 {
+    // Invocation Completed/Accepted is orchestration status only; it never declares task completion; downstream decision is owned by TaskContext/ABCD.
     /// <summary>
     /// Machine-local Feishu role ownership. Raw external identity bindings stay under the
     /// ignored Automation Runs root and are never returned through normal task results.
@@ -22,7 +23,7 @@ namespace ES
         internal const string WorkerType = "DotNet";
         internal const string WorkerId = "es.feishu.identity.csharp";
         internal const string WorkerVersion = "0.1.0";
-        internal const string WorkerEntrypointHash = "ca2b700505014eb6817c9b6b42d1b479cc28e6190713a99fe9dd911b1cc08d73";
+        internal const string WorkerEntrypointHash = "1b451449bf122d79c6f2dcdafd4c65cef5a5d6a48dad93811c62098a7bb9579a";
         internal const string InputSchemaHash = "2c87970d691504566588d02621354a62c8e7c1342533730180618992ff575c7c";
         private const int TimeoutSeconds = 10;
         private static readonly TimeSpan DryRunEvidenceLifetime = TimeSpan.FromMinutes(30);
@@ -850,6 +851,7 @@ namespace ES
                 File.ReadAllText(path, StrictUtf8));
             if (record == null || record.taskId != TaskId || record.taskVersion != TaskVersion)
                 throw new InvalidDataException("飞书身份 RunRecord 身份无效。");
+            record.Validate();
             return record;
         }
 

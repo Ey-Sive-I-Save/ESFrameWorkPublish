@@ -3,6 +3,7 @@
     "rootNamespace": "ES.Tests",
     "references": [
         "ES_Editor",
+        "ES_Logic",
         "ES_Stand",
         "Unity.TextMeshPro",
         "Unity.RenderPipelines.Universal.Runtime"

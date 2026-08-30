@@ -17,6 +17,8 @@ namespace ES
         public string summary = string.Empty;
         public string role = string.Empty;
         public string riskLevel = string.Empty;
+        public string authorityDomain = string.Empty;
+        public string authorityRiskClass = string.Empty;
         public string writeMode = string.Empty;
         public string keywords = string.Empty;
     }
@@ -310,6 +312,8 @@ namespace ES
                 + "合同 ID：" + entry.id + "\n"
                 + "合同角色：" + entry.role + "\n"
                 + "风险等级：" + entry.riskLevel + "\n"
+                + "权威领域：" + entry.authorityDomain + "\n"
+                + "权威风险：" + entry.authorityRiskClass + "\n"
                 + "写入模式：" + entry.writeMode + "\n"
                 + "合同路径（项目相对路径）：" + entry.path + "\n"
                 + "合同 SHA-256：" + commandHash + "\n"
@@ -360,6 +364,15 @@ namespace ES
                 reason = "role、writeMode 或 riskLevel 不在允许枚举内";
                 return false;
             }
+            if (entry.riskLevel != "L1"
+                && (string.IsNullOrWhiteSpace(entry.authorityDomain)
+                    || string.IsNullOrWhiteSpace(entry.authorityRiskClass)
+                    || !IsAuthorityDomain(entry.authorityDomain)
+                    || !IsAuthorityRiskClass(entry.authorityRiskClass)))
+            {
+                reason = "L2/L3 命令必须显式声明有效 authorityDomain 与 authorityRiskClass";
+                return false;
+            }
             if (string.IsNullOrWhiteSpace(entry.keywords) || entry.keywords.Trim().Length > 320)
             {
                 reason = "keywords 缺失或超过目录展示上限";
@@ -387,6 +400,17 @@ namespace ES
                     return false;
             }
             return value[0] != '.' && value[0] != '-';
+        }
+
+        private static bool IsAuthorityDomain(string value)
+        {
+            return value == "ai-collaboration" || value == "game-logic"
+                || value == "editor-tooling" || value == "release";
+        }
+
+        private static bool IsAuthorityRiskClass(string value)
+        {
+            return value == "standard" || value == "high" || value == "critical";
         }
 
         private static bool TryResolveAICommandFile(string projectRelativePath, string requiredExtension,

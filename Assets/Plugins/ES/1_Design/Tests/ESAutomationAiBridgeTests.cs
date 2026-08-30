@@ -1129,6 +1129,62 @@ namespace ES.Tests
         }
 
         [Test]
+        public void CompletionDecision_GameLogicEvidenceGapIsHardBlocked()
+        {
+            var decision = new ESAutomationCompletionDecision
+            {
+                runId = Guid.NewGuid().ToString("N"),
+                authorityDomain = "game-logic",
+                evidenceStatus = "missing",
+                runtimeStatus = "runtime-not-run",
+            };
+
+            decision.RefreshDecisionSemantics();
+
+            Assert.That(decision.accepted, Is.False);
+            Assert.That(decision.decisionStatus, Is.EqualTo("Blocked"));
+            Assert.That(decision.blockingLayer, Is.EqualTo("evidence"));
+            Assert.That(decision.nextAction, Is.EqualTo("stop-and-report"));
+        }
+
+        [Test]
+        public void CompletionDecision_AiCollaborationEvidenceGapRemainsActionable()
+        {
+            var decision = new ESAutomationCompletionDecision
+            {
+                runId = Guid.NewGuid().ToString("N"),
+                authorityDomain = "ai-collaboration",
+                evidenceStatus = "missing",
+                runtimeStatus = "runtime-not-run",
+            };
+
+            decision.RefreshDecisionSemantics();
+
+            Assert.That(decision.accepted, Is.False);
+            Assert.That(decision.decisionStatus, Is.EqualTo("Unverified"));
+            Assert.That(decision.blockingLayer, Is.EqualTo("evidence"));
+        }
+
+        [Test]
+        public void CompletionDecision_HighRiskWithoutDomainIsBlocked()
+        {
+            var decision = new ESAutomationCompletionDecision
+            {
+                runId = Guid.NewGuid().ToString("N"),
+                authorityRiskClass = "critical",
+                evidenceStatus = "fresh",
+                runtimeStatus = "passed",
+            };
+
+            decision.RefreshDecisionSemantics();
+
+            Assert.That(decision.accepted, Is.False);
+            Assert.That(decision.decisionStatus, Is.EqualTo("Blocked"));
+            Assert.That(decision.blockingLayer, Is.EqualTo("authority"));
+            Assert.That(decision.nextAction, Is.EqualTo("declare-authority-domain"));
+        }
+
+        [Test]
         public void CompletionDecision_StaticBoundaryCannotBeAcceptedByReceipt()
         {
             var decision = new ESAutomationCompletionDecision

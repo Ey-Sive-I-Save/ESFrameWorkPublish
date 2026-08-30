@@ -4,9 +4,9 @@
 `Authority`: ES UI Prefab Authoring Skill、ScreenSpec Validator 与 UI 失败反馈规则
 `RouteKeys`: `ui-automation`, `ui-workflow`, `ui-intent`, `ui-screen-family`, `ui-visual-design`, `requirements-traceability`, `intent-drift`, `reference-policy`
 `HashSchema`: `v2`
-`ContentHash`: `a86f981dd23b1804f8e3cd1e1a0cd58d88e0b6394ea7be53db19b348decc12cf`
-`SourceSetHash`: `a86f981dd23b1804f8e3cd1e1a0cd58d88e0b6394ea7be53db19b348decc12cf`
-`EntryBodyHash`: `5aeb90d5c36c122b7431347a573e7d44fa94094e74098cbbe479dff716f58d34`
+`ContentHash`: `da07e0ea3749322f0dcb0954544d5e84081cae067e8c211d13471407d9e5fc98`
+`SourceSetHash`: `da07e0ea3749322f0dcb0954544d5e84081cae067e8c211d13471407d9e5fc98`
+`EntryBodyHash`: `71299c77e9390213c5033293942418e6a5fb395d8024fd5ff03224e0c490b35f`
 `EvidenceLevel`: `S0`
 `StaleWhen`: ScreenSpec schema、Task Classifier、UI Validator、Prefab Authoring Skill、视觉参考入口或产品边界规则变化。
 
@@ -66,8 +66,8 @@ UI 生成必须先保留用户的需求意图，再进行屏幕族、布局、�
 
 ## SourceRefs
 
-- `.agents/skills/es-ui-prefab-authoring/SKILL.md` (`fa52ef95fa6ef643c8d18e2ad9b72012581aef03c9e949669f3caeb8e2e0c7c4`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`509f924a7ec31b5f4ff6c8e405127ea7e7bbb6c9714efd3e74ed3ccdd8e4a31c`)
+- `.agents/skills/es-ui-prefab-authoring/SKILL.md` (`d19f224ad40646a2820019a16b42ea0ecc0c35d2ae97d753f79afe8be42ebfd1`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`c29986030b842af905536e699778ad7a5a267e415f8842b74ae42a7c80ed4739`)
 - `.agents/skills/es-ui-prefab-authoring/scripts/generate_ui_iteration_packet.py` (`1c4b301eb2161953fc21f4fa10916c54c7abc542cc96606f0a9f1502fd44c352`)
-- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`04fb0702c3fc9691a1a81da8c27fc46473e3d1dcb4f650f40f3250d479502eef`)
+- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`c694ed9fa2a38cd1d207068c254bf548010c48e5ee6bc6bf1bfb05ac63858875`)
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md` (`8e1fe9d3736ad07de9ae953dd628d3f512dc94713ea07a9aee32208570746aa4`)

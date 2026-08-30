@@ -1,0 +1,111 @@
+schemaVersion: 1
+graphId: es.web-knowledge.graph.v1
+title: WebPageStudio 三维知识库与生产闭环图谱
+status: calibrated-static
+authority: current-project-source-and-bounded-knowledge-entries
+evidenceLevel: S1
+contentHash: 4a34a4a5a8b2c4d8a33f7701574f3b471f7a635e008886823e27f6cf814ca316
+sourceSetHash: 4a34a4a5a8b2c4d8a33f7701574f3b471f7a635e008886823e27f6cf814ca316
+staleWhen: WebPageStudio 生成器、Page IR、验证器、发布合同、KnowledgeIndex 或来源快照变化。
+nonClaims:
+  - 不证明浏览器、Node、Unity、网络、性能、视觉回归或生产部署已运行通过。
+  - 不把外部案例或开源框架能力直接提升为 ES 权威实现。
+  - 不授予 Worker、Runtime、网络、Git 或发布权限。
+sourceRefs:
+  - path: Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+    sha256: 0346ca3cf6e26694895bc82250b05ba9ace5a69910141df5d0fc610618d365cf
+  - path: Documentation/AIKnowledge/KnowledgeIndex.yaml
+    sha256: 8f68e3346ed3577c9df2d221df8158153b3980b72df09c8b2fd54da0ab5883a6
+  - path: Documentation/AIKnowledge/entries/web-typography-layout.md
+    sha256: c9949f3cfeff7473de7c14dd943d3ce1edb4bb6c4cd36fe729e0a19b8af30afa
+  - path: Documentation/AIKnowledge/entries/web-motion-showcase.md
+    sha256: bcc82c3ca727315f82c4ba1d502245afc7eb0f4c730e0c677e40cd9352fb4cc8
+  - path: Documentation/AIKnowledge/entries/web-interaction-experience.md
+    sha256: 60e756fb47e5d326224dafd6469e535f9b4a6f0146ccae8864d3ba62a942b119
+  - path: Documentation/AIKnowledge/entries/web-open-source-calibration.md
+    sha256: 3ab0c799c11a1dbf93f115a4f48e2a57b009c0be9af23058039eaf17d79b6fb2
+  - path: Documentation/AIKnowledge/external/web/web-official-calibration-2026-08-29-v2.md
+    sha256: 03d215a9a2b572736668873e1e33aa4677d24bc2641921b4b4f149f8f6acbe48
+  - path: ES/Automation/Contracts/es-web-page-studio-kernel-v1.schema.json
+    sha256: db40aad82f8eb6647de4a69357d1022e8cef520f389d83cea590cb5da6ff49e1
+  - path: ES/Automation/WebPageStudio/Invoke-ESWebPageStudioKernel.ps1
+    sha256: 0a958512aa4ead4dfcfb1b70ca19b62f12433862f6830bee0eef089a6475838b
+  - path: ES/Automation/WebPageStudio/Test-ESWebPageStudioQuality.ps1
+    sha256: 72fba7042e5da70008a5b30a9fa49dfcb6263b959d0120d677cb740808b78ad8
+
+dimensions:
+  - id: typography-layout
+    routeKeys: [web-layout-system, web-typography, web-type-scale, web-editorial-grid]
+    knowledgeIds: [es.project.web-typography-layout.v1]
+    capabilities: [semantic-order, fluid-type, container-query, editorial-grid, rtl-and-cjk-fallback]
+    generation: define-content-intent -> choose-grid-and-type-scale -> emit-responsive-css -> preserve-dom-order
+    validation: quality + accessibility + overflow-and-focus-static-checks
+    publish: immutable-html-css-assets-with-manifest
+  - id: motion-showcase
+    routeKeys: [web-motion-showcase, web-scroll-animation, web-view-transition, web-3d-motion]
+    knowledgeIds: [es.project.web-motion-showcase.v1]
+    capabilities: [scroll-timeline, view-transition, finite-3d-depth, staggered-reveal, reduced-motion-fallback]
+    generation: storyboard(hero,reveal,focus,micro) -> whitelist-transform-opacity -> emit-supports-fallback
+    validation: reduced-motion + animation-budget + static-first-frame + unsupported-api-fallback
+    publish: preserve-static-frame-and-feature-detect-enhancement
+  - id: interaction
+    routeKeys: [web-interaction, web-microinteraction, web-input-feedback, web-state-design]
+    knowledgeIds: [es.project.web-interaction-experience.v1]
+    capabilities: [state-machine, keyboard-parity, focus-management, async-recovery, idempotent-submit]
+    generation: declare-intent-trigger-feedback-success-error-cancel-recovery -> bind-aria-and-focus
+    validation: accessibility + contract + malformed-state-and-duplicate-submit-static-fixtures
+    publish: deterministic-navigation-and-recoverable-runtime-boundary
+
+pipeline:
+  stages:
+    - id: intent
+      input: user-brief
+      output: bounded-page-intent
+    - id: knowledge-route
+      input: [intent, routeKeys]
+      output: selected-knowledge-1-to-3
+    - id: page-ir
+      input: [selected-knowledge, design-tokens, component-library]
+      output: immutable-page-ir
+    - id: generate
+      input: page-ir
+      output: static-html-css-js-and-manifest
+    - id: validate
+      input: generated-artifacts
+      output: [quality-receipt, accessibility-receipt, contract-receipt, utf8-receipt]
+    - id: publish
+      input: accepted-static-receipts
+      output: release-staging-artifact
+  gate: every-stage-hash-and-evidence-bound; runtime-not-run remains explicit
+
+failureSurface:
+  - failureId: WEB-KG-001
+    severity: identity/authority
+    erroneousBehavior: 使用 mutable sourceAbsolutePath 替代私有快照或把外部案例当 ES 事实。
+    triggerAndSymptom: 来源漂移、哈希不匹配、生成决策不可重放。
+    rootCause: SourceRef/ContentHash 未绑定。
+    preventionCheck: 校验所有本地 SourceRef 路径、SHA-256 与 staleWhen。
+    correctAction: 标记 stale，回读权威源码并重建图谱。
+    recoveryAction: 丢弃旧计划/回执，重新路由和哈希计算。
+    evidencePresent: sourceRefs
+    evidenceMissing: fresh-runtime-proof
+  - failureId: WEB-KG-002
+    severity: lifecycle/partial
+    erroneousBehavior: 动效或交互增强失败后页面不可读、焦点丢失或无法恢复。
+    triggerAndSymptom: reduced-motion/不支持 API/异步错误/重复提交。
+    rootCause: 只生成视觉路径，没有静态首帧和状态机。
+    preventionCheck: 要求静态首帧、@supports、完整状态和键盘焦点检查。
+    correctAction: 保留内容与导航，降级动画并显示可恢复错误。
+    recoveryAction: 使用 retry/cancel/undo 状态回到稳定态。
+    evidencePresent: dimension validation fields
+    evidenceMissing: browser DOM and timing receipt
+  - failureId: WEB-KG-003
+    severity: advisory
+    erroneousBehavior: 以静态 Quality/Accessibility 通过声称跨浏览器、性能或发布就绪。
+    triggerAndSymptom: 缺少 Preview/Visual/Release 运行回执。
+    rootCause: 混淆 Static 与 Runtime/Release 证据层。
+    preventionCheck: 检查 nonClaims 与独立 receipt 状态。
+    correctAction: 仅声明静态范围，标注 runtime-not-run。
+    recoveryAction: 在获得明确授权后执行对应运行验证并绑定新回执。
+    evidencePresent: evidenceLevel S1 and nonClaims
+    evidenceMissing: runtime-not-run receipts

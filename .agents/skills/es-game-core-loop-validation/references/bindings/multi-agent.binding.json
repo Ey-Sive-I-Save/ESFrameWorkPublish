@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-game-core-loop-validation",
+  "bindingId": "es.game-core-loop.multi-agent.v1",
+  "execution": "task-scoped",
+  "fanOut": {"min": 4, "max": 6, "joinPolicy": "all-required-or-explicit-degrade", "requiredAgents": ["structure", "implementation", "presentation", "performance"], "optionalAgents": ["adversarial", "evidence-audit"]},
+  "agentContract": {"input": "TaskContext goalRevision + sourceSnapshot + layerScope", "output": "EvidenceReceipt", "forbidden": ["final-acceptance", "alternate-handoff", "scope-expansion", "runtime-claim-without-receipt"]},
+  "join": {"identityKey": "taskId/goalRevision/agentId/attempt/leaseId/processId", "conflictPolicy": "replan-on-same-field-disagreement", "missingEvidencePolicy": "cap-claim-and-preserve-layer-status", "lateResultPolicy": "isolate-by-lease-and-process", "finalAuthority": "ABCD-final-decision"},
+  "abcdCapabilities": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"],
+  "taskContext": {"requiredBindings": ["goalRevisionHash", "routePlanHash", "sourceSnapshotHash", "authorization"], "childReceiptRequired": ["attempt", "leaseId", "processId", "processStartedUtc", "processExitCode"], "allowedTransitions": ["assigned", "running", "evidence-ready", "reviewed", "degraded", "failed"], "completionRequires": ["all-required-agent-receipts", "abcd-final-decision", "claimsNotProven"]}
+}

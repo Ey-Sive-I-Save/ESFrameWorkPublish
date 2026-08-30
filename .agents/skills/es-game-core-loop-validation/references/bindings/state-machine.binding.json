@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-game-core-loop-validation",
+  "stateMachineId": "es.game-core-loop.validation-state.v1",
+  "authority": "TaskContextRuntime + ESABCInnovationRun",
+  "states": [
+    {"id":"intake","requires":[],"emits":["goalRevision","authorization","scope"]},
+    {"id":"authority-locked","requires":["goalRevision","authorization","scope"],"emits":["routePlan","authorityDecision"]},
+    {"id":"snapshot-frozen","requires":["routePlan","authorityDecision"],"emits":["sourceSnapshotHash","branch","head","worktreeFingerprint"]},
+    {"id":"decomposed","requires":["sourceSnapshotHash"],"emits":["layerAssignments","acceptanceProfile"]},
+    {"id":"fanout-running","requires":["layerAssignments"],"emits":["childTaskIds","leaseOrCas"]},
+    {"id":"evidence-joined","requires":["childTaskIds"],"emits":["evidenceSet","conflicts","missingLayers"]},
+    {"id":"adversarial-reviewed","requires":["evidenceSet"],"emits":["counterclaims","recoveryActions"]},
+    {"id":"converged","requires":["counterclaims","recoveryActions"],"emits":["layerVerdicts","claimsNotProven"]},
+    {"id":"final-decision","requires":["layerVerdicts","claimsNotProven"],"emits":["decision","receiptRef"]},
+    {"id":"closed","requires":["decision","receiptRef"],"emits":[]}
+  ],
+  "transitions": {
+    "failure": {"from":"*","to":"evidence-joined","requires":["failureReceipt"]},
+    "conflict": {"from":"evidence-joined","to":"authority-locked","requires":["conflictReceipt"]},
+    "staleSnapshot": {"from":"snapshot-frozen","to":"snapshot-frozen","requires":["staleReceipt"]},
+    "cancel": {"from":"fanout-running","to":"closed","requires":["cancelReceipt"]}
+  },
+  "invariants": [
+    "only-task-context-owns-lifecycle",
+    "only-abcd-final-decision-can-emit-final-decision",
+    "missing-required-layer-cannot-converge-to-accepted",
+    "late-or-cancelled-child-result-is-isolated",
+    "runtime-not-run-caps-runtime-and-performance-profiles"
+  ]
+}

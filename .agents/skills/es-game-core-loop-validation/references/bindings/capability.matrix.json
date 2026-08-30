@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-game-core-loop-validation",
+  "matrixId": "es.game-core-loop.capability-matrix.v1",
+  "layers": {
+    "structure": {"abcd": ["bounded-tool-action", "state-transition-guard", "audit-evidence-chain"], "evidence": ["entryPoint", "sourceHash", "observed", "claimsNotProven"]},
+    "implementation": {"abcd": ["bounded-tool-action", "failure-recovery", "environment-trust-gate", "audit-evidence-chain"], "evidence": ["exitCode", "testName", "environment", "artifactHash", "runtimeStatus"]},
+    "presentation": {"abcd": ["bounded-tool-action", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"], "evidence": ["inputTimeline", "observableFeedback", "screenshotOrVideo", "runtimeStatus"]},
+    "performance": {"abcd": ["bounded-tool-action", "branch-evaluation", "environment-trust-gate", "audit-evidence-chain"], "evidence": ["platform", "inputScale", "baseline", "steadyState", "peak", "cpu", "gc", "memory", "latency", "runtimeStatus"]}
+  },
+  "failureCodes": ["AUTHORITY_MISSING", "SOURCE_SNAPSHOT_STALE", "AGENT_RECEIPT_MISSING", "AGENT_RESULT_CONFLICT", "RUNTIME_RECEIPT_MISSING", "PERFORMANCE_BASELINE_MISSING", "TRANSITION_ILLEGAL", "LATE_RESULT_ISOLATED"],
+  "claimCaps": {"runtime-not-run": ["StaticReview"], "missing-required-layer": ["partial", "unverifiable"], "source-drift": ["stale", "replan"], "agent-conflict": ["replan"]},
+  "closure": "every layer maps to evidence fields and at least one recovery or environment gate"
+}

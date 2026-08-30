@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Game Logic Content Development"
+  short_description: "Create and validate gameplay content on existing systems"
+  default_prompt: "Use es-game-logic-content-development: read project authorities, then use ABCDN to design and validate gameplay content without parallel systems."

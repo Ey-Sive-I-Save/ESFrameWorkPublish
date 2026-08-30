@@ -1,0 +1,3 @@
+[CmdletBinding()]
+param([string]$SkillRoot = (Join-Path (Get-Location) '.agents/skills/es-game-core-loop-validation'))
+$ErrorActionPreference='Stop';$root=(Resolve-Path (Join-Path $SkillRoot '..\..\..')).Path;$report=Join-Path $SkillRoot 'stress-fixture.json';try{$raw=& powershell -NoProfile -File (Join-Path $root 'ES/Automation/ABCD/Test-ESABCDStress.ps1') -ProjectRoot $root -ReportPath $report -Rounds 1;$r=$raw|ConvertFrom-Json;if($r.status -ne 'passed' -or [int]$r.failedCount -ne 0){throw 'ABCD_STRESS_FAILED'};[ordered]@{status='passed';rounds=$r.rounds;caseCount=$r.caseCount;passedCount=$r.passedCount;runtimeStatus='runtime-not-run';deterministic=$true}|ConvertTo-Json}finally{if(Test-Path -LiteralPath $report){Remove-Item -LiteralPath $report -Force}}

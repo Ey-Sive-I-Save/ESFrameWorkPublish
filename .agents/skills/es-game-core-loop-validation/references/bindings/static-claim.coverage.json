@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-game-core-loop-validation",
+  "coverage": {
+    "four-layer-validation-model": ["SKILL.md"],
+    "abcd-abcc-binding": ["scripts/Test-ESGameCoreLoopABCDCapabilities.ps1", "ES/Automation/ABCD/Test-ESABCDStaticAcceptance.ps1"],
+    "evidence-matrix": ["references/evidence-matrix.md", "scripts/Test-ESGameCoreLoopEvidenceJoin.ps1"],
+    "permission-boundary": ["scripts/Test-ESGameCoreLoopExecutionBinding.ps1"],
+    "deterministic-replay": ["scripts/Test-es-game-core-loop-validation-StaticReplay.ps1"],
+    "plan-adapter-contract": ["scripts/Test-ESGameCoreLoopExecutionBinding.ps1"],
+    "evidence-join-contract": ["scripts/Test-ESGameCoreLoopEvidenceJoin.ps1"],
+    "state-transition-contract": ["scripts/Test-ESGameCoreLoopStateTransition.ps1", "scripts/Test-ESGameCoreLoopStateMachine.ps1"],
+    "state-machine-execution-contract": ["scripts/Test-ESGameCoreLoopStateMachine.ps1"],
+    "task-context-execution-binding": ["scripts/Test-ESGameCoreLoopProjectMechanisms.ps1"],
+    "worker-evidence-conversion-contract": ["scripts/Test-ESGameCoreLoopWorkerEvidence.ps1", "scripts/Test-ESGameCoreLoopStrictReceipt.ps1"],
+    "abcd-capability-dispatch-contract": ["scripts/Test-ESGameCoreLoopABCDCapabilities.ps1"],
+    "adversarial-divergence-contract": ["scripts/Test-ESGameCoreLoopAdversarialMechanisms.ps1"],
+    "audit-consistency-contract": ["scripts/Test-ESGameCoreLoopAdversarialMechanisms.ps1"],
+    "stress-replay-contract": ["scripts/Test-ESGameCoreLoopStress.ps1"],
+    "evidence-recovery-contract": ["scripts/Test-ESGameCoreLoopEvidenceRecovery.ps1"],
+    "worker-process-isolation-contract": ["scripts/Test-ESGameCoreLoopWorkerIsolation.ps1"],
+    "child-receipt-identity-contract": ["scripts/Test-ESGameCoreLoopChildReceiptIdentity.ps1"],
+    "strict-evidence-receipt-contract": ["scripts/Test-ESGameCoreLoopStrictReceipt.ps1"],
+    "final-gate-claim-cap-contract": ["scripts/Test-ESGameCoreLoopFinalGate.ps1"],
+    "project-mechanism-integration": ["scripts/Test-ESGameCoreLoopProjectMechanisms.ps1", "scripts/Test-ESGameCoreLoopProjectMechanismStability.ps1"]
+  }
+}

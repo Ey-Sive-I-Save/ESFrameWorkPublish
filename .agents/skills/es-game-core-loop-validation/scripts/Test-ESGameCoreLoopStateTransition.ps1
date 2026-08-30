@@ -1,0 +1,7 @@
+[CmdletBinding()]
+param()
+$ErrorActionPreference='Stop';$states=@('intake','authority-locked','snapshot-frozen','decomposed','fanout-running','evidence-joined','adversarial-reviewed','converged','final-decision','closed');$next=@{};for($i=0;$i -lt $states.Count-1;$i++){$next[$states[$i]]=$states[$i+1]}
+function Assert-Transition([string]$from,[string]$to,[bool]$allowed){$actual=$false;if($next.ContainsKey($from)){$actual=$next[$from]-ceq$to};if($actual-ne$allowed){throw "STATE_TRANSITION_ASSERTION_FAILED:$from->$to expected=$allowed actual=$actual"}}
+Assert-Transition 'intake' 'authority-locked' $true;Assert-Transition 'authority-locked' 'snapshot-frozen' $true;Assert-Transition 'snapshot-frozen' 'decomposed' $true;Assert-Transition 'decomposed' 'fanout-running' $true;Assert-Transition 'fanout-running' 'evidence-joined' $true;Assert-Transition 'evidence-joined' 'adversarial-reviewed' $true;Assert-Transition 'adversarial-reviewed' 'converged' $true;Assert-Transition 'converged' 'final-decision' $true;Assert-Transition 'final-decision' 'closed' $true
+Assert-Transition 'intake' 'final-decision' $false;Assert-Transition 'fanout-running' 'final-decision' $false;Assert-Transition 'closed' 'intake' $false
+[ordered]@{status='passed';stateCount=$states.Count;legalTransitions=$states.Count-1;illegalTransitions=3;specialTransitions=[ordered]@{staleSnapshot='snapshot-frozen';conflict='authority-locked';cancel='closed-with-isolated-receipt'};runtimeStatus='runtime-not-run'}|ConvertTo-Json -Depth 8

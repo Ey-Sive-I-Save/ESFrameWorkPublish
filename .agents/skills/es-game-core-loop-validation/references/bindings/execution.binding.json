@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-game-core-loop-validation",
+  "bindingId": "es.game-core-loop.task-context-execution.v1",
+  "authority": "ES/Automation/TaskContextRuntime/Invoke-ESTaskContextRuntime.ps1",
+  "operations": [
+    {"state":"intake","action":"Create","function":"New-ESTaskContextTask","authorization":"plan-only","casRequired":false},
+    {"state":"authority-locked","action":"ConfirmSourceScope","function":"Confirm-ESTaskSourceScope","authorization":"plan-only","casRequired":true},
+    {"state":"snapshot-frozen","action":"Get","function":"Get-ESTaskContextState","authorization":"read-only","casRequired":false},
+    {"state":"evidence-joined","action":"SubmitEvidence","function":"Submit-ESTaskEvidenceSet","authorization":"explicit-user","casRequired":true},
+    {"state":"final-decision","action":"Complete","function":"Complete-ESTaskContextTask","authorization":"explicit-user","casRequired":true},
+    {"state":"closed","action":"DeliveryAcceptance","function":"Set-ESTaskDeliveryAcceptance","facadeAction":"SetDelivery","authorization":"explicit-user","casRequired":true},
+    {"state":"fanout-running","action":"SuspendForLease","function":"Invoke-ESTaskContextTransition","facadeAction":"Transition","transition":"Suspend","authorization":"explicit-user","casRequired":true},
+    {"state":"fanout-running","action":"ResumeAfterRetry","function":"Invoke-ESTaskContextTransition","facadeAction":"Transition","transition":"Resume","authorization":"explicit-user","casRequired":true},
+    {"state":"fanout-running","action":"Cancel","function":"Invoke-ESTaskContextTransition","facadeAction":"Transition","transition":"Cancel","authorization":"explicit-user","casRequired":true},
+    {"state":"evidence-joined","action":"Quarantine","function":"Invoke-ESTaskContextTransition","facadeAction":"Transition","transition":"Quarantine","authorization":"explicit-user","casRequired":true},
+    {"state":"closed","action":"Recover","function":"Invoke-ESTaskContextTransition","facadeAction":"Transition","transition":"Recover","authorization":"explicit-user","casRequired":true},
+    {"state":"closed","action":"Reopen","function":"Invoke-ESTaskContextTransition","facadeAction":"Transition","transition":"Reopen","authorization":"explicit-user","casRequired":true}
+  ],
+  "requestRequirements": ["taskId", "expectedTaskRevision", "expectedContextVersion", "idempotencyKey"],
+  "runtimeGates": {"unity": "explicit-user", "playmode": "explicit-user", "profiler": "explicit-user", "release": "explicit-user"},
+  "failureRecovery": {"casConflict":"re-read-and-replan", "stalePlan":"reject-and-regenerate", "missingEvidence":"degrade-without-completion", "cancelledChild":"isolate-receipt"},
+  "nonClaims": ["plan-only does not mutate TaskContext", "Automation Accepted is not task completion", "static evidence does not prove runtime"]
+}

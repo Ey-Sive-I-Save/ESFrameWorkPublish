@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-game-core-loop-validation",
+  "governanceControls": ["multi-agent-join", "abcd-final-decision"],
+  "multiAgentBinding": "multi-agent.binding.json",
+  "taskContextBinding": {"required": ["goalRevisionHash", "routePlanHash", "sourceSnapshotHash", "authorization"], "transitions": ["assigned", "running", "evidence-ready", "reviewed", "degraded", "failed"]},
+  "abcdIntegration": {"coreSkill": "es-ai-abc-core", "innovationRun": "ES/Automation/ABCD/ESABCInnovationRun.psm1", "finalAuthority": "ABCD-final-decision", "capabilities": ["bounded-tool-action", "failure-recovery", "branch-evaluation", "state-transition-guard", "environment-trust-gate", "audit-evidence-chain"]},
+  "knowledge": {"aibrainEntry": "Documentation/AIKnowledge/AIBRAIN_ENTRY.md", "index": "Documentation/AIKnowledge/KnowledgeIndex.yaml", "playableLoopEntry": "Documentation/AIKnowledge/entries/aiwarning-p0-playable-loop-runtime-evidence.md", "buffLifecycleEntry": "Documentation/AIKnowledge/entries/aiwarning-runtime-buff-passive-lifecycle-boundary.md", "valueChangeEntry": "Documentation/AIKnowledge/entries/aiwarning-runtime-attribute-valuechange-boundary.md"},
+  "runtimeBoundary": "Unity/PlayMode/Profiler/Player require explicit authorization and fresh receipts",
+  "reusedMechanisms": {
+    "taskContextCas": {"module": "ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1", "validator": "ES/Automation/TaskContextRuntime/Test-ESTaskContextCrossProcess.ps1", "required": true},
+    "platformEvidence": {"module": "ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1", "validator": "ES/Automation/TaskContextRuntime/Test-ESPlatformEvidenceContract.ps1", "required": true},
+    "abcdAuthority": {"module": "ES/Automation/ABCD/ESABCDAuthorityKernel.psm1", "validator": "ES/Automation/ABCD/Test-ESABCDStaticAcceptance.ps1", "required": true},
+    "workerEvaluation": {"module": "ES/Automation/Workers/PowerShell/Invoke-ESTaskContextEvaluationWorker.ps1", "validator": "ES/Automation/TaskContextRuntime/Test-ESTaskContextEvaluationAdapter.ps1", "required": true, "role": "candidate-evidence-only"},
+    "workerRuntimeIsolation": {"module": "ES/Automation/ABCD/Invoke-ESABCDWorker.ps1", "validator": "ES/Automation/ABCD/Test-ESABCDWorkerRuntime.ps1", "skillAdapter": "scripts/Test-ESGameCoreLoopWorkerIsolation.ps1", "required": true, "role": "process-isolated-evidence"},
+    "finalGate": {"module": ".agents/skills/es-game-core-loop-validation/scripts/Invoke-ESGameCoreLoopFinalGate.ps1", "validator": ".agents/skills/es-game-core-loop-validation/scripts/Test-ESGameCoreLoopFinalGate.ps1", "required": true, "role": "candidate-aggregation-only"},
+    "childLifecycle": {"module": "ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1", "validator": "ES/Automation/TaskContextRuntime/Test-ESTaskContextCrossProcess.ps1", "identityValidator": ".agents/skills/es-game-core-loop-validation/scripts/Test-ESGameCoreLoopChildReceiptIdentity.ps1", "required": true, "invariants": ["attempt-monotonic", "lease-process-bound", "late-result-isolated", "cas-retry-idempotent"]}
+  },
+  "upstreamFindings": [{"validator":"Test-ESPlatformEvidenceContract","status":"unverifiable","reasonCode":"UPSTREAM_AUTHORITY_KERNEL_FIXTURE_MISSING","impact":"platform-evidence frozen-contract-drift case cannot execute","recovery":"restore the authoritative ESABCDAuthorityKernel.psm1 fixture before Runtime profile"}]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 游戏核心循环验证"
+  short_description: "分层验证结构实现表现性能并接入ABCD证据链与运行时门禁"
+  default_prompt: "Use $es-game-core-loop-validation to validate the ES game core loop across structure, implementation, presentation, and performance."

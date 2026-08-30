@@ -1,0 +1,6 @@
+[CmdletBinding()]
+param([Parameter(Mandatory)][string]$PlanPath,[ValidateSet('Plan','Validate')][string]$Mode='Validate')
+$ErrorActionPreference='Stop';$root=Split-Path -Parent $PSScriptRoot;$plan=Get-Content -Raw -Encoding UTF8 $PlanPath|ConvertFrom-Json;$binding=Get-Content -Raw -Encoding UTF8 (Join-Path $root 'references/bindings/execution.binding.json')|ConvertFrom-Json
+if([string]::IsNullOrWhiteSpace([string]$plan.planHash)){throw 'PLAN_HASH_MISSING'};if(@($plan.requiredAgents).Count -ne 4){throw 'PLAN_REQUIRED_AGENT_SET_INVALID'};if([string]$plan.runtimePolicy.status -ne 'runtime-not-run'){throw 'PLAN_RUNTIME_POLICY_INVALID'}
+$ops=@($binding.operations|ForEach-Object{[ordered]@{state=$_.state;action=$_.action;function=$_.function;authorization=$_.authorization;casRequired=[bool]$_.casRequired;status=if($_.authorization -in @('plan-only','read-only')){'ready'}else{'authorization-required'}}})
+[ordered]@{schemaVersion=1;adapter='es-game-core-loop-task-context-plan';mode=$Mode;taskId=[string]$plan.taskId;planHash=[string]$plan.planHash;operations=$ops;mutatesTaskContext=$false;runtimeStatus='runtime-not-run';nonClaims=@('Plan mode does not mutate TaskContext','No completion decision is emitted','Unity/PlayMode/Profiler are not executed')}|ConvertTo-Json -Depth 12

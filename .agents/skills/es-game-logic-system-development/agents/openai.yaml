@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Game Logic System Development"
+  short_description: "Build and validate governed ES gameplay runtime systems"
+  default_prompt: "Use es-game-logic-system-development: read project authorities, then use ABCDN to design and validate the existing game logic system."

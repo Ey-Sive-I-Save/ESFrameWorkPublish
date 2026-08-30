@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'ESABCDOrchestrator.psm1')
 Import-Module (Join-Path $PSScriptRoot 'ESABCDEvidence.psm1')
+Import-Module (Join-Path $PSScriptRoot 'ESABCDCapabilityDispatcher.psm1')
 $script:DecisionMap = [ordered]@{ retry = 'retry-same-plan'; replan = 'create-new-plan'; branch = 'await-collaborator-choice'; stop = 'stop-and-report' }
 
 function Invoke-ESABCDDynamicIteration {
@@ -18,7 +19,10 @@ function Invoke-ESABCDDynamicIteration {
         [Parameter(Mandatory)][int]$AttemptNo,
         [Parameter(Mandatory)][ValidateSet('passed','failed','review')][string]$VerificationStatus,
         [string]$VerificationReceiptRef,
-        [string]$VerificationReceiptHash
+        [string]$VerificationReceiptHash,
+        [object]$CapabilityPlan = $null,
+        [object]$CapabilityContext = $null,
+        [string]$CapabilityRecoveryPath = ''
     )
     if ([int]$Store.currentRound -ge [int]$Store.maxRounds) { throw 'ROUND_BUDGET_EXHAUSTED' }
     if (@($CandidateProposals).Count -lt 1 -or @($CandidateProposals).Count -gt 64) { throw 'DYNAMIC_CANDIDATE_BUDGET_INVALID' }
@@ -51,6 +55,15 @@ function Invoke-ESABCDDynamicIteration {
         if ([string]$winner.branchId -cne $SelectedBranchId) { throw 'DYNAMIC_SELECTED_BRANCH_NOT_DETERMINISTIC_WINNER' }
     }
     if ($SelectedBranchId -notin $candidateIds) { throw 'DYNAMIC_SELECTED_BRANCH_NOT_IN_BATCH' }
+    $capabilityRecovery = $null
+    if ($null -ne $CapabilityPlan -and $VerificationStatus -ne 'passed') {
+        $base = [ordered]@{ scope = 'dynamic-controller'; authorization = [string]$Store.authorizationRef; sourceHash = [string]$Store.sourceScopeHash; stage = 'failure-recovery'; failureObserved = $true; failureMessage = 'verification-status-' + $VerificationStatus; retryBudget = [int]$Store.maxRounds - [int]$Store.currentRound; recoveryAction = $Decision; branchCount = @($CandidateProposals).Count }
+        if ($null -ne $CapabilityContext) { foreach ($p in @($CapabilityContext.PSObject.Properties)) { $base[$p.Name] = $p.Value } }
+        $capabilityRecovery = Invoke-ESABCDCapabilityPlan -Plan $CapabilityPlan -Context ([pscustomobject]$base)
+        if(-not [string]::IsNullOrWhiteSpace($CapabilityRecoveryPath)) {
+            Add-Member -InputObject $capabilityRecovery -NotePropertyName persistence -NotePropertyValue (Save-ESABCDCapabilityRecoveryReceipt -CapabilityEvidence $capabilityRecovery.receipts -Path $CapabilityRecoveryPath) -Force
+        }
+    }
     $events = [Collections.Generic.List[object]]::new()
     $start = Start-ESABCDIterationRound -Store $Store -ExpectedTaskRevision $Store.taskRevision -ExpectedContextVersion $Store.contextVersion
     [void]$events.Add($start.event)
@@ -82,7 +95,7 @@ function Invoke-ESABCDDynamicIteration {
         $stop = Stop-ESABCDIteration -Store $Store -Reason 'ABCD dynamic controller received explicit stop decision.' -ExpectedTaskRevision $Store.taskRevision -ExpectedContextVersion $Store.contextVersion
         [void]$events.Add($stop.event)
     }
-    [pscustomobject][ordered]@{ status = if ($Store.stopped) { 'stopped' } elseif ($advanced) { 'advanced' } else { 'review' }; cycleId = $cycleId; selectedBranchId = $SelectedBranchId; nextAction = $script:DecisionMap[$Decision]; advanced = $advanced; eventCount = $events.Count; events = @($events); snapshot = Get-ESABCDSnapshot $Store; eligibility = Test-ESABCDCompletionEligibility $Store $cycleId }
+    [pscustomobject][ordered]@{ status = if ($Store.stopped) { 'stopped' } elseif ($advanced) { 'advanced' } else { 'review' }; cycleId = $cycleId; selectedBranchId = $SelectedBranchId; nextAction = $script:DecisionMap[$Decision]; advanced = $advanced; eventCount = $events.Count; events = @($events); capabilityRecovery = $capabilityRecovery; snapshot = Get-ESABCDSnapshot $Store; eligibility = Test-ESABCDCompletionEligibility $Store $cycleId }
 }
 
 Export-ModuleMember -Function Invoke-ESABCDDynamicIteration

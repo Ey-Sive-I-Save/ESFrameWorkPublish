@@ -1,0 +1,5 @@
+[CmdletBinding()]
+param([string]$ProjectRoot)
+$ErrorActionPreference='Stop';if([string]::IsNullOrWhiteSpace($ProjectRoot)){$ProjectRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path};Import-Module (Join-Path $ProjectRoot 'ES/Automation/ABCD/ESABCInnovationRun.psm1') -Force
+$arch=[pscustomobject]@{architectureId='replay-test'};$ok={param($ctx) [pscustomobject]@{baselineScore=2;candidateScore=3;baselineStateHash=('a'*64);candidateStateHash=(('b'*63)+[string]$ctx.round)}};$bad={param($ctx) [pscustomobject]@{baselineScore=2;candidateScore=3;baselineStateHash=('a'*64);candidateStateHash=('a'*64)}}
+$a=Invoke-ESABCIndependentCounterfactualReplay -Architecture $arch -ReplayInvoker $ok;$b=Invoke-ESABCIndependentCounterfactualReplay -Architecture $arch -ReplayInvoker $bad;$pass=($a.status -eq 'passed' -and $a.observedDelta -eq 1 -and $b.status -eq 'failed');$state='failed';if($pass){$state='passed'};[pscustomobject]@{status=$state;valid=$a.status;observedDelta=$a.observedDelta;unchangedStateRejected=$b.status -eq 'failed'};if(-not $pass){exit 1}

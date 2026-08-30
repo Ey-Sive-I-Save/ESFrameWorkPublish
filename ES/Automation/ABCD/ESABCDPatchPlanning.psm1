@@ -8,6 +8,12 @@ function Get-ESABCDPatchHash($Value) {
     finally { $sha.Dispose() }
 }
 
+function Get-ESABCDCanonicalPatchPlanHash($Plan) {
+    $canonical=[ordered]@{}
+    foreach($p in $Plan.PSObject.Properties){ if($p.Name -notin @('planHash','createdUtc')){$canonical[$p.Name]=$p.Value} }
+    Get-ESABCDPatchHash ([pscustomobject]$canonical)
+}
+
 function New-ESABCDCandidatePatchPlan {
     [CmdletBinding()]
     param(
@@ -47,7 +53,7 @@ function New-ESABCDCandidatePatchPlan {
         candidateCount = @($CandidateEnvelope.Candidates).Count
         createdUtc = [DateTime]::UtcNow.ToString('o')
     }
-    $plan.planHash = Get-ESABCDPatchHash $plan
+    $plan.planHash = Get-ESABCDCanonicalPatchPlanHash ([pscustomobject]$plan)
     [pscustomobject]$plan
 }
 
@@ -90,7 +96,7 @@ function Test-ESABCDCandidatePatchPlan {
     if (-not [bool]$Plan.requiresExplicitApply -or -not [bool]$Plan.auditRequired) { [void]$issues.Add('PATCH_PLAN_AUTHORITY_POLICY_INVALID') }
     if ([bool]$Plan.effects.writesAllowed -or [bool]$Plan.effects.runtimeAllowed -or [bool]$Plan.effects.gitAllowed) { [void]$issues.Add('PATCH_PLAN_EFFECTS_ESCAPED') }
     if (-not [bool]$Plan.rollback.available -or -not [bool]$Plan.rollback.sourceHashesPinned) { [void]$issues.Add('PATCH_PLAN_ROLLBACK_MISSING') }
-    [pscustomobject][ordered]@{ status=if($issues.Count){'failed'}else{'passed'}; issues=@($issues); planHash=Get-ESABCDPatchHash $Plan }
+    [pscustomobject][ordered]@{ status=if($issues.Count){'failed'}else{'passed'}; issues=@($issues); planHash=Get-ESABCDCanonicalPatchPlanHash $Plan }
 }
 
 function New-ESABCDApprovedApplyRequest {

@@ -1,0 +1,3 @@
+[CmdletBinding()]
+param([Parameter(Mandatory)][string]$ResultPath)
+$ErrorActionPreference='Stop';$r=Get-Content -Raw -Encoding UTF8 -LiteralPath $ResultPath|ConvertFrom-Json;$issues=@();if($r.status -eq 'completed'){$e=$r.evidenceSummary;if($null -eq $e){$issues+='evidence-summary-missing'}else{if([int]$e.independentReplayVerifiedCount -ne [int]$e.eligibleCount){$issues+='completed-without-independent-replay'};if([string]$e.providerScoreComparisonStatus -cne 'stable'){$issues+='completed-with-provider-drift-or-unverified'}}};$state='passed';if($issues.Count){$state='failed'};[pscustomobject]@{status=$state;issues=$issues};if($issues.Count){exit 1}
